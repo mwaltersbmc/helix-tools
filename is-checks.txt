@@ -55,3 +55,7 @@ $ openssl s_client -showcerts -connect LB_HOST:443
 Convert cacerts to pem
 $ keytool -importkeystore -srckeystore cacerts -destkeystore keystore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass changeit -deststorepass changeit
 $ openssl pkcs12 -in keystore.p12 -out keystore.pem
+
+SmartApps deployment checks
+$  JWT=$(curl -k -X POST http://localhost:8008/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd')
+$ curl http://localhost:8008/api/rx/application/bundle/deploymentstatus/IDGERME9BMY5DASD9UR2SD9UR2HX3S -H "Authorization: AR-JWT $JWT" | jq .
