@@ -1,0 +1,37 @@
+RSSO login - expected to return a token
+$ curl -k -X POST $RSSO_SERVICE_URL/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
+
+Look for clues in
+/opt/bmc/ARSystem/db/arjavplugin-authentication.log
+/tmp/rsso.0.log
+
+Check the RSSO tenant/agent
+$ cat /opt/bmc/ARSystem/conf/rsso.cfg
+$ cat /opt/bmc/ARSystem/conf/rsso-agent.properties
+
+Download and compile SSLPoke.java 
+$ curl -s https://gist.githubusercontent.com/MatthewJDavis/50f3f92660af72c812e21b7ff6b56354/raw/7f258a30be4ddea7b67239b40ae305f6a2e98e0a/SSLPoke.java -o SSLPoke.java
+$ /opt/java/bin/javac SSLPoke.java
+
+Test for valid certificate using SSLPoke
+$ /opt/java/bin/java SSLPoke $WEBAPI_HOST_NAME 443
+
+REST API checks
+$ curl -k -X POST https://$WEBAPI_HOST_NAME/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd'
+
+FTS Elastic tests
+$ curl -k -u admin:admin -X GET https://$FTS_ELASTIC_HOST:9200/_cluster/health?pretty
+
+cacerts contains expected esnode certificate?
+$ /opt/java/bin/keytool --list -cacerts -storepass changeit -alias esnode
+esnode, Aug 6, 2021, trustedCertEntry,
+Certificate fingerprint (SHA-256): 1D:9B:18:7B:27:9B:0D:38:21:76:5E:E0:77:89:0B:8B:48:50:24:E8:5D:76:4D:1B:4A:82:31:9C:FE:56:8A:90
+
+
+RSSO Checks
+
+Login to RSSO as the admin user and verify the realm has been created under the SAAS_TENANT
+Realm ID is CUSTOMER_SERVICE-ENVIRONMENT
+Check that all the aliases in the realm are present and correct in Application Domain(s) section
+Tenant ID is name.number as seen on Tenant page
+Authentication page - Host should be platform-user-ext.HELIX_PLATFORM_NAMESPACE and port is 46262
