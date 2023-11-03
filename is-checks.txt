@@ -27,7 +27,6 @@ $ /opt/java/bin/keytool --list -cacerts -storepass changeit -alias esnode
 esnode, Aug 6, 2021, trustedCertEntry,
 Certificate fingerprint (SHA-256): 1D:9B:18:7B:27:9B:0D:38:21:76:5E:E0:77:89:0B:8B:48:50:24:E8:5D:76:4D:1B:4A:82:31:9C:FE:56:8A:90
 
-
 RSSO Checks
 
 Login to RSSO as the admin user and verify the realm has been created under the SAAS_TENANT
@@ -35,3 +34,24 @@ Realm ID is CUSTOMER_SERVICE-ENVIRONMENT
 Check that all the aliases in the realm are present and correct in Application Domain(s) section
 Tenant ID is name.number as seen on Tenant page
 Authentication page - Host should be platform-user-ext.HELIX_PLATFORM_NAMESPACE and port is 46262
+
+External Tests
+
+$ curl -k -X POST $LB_HOST/rsso/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
+$ curl -X POST $LB_HOST/rsso/api/v1.1/admin/login -cacerts custom_cacert.pem -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
+
+Verify PEM at https://tools.keycdn.com/ssl
+
+Recreate IS secret from good cacerts
+$ kubectl delete secret cacerts -n IS-NAMESPACE
+$ kubectl create secret -n IS-NAMESPACE generic cacerts --from-file=itsm --dry-run=client -o yaml | kubectl apply -f -
+
+Extract cacerts from secret
+$ kubectl get secret -n IS-NAMESPACE cacerts -o jsonpath='{.data.cacerts}' | base64 -d > cacerts
+
+Get certs from LB/Ingress
+$ openssl s_client -showcerts -connect LB_HOST:443
+
+Convert cacerts to pem
+$ keytool -importkeystore -srckeystore cacerts -destkeystore keystore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass changeit -deststorepass changeit
+$ openssl pkcs12 -in keystore.p12 -out keystore.pem
