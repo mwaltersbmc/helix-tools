@@ -60,3 +60,6 @@ $ openssl pkcs12 -in keystore.p12 -out keystore.pem
 SmartApps deployment checks
 $  JWT=$(curl -k -X POST http://localhost:8008/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd')
 $ curl http://localhost:8008/api/rx/application/bundle/deploymentstatus/IDGERME9BMY5DASD9UR2SD9UR2HX3S -H "Authorization: AR-JWT $JWT" | jq .
+
+Update Ingress controller SSL secret
+$ kubectl create secret tls my-tls-secret --cert=/path/to/cert.pem --key=/path/to/privkey.pem -n ingress-nginx
