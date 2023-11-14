@@ -1,4 +1,10 @@
-RSSO login - expected to return a token
+Set NS variables for later use
+$ export HP-NS=helix-platform
+$ export IS-NS=helix-is
+
+Commands to be run from IS platform pods
+
+RSSO/Certificate Troubleshooting - RSSO login - expected to return a token
 $ curl -k -X POST $RSSO_SERVICE_URL/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
 
 Look for clues in
@@ -28,13 +34,16 @@ $ /opt/java/bin/keytool --list -cacerts -storepass changeit -alias esnode
 esnode, Aug 6, 2021, trustedCertEntry,
 Certificate fingerprint (SHA-256): 1D:9B:18:7B:27:9B:0D:38:21:76:5E:E0:77:89:0B:8B:48:50:24:E8:5D:76:4D:1B:4A:82:31:9C:FE:56:8A:90
 
-RSSO Checks
+SmartApps deployment checks
+$  JWT=$(curl -k -X POST http://localhost:8008/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd')
+$ curl http://localhost:8008/api/rx/application/bundle/deploymentstatus/IDGERME9BMY5DASD9UR2SD9UR2HX3S -H "Authorization: AR-JWT $JWT" | jq .
 
-Login to RSSO as the admin user and verify the realm has been created under the SAAS_TENANT
-Realm ID is CUSTOMER_SERVICE-ENVIRONMENT
-Check that all the aliases in the realm are present and correct in Application Domain(s) section
-Tenant ID is name.number as seen on Tenant page
-Authentication page - Host should be platform-user-ext.HELIX_PLATFORM_NAMESPACE and port is 46262
+RSSO Server Checks
+- Login to RSSO as the admin user and verify the realm has been created under the SAAS_TENANT
+- Realm ID is CUSTOMER_SERVICE-ENVIRONMENT
+- Check that all the aliases in the realm are present and correct in Application Domain(s) section
+- Tenant ID is name.number as seen on Tenant page
+- Authentication page - Host should be platform-user-ext.HELIX_PLATFORM_NAMESPACE with port 46262
 
 External Tests
 
@@ -44,11 +53,11 @@ $ curl -X POST $LB_HOST/rsso/api/v1.1/admin/login -cacerts custom_cacert.pem -H 
 Verify PEM at https://tools.keycdn.com/ssl
 
 Recreate IS secret from good cacerts
-$ kubectl delete secret cacerts -n IS-NAMESPACE
-$ kubectl create secret -n IS-NAMESPACE generic cacerts --from-file=itsm --dry-run=client -o yaml | kubectl apply -f -
+$ kubectl delete secret cacerts -n $IS-NS
+$ kubectl create secret -n $IS-NS generic cacerts --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
 
 Extract cacerts from secret
-$ kubectl get secret -n IS-NAMESPACE cacerts -o jsonpath='{.data.cacerts}' | base64 -d > cacerts
+$ kubectl get secret -n $IS-NS cacerts -o jsonpath='{.data.cacerts}' | base64 -d > cacerts
 
 Get certs from LB/Ingress
 $ openssl s_client -showcerts -connect LB_HOST:443
@@ -56,10 +65,6 @@ $ openssl s_client -showcerts -connect LB_HOST:443
 Convert cacerts to pem
 $ keytool -importkeystore -srckeystore cacerts -destkeystore keystore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass changeit -deststorepass changeit
 $ openssl pkcs12 -in keystore.p12 -out keystore.pem
-
-SmartApps deployment checks
-$  JWT=$(curl -k -X POST http://localhost:8008/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd')
-$ curl http://localhost:8008/api/rx/application/bundle/deploymentstatus/IDGERME9BMY5DASD9UR2SD9UR2HX3S -H "Authorization: AR-JWT $JWT" | jq .
 
 Update Ingress controller SSL secret
 $ kubectl create secret tls my-tls-secret --cert=/path/to/cert.pem --key=/path/to/privkey.pem -n ingress-nginx
