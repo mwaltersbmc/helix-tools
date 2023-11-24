@@ -70,5 +70,7 @@ $ kubectl create secret tls my-tls-secret --cert=/path/to/cert.pem --key=/path/t
 
 Kubernetes Events
 $ kubectl get events -n ${NS} --sort-by='.metadata.creationTimestamp' --field-selector=type!=Normal | grep -E "$(date -d '1 hour ago' --utc +%FT%T|awk -F"+" '{print $1}')|Unknown|Warning|Error"
-$ kubectl get events -n ${NS} --sort-by='.lastTimestamp' --field-selector=type!=Normal | grep -E "$(date -d '1 hour ago' --utc +%FT%T|awk -F"+" '{print $1}')|Unknown|Warning|Error"
+--sort-by='.lastTimestamp'
+--sort-by='.firstTimestamp'
+
 
