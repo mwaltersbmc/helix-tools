@@ -1,6 +1,5 @@
-Set NS variables for later use
-$ export HP-NS=helix-platform
-$ export IS-NS=helix-is
+Set NS variable for later use
+$ export NS=helix-platform
 
 Commands to be run from IS platform pods
 
@@ -68,3 +67,8 @@ $ openssl pkcs12 -in keystore.p12 -out keystore.pem
 
 Update Ingress controller SSL secret
 $ kubectl create secret tls my-tls-secret --cert=/path/to/cert.pem --key=/path/to/privkey.pem -n ingress-nginx
+
+Kubernetes Events
+$ kubectl get events -n ${NS} --sort-by='.metadata.creationTimestamp' --field-selector=type!=Normal | grep -E "$(date -d '1 hour ago' --utc +%FT%T|awk -F"+" '{print $1}')|Unknown|Warning|Error"
+$ kubectl get events -n ${NS} --sort-by='.lastTimestamp' --field-selector=type!=Normal | grep -E "$(date -d '1 hour ago' --utc +%FT%T|awk -F"+" '{print $1}')|Unknown|Warning|Error"
+
