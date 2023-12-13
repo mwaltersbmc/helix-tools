@@ -1,5 +1,6 @@
 Set NS variable for later use
 $ export NS=helix-platform
+$ export IS-NS=helix-is
 
 Commands to be run from IS platform pods
 
