@@ -22,6 +22,7 @@ $ /opt/java/bin/javac SSLPoke.java
 Test for valid certificate using SSLPoke
 $ /opt/java/bin/java SSLPoke $WEBAPI_HOST_NAME 443
 $ /opt/java/bin/java -Djavax.net.ssl.trustStore=cacerts SSLPoke $WEBAPI_HOST_NAME 443
+$ java SSLPoke -Djavax.net.ssl.trustStore=/path/to/cacerts SSLPoke LB_HOST 443
  
 REST API checks
 $ curl -k -X POST https://$WEBAPI_HOST_NAME/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd'
