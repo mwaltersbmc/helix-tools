@@ -75,4 +75,5 @@ $ kubectl get events -n ${NS} --sort-by='.metadata.creationTimestamp' --field-se
 --sort-by='.lastTimestamp'
 --sort-by='.firstTimestamp'
 
-
+View certificate file details
+$  openssl x509 -in certfile.pem -noout -text
