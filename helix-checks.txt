@@ -11,7 +11,7 @@ Look for clues in
 /opt/bmc/ARSystem/db/arjavplugin-authentication.log
 /tmp/rsso.0.log
 
-Check the RSSO tenant/agent
+Check the RSSO tenant/agent values
 $ cat /opt/bmc/ARSystem/conf/rsso.cfg
 $ cat /opt/bmc/ARSystem/conf/rsso-agent.properties
 
@@ -24,18 +24,18 @@ $ /opt/java/bin/java SSLPoke $WEBAPI_HOST_NAME 443
 $ /opt/java/bin/java -Djavax.net.ssl.trustStore=cacerts SSLPoke $WEBAPI_HOST_NAME 443
 $ java SSLPoke -Djavax.net.ssl.trustStore=/path/to/cacerts SSLPoke LB_HOST 443
  
-REST API checks
+REST API checks - should return a token
 $ curl -k -X POST https://$WEBAPI_HOST_NAME/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd'
 
-FTS Elastic tests
+FTS Elastic tests - should return status
 $ curl -k -u admin:admin -X GET https://$FTS_ELASTIC_HOST:9200/_cluster/health?pretty
 
-cacerts contains expected esnode certificate?
+cacerts contains expected esnode certificate?  If not then incorrect cacerts file attached to pipeline
 $ /opt/java/bin/keytool --list -cacerts -storepass changeit -alias esnode
 esnode, Aug 6, 2021, trustedCertEntry,
 Certificate fingerprint (SHA-256): 1D:9B:18:7B:27:9B:0D:38:21:76:5E:E0:77:89:0B:8B:48:50:24:E8:5D:76:4D:1B:4A:82:31:9C:FE:56:8A:90
 
-SmartApps deployment checks
+SmartApps deployment checks - GUID will vary for each app and can be found in smartapps pipeline console output
 $  JWT=$(curl -k -X POST http://localhost:8008/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd')
 $ curl http://localhost:8008/api/rx/application/bundle/deploymentstatus/IDGERME9BMY5DASD9UR2SD9UR2HX3S -H "Authorization: AR-JWT $JWT" | jq .
 
