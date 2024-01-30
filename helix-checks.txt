@@ -2,7 +2,9 @@ Set NS variable for later use
 $ export NS=helix-platform
 $ export IS-NS=helix-is
 
-Commands to be run from IS platform pods
+Commands to be run from IS platform pods - get a command prompt in the pod
+
+$ kubectl exec -ti -n ${IS-NS} platform-fts-0 -c platform -- bash
 
 RSSO/Certificate Troubleshooting - RSSO login - expected to return a token
 $ curl -k -X POST $RSSO_SERVICE_URL/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
