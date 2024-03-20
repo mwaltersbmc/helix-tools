@@ -21,9 +21,14 @@ if [ $TMSPODCOUNT -eq 0 ]; then
 fi
 
 >&2 echo "Getting data from TMS..."
-# Get the RSSO credentials
-USER=$(kubectl get job -n ${NAMESPACE} tms-superuser-job -o=jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="LOCAL_USER_NAME")].value}')
-PASSWD=$(kubectl get job -n ${NAMESPACE} tms-superuser-job -o=jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="LOCAL_USER_PASSWORD")].value}')
+# If tms-realm-admin secret exists (v23 onwards) we should use it otherwise use the tms-superuser-job
+if kubectl get secret -n ${NAMESPACE} tms-realm-admin 2>&1 >/dev/null; then
+  USER=$(kubectl get secret -n ${NAMESPACE} tms-realm-admin -o jsonpath='{.data.local_username}' | base64 -d)
+  PASSWD=$(kubectl get secret -n ${NAMESPACE} tms-realm-admin -o jsonpath='{.data.local_password}' | base64 -d)
+else
+  USER=$(kubectl get job -n ${NAMESPACE} tms-superuser-job -o=jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="LOCAL_USER_NAME")].value}')
+  PASSWD=$(kubectl get job -n ${NAMESPACE} tms-superuser-job -o=jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="LOCAL_USER_PASSWORD")].value}')
+fi
 
 # Get the config file values
 TMS_URL=$(kubectl -n ${NAMESPACE} get deployment tms -o=jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="ADE_PLATFORM_BASE_URL")].value}')
@@ -32,7 +37,7 @@ CLIENTID=$(kubectl -n ${NAMESPACE} get secret tms-auth-proxy-secret -o jsonpath=
 CLIENTSECRET=$(kubectl -n ${NAMESPACE} get secret tms-auth-proxy-secret -o jsonpath='{.data.clientsecret}' | base64 -d -w 0)
 RSSOURL=$(kubectl -n ${NAMESPACE} get cm rsso-admin-tas -o jsonpath='{.data.rssourl}{"/rsso\n"}')
 
->&2 echo -e "tctl config file generated....\nRSSO credentials are ${USER}/${PASSWD}"
+>&2 echo -e "RSSO credentials are ${USER}/${PASSWD}"
 echo "
 appurl: ${APPURL}
 clientid: ${CLIENTID}
