@@ -1,10 +1,6 @@
-Set NS variable for later use
-$ export NS=helix-platform
-$ export IS-NS=helix-is
-
 Commands to be run from IS platform pods - get a command prompt in the pod
 
-$ kubectl exec -ti -n ${IS-NS} platform-fts-0 -c platform -- bash
+$ kubectl exec -ti -n IS-NS platform-fts-0 -c platform -- bash
 
 RSSO/Certificate Troubleshooting - RSSO login - expected to return a token
 $ curl -k -X POST $RSSO_SERVICE_URL/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
@@ -56,11 +52,11 @@ $ curl -X POST $LB_HOST/rsso/api/v1.1/admin/login -cacerts custom_cacert.pem -H 
 Verify PEM at https://tools.keycdn.com/ssl
 
 Recreate IS secret from good cacerts
-$ kubectl delete secret cacerts -n $IS-NS
-$ kubectl create secret -n $IS-NS generic cacerts --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
+$ kubectl delete secret cacerts -n IS-NS
+$ kubectl create secret -n IS-NS generic cacerts --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
 
 Extract cacerts from secret
-$ kubectl get secret -n $IS-NS cacerts -o jsonpath='{.data.cacerts}' | base64 -d > cacerts
+$ kubectl get secret -n IS-NS cacerts -o jsonpath='{.data.cacerts}' | base64 -d > cacerts
 
 Get certs from LB/Ingress
 $ openssl s_client -showcerts -connect LB_HOST:443
@@ -73,7 +69,7 @@ Update Ingress controller SSL secret
 $ kubectl create secret tls my-tls-secret --cert=/path/to/cert.pem --key=/path/to/privkey.pem -n ingress-nginx
 
 Kubernetes Events
-$ kubectl get events -n ${NS} --sort-by='.metadata.creationTimestamp' --field-selector=type!=Normal | grep -E "$(date -d '1 hour ago' --utc +%FT%T|awk -F"+" '{print $1}')|Unknown|Warning|Error"
+$ kubectl get events -n NS --sort-by='.metadata.creationTimestamp' --field-selector=type!=Normal | grep -E "$(date -d '1 hour ago' --utc +%FT%T|awk -F"+" '{print $1}')|Unknown|Warning|Error"
 --sort-by='.lastTimestamp'
 --sort-by='.firstTimestamp'
 
