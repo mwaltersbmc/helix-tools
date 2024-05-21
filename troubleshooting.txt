@@ -42,7 +42,7 @@ RSSO Server Checks
 - Realm ID is CUSTOMER_SERVICE-ENVIRONMENT
 - Check that all the aliases in the realm are present and correct in Application Domain(s) section
 - Tenant ID is name.number as seen on Tenant page
-- Authentication page - Host should be platform-user-ext.HELIX_PLATFORM_NAMESPACE with port 46262
+- Authentication page - Host should be platform-user-ext.HELIX_IS_NAMESPACE with port 46262
 
 External Tests
 
