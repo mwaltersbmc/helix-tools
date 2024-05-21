@@ -47,7 +47,7 @@ RSSO Server Checks
 External Tests
 
 $ curl -k -X POST $LB_HOST/rsso/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
-$ curl -X POST $LB_HOST/rsso/api/v1.1/admin/login -cacerts custom_cacert.pem -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
+$ curl -X POST $LB_HOST/rsso/api/v1.1/admin/login --cacert custom_cacert.pem -H 'Content-Type: application/json' -d '{"username":"admin","password":"RSSO#Admin#"}'
 
 Verify PEM at https://tools.keycdn.com/ssl
 
