@@ -6,3 +6,4 @@ Please note these tools are **not** supported by BMC.  They are provided as-is a
 | ----------- | ----------- |
 |  generate_tctl_config.sh      | A shell script to create the config file needed by the tctl tool. |
 | troubleshooting.txt   | A collection of commands to help with troubleshooting Helix issues.        |
+| HITT   | The Helix IS Triage Tool script for pre/post install validation & troubleshooting.        |
