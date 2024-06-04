@@ -1,3 +1,15 @@
+**BMC internal download command**
+```shell
+wget http://goto.bmc.com/gethitt -O hitt.sh
+```
+
+**External customer download command - PENDING**
+```shell
+wget https://github.com/mwaltersbmc/helix-tools/raw/main/hitt/hitt.sh
+```
+
+
+
 The Helix IS Triage Tool (HITT) is a shell script designed to check for common configuration issues that might cause problems during the installation and use of Helix IS Service Management applications. This script is intended to be run on the system where the Helix Platform deployment manager was executed and where Jenkins is installed.
 
 ### HITT Operating Modes
@@ -13,7 +25,7 @@ In all modes, HITT requires minimal configuration and automatically reads additi
 HITT can perform optional tests to validate the Helix IS database using a Java SQL client called JISQL and JDBC drivers for each database type. To enable these tests, download the `dbjars.tgz` file and place it in the directory with the `hitt.sh` script. HITT will detect, unpack, and use these files for the SQL checks.
 
 ### Configuration
-HITT is configured via a file named `hitt.conf`, which is created the first time the script is run. You need to edit this file and provide the following required settings:
+HITT is configured via a file named `hitt.conf`, which is created the first time the script is run. You will be prompted to select your namespaces and enter the other required variables.  
 
 ```shell
 # REQUIRED SETTINGS
@@ -21,11 +33,7 @@ HP_NAMESPACE=
 IS_NAMESPACE=
 IS_CUSTOMER_SERVICE=
 IS_ENVIRONMENT=
-```
 
-There is also an optional section for Jenkins settings, which can be left unchanged unless your Jenkins instance requires specific credentials or runs on a non-default port:
-
-```shell
 # OPTIONAL SETTINGS
 JENKINS_USERNAME=
 JENKINS_PASSWORD=
