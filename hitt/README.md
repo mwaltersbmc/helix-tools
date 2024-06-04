@@ -3,7 +3,7 @@
 wget http://goto.bmc.com/gethitt -O hitt.sh
 ```
 
-**External customer download command - PENDING**
+**External customer download command**
 ```shell
 wget https://github.com/mwaltersbmc/helix-tools/raw/main/hitt/hitt.sh
 ```
