@@ -449,7 +449,7 @@ validateRealm() {
   BAD_DOMAINS=0
   validateRealmDomains
   if [ "${BAD_DOMAINS}" == "1" ]; then
-    logWarning "Application Domains found in SSO Realm ${REALM_NAME} are:"
+    logMessage "Application Domains found in SSO Realm ${REALM_NAME} are:"
     printf '%s\n' "${REALM_DOMAINS[@]}"
   fi
 }
@@ -839,7 +839,7 @@ validateISDetails() {
     fi
 
     if [ "${ITSM_INSIGHTS}" == "1" ] && ([ "${IS_BMC_HELIX_ITSM_INSIGHTS}" == "true" ] || [ "${IS_HELIX_ITSM_INSIGHTS}" == "true" ]) ; then
-        logWarning "BMC_HELIX_ITSM_INSIGHTS and/or HELIX_ITSM_INSIGHTS is selected in the but ITSM Insights."
+        logWarning "BMC_HELIX_ITSM_INSIGHTS and/or HELIX_ITSM_INSIGHTS are selected but ITSM Insights is not installed in the Helix Platform."
     fi
 
     if [ "${IS_BMC_HELIX_ITSM_INSIGHTS}" == "true" ] && [ "${IS_HELIX_ITSM_INSIGHTS}" == "false" ] ; then
