@@ -1,16 +1,9 @@
-**BMC internal download command**
-```shell
-wget http://goto.bmc.com/gethitt -O hitt.sh
-```
-
-**External customer download command**
+**Customer download command**
 ```shell
 wget https://github.com/mwaltersbmc/helix-tools/raw/main/hitt/hitt.sh
 ```
 
-
-
-The Helix IS Triage Tool (HITT) is a shell script designed to check for common configuration issues that might cause problems during the installation and use of Helix IS Service Management applications. This script is intended to be run on the system where the Helix Platform deployment manager was executed and where Jenkins is installed.
+The Helix IS Triage Tool (HITT) is a shell script designed to check for common configuration issues that might cause problems during the installation and use of Helix IS Service Management applications. This script is intended to be run as the git user on the system where the Helix Platform deployment manager was executed and where Jenkins is installed.
 
 ### HITT Operating Modes
 HITT has three modes of operation, which all require the Helix Platform to be installed first:
