@@ -207,10 +207,10 @@ checkPodStatus() {
 getVersions() {
   HP_VERSION=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o jsonpath='{.data.version}' | head -1)
   EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
-  logMessage "Helix Platform version - ${HP_VERSION}"
+  logMessage "Helix Platform version - ${HP_VERSION}."
     if [ "${MODE}" == "post-is" ]; then
     IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
-    logMessage "Helix IS version - ${IS_VERSION}"
+    logMessage "Helix IS version - ${IS_VERSION}."
     # Set expected currDBVersion
     case "${IS_VERSION%%.*}" in
       21)
@@ -245,9 +245,9 @@ getVersions() {
 getRSSODetails() {
   RSSO_ADMIN_TAS_CM=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm rsso-admin-tas -o json)
   RSSO_URL=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.rssourl + "/rsso"')
-  logMessage "RSSO URL is ${RSSO_URL}"
+  logMessage "RSSO URL is ${RSSO_URL}."
   RSSO_USERNAME=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.username')
-  logMessage "RSSO username is ${RSSO_USERNAME}"
+  logMessage "RSSO username is ${RSSO_USERNAME}."
   RSSO_PASSWORD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret rsso-admin-tas -o jsonpath='{.data.password}' | ${BASE64_BIN} -d)
   RSSO_TOKEN=$(${CURL_BIN} -sk -X POST "${RSSO_URL}"/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"'"${RSSO_USERNAME}"'","password":"'"${RSSO_PASSWORD}"'"}' | ${JQ_BIN} -r .admin_token)
 }
@@ -274,7 +274,7 @@ checkHelixLoggingDeployed() {
 
 checkEFKClusterHealth() {
   EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" -- sh -c 'curl -sk -u elastic:"'"${HELIX_LOGGING_PASSWORD}"'" -X GET https://"'"${EFK_ELASTIC_SERVICENAME}"'":9200/_cluster/health')
-  EFK_ELASTIC_STATUS=$(echo ${EFK_ELASTIC_JSON} | jq -r '.status')
+  EFK_ELASTIC_STATUS=$(echo ${EFK_ELASTIC_JSON} | ${JQ_BIN} -r '.status')
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
     logError "Helix Logging Elasticsearch problem - ${EFK_ELASTIC_STATUS} - check ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
@@ -283,7 +283,7 @@ checkEFKClusterHealth() {
 }
 
 getTenantDetails() {
-  TENANT_JSON=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/tenant -H "Authorization: RSSO ${RSSO_TOKEN}" | jq .tenants)
+  TENANT_JSON=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/tenant -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} .tenants)
   TENANT_ARRAY=($(echo "${TENANT_JSON}" | jq -r .[].name | grep -v SAAS_TENANT))
   if [ "${#TENANT_ARRAY[@]}" == "0" ]; then
     logError "Failed to get tenant(s) from SSO." 1
@@ -297,11 +297,11 @@ getTenantDetails() {
   else
     HP_TENANT="${TENANT_ARRAY[0]}"
   fi
-  logMessage "Helix Platform tenant is ${HP_TENANT}"
-  PORTAL_HOSTNAME=$(echo $TENANT_JSON | jq -r '.[] | select(.name=="'${HP_TENANT}'").host')
-  logMessage "Helix portal hostname is ${PORTAL_HOSTNAME}"
+  logMessage "Helix Platform tenant is ${HP_TENANT}."
+  PORTAL_HOSTNAME=$(echo $TENANT_JSON | ${JQ_BIN} -r '.[] | select(.name=="'${HP_TENANT}'").host')
+  logMessage "Helix portal hostname is ${PORTAL_HOSTNAME}."
   HP_COMPANY_NAME=$(echo "${HP_TENANT%%.*}")
-  logMessage "Helix Platform ${HP_COMPANY_NAME_LABEL} is ${HP_COMPANY_NAME}"
+  logMessage "Helix Platform ${HP_COMPANY_NAME_LABEL} is ${HP_COMPANY_NAME}."
 }
 
 selectFromArray () {
@@ -336,12 +336,12 @@ setTCTLRESTImageName() {
 deployTCTL() {
   TCTL_COMMAND="${1}"
   if ! setTCTLRESTImageName ; then
-    logError "unable to find job with TCTL image details."
+    logError "Unable to find job with TCTL image details."
     return 1
   fi
   TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o jsonpath='{.spec.template.spec.containers[0].image}')
   if [ -z "${TCTL_IMAGE}" ]; then
-    logError "unable to get TCTL image name from job ${TCTL_JOB_NAME}"
+    logError "Unable to get TCTL image name from job ${TCTL_JOB_NAME}."
     return 1
   fi
   logMessage "Deploying job ${SEALTCTL} and waiting for it to complete..."
@@ -421,7 +421,7 @@ checkTenantRealms() {
   if ! echo "${TENANT_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     logError "Helix IS realm (${REALM_NAME}) exists for tenant ${HP_TENANT} when it should be configured for the SAAS_TENANT."
   else
-    logMessage "Verified Helix IS realm (${REALM_NAME}) is not configured for tenant ${HP_TENANT}"
+    logMessage "Verified Helix IS realm (${REALM_NAME}) is not configured for tenant ${HP_TENANT}."
   fi
 }
 
@@ -429,19 +429,19 @@ validateRealm() {
   # Parse realm data
   REALM_ARHOST=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arHost)
   if [ "${REALM_ARHOST}" != "platform-user-ext.${IS_NAMESPACE}" ]; then
-    logError "Invalid arHost in realm - expected platform-user-ext.${IS_NAMESPACE} but found ${REALM_ARHOST}"
+    logError "Invalid arHost in realm - expected platform-user-ext.${IS_NAMESPACE} but found ${REALM_ARHOST}."
   else
     logMessage "AR host ${REALM_ARHOST} is the expected value."
   fi
   REALM_ARPORT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arPort)
   if [ "${REALM_ARPORT}" != "46262" ]; then
-    logError "Invalid arPort in realm - expected 46262 but found ${REALM_ARPORT}"
+    logError "Invalid arPort in realm - expected 46262 but found ${REALM_ARPORT}."
   else
     logMessage "AR port ${REALM_ARPORT} is the expected value."
   fi
   REALM_TENANT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .tenantDomain)
   if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
-    logError "Invalid TENANT in realm - expected ${HP_TENANT} but found ${REALM_TENANT}"
+    logError "Invalid TENANT in realm - expected ${HP_TENANT} but found ${REALM_TENANT}."
   else
     logMessage "Tenant ${REALM_TENANT} is the expected value."
   fi
@@ -568,7 +568,7 @@ getValueFromPlatformSecret() {
 }
 
 checkJenkinsIsRunning() {
-  if ! curl -s http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated | grep -q WhoAmI ; then
+  if ! "${CURL_BIN}" -s http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated | grep -q WhoAmI ; then
     logError "Jenkins not found on http://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
     SKIP_JENKINS=1
   else
@@ -592,13 +592,15 @@ getISDetailsFromJenkins() {
   checkJenkinsIsRunning
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   logMessage "Reading values from Jenkins..."
-  JENKINS_PARAMS=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json"  | ${JQ_BIN} -r '.actions[] | select(._class=="hudson.model.ParametersAction") .parameters[]')
+  JENKINS_JSON=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
   checkJenkinsJobResult
+  JENKINS_PARAMS=$(echo "${JENKINS_JSON}" | ${JQ_BIN} -r '.actions[] | select(._class=="hudson.model.ParametersAction") .parameters[]')
+
   getPipelineValues
 }
 
 checkJenkinsJobResult() {
-  if ! echo "${JENKINS_PARAMS}" | jq -r .result | grep -q "SUCCESS"; then
+  if ! echo "${JENKINS_JSON}" | ${JQ_BIN} -r .result | grep -q "SUCCESS"; then
     logWarning "Last build of HELIX_ONPREM_DEPLOYMENT was not successful. Please review the console output for both this and the HELIX_GENERATE_CONFIG pipelines."
   fi
 }
@@ -609,6 +611,9 @@ parseJenkinsParam() {
 
 createPipelineVarsArray() {
   PIPELINE_VARS=(
+    IS_CLOUD
+    ROUTE_ENABLED
+    ROUTE_TLS_ENABLED
     CLUSTER
     IS_NAMESPACE
     CUSTOMER_NAME
@@ -629,6 +634,7 @@ createPipelineVarsArray() {
     IMAGE_REGISTRY_USERNAME
     IMAGESECRET_NAME
     DB_TYPE
+    DB_SSL_ENABLED
     DB_PORT
     DATABASE_HOST_NAME
     DATABASE_ADMIN_USER
@@ -727,7 +733,7 @@ cloneCustomerConfigsRepo() {
     SKIP_REPO=1
     return
   else
-    logMessage "Input config file found - ${INPUT_CONFIG_FILE}"
+    logMessage "Input config file found - ${INPUT_CONFIG_FILE}."
     getInputFileValues
   fi
 }
@@ -748,15 +754,15 @@ validateISDetails() {
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   # Common to pre and post
   if [ "${IS_TENANT_DOMAIN}" != "${HP_TENANT}" ]; then
-    logError "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform tenant (${HP_TENANT})"
+    logError "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform tenant (${HP_TENANT})."
   else
-    logMessage "TENANT_DOMAIN is the expected value of ${HP_TENANT}"
+    logMessage "TENANT_DOMAIN is the expected value of ${HP_TENANT}."
   fi
 
   if [ "${IS_RSSO_URL}" != "${RSSO_URL}" ]; then
-    logError "IS RSSO_URL (${IS_RSSO_URL}) does not match the Helix Platform RSSO_URL (${RSSO_URL})"
+    logError "IS RSSO_URL (${IS_RSSO_URL}) does not match the Helix Platform RSSO_URL (${RSSO_URL})."
   else
-    logMessage "IS RSSO_URL is the expected value of ${RSSO_URL}"
+    logMessage "IS RSSO_URL is the expected value of ${RSSO_URL}."
   fi
 
   if [ "${#IS_AR_SERVER_APP_SERVICE_PASSWORD}" -gt 19 ]; then
@@ -786,6 +792,14 @@ validateISDetails() {
       logMessage "CLUSTER (${IS_CLUSTER}) is a valid kubeconfig context."
     fi
 
+    if [ "${IS_CLOUD}" == "true" ]; then
+      logWarning "IS_CLOUD option is selected - this will cause public cloud systems to provision external an load balancer."
+    fi
+
+    if [ "${IS_ROUTE_ENABLED}" == "true" ] || [ "${IS_ROUTE_TLS_ENABLED}" == "true" ]; then
+      logWarning "ROUTE_ENABLED and/or ROUTE_TLS_ENABLED are selected but should not be."
+    fi
+
     if [ "${IS_IS_NAMESPACE}" != "${IS_NAMESPACE}" ]; then
       logError "Pipeline IS_NAMESPACE (${IS_IS_NAMESPACE}) does not match IS_NAMESPACE defined in this script (${IS_NAMESPACE})."
     else
@@ -799,9 +813,9 @@ validateISDetails() {
     fi
 
     if [ "${ISP_CUSTOMER_SERVICE}-${ISP_ENVIRONMENT}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
-      logError "CUSTOMER_SERVICE (${ISP_CUSTOMER_SERVICE}) or ENVIRONMENT (${ISP_ENVIRONMENT}) do not match values defined in this script (${IS_CUSTOMER_SERVICE} and ${IS_ENVIRONMENT})"
+      logError "CUSTOMER_SERVICE (${ISP_CUSTOMER_SERVICE}) or ENVIRONMENT (${ISP_ENVIRONMENT}) do not match values defined in this script (${IS_CUSTOMER_SERVICE} and ${IS_ENVIRONMENT})."
     else
-      logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid (${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT})"
+      logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid (${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT})."
     fi
 
     if isBlank "${IS_INGRESS_CLASS}" || ! ${KUBECTL_BIN} get ingressclasses.networking.k8s.io "${IS_INGRESS_CLASS}" > /dev/null 2>&1 ; then
@@ -825,7 +839,7 @@ validateISDetails() {
     if isBlank "${IS_HELM_NODE}" ; then
       logError "HELM_NODE is blank."
     else
-      NODE_ARRAY=($(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json" | jq -r .computer[].displayName | grep -v Built ))
+      NODE_ARRAY=($(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json" | ${JQ_BIN} -r .computer[].displayName | grep -v Built ))
       NODE_MATCH=0
       for i in "${NODE_ARRAY[@]}"; do
         if [ "${IS_HELM_NODE}" == "${i}" ]; then NODE_MATCH=1; fi
@@ -833,7 +847,7 @@ validateISDetails() {
       if [ "${NODE_MATCH}" == 1"" ]; then
         logMessage "HELM_NODE (${IS_HELM_NODE}) is a valid node in Jenkins."
       else
-        logError "HELM_NODE (${IS_HELM_NODE}) not found in Jenkins which are"
+        logError "HELM_NODE (${IS_HELM_NODE}) not found as a Jenkins node.  Available nodes are:"
         printf '%s\n' "${NODE_ARRAY[@]}"
       fi
     fi
@@ -873,6 +887,10 @@ validateISDetails() {
       logMessage "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) matches the Helix Platform registry username (${HP_REGISTRY_USERNAME})."
     fi
 
+    if [ "${IS_DB_SSL_ENABLED}" == "true" ]; then
+        logError "DB_SSL_ENABLED should not be selected."
+    fi
+
     if [ "$HELIX_LOGGING_DEPLOYED" == 0 ]; then
       if [ "${IS_SIDECAR_FLUENTBIT}" == true ]; then
         logWarning "SIDECAR_FLUENTBIT selected but Helix Logging is not installed."
@@ -883,7 +901,7 @@ validateISDetails() {
       if [ "${IS_LOGS_ELASTICSEARCH_TLS}" != "true" ]; then
         logError "LOGS_ELASTICSEARCH_TLS (${IS_LOGS_ELASTICSEARCH_TLS}) is not the expected value of true."
       else
-        logMessage "LOGS_ELASTICSEARCH_TLS is the expected value of true"
+        logMessage "LOGS_ELASTICSEARCH_TLS is the expected value of true."
       fi
       if [ "${IS_LOGS_ELASTICSEARCH_PASSWORD}" != "${HELIX_LOGGING_PASSWORD}" ]; then
         logError "LOGS_ELASTICSEARCH_PASSWORD does not match the Helix Platform KIBANA_PASSWORD."
@@ -908,25 +926,25 @@ validateISDetails() {
     if [ -n "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" ] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ ^\[.* ]] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ .*\]$ ]]; then
       logError "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}) does not match the expected format of [x.x.x.x] - missing square brackets?"
     else
-      logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS})"
+      logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS})."
     fi
 
     if [ "${IS_RSSO_ADMIN_USER,,}" != "${RSSO_USERNAME,,}" ]; then
-      logError "RSSO_ADMIN_USER (${IS_RSSO_ADMIN_USER}) does not match the Helix Platform RSSO_ADMIN_USER (${RSSO_USERNAME})"
+      logError "RSSO_ADMIN_USER (${IS_RSSO_ADMIN_USER}) does not match the Helix Platform RSSO_ADMIN_USER (${RSSO_USERNAME})."
     else
-      logMessage "RSSO_ADMIN_USER is the expected value of ${IS_RSSO_ADMIN_USER}"
+      logMessage "RSSO_ADMIN_USER is the expected value of ${IS_RSSO_ADMIN_USER}."
     fi
 
     if [ "${IS_HELIX_PLATFORM_NAMESPACE}" != "${HP_NAMESPACE}" ]; then
-      logError "HELIX_PLATFORM_NAMESPACE (${IS_HELIX_PLATFORM_NAMESPACE}) is not the expected value of ${HP_NAMESPACE}"
+      logError "HELIX_PLATFORM_NAMESPACE (${IS_HELIX_PLATFORM_NAMESPACE}) is not the expected value of ${HP_NAMESPACE}."
     else
-      logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of ${HP_NAMESPACE}"
+      logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of ${HP_NAMESPACE}."
     fi
 
     if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ]; then
-      logError "HELIX_PLATFORM_CUSTOMER_NAME (${IS_HELIX_PLATFORM_CUSTOMER_NAME}) is not the expected value of ${HP_COMPANY_NAME}"
+      logError "HELIX_PLATFORM_CUSTOMER_NAME (${IS_HELIX_PLATFORM_CUSTOMER_NAME}) is not the expected value of ${HP_COMPANY_NAME}."
     else
-      logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of ${HP_COMPANY_NAME}"
+      logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of ${HP_COMPANY_NAME}."
     fi
   fi
 }
@@ -988,7 +1006,7 @@ checkISFTSElasticHost() {
     if [ $(getSvcFromExternalIP "${1}") == "1" ]; then
       logError "FTS_ELASTICSEARCH_HOSTNAME IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
     else
-      logWarning "recommend using servicename.namespace format instead of an exposed IP address for FTS_ELASTICSEARCH_HOSTNAME."
+      logWarning "Recommend using servicename.namespace format instead of an exposed IP address for FTS_ELASTICSEARCH_HOSTNAME."
       # Try and confirm IP is a valid ES
       ES_HEALTH=$(${CURL_BIN} -sk -u admin:admin -X GET https://"${1}":9200/_cluster/health)
       if [ -z "${ES_HEALTH}" ]; then
@@ -1004,9 +1022,9 @@ checkISFTSElasticHost() {
     fi
   else
     if [ "${1}" != "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-      logError "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
+      logError "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
     else
-      logMessage "FTS_ELASTICSEARCH_HOSTNAME appears valid (${1})"
+      logMessage "FTS_ELASTICSEARCH_HOSTNAME appears valid (${1})."
     fi
   fi
 }
@@ -1018,7 +1036,7 @@ checkIsValidElastic() {
       logError "${2} IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
       return
     else
-      logWarning "recommend using servicename.namespace format instead of an exposed IP address for ${2}."
+      logWarning "Recommend using servicename.namespace format instead of an exposed IP address for ${2}."
       # Try and confirm IP is a valid ES
       ES_HEALTH=$(${CURL_BIN} -sk -u "${3}:${4}" -X GET https://"${1}":9200/_cluster/health)
       if [ -z "${ES_HEALTH}" ]; then
@@ -1030,12 +1048,12 @@ checkIsValidElastic() {
     case "${2}" in
       FTS_ELASTICSEARCH_HOSTNAME)
         if [ "${1}" != "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
+          logError "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
         fi
         ;;
       LOGS_ELASTICSEARCH_HOSTNAME)
         if [ "${1}" != "${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
+          logError "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
         fi
         ;;
     esac
@@ -1053,14 +1071,14 @@ checkFTSElasticSettings() {
     logError "FTS_ELASTICSEARCH_PORT (${IS_FTS_ELASTICSEARCH_PORT}) is not the expected value of 9200."
     BAD_FTS_ELASTIC=1
   else
-    logMessage "FTS_ELASTICSEARCH_PORT is the expected value of 9200"
+    logMessage "FTS_ELASTICSEARCH_PORT is the expected value of 9200."
   fi
 
   if [ "${IS_FTS_ELASTICSEARCH_SECURE}" != "true" ]; then
     logError "FTS_ELASTICSEARCH_SECURE (${IS_FTS_ELASTICSEARCH_SECURE}) is not the expected value of true."
     BAD_FTS_ELASTIC=1
   else
-    logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of true"
+    logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of true."
   fi
 
   if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" != "admin" ]; then
@@ -1175,7 +1193,7 @@ checkISDBSettings() {
   fi
   checkISDBLatency
   if [ -z "${IS_AR_DB_USER}" ] || [ -z ${IS_AR_DB_PASSWORD} ]; then
-    logWarning "one or more DB settings are blank - skipping checks."
+    logWarning "One or more DB settings are blank - skipping checks."
     return
   fi
   if [ -f dbjars.tgz ]; then
@@ -1267,7 +1285,7 @@ getRegistryDetailsFromSecret() {
   REGISTRY_SERVER=""
   REGISTRY_USERNAME=""
   REGISTRY_PASSWORD=""
-  IMAGESECRET_JSON=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
+  IMAGESECRET_JSON=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o jsonpath='{.data.\.dockerconfigjson}' | ${BASE64_BIN} -d)
   if [ "${IMAGESECRET_JSON}" = "" ]; then
     logError "couldn't get registry details from ${2} secret in ${1} namespace."
     SKIP_REGISTRY=1
@@ -1301,7 +1319,7 @@ checkISDBLatency() {
     PING_RESULT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PING_POD}" -- ping ${IS_DATABASE_HOST_NAME} -c 3 -q | tail -1)
     if echo "${PING_RESULT}" | grep -q "^round-trip" ; then
       IS_DB_LATENCY=$(echo "${PING_RESULT}" | cut -d '/' -f 4)
-      logMessage "IS DB latency from cluster is ${IS_DB_LATENCY}ms"
+      logMessage "IS DB latency from cluster is ${IS_DB_LATENCY}ms."
       if compare "${IS_DB_LATENCY} < 1" ; then logMessage "Latency is ${BOLD}GOOD${NORMAL}."; fi ; return
       if compare "${IS_DB_LATENCY} < 3" ; then logMessage "Latency is ${BOLD}AVERAGE${NORMAL}."; fi ; return
       if compare "${IS_DB_LATENCY} < 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted."; fi ; return
@@ -1322,11 +1340,11 @@ checkISDockerLogin() {
 
   if [ "${MODE}" == "pre-is" ]; then
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${IS_SECRET_HARBOR_REGISTRY_HOST}" ]; then
-      logError "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the value in the registry secret (${IS_SECRET_HARBOR_REGISTRY_HOST})"
+      logError "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the value in the registry secret (${IS_SECRET_HARBOR_REGISTRY_HOST})."
       return
     fi
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" ]; then
-      logError "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the value in the registry secret (${IS_SECRET_IMAGE_REGISTRY_USERNAME})"
+      logError "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the value in the registry secret (${IS_SECRET_IMAGE_REGISTRY_USERNAME})."
       return
     fi
 #    if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" ]; then
@@ -1336,13 +1354,13 @@ checkISDockerLogin() {
   fi
 
   if ! docker ps > /dev/null 2>&1; then
-    logWarning "docker command not found or failed - skipping registry credentials check."
+    logWarning "'docker' command not found or failed - skipping registry credentials check."
     return
   fi
   if docker login "${IS_SECRET_HARBOR_REGISTRY_HOST}" -u "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" -p "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" > /dev/null 2>&1 ; then
     logMessage "IMAGE_REGISTRY credentials are valid - docker login to ${IS_SECRET_HARBOR_REGISTRY_HOST} was successful."
   else
-    logError "docker login to ${IS_SECRET_HARBOR_REGISTRY_HOST} failed - please check credentials."
+    logError "'docker login' to ${IS_SECRET_HARBOR_REGISTRY_HOST} failed - please check credentials."
   fi
 }
 
