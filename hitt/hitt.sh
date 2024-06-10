@@ -59,7 +59,7 @@ logError() {
   echo "${MSG}"
   [[ ${2} == 1 ]] && exit 1
   ((FAIL++))
-  ERROR_ARRAY+=("${MSG}")
+  ERROR_ARRAY+=(" - ${1}")
 }
 
 logWarning() {
@@ -67,7 +67,7 @@ logWarning() {
   MSG="${BOLD}WARNING${NORMAL} - ${1}"
   echo "${MSG}"
   ((WARN++))
-  WARN_ARRAY+=("${MSG}")
+  WARN_ARRAY+=(" - ${1}")
 }
 
 logMessage() {
@@ -585,12 +585,9 @@ fi
 
 getISDetailsFromJenkins() {
   [[ "${MODE}" != "pre-is" ]] && return
-  JENKINS_CREDENTIALS=""
-  if [ -n "${JENKINS_USERNAME}" ]; then
-    JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
-  fi
   checkJenkinsIsRunning
   [[ "${SKIP_JENKINS}" == "1" ]] && return
+  checkJenkinsConfig
   logMessage "Reading values from Jenkins..."
   JENKINS_JSON=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
   checkJenkinsJobResult
@@ -1383,9 +1380,120 @@ dumpVARs() {
       fi
     done
   fi
-
 }
 
+checkJenkinsConfig() {
+  logMessage "Checking expected plugins exist in Jenkins..."
+  checkJenkinsPlugins
+  logMessage "Checking nodes in Jenkins..."
+  checkJenkinsNodes
+}
+
+checkJenkinsNodes() {
+  NODE_STATUS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/manage/computer/api/json?depth=1")
+  OFFLINE_NODES=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[]| select(.offline=='true').displayName')
+  if [ ! -z "${OFFLINE_NODES}" ] ; then
+    logError "One or more Jenkins nodes found in an 'offline' state."
+    printf '%s\n' "${OFFLINE_NODES}"
+  fi
+
+  NODE_LABELS=$(echo "${NODE_STATUS}" | jq -r '.computer[].assignedLabels[].name')
+  if ! echo "${NODE_LABELS}" | grep -q 'ansible-master' ; then
+    logError "No Jenkins nodes found with the 'ansible-master' label."
+  fi
+}
+
+checkJenkinsPlugins() {
+  # token-macro email-ext jira
+  EXPECTED_PLUGINS=(
+    apache-httpcomponents-client-4-api
+    bootstrap5-api
+    bouncycastle-api
+    branch-api
+    caffeine-api
+    checks-api
+    cloudbees-folder
+    commons-lang3-api
+    commons-text-api
+    credentials
+    credentials-binding
+    display-url-api
+    durable-task
+    echarts-api
+    font-awesome-api
+    git
+    git-client
+    instance-identity
+    ionicons-api
+    jackson2-api
+    jakarta-activation-api
+    jakarta-mail-api
+    javax-activation-api
+    javax-mail-api
+    jaxb
+    jquery3-api
+    junit
+    mailer
+    mask-passwords
+    matrix-project
+    mina-sshd-api-common
+    mina-sshd-api-core
+    parameter-separator
+    pipeline-build-step
+    pipeline-groovy-lib
+    pipeline-input-step
+    pipeline-milestone-step
+    pipeline-model-api
+    pipeline-model-definition
+    pipeline-model-extensions
+    pipeline-stage-step
+    pipeline-stage-tags-metadata
+    plain-credentials
+    plugin-util-api
+    rebuild
+    resource-disposer
+    scm-api
+    script-security
+    snakeyaml-api
+    ssh-credentials
+    ssh-slaves
+    structs
+    trilead-api
+    validating-string-parameter
+    variant
+    workflow-aggregator
+    workflow-api
+    workflow-basic-steps
+    workflow-cps
+    workflow-durable-task-step
+    workflow-job
+    workflow-multibranch
+    workflow-scm-step
+    workflow-step-api
+    workflow-support
+    ws-cleanup
+    pipeline-stage-view
+    pipeline-rest-api
+    )
+  JK_PLUGINS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | jq -r '.plugins[].shortName')
+  for i in "${EXPECTED_PLUGINS[@]}" ; do
+    if ! echo "${JK_PLUGINS}" | grep -wq "${i}" ; then
+      logError "Jenkins plugin '${i}' is missing."
+    fi
+  done
+}
+
+checkJenkinsCredentials() {
+  # Get list of credentials and check for expected IDs
+  EXPECTED_CREDENTIALS=(github ansible_host ansible kubeconfig TOKENS)
+   #password_vault_apikey)
+  JK_CREDS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | jq -r '.stores.system.domains._.credentials[].id')
+  for i in "${EXPECTED_CREDENTIALS[@]}" ; do
+    if ! echo "${JK_CREDS}" | grep -wq "${i}" ; then
+      logError "Jenkins credentials with id '${i}' is missing."
+    fi
+  done
+}
 # FUNCTIONS End
 
 # MAIN Start
@@ -1400,8 +1508,10 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 SEALTCTL=sealtctl
 KUBECTL_BIN=kubectl
+JQ_BIN=jq
 ERROR_ARRAY=()
 WARN_ARRAY=()
+JENKINS_CREDENTIALS=""
 
 while getopts "m:f:" options; do
   case "${options}" in
@@ -1437,7 +1547,7 @@ fi
 source "${HITT_CONFIG_FILE}"
 
 # Validate action
-[[ "${MODE}" =~ ^post-hp$|^pre-is$|^post-is$ ]] || usage
+[[ "${MODE}" =~ ^post-hp$|^pre-is$|^post-is$|^jenkins$ ]] || usage
 
 # MODE is required
 if [[ -z ${MODE} ]]; then
@@ -1446,6 +1556,10 @@ fi
 
 if [ "${MODE}" == "post-hp" ]; then
   SKIP_JENKINS=1
+else
+  if [ -n "${JENKINS_USERNAME}" ]; then
+    JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
+  fi
 fi
 
 # Check required variables are settings
@@ -1499,7 +1613,6 @@ if [ "${MODE}" != "post-hp" ]; then
 fi
 
 if [ "${SKIP_JENKINS}" == "0" ]; then
-
   logStatus "Checking IS FTS Elastic settings..."
   checkFTSElasticSettings
   logStatus "Checking IS DB settings..."
