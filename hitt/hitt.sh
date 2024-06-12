@@ -239,7 +239,21 @@ getVersions() {
       ;;
   esac
 
-  [[ "${HP_VERSION}" == "24.2.00" ]] && HP_COMPANY_NAME_LABEL="TENANT_NAME" || HP_COMPANY_NAME_LABEL="COMPANY_NAME"
+  HP_COMPANY_NAME_LABEL="COMPANY_NAME"
+  if compare "${HP_VERSION%.*} >= 24.2" ; then
+    HP_COMPANY_NAME_LABEL="TENANT_NAME"
+  fi
+
+  if [ "${HP_VERSION}" == "24.2.00" ] ; then
+    ADE_CS_OK=0
+    if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment credential > /dev/null 2>&1; then
+      ADE_CS_OK=1
+    else
+      ADE_CS_ENABLED=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="ADE_CS_ENABLED")].value}')
+      [[ ! -z "${ADE_CS_ENABLED}" ]] && ADE_CS_OK=1
+    fi
+    [[ "${ADE_CS_OK}" == "0" ]] && logError "Helix Plaform credential service is not installed or disabled in the TMS deployment.  Please see the 'Known and corrected issues' documentation."
+  fi
 }
 
 getRSSODetails() {
@@ -253,7 +267,7 @@ getRSSODetails() {
 }
 
 getDomain() {
-  CLUSTER_DOMAIN=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o 'jsonpath={.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="DOMAIN_NAME")].value}')
+  CLUSTER_DOMAIN=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="DOMAIN_NAME")].value}')
   logMessage "Helix domain is ${CLUSTER_DOMAIN}."
 }
 
@@ -608,6 +622,7 @@ parseJenkinsParam() {
 
 createPipelineVarsArray() {
   PIPELINE_VARS=(
+    CUSTOM_BINARY_PATH
     IS_CLOUD
     ROUTE_ENABLED
     ROUTE_TLS_ENABLED
@@ -782,6 +797,10 @@ validateISDetails() {
 
   # PRE mode only
   if [ "${MODE}" == "pre-is" ]; then
+    if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
+      logWarning "CUSTOM_BINARY_PATH option is selected - this is not usually required and may be a mistake."
+    fi
+
     if ! ${KUBECTL_BIN} config get-contexts "${IS_CLUSTER}" > /dev/null 2>&1; then
       logError "CLUSTER (${IS_CLUSTER}) is not a valid context in your kubeconfig file. Available contexts are:"
       ${KUBECTL_BIN} config get-contexts
@@ -1258,7 +1277,7 @@ checkKubeconfig() {
     KUBECONFIG_ERROR=1
   fi
   if [ ! -f ~/.kube/config ]; then
-    logError "Default KUBECONFIG file ~/home/.kube/config required by Jenkins pipelines not found."
+    logError "Default KUBECONFIG file (~/home/.kube/config) required by Jenkins pipelines not found."
     KUBECONFIG_ERROR=1
   fi
   if [ ${KUBECONFIG_ERROR} == "0" ]; then
@@ -1547,7 +1566,7 @@ fi
 source "${HITT_CONFIG_FILE}"
 
 # Validate action
-[[ "${MODE}" =~ ^post-hp$|^pre-is$|^post-is$|^jenkins$ ]] || usage
+[[ "${MODE}" =~ ^post-hp$|^pre-is$|^post-is$ ]] || usage
 
 # MODE is required
 if [[ -z ${MODE} ]]; then
