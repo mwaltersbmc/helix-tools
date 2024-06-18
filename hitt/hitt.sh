@@ -19,9 +19,6 @@ getConfValues() {
 }
 
 createHITTconf() {
-  logStatus "Welcome to the Helix IS Triage Tool."
-  logStatus "Please use the following steps to configure the HITT and create your config file..."
-  getConfValues
   cat << EOF > "${HITT_CONFIG_FILE}"
 # This is the config file for the Helix IS Triage Tool script.
 
@@ -263,7 +260,12 @@ getRSSODetails() {
   RSSO_USERNAME=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.username')
   logMessage "RSSO username is ${RSSO_USERNAME}."
   RSSO_PASSWORD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret rsso-admin-tas -o jsonpath='{.data.password}' | ${BASE64_BIN} -d)
-  RSSO_TOKEN=$(${CURL_BIN} -sk -X POST "${RSSO_URL}"/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"'"${RSSO_USERNAME}"'","password":"'"${RSSO_PASSWORD}"'"}' | ${JQ_BIN} -r .admin_token)
+  RSSO_TOKEN_JSON=$(${CURL_BIN} -sk -X POST "${RSSO_URL}"/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"'"${RSSO_USERNAME}"'","password":"'"${RSSO_PASSWORD}"'"}')
+  if [[ "${RSSO_TOKEN_JSON}" =~ "admin_token" ]]; then
+    RSSO_TOKEN=$(echo "${RSSO_TOKEN_JSON}" | ${JQ_BIN} -r .admin_token)
+  else
+    logError "Unable to get RSSO admin token. RSSO response: ${RSSO_TOKEN_JSON}" 1
+  fi
 }
 
 getDomain() {
@@ -298,7 +300,7 @@ checkEFKClusterHealth() {
 
 getTenantDetails() {
   TENANT_JSON=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/tenant -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} .tenants)
-  TENANT_ARRAY=($(echo "${TENANT_JSON}" | jq -r .[].name | grep -v SAAS_TENANT))
+  TENANT_ARRAY=($(echo "${TENANT_JSON}" | ${JQ_BIN} -r .[].name | grep -v SAAS_TENANT))
   if [ "${#TENANT_ARRAY[@]}" == "0" ]; then
     logError "Failed to get tenant(s) from SSO." 1
   fi
@@ -464,7 +466,7 @@ validateRealm() {
   validateRealmDomains
   if [ "${BAD_DOMAINS}" == "1" ]; then
     logMessage "Application Domains found in SSO Realm ${REALM_NAME} are:"
-    printf '%s\n' "${REALM_DOMAINS[@]}"
+    printf '  %s\n' "${REALM_DOMAINS[@]}"
   fi
 }
 
@@ -980,8 +982,20 @@ getCacertsFile() {
 
   if [ "${MODE}" == "post-is" ]; then
     logMessage "Extracting cacerts file from Helix IS cacerts secret..."
-    ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o jsonpath='{.data.cacerts}' | ${BASE64_BIN} -d > sealcacerts
-    return
+    if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts > /dev/null 2>&1; then
+      logError "cacerts secret not found in Helix IS namespace."
+      SKIP_CACERTS=1
+      return
+    fi
+    IS_CACERTS_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o json)
+    IS_CACERTS=$(echo "${IS_CACERTS_JSON}" | ${JQ_BIN} -r '.data.cacerts')
+    if [ "${IS_CACERTS}" == "null" ]; then
+      logError "Required file 'cacerts' not found in the cacerts secret. File(s) in the secret are:"
+      echo "${IS_CACERTS_JSON}" | ${JQ_BIN} '.data | keys'
+      SKIP_CACERTS=1
+    else
+      echo "${IS_CACERTS}" | ${BASE64_BIN} -d > sealcacerts
+    fi
   fi
 }
 
@@ -1416,7 +1430,7 @@ checkJenkinsNodes() {
     printf '%s\n' "${OFFLINE_NODES}"
   fi
 
-  NODE_LABELS=$(echo "${NODE_STATUS}" | jq -r '.computer[].assignedLabels[].name')
+  NODE_LABELS=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[].assignedLabels[].name')
   if ! echo "${NODE_LABELS}" | grep -q 'ansible-master' ; then
     logError "No Jenkins nodes found with the 'ansible-master' label."
   fi
@@ -1494,7 +1508,7 @@ checkJenkinsPlugins() {
     pipeline-stage-view
     pipeline-rest-api
     )
-  JK_PLUGINS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | jq -r '.plugins[].shortName')
+  JK_PLUGINS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
   for i in "${EXPECTED_PLUGINS[@]}" ; do
     if ! echo "${JK_PLUGINS}" | grep -wq "${i}" ; then
       logError "Jenkins plugin '${i}' is missing."
@@ -1506,7 +1520,7 @@ checkJenkinsCredentials() {
   # Get list of credentials and check for expected IDs
   EXPECTED_CREDENTIALS=(github ansible_host ansible kubeconfig TOKENS)
    #password_vault_apikey)
-  JK_CREDS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | jq -r '.stores.system.domains._.credentials[].id')
+  JK_CREDS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
   for i in "${EXPECTED_CREDENTIALS[@]}" ; do
     if ! echo "${JK_CREDS}" | grep -wq "${i}" ; then
       logError "Jenkins credentials with id '${i}' is missing."
@@ -1550,18 +1564,21 @@ while getopts "m:f:" options; do
   esac
 done
 
+logStatus "Welcome to the Helix IS Triage Tool."
 logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
-NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
 
-# config file override
-if [[ ! -z "${HITT_CONFIG_FILE}" ]]; then
-  if [ ! -f "${HITT_CONFIG_FILE}" ]; then
-    logStatus "HITT config file (${HITT_CONFIG_FILE}) not found - creating..."
+# config file checks
+if [ ! -f "${HITT_CONFIG_FILE}" ]; then
+  if ! ${KUBECTL_BIN} get ns > /dev/null 2>&1 ; then
     createHITTconf
+    logError "'kubectl get namespaces' command returned unexpected results - please update the HITT config file (${HITT_CONFIG_FILE}) manually." 1
   fi
-else
-  logError "HITT config file not found - can't continue." 1
+  NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
+  logStatus "HITT config file (${HITT_CONFIG_FILE}) not found - creating..."
+  logStatus "Please use the following steps to configure the HITT and create your config file..."
+  getConfValues
+  createHITTconf
 fi
 source "${HITT_CONFIG_FILE}"
 
