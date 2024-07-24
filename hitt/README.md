@@ -65,8 +65,8 @@ Optional -f to use a different config file.
 
 HITT will print a runnning summary of the checks and tests as it performs them.  Errors and Warnings are noted with highlighted messages.
 
-ERRORS indicate problems which likely need to be addressed before installation will be successful or may be the cause of problems post-install.
-WARNINGS highlight potential problems or settings which may be appropriate under some conditions but are usually recommended to be different.
+**ERRORS** indicate problems which likely need to be addressed before installation will be successful or may be the cause of problems post-install.
+**WARNINGS** highlight potential problems or settings which may be appropriate under some conditions but are usually recommended to be different.
 
 Where the test being run includes additional output, pod status for example, this is displayed after the related ERROR or WARNING.
 
