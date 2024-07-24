@@ -2,15 +2,15 @@ The Helix IS Triage Tool (aka HITT) is a shell script designed to test for many 
 
 HITT has three operating modes, all of which require that the Helix Platform installation has been completed.
 
-post-hp	- used after the Helix Platform has been installed and the SSO realm for Helix IS has been created.
-pre-is	- used when the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline has been built successfully with all the parameters populated and the HELIX_GENERATE_CONFIG option selected.
-post-is	- used after the installation of Helix IS has been completed.
+**post-hp**	- used after the Helix Platform has been installed and the SSO realm for Helix IS has been created.\
+**pre-is**	- used when the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline has been built successfully with all the parameters populated and the HELIX_GENERATE_CONFIG option selected.\
+**post-is**	- used after the installation of Helix IS has been completed.\
 
 In all modes the HITT script requires minimal configuration and will read all the additonal information it requires from Kubernetes, Jenkins and the CUSTOMER_CONFIGS git repository.
 
 There are some additional, optional, tests that will attempt to validate the Helix IS database which require the use of a Java SQL client called JISQL and JDBC drivers for each database type.  To enable these tests simply download the dbjars.tgz file and copy it to the directory where the hitt.sh script is located.  HITT will detect, unpack and enable the SQL checks when this file is present.
 
-Configuration
+**Configuration**
 
 HITT is configured by a file called hitt.conf which will be created the first time the script is run. If required edit this file and enter the four required variables manually  There is also a section where you can enter details about Jenkins.  This may be left as-is unless your Jenkins requires credentials or is running on a non-default port. If your Jenkins password includes special characters enclose the value in double quotes.
 
@@ -32,8 +32,8 @@ JENKINS_PORT=8080
 
 Finally, there is a section for all the command line tools which the script uses.  It is assumed that all of these are installed and avialable in a directory that is included in the PATH environment variable of the user running the script.  HITT will check that these tools are present when it is run and report any that can't be found.  Missing tools must be installed or the full path to their location set in this file if they are not on the user's PATH.
 
-Running HITT
-
+**Running HITT
+**
 Run the script using bash or make it executable with chmod if preferred.
 
 ```
