@@ -16,14 +16,14 @@ HITT is configured by a file called hitt.conf which will be created the first ti
 
 ```
 # REQUIRED SETTINGS
-# Enter your Helix namespace names and HELIX_ONPREM_DEPLOYMENT pipeline values for CUSTOMER_SERVICE and ENVIRONMENT**
+# Enter your Helix namespace names and HELIX_ONPREM_DEPLOYMENT pipeline values for CUSTOMER_SERVICE and ENVIRONMENT
 HP_NAMESPACE=
 IS_NAMESPACE=
 IS_CUSTOMER_SERVICE=
 IS_ENVIRONMENT=
 
 # OPTIONAL SETTINGS
-# Set JENKINS credentials and hostname/port if required**
+# Set JENKINS credentials and hostname/port if required
 JENKINS_USERNAME=
 JENKINS_PASSWORD=
 JENKINS_HOSTNAME=localhost
