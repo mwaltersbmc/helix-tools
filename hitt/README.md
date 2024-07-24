@@ -1,89 +1,126 @@
-**Customer download command**
-```shell
-wget https://github.com/mwaltersbmc/helix-tools/raw/main/hitt/hitt.sh
-```
+The Helix IS Triage Tool (aka HITT) is a shell script designed to test for many common configuration problems that can cause issues during installation and use of the Helix IS Sevice Management applications.  The script is intended to be used on the Deployment Engine system where the Helix Platform deployment-manager was run and Jenkins is installed.
 
-The Helix IS Triage Tool (HITT) is a shell script designed to check for common configuration issues that might cause problems during the installation and use of Helix IS Service Management applications. This script is intended to be run as the git user on the system where the Helix Platform deployment manager was executed and where Jenkins is installed.
+HITT has three operating modes, all of which require that the Helix Platform installation has been completed.
 
-### HITT Operating Modes
-HITT has three modes of operation, which all require the Helix Platform to be installed first:
+post-hp	- used after the Helix Platform has been installed and the SSO realm for Helix IS has been created.
+pre-is	- used when the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline has been built successfully with all the parameters populated and the HELIX_GENERATE_CONFIG option selected.
+post-is	- used after the installation of Helix IS has been completed.
 
-1. **post-hp**: Used after installing the Helix Platform and creating the SSO realm for Helix IS.
-2. **pre-is**: Used after successfully building the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline with all parameters set and the HELIX_GENERATE_CONFIG option selected.
-3. **post-is**: Used after completing the installation of Helix IS.
+In all modes the HITT script requires minimal configuration and will read all the additonal information it requires from Kubernetes, Jenkins and the CUSTOMER_CONFIGS git repository.
 
-In all modes, HITT requires minimal configuration and automatically reads additional information from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
+There are some additional, optional, tests that will attempt to validate the Helix IS database which require the use of a Java SQL client called JISQL and JDBC drivers for each database type.  To enable these tests simply download the dbjars.tgz file and copy it to the directory where the hitt.sh script is located.  HITT will detect, unpack and enable the SQL checks when this file is present.
 
-### Optional Database Validation Tests
-HITT can perform optional tests to validate the Helix IS database using a Java SQL client called JISQL and JDBC drivers for each database type. To enable these tests, download the `dbjars.tgz` file and place it in the directory with the `hitt.sh` script. HITT will detect, unpack, and use these files for the SQL checks.
+Configuration
 
-### Configuration
-HITT is configured via a file named `hitt.conf`, which is created the first time the script is run. You will be prompted to select your namespaces and enter the other required variables.  
+HITT is configured by a file called hitt.conf which will be created the first time the script is run.  Edit this file and enter the four required variables:
 
-```shell
 # REQUIRED SETTINGS
+# Enter your Helix namespace names and HELIX_ONPREM_DEPLOYMENT pipeline values for CUSTOMER_SERVICE and ENVIRONMENT
 HP_NAMESPACE=
 IS_NAMESPACE=
 IS_CUSTOMER_SERVICE=
 IS_ENVIRONMENT=
 
+This file also has a section where you can enter details about Jenkins.  This may be left as-is unless your Jenkins requires credentials or is running on a non-default port. If your Jenkins password includes special characters enclose the value in double quotes.
+
 # OPTIONAL SETTINGS
+# Set JENKINS credentials and hostname/port if required
 JENKINS_USERNAME=
 JENKINS_PASSWORD=
 JENKINS_HOSTNAME=localhost
 JENKINS_PORT=8080
-```
 
-The script assumes that all necessary command line tools are installed and available in the user's PATH. HITT will check for these tools and report any that are missing. If a tool is not in the PATH, you can specify its full path in the configuration file.
+Finally, there is a section for all the command line tools which the script uses.  It is assumed that all of these are installed and avialable in a directory that is included in the PATH environment variable of the user running the script.  HITT will check that these tools are present when it is run and report any that can't be found.  Missing tools must be installed or the full path to their location set in this file if they are not on the user's PATH.
 
-### Running HITT
-To run the script, you can use bash or make it executable with `chmod`:
+Running HITT
 
-```shell
+Run the script using bash or make it executable with chmod if preferred.
+
 $ bash hitt.sh
 OR
 $ chmod a+x hitt.sh
 $ ./hitt.sh
-```
 
-HITT requires a mode to be specified using the `-m` option and will display a usage message if this option is not provided:
+HITT requires one command line option (-m) to specify the mode and will print a usage message if this is not provided.
 
-```shell
 $ bash hitt.sh
 Helix IS Triage Tool (HITT)
 Usage: bash hitt.sh -m <post-hp|pre-is|post-is> [-f HITT_CONFIG_FILE]
 
 Examples:
-bash hitt.sh -m post-hp  # Run post HP installation only checks
-bash hitt.sh -m pre-is   # Run IS pre-installation checks
-bash hitt.sh -m post-is  # Run IS post-installation checks
-```
+bash hitt.sh -m post-hp  - run post HP installation only checks
+OR
+bash hitt.sh -m pre-is   - run IS pre-installation checks
+OR
+bash hitt.sh -m post-is  - run IS post-installation checks
 
-- Use **post-hp** after installing the Helix Platform but before using Jenkins.
-- Use **pre-is** after running the HELIX_GENERATE_CONFIG pipeline but before deploying Helix IS.
-- Use **post-is** for troubleshooting after IS deployment.
-- Optionally, use `-f` to specify a different configuration file.
+Use post-hp after successfully installing the Helix Platform but before using Jenkins.
+Use pre-is after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS.
+Use post-is for troubleshooting after IS deployment.
+Optional -f to use a different config file.
 
-### Output and Error Handling
-HITT will display a running summary of the checks it performs. Errors and warnings are highlighted:
+HITT will print a runnning summary of the checks and tests as it performs them.  Errors and Warnings are noted with highlighted messages.
 
-- **ERRORS** indicate serious issues that likely need to be fixed before installation or that could cause problems afterward.
-- **WARNINGS** highlight potential issues or settings that might be suboptimal.
+ERRORS indicate problems which likely need to be addressed before installation will be successful or may be the cause of problems post-install.
+WARNINGS highlight potential problems or settings which may be appropriate under some conditions but are usually recommended to be different.
 
-Detailed information, like pod status, will be shown after related errors or warnings.
+Where the test being run includes additional output, pod status for example, this is displayed after the related ERROR or WARNING.
 
-### Check Summary
-HITT performs various checks depending on the mode and gathered information:
+All of the tests are read-only and will not make changes to the system.  However, please note that the checks which discover the tenant and service details from the Helix Platform deploy a tctl job/pod in the same way as the Jenkins HELIX_ITSM_INTEROPS pipeline.  The job/pod are deleted after use.
 
-- Verifying required tools in the PATH
-- Checking the KUBECONFIG file
-- Checking namespaces and reporting unhealthy pods
-- Discovering installed product versions
-- Getting Helix Platform registry and RSSO details
-- Validating the SSO realm configuration
-- Reading IS details from Kubernetes and Jenkins
-- Validating IS configuration settings, cacerts, and FTS Elastic settings
-- Connecting to the IS database to query the current version
-- Checking IS server license status and the Support Assistant Tool deployment
+Checks Summary
 
-All tests are read-only and won't change the system. However, some checks deploy and delete temporary jobs/pods in the same way the Jenkins HELIX_ITSM_INTEROPS pipeline does.
+Not all groups of checks are run in every mode and some run different tests depending on the mode and discovered information.  Some groups only query information which is used by other checks.
+
+Checking for required tools in path...
+	To verify that the required command line tools are available and, where needed, the correct version.
+
+Checking KUBECONFIG file...
+        Tests that a valid kubeconfig file is present and that a non-default file, configured via the KUBECONFIG environment variable, is not set.
+
+Checking namespaces...
+  	Tests that namespaces exist, are of the expected type and reports unhealthy pods.
+
+Getting versions...
+        Discovers versions of installed products.
+
+Getting Helix Platform registry details from bmc-dtrhub secret...
+Getting RSSO details...
+Getting domain...
+	Config discovery from the Helix Platform
+
+Getting tenant details from Helix Platform...
+        Discovers tenant data and will offer a selection menu if a multi-tenant platform is found.
+
+Checking for ITSM services in Helix Platform...
+        Checks that the ARSERVICES option was enabled during Helix Platform installation.
+
+Checking FTS Elasticsearch cluster status...
+        Checks the health of the Elasticsearch instance used for FTS.
+
+Getting realm details from RSSO...
+        Reports SSO realm details.
+
+Validating realm...
+        Verifies that the SSO realm has been configured with the expected tenant, Application Domains and authentication details.
+
+Getting IS details...
+        Reads IS details from Kubernetes/Jenkins
+
+Validating IS details...
+        Tests many IS config settings.
+
+Validating IS cacerts...
+        Tests the cacerts file from Jenkins or namespace to make sure it has the required certificates.
+
+Checking IS FTS Elastic settings...
+        Validation of FTS specific settings.
+
+Checking IS DB settings...
+	Attempts to connect to the IS database and query the currDbVersion from the control table.
+
+Checking IS license status...
+        IS Server license status
+
+Checking Support Assistant Tool...
+        If deployed are the sidecars and required permissons present.

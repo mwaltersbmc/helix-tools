@@ -291,7 +291,7 @@ checkHelixLoggingDeployed() {
 
 checkEFKClusterHealth() {
   EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" -- sh -c 'curl -sk -u elastic:"'"${HELIX_LOGGING_PASSWORD}"'" -X GET https://"'"${EFK_ELASTIC_SERVICENAME}"'":9200/_cluster/health')
-  EFK_ELASTIC_STATUS=$(echo ${EFK_ELASTIC_JSON} | ${JQ_BIN} -r '.status')
+  EFK_ELASTIC_STATUS=$(echo "${EFK_ELASTIC_JSON}" | ${JQ_BIN} -r '.status')
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
     logError "Helix Logging Elasticsearch problem - ${EFK_ELASTIC_STATUS} - check ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
@@ -315,7 +315,7 @@ getTenantDetails() {
     HP_TENANT="${TENANT_ARRAY[0]}"
   fi
   logMessage "Helix Platform tenant is ${HP_TENANT}."
-  PORTAL_HOSTNAME=$(echo $TENANT_JSON | ${JQ_BIN} -r '.[] | select(.name=="'${HP_TENANT}'").host')
+  PORTAL_HOSTNAME=$(echo "${TENANT_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${HP_TENANT}'").host')
   logMessage "Helix portal hostname is ${PORTAL_HOSTNAME}."
   HP_COMPANY_NAME=$(echo "${HP_TENANT%%.*}")
   logMessage "Helix Platform ${HP_COMPANY_NAME_LABEL} is ${HP_COMPANY_NAME}."
@@ -324,7 +324,7 @@ getTenantDetails() {
 selectFromArray () {
   ARRAY="${1}[@]"
   select i in "${!ARRAY}"; do
-    echo $i;
+    echo "${i}";
     break;
   done
 }
@@ -479,7 +479,7 @@ validateRealmDomains() {
     logMessage "ENVIRONMENT value is prod - IS hostnames prefix will be \"${IS_ALIAS_PREFIX}-\""
   else
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
-    logMessage "IS hostnames prefix is \"${IS_ALIAS_PREFIX}-\""
+    logMessage "IS hostnames prefix is \"${IS_ALIAS_PREFIX}\""
   fi
   # Check for midtier alias
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}" ; then
@@ -560,14 +560,23 @@ getISDetailsFromK8s() {
   IS_FTS_ELASTICSEARCH_USER_PASSWORD=$(getValueFromPlatformSecret "FTS_ELASTIC_SEARCH_USER_PASSWORD")
   IS_AR_DB_USER=$(getValueFromPlatformSecret "AR_SERVER_DB_USERNAME")
 
-  IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo $IS_PLATFORM_SECRET | ${JQ_BIN} -r '.CACERTS_SSL_TRUSTSTORE_PASSWORD')
+  IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_PLATFORM_SECRET}" | ${JQ_BIN} -r '.CACERTS_SSL_TRUSTSTORE_PASSWORD')
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "null" ]; then
     IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" | ${BASE64_BIN} -d)
   else
     IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
   fi
 
-  IS_IMAGESECRET_NAME=$(${KUBECTL_BIN} -n ${IS_NAMESPACE} get sts platform-fts -o jsonpath='{.spec.template.spec.imagePullSecrets[0].name}')
+  IS_ENABLE_PLATFORM_INT_NORMALIZATION="false"
+  IS_PLATFORM_INT=0
+  if [ $(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod -l app=platform-int > /dev/null 2>&1 | wc -l) != "0" ]; then
+    IS_PLATFORM_INT=1
+    if ${KUBECTL_BIN} -n ${IS_NAMESPACE} get sts platform-int -o jsonpath='{.spec.template.spec.containers[?(@.name=="platform")].env[?(@.name=="ENABLE_AR_SERVICES")].value}' | grep -q normalization; then
+      IS_ENABLE_PLATFORM_INT_NORMALIZATION="true"
+    fi
+  fi
+
+  IS_IMAGESECRET_NAME=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.imagePullSecrets[0].name}')
 
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[?(@.name=="fluent-bit")].name}' | grep -q fluent-bit; then
     IS_SIDECAR_FLUENTBIT=1
@@ -581,15 +590,15 @@ getValueFromPlatformSTS() {
 }
 
 getValueFromPlatformSecret() {
-  echo $IS_PLATFORM_SECRET | ${JQ_BIN} -r '."'"${1}"'" | @base64d'
+  echo "${IS_PLATFORM_SECRET}" | ${JQ_BIN} -r '."'"${1}"'" | @base64d'
 }
 
 checkJenkinsIsRunning() {
-  if ! "${CURL_BIN}" -s http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated | grep -q WhoAmI ; then
+  if ! "${CURL_BIN}" -s "http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
     logError "Jenkins not found on http://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
     SKIP_JENKINS=1
   else
-    JENKINS_RESPONSE=$(${CURL_BIN} -sI http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT})
+    JENKINS_RESPONSE=$(${CURL_BIN} -sI "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
     JENKINS_VERSION=$(echo "${JENKINS_RESPONSE}" | grep -i 'X-Jenkins:' | awk '{print $2}' | tr -d '\r')
     JENKINS_HTTP_CODE=$(echo "${JENKINS_RESPONSE}" | grep "^HTTP" | cut -f 2 -d ' '| tr -d '\r')
     logMessage "Jenkins version ${JENKINS_VERSION} found on http://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
@@ -631,10 +640,11 @@ createPipelineVarsArray() {
     ROUTE_TLS_ENABLED
     CLUSTER
     IS_NAMESPACE
-    CUSTOMER_NAME
+#    CUSTOMER_NAME - removed as may have spaces
     INGRESS_CLASS
     CLUSTER_DOMAIN
     INPUT_CONFIG_METHOD
+    CUSTOMER_SIZE
     HELM_NODE
     HELIX_ITSM_INSIGHTS
     HELIX_BWF
@@ -665,6 +675,7 @@ createPipelineVarsArray() {
     VC_PROXY_USER_LOGIN_NAME
     DWP_CONFIG_PRIMARY_ORG_NAME
     PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS
+    ENABLE_PLATFORM_INT_NORMALIZATION
     RSSO_URL
     RSSO_ADMIN_USER
     TENANT_DOMAIN
@@ -699,7 +710,7 @@ createInputFileVarsArray() {
 getPipelineValues() {
   createPipelineVarsArray
   for i in "${PIPELINE_VARS[@]}"; do
-    eval "IS_$i=$(parseJenkinsParam $i)"
+    eval "IS_$i=$(parseJenkinsParam ${i})"
   done
 
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
@@ -707,7 +718,9 @@ getPipelineValues() {
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
     logError "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all requried values in the HELIX_ONPREM_DEPLOYMENT pipeline." 1
   fi
-
+  if [ "${IS_CUSTOMER_SIZE}" == "M" ] || [ "${IS_CUSTOMER_SIZE}" == "L" ] || [ "${IS_CUSTOMER_SIZE}" == "XL" ]; then
+    IS_PLATFORM_INT=1
+  fi
   cloneCustomerConfigsRepo
 }
 
@@ -735,15 +748,15 @@ grepInputFile() {
 cloneCustomerConfigsRepo() {
   SKIP_REPO=0
   GIT_REPO_DIR=$(parseJenkinsParam GIT_REPO_DIR)
-  INPUT_CONFIG_FILE=configsrepo/customer/${IS_CUSTOMER_SERVICE}/${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}.sh
-  if ! ${GIT_BIN} clone ${GIT_REPO_DIR}/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
+  INPUT_CONFIG_FILE="configsrepo/customer/${IS_CUSTOMER_SERVICE}/${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}.sh"
+  if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
     logError "Failed to clone ${GIT_REPO_DIR}/CUSTOMER_CONFIGS/onprem-remedyserver-config.git"
     SKIP_REPO=1
     return
   else
     logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory."
   fi
-  if [ ! -f ${INPUT_CONFIG_FILE} ]; then
+  if [ ! -f "${INPUT_CONFIG_FILE}" ]; then
     logError "Input config file (${INPUT_CONFIG_FILE}) not found. Has the HELIX_GENERATE_CONFIG pipeline been run successfully?"
     SKIP_REPO=1
     return
@@ -796,6 +809,12 @@ validateISDetails() {
     logError "AR_SERVER_MIDTIER_SERVICE_PASSWORD is too long - maximum of 20 characters."
   else
     logMessage "AR_SERVER_MIDTIER_SERVICE_PASSWORD length is 20 characters or less."
+  fi
+
+  if [ "${IS_PLATFORM_INT}" == "1" ] ; then
+    if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "false" ]; then
+      logWarning "platform-int pods are enabled but ENABLE_PLATFORM_INT_NORMALIZATION is not selected."
+    fi
   fi
 
   # PRE mode only
@@ -1208,7 +1227,7 @@ buildJISQLcmd() {
 }
 
 testNetConnection () {
-  if ! ${NC_BIN} -z "${1}" ${2}; then
+  if ! ${NC_BIN} -z "${1}" "${2}"; then
     return 1
   else
     return 0
@@ -1223,7 +1242,7 @@ checkISDBSettings() {
     logMessage "IS DB server (${IS_DATABASE_HOST_NAME}) is reachable on port ${IS_DB_PORT}."
   fi
   checkISDBLatency
-  if [ -z "${IS_AR_DB_USER}" ] || [ -z ${IS_AR_DB_PASSWORD} ]; then
+  if [ -z "${IS_AR_DB_USER}" ] || [ -z "${IS_AR_DB_PASSWORD}" ]; then
     logWarning "One or more DB settings are blank - skipping checks."
     return
   fi
@@ -1287,7 +1306,7 @@ checkKubeconfig() {
   if ! ${KUBECTL_BIN} version > /dev/null 2>&1; then
     logError "'kubectl version' command returned an error - unable to continue." 1
   fi
-  if [ ! -z ${KUBECONFIG} ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
+  if [ ! -z "${KUBECONFIG}" ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
     logError "KUBECONFIG environment variable is set (${KUBECONFIG}) but is not the default of ${HOME}/.kube/config required by Jenkins."
     KUBECONFIG_ERROR=1
   fi
@@ -1347,7 +1366,7 @@ checkISDBLatency() {
   logMessage "Testing latency between cluster and IS DB server ${IS_DATABASE_HOST_NAME}."
   PING_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pod --no-headers -l app=rsso -o custom-columns=:metadata.name --field-selector status.phase=Running | head -1)
   if [ ! -z "${PING_POD}" ]; then
-    PING_RESULT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PING_POD}" -- ping ${IS_DATABASE_HOST_NAME} -c 3 -q | tail -1)
+    PING_RESULT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PING_POD}" -- ping "${IS_DATABASE_HOST_NAME}" -c 3 -q | tail -1)
     if echo "${PING_RESULT}" | grep -q "^round-trip" ; then
       IS_DB_LATENCY=$(echo "${PING_RESULT}" | cut -d '/' -f 4)
       logMessage "IS DB latency from cluster is ${IS_DB_LATENCY}ms."
