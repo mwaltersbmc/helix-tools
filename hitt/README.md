@@ -15,7 +15,7 @@ Configuration
 HITT is configured by a file called hitt.conf which will be created the first time the script is run.  Edit this file and enter the four required variables:
 
 # REQUIRED SETTINGS
-# Enter your Helix namespace names and HELIX_ONPREM_DEPLOYMENT pipeline values for CUSTOMER_SERVICE and ENVIRONMENT
+# Enter your Helix namespace names and HELIX_ONPREM_DEPLOYMENT pipeline values for CUSTOMER_SERVICE and ENVIRONMENT**
 HP_NAMESPACE=
 IS_NAMESPACE=
 IS_CUSTOMER_SERVICE=
@@ -23,8 +23,8 @@ IS_ENVIRONMENT=
 
 This file also has a section where you can enter details about Jenkins.  This may be left as-is unless your Jenkins requires credentials or is running on a non-default port. If your Jenkins password includes special characters enclose the value in double quotes.
 
-# OPTIONAL SETTINGS
-# Set JENKINS credentials and hostname/port if required
+# OPTIONAL SETTINGS**
+# Set JENKINS credentials and hostname/port if required**
 JENKINS_USERNAME=
 JENKINS_PASSWORD=
 JENKINS_HOSTNAME=localhost
