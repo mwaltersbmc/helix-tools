@@ -32,8 +32,8 @@ JENKINS_PORT=8080
 
 Finally, there is a section for all the command line tools which the script uses.  It is assumed that all of these are installed and avialable in a directory that is included in the PATH environment variable of the user running the script.  HITT will check that these tools are present when it is run and report any that can't be found.  Missing tools must be installed or the full path to their location set in this file if they are not on the user's PATH.
 
-**Running HITT
-**
+**Running HITT**
+
 Run the script using bash or make it executable with chmod if preferred.
 
 ```
