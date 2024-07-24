@@ -72,7 +72,7 @@ Where the test being run includes additional output, pod status for example, thi
 
 All of the tests are read-only and will not make changes to the system.  However, please note that the checks which discover the tenant and service details from the Helix Platform deploy a tctl job/pod in the same way as the Jenkins HELIX_ITSM_INTEROPS pipeline.  The job/pod are deleted after use.
 
-Checks Summary
+**Checks Summary**
 
 Not all groups of checks are run in every mode and some run different tests depending on the mode and discovered information.  Some groups only query information which is used by other checks.
 
