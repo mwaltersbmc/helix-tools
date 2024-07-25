@@ -18,7 +18,7 @@ Log in as the git user, create a new directory, cd to it and download the script
 $ mkdir hitt
 $ cd hitt
 $ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
-$ wget  https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz
+$ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz
 ```
 
 **Configuration**
