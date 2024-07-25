@@ -53,8 +53,8 @@ EOF
 
 logError() {
   # Print error message / exit if value of 1 passed as second parameter
-  MSG="${BOLD}ERROR${NORMAL} - ${1}"
-  echo "${MSG}"
+  MSG="${BOLD}${RED}ERROR${NORMAL} - ${1}"
+  echo -e "${MSG}"
   [[ ${2} == 1 ]] && exit 1
   ((FAIL++))
   ERROR_ARRAY+=(" - ${1}")
@@ -62,8 +62,8 @@ logError() {
 
 logWarning() {
   # Print warning message
-  MSG="${BOLD}WARNING${NORMAL} - ${1}"
-  echo "${MSG}"
+  MSG="${BOLD}${YELLOW}WARNING${NORMAL} - ${1}"
+  echo -e "${MSG}"
   ((WARN++))
   WARN_ARRAY+=(" - ${1}")
 }
@@ -1289,11 +1289,11 @@ reportResults() {
   if [ $FAIL -gt 0 ] || [ $WARN -gt 0 ] ; then
     echo "${BOLD}${FAIL} errors / ${WARN} warnings found - please review output for details.${NORMAL}"
     if [ "${#ERROR_ARRAY[@]}" != "0" ]; then
-      echo "${BOLD}ERRORS:${NORMAL}"
+      echo -e "${BOLD}${RED}ERRORS:${NORMAL}"
       printf '%s\n' "${ERROR_ARRAY[@]}"
     fi
     if [ "${#WARN_ARRAY[@]}" != "0" ]; then
-      echo "${BOLD}WARNINGS:${NORMAL}"
+      echo -e "${BOLD}${YELLOW}WARNINGS:${NORMAL}"
       printf '%s\n' "${WARN_ARRAY[@]}"
     fi
   else
@@ -1559,6 +1559,8 @@ REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
+RED="\e[1;31m"
+YELLOW="\e[1;33m"
 SEALTCTL=sealtctl
 KUBECTL_BIN=kubectl
 JQ_BIN=jq
