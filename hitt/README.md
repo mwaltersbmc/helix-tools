@@ -10,9 +10,26 @@ In all modes the HITT script requires minimal configuration and will read all th
 
 There are some additional, optional, tests that will attempt to validate the Helix IS database which require the use of a Java SQL client called JISQL and JDBC drivers for each database type.  To enable these tests simply download the dbjars.tgz file and copy it to the directory where the hitt.sh script is located.  HITT will detect, unpack and enable the SQL checks when this file is present.
 
+**Installation**
+
+Log in as the git user, create a new directory, cd to it and download the script and, if required, dbjars file.
+
+```
+$ mkdir hitt
+$ cd hitt
+$ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
+$ wget  https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz
+```
+
 **Configuration**
 
-HITT is configured by a file called hitt.conf which will be created the first time the script is run. If required edit this file and enter the four required variables manually  There is also a section where you can enter details about Jenkins.  This may be left as-is unless your Jenkins requires credentials or is running on a non-default port. If your Jenkins password includes special characters enclose the value in double quotes.
+HITT is configured by a file called hitt.conf which will be created the first time the script is run. If you need to change any values after the first run, either delete or edit this file and enter the four required variables manually. There is also a section where you can enter details about Jenkins.  This may be left as-is unless your Jenkins requires credentials or is running on a non-default port. If your Jenkins password includes special characters enclose the value in double quotes.
+
+```
+# First run to configure HITT
+$ bash -m hitt.sh
+```
+The hitt.conf file:
 
 ```
 # REQUIRED SETTINGS
