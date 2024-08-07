@@ -4,7 +4,7 @@ HITT has three operating modes, all of which require that the Helix Platform ins
 
 **post-hp**	- used after the Helix Platform has been installed and the SSO realm for Helix IS has been created.\
 **pre-is**	- used when the Jenkins HELIX_ONPREM_DEPLOYMENT and HELIX_GENERATE_CONFIG pipelines have been run with all the required parameters populated.\
-**post-is**	- used after the installation of Helix IS has been completed.\
+**post-is**	- used after the installation of Helix IS has been completed.
 
 In all modes the HITT script requires minimal configuration and will read additional information from Kubernetes, Jenkins and the CUSTOMER_CONFIGS git repository.
 
@@ -82,8 +82,8 @@ Optional -f to use a different config file.
 
 HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages.
 
-**ERRORS** indicate problems which likely need to be addressed before installation will be successful or may be the cause of problems post-install.\
-**WARNINGS** highlight potential problems or settings which may be appropriate under some conditions but are usually recommended to be different.
+<span style="color:red">ERRORS</span> indicate problems which likely need to be addressed before installation will be successful or may be the cause of problems post-install.\
+<span style="color:yellow">WARNINGS</span> highlight potential problems or settings which may be appropriate under some conditions but are usually recommended to be different.
 
 Where the test being run includes additional output, pod status for example, this is displayed after the related ERROR or WARNING.
 
