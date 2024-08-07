@@ -400,6 +400,13 @@ spec:
         image: ${TCTL_IMAGE}
         imagePullPolicy: IfNotPresent
         name: ${SEALTCTL}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
         resources:
           limits:
             cpu: 512m
@@ -1559,8 +1566,8 @@ REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
-RED="\e[1;31m"
-YELLOW="\e[1;33m"
+RED="\e[31m"
+YELLOW="\e[33m"
 SEALTCTL=sealtctl
 KUBECTL_BIN=kubectl
 JQ_BIN=jq
