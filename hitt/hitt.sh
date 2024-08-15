@@ -264,6 +264,7 @@ getRSSODetails() {
   RSSO_TOKEN_JSON=$(${CURL_BIN} -sk -X POST "${RSSO_URL}"/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"'"${RSSO_USERNAME}"'","password":"'"${RSSO_PASSWORD}"'"}')
   if [[ "${RSSO_TOKEN_JSON}" =~ "admin_token" ]]; then
     RSSO_TOKEN=$(echo "${RSSO_TOKEN_JSON}" | ${JQ_BIN} -r .admin_token)
+    logMessage "RSSO login OK - got admin token."
   else
     logError "Unable to get RSSO admin token. RSSO response: ${RSSO_TOKEN_JSON}" 1
   fi
