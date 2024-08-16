@@ -304,7 +304,7 @@ getTenantDetails() {
   TENANT_JSON=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/tenant -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} .tenants)
   TENANT_ARRAY=($(echo "${TENANT_JSON}" | ${JQ_BIN} -r .[].name | grep -v SAAS_TENANT))
   if [ "${#TENANT_ARRAY[@]}" == "0" ]; then
-    logError "Failed to get tenant(s) from SSO." 1
+    logError "No tenants, or only the SAAS_TENANT, found in SSO. Please review the Helix Platform deployment.log." 1
   fi
   if [ "${#TENANT_ARRAY[@]}" != "1" ]; then
 #    echo "${TENANT_ARRAY}"
