@@ -1,0 +1,62 @@
+# Playbook to perform tctl tasks using tctlrest pod.  Will auto discover versions and registry.
+---
+- hosts: localhost
+
+  vars:
+    hp_namespace: ""
+    command: ""
+    entity: ""
+    tctl_args: ""
+    hp_version: ""
+    tctl_image: ""
+    delete_pod: false
+    job_name: sealtctl
+
+  tasks:
+
+    - name: Check namespace
+      include_tasks: tasks/check_namespace.yaml
+      vars:
+        k8s_object_type: Deployment
+        k8s_object_name: tms
+        namespace_type: "Helix Platform"
+        namespace_name: "{{ hp_namespace }}"
+
+    - name: Set pod deletion policy
+      set_fact:
+        prop_pol: 'Foreground'
+      when: delete_pod|bool
+
+    - name: Get the Helix Platform version
+      include_tasks: tasks/get_hp_version.yaml
+
+    - name: Get the tctl image
+      include_tasks: tasks/get_tctl_image.yaml
+
+    - name: Delete existing job
+      include_tasks: tasks/delete_job.yaml
+      vars:
+        with_wait: yes
+
+    - name: Deploy tctl job
+      kubernetes.core.k8s:
+        state: present
+        template: tctlrest.j2
+        wait: yes
+        wait_condition:
+          type: Complete
+          status: "True"
+
+    - name: Get job log
+      kubernetes.core.k8s_log:
+        name: "{{ job_name }}"
+        kind: Job
+        namespace: "{{ hp_namespace }}"
+      register: log
+
+    - debug: msg="{{ log.log }}"
+
+    - name: Delete job
+      include_tasks: tasks/delete_job.yaml
+      vars:
+        with_wait: no

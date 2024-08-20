@@ -1,0 +1,88 @@
+# Update tools
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    target_dir:  "{{ lookup('env', 'TARGET_DIR') | default('/usr/local/bin', true) }}"
+    install_kubectl: "{{ lookup('env', 'INSTALL_KUBECTL') }}"
+    kubectl_version: "{{ lookup('env', 'KUBECTL_VERSION') }}"
+    install_helm: "{{ lookup('env', 'INSTALL_HELM') }}"
+    helm_version: "{{ lookup('env', 'HELM_VERSION') }}"
+    install_kubecapacity: "{{ lookup('env', 'INSTALL_KUBE_CAPACITY') }}"
+    install_k9s: "{{ lookup('env', 'INSTALL_K9S') }}"
+    enable_become: false
+
+  tasks:
+
+    - name: Test if {{ target_dir }} is writable
+      ansible.builtin.stat:
+        path: "{{ target_dir }}"
+      register: stat_res
+
+    - name: Set variable for become tests
+      ansible.builtin.set_fact:
+        enable_become: true
+      when: not stat_res.stat.writeable|bool
+
+    - name: Install kubectl
+      ansible.builtin.get_url:
+        url: "{{ kubectl_url }}"
+        dest: "{{ target_dir }}"
+        mode: "0755"
+      vars:
+        kubectl_url: https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl
+      when: install_kubectl|bool and kubectl_version|length > 0
+      become: "{{ enable_become }}"
+
+    - name: Install helm
+      ansible.builtin.unarchive:
+        src: "{{ helm_url }}"
+        dest: "{{ target_dir }}"
+        remote_src: true
+        extra_opts:
+          - --strip=1
+          - --no-anchored
+          - helm
+        mode: "0755"
+      vars:
+        helm_url: https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz
+      when: install_helm|bool and helm_version|length > 0
+      become: "{{ enable_become }}"
+
+    - name: kube-capacity block
+      block:
+        - name: Get kube-capacity latest releases
+          ansible.builtin.uri:
+            url: "https://api.github.com/repos/robscott/kube-capacity/releases/latest"
+          register: kc_res
+
+        - name: Find linux_x86_64 download url
+          ansible.builtin.set_fact:
+            kube_capacity_url: "{{ item.browser_download_url }}"
+          with_items: "{{ kc_res.json.assets }}"
+          when: item.browser_download_url is search("linux_x86_64")
+
+        - name: Install kube-capacity
+          ansible.builtin.unarchive:
+            src: '{{ kube_capacity_url }}'
+            dest: "{{ target_dir }}"
+            mode: "0755"
+            remote_src: true
+            extra_opts:
+              - kube-capacity
+          become: "{{ enable_become }}"
+      when: install_kubecapacity|bool
+
+    - name: Install K9s
+      ansible.builtin.unarchive:
+        src: "{{ k9s_url }}"
+        dest: "{{ target_dir }}"
+        remote_src: true
+        extra_opts:
+          - k9s
+        mode: "0755"
+      vars:
+        k9s_url: https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz
+      when: install_k9s|bool
+      become: "{{ enable_become }}"

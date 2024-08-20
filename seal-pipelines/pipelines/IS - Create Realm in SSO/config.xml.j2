@@ -1,0 +1,47 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1400.v7fd111b_ec82f">
+  <actions/>
+  <description>Creates and configures the SSO realm for Helix Innovation Suite use.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.plugins.jira.JiraProjectProperty plugin="jira@3.13"/>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@330.v645b_7df10e2a_">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>HELIX_PLATFORM_NAMESPACE</name>
+          <description>The Helix Platform namespace name.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>IS_NAMESPACE</name>
+          <description>The Helix Innovation Suite namespace name.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>CUSTOMER_SERVICE</name>
+          <description>The CUSTOMER_SERVICE value to be used in the HELIX_ONPREM_DEPLOYMENT pipeline.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>ENVIRONMENT</name>
+          <description>The ENVIRONMENT value to be used in the HELIX_ONPREM_DEPLOYMENT pipeline.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3883.vb_3ff2a_e3eea_f">
+    <script>node(&quot;ansible-master&quot;) {
+  stage(&apos;Run playbook&apos;){
+    sh &apos;ansible-playbook {{ base_dir }}/playbooks/create_rsso_realm.yaml&apos;
+  }
+}</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

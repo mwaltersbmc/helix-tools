@@ -1,0 +1,23 @@
+- name: Get DTR secret
+  kubernetes.core.k8s_info:
+    kind: Secret
+    name: "{{ dtr_secret_name }}"
+    namespace: "{{ hp_namespace }}"
+  register: pullsecret
+
+- name: Get the original cred secrets
+  set_fact:
+    original_secret: "{{ item.data }}"
+  with_items: "{{ pullsecret.resources }}"
+  no_log: true
+
+- name: Get the dockerconfigjson info
+  set_fact:
+    secret_string: '{{ original_secret[".dockerconfigjson"] | b64decode  }}'
+
+- name: Get DTR name
+  set_fact:
+    dtr_name: "{{ secret_string.auths | first }}"
+
+- debug:
+    msg: "DTR name - {{ dtr_name }}"

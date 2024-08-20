@@ -1,0 +1,189 @@
+# Playbook to create the RSSO real for a Helix ITSM installation.
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    infra_config: /tmp/infra_config
+    hp_namespace: "{{ lookup('env', 'HELIX_PLATFORM_NAMESPACE') }}"
+    customer_service: "{{ lookup('env', 'CUSTOMER_SERVICE') }}"
+    environment_name: "{{ lookup('env', 'ENVIRONMENT') }}"
+    is_namespace: "{{ lookup('env', 'IS_NAMESPACE') }}"
+
+  tasks:
+
+    - name: Check namespace
+      include_tasks: tasks/check_namespace.yaml
+      vars:
+        k8s_object_type: Deployment
+        k8s_object_name: tms
+        namespace_type: "Helix Platform"
+        namespace_name: "{{ hp_namespace }}"
+
+    - name: Check namespace
+      include_tasks: tasks/check_namespace.yaml
+      vars:
+        k8s_object_type: Deployment
+        k8s_object_name: midtier-user
+        namespace_type: "Helix IS"
+        namespace_name: "{{ is_namespace }}"
+
+    - name: Get RSSO URL/user
+      shell: "kubectl -n {{ hp_namespace }} get cm rsso-admin-tas -o jsonpath='{.data}'"
+      register: results
+
+    - set_fact:
+        rsso_url:  "{{ results.stdout | from_json | json_query('rssourl') }}/rsso"
+        rsso_username: "{{ results.stdout | from_json | json_query('username') }}"
+
+    - name: Get RSSO password
+      shell: "kubectl -n {{ hp_namespace }} get secret rsso-admin-tas -o jsonpath='{.data.password}'"
+      register: results
+
+    - set_fact: rsso_password="{{ results.stdout | b64decode }}"
+
+    - name: Get Helix Platform config data
+      kubernetes.core.k8s_info:
+        kind: ConfigMap
+        name: helix-on-prem-config
+        namespace: "{{ hp_namespace }}"
+      register: hp_config
+
+    - name: Save file
+      copy:
+        content: "{{ hp_config.resources[0].data.infra_config }}"
+        dest: "{{ infra_config }}"
+
+    - set_fact:
+        cluster_domain: "{{ lookup('ini', 'DOMAIN type=properties file={{ infra_config }}') }}"
+        company_name: "{{ lookup('ini', 'COMPANY_NAME type=properties file={{ infra_config }}') }}"
+
+    - debug:
+        msg: "{{ rsso_url }} / {{ rsso_username }} / {{ rsso_password }} / {{ cluster_domain }}"
+
+    - name: Set RSSO realm variables
+      set_fact:
+        realm_name: "{{ customer_service }}-{{ environment_name }}"
+        realm_url: "{{ customer_service if environment_name == 'prod' else customer_service + '-' + environment_name }}"
+
+    - debug:
+        msg: "realm name is {{ realm_url }}"
+
+    - name: Check that RSSO is running and accessible
+      uri:
+        url: '{{ rsso_url }}'
+        validate_certs: false
+      register: rsso_response
+
+    - debug: msg="{{ rsso_response }}"
+
+    - name: Get RSSO admin token
+      uri:
+        url: '{{ rsso_url }}/api/v1.1/admin/login'
+        validate_certs: false
+        method: POST
+        body_format: json
+        body: '{"username":"{{ rsso_username }}","password":"{{ rsso_password }}"}'
+        return_content: yes
+      register: login
+
+    - debug: msg="{{ login.json.admin_token }}"
+
+    - name: Get RSSO tenants
+      uri:
+        url: '{{ rsso_url }}/api/v1.1/tenant'
+        validate_certs: false
+        return_content: yes
+        headers:
+          Authorization: RSSO {{ login.json.admin_token }}
+      register: tenants
+
+    - debug: msg="{{ tenants }}"
+
+    - name: Get TENANT_DOMAIN
+      set_fact:
+        tenant_domain: '{{ item.name }}'
+      when: "item.name|regex_search('^' + company_name, ignorecase=True)"
+      loop: '{{ tenants.json.tenants }}'
+
+    - debug: msg="TENANT_DOMAIN is {{ tenant_domain }}"
+
+    - name: Get RSSO realms
+      uri:
+        url: '{{ rsso_url }}/api/v1.1/realms'
+        validate_certs: false
+        return_content: yes
+        headers:
+          Authorization: RSSO {{ login.json.admin_token }}
+      register: realms
+
+    - debug: msg="{{ item }}"
+      loop: '{{ realms.json.realms }}'
+
+    - name: Fail if realm already exists
+      fail:
+        msg: "Realm already exists - {{ realm_name }}"
+      when: 'item.id == realm_name|string'
+      loop: '{{ realms.json.realms }}'
+
+    - name: Create realm
+      uri:
+        url: '{{ rsso_url }}/api/v1.1/realms'
+        validate_certs: false
+        method: POST
+        headers:
+          Authorization: RSSO {{ login.json.admin_token }}
+        body_format: json
+        body: {
+        "domainMapping": {
+           "domain": [
+             "{{ realm_url }}.{{ cluster_domain }}",
+             "{{ realm_url }}-smartit.{{ cluster_domain }}",
+             "{{ realm_url }}-sr.{{ cluster_domain }}",
+             "{{ realm_url }}-is.{{ cluster_domain }}",
+             "{{ realm_url }}-restapi.{{ cluster_domain }}",
+             "{{ realm_url }}-atws.{{ cluster_domain }}",
+             "{{ realm_url }}-dwp.{{ cluster_domain }}",
+             "{{ realm_url }}-dwpcatalog.{{ cluster_domain }}",
+             "{{ realm_url }}-vchat.{{ cluster_domain }}",
+             "{{ realm_url }}-chat.{{ cluster_domain }}",
+             "{{ realm_url }}-int.{{ cluster_domain }}"
+           ]
+         },
+         "tenantDomain": "{{ tenant_domain }}",
+         "authChain": {
+           "idpSaml": [],
+           "idpAr": [
+             {
+               "cspDomains": {
+                 "domain": [
+                   ""
+                 ]
+               },
+               "id": "ar",
+               "order": 1,
+               "arHost": "platform-user-ext.{{ is_namespace }}",
+               "arQueue": 0,
+               "arPort": 46262,
+               "transformationStrategy": "None",
+               "customExpression": ""
+             }
+           ],
+           "idpLdap": [],
+           "idpCert": [],
+           "idpKerberos": [],
+           "idpPreauth": [],
+           "idpOidc": [],
+           "idpLocalUser": []
+         },
+         "bypassAllowed": false,
+         "tenantLogoutURL": "",
+         "sessionQuota": 0,
+         "forceLogoutOnReachQuota": true,
+         "singleLogOut": false,
+         "useCaptcha": false,
+         "onAuthWebhook": "",
+         "tenantName": "{{ realm_name }}"
+       }
+
+    - debug: msg="Realm {{ realm_name }} created with TENANT_DOMAIN {{ tenant_domain }} and HELIX_PLATFORM_CUSTOMER_NAME {{ company_name }}"

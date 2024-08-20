@@ -1,0 +1,48 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1400.v7fd111b_ec82f">
+  <actions/>
+  <description>Add custom CA certs file to BMC cacerts and saves to git ITSM_REPO.&#xd;
+File may be loaded from a path on the Deployment Engine or attached to the pipeline.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@330.v645b_7df10e2a_">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>ITSM_REPO_PATH</name>
+          <description>Full path to ITSM_REPO/itsm-on-premise-installer.git</description>
+          <defaultValue>/home/git/git_repo/ITSM_REPO/itsm-on-premise-installer.git</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>DE_CACERTS_FILE</name>
+          <description>Full path to the updated cacerts file on the Deployment Engine - e.g. /home/git/cacerts
+Leave blank if attaching the file to the pipeline using the option below.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.FileParameterDefinition>
+          <name>LOCAL_CACERTS_FILE</name>
+          <description>Attach your cacerts from a local system.  This value is ignored if DE_CACERTS_FILE above is provided.</description>
+        </hudson.model.FileParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3889.v937e0b_3412d3">
+    <script>node(&quot;ansible-master&quot;) {
+  stage(&quot;Process cacerts&quot;) {
+    if (&quot;${DE_CACERTS_FILE}&quot; == &quot;&quot; &amp;&amp; &quot;${LOCAL_CACERTS_FILE}&quot; != &quot;&quot;) {
+      def file_in_workspace = unstashParam &quot;LOCAL_CACERTS_FILE&quot;
+      sh &quot;cp -f ${file_in_workspace} /tmp/cacerts&quot;
+    }
+    sh &apos;ansible-playbook {{ base_dir }}/playbooks/save_cacerts_in_itsm_repo.yaml&apos;
+  }
+}
+      </script>
+    <sandbox>false</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

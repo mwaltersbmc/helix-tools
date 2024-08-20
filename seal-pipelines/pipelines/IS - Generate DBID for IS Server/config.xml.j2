@@ -1,0 +1,49 @@
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1400.v7fd111b_ec82f">
+  <actions/>
+  <description>Generates the Database ID used to license the IS server.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.plugins.jira.JiraProjectProperty plugin="jira@3.13"/>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@330.v645b_7df10e2a_">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>DB_TYPE</name>
+          <description>The database type.</description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>postgres</string>
+              <string>mssql</string>
+              <string>oracle</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>DATABASE_HOST_NAME</name>
+          <description>The hostname of the system where the database is running or the AR_JDBC_URL.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>AR_DB_NAME</name>
+          <description>Database name - eg ARSystem.</description>
+          <defaultValue>ARSystem</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3883.vb_3ff2a_e3eea_f">
+    <script>node("ansible-master") {
+  stage("Run generateDbID") {
+    sh 'cd {{ base_dir }}/java &amp;&amp; java generateDbID "${DB_TYPE}" "${DATABASE_HOST_NAME}" "${AR_DB_NAME}"'
+  }
+}
+      </script>
+    <sandbox>false</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

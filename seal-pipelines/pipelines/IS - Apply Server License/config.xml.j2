@@ -1,0 +1,54 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1400.v7fd111b_ec82f">
+  <actions/>
+  <description>Applies an IS Server License.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.plugins.jira.JiraProjectProperty plugin="jira@3.13"/>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@330.v645b_7df10e2a_">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>IS_NAMESPACE</name>
+          <description>The Helix Innovation Suite namespace name.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>AR_ADMIN_USER</name>
+          <description>Username of a member of the Administrators group.</description>
+          <defaultValue>Demo</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.PasswordParameterDefinition>
+          <name>AR_ADMIN_PASSWORD</name>
+          <description>The admin user&apos;s password.</description>
+          <defaultValue>{AQAAABAAAAAQl9sC85kPqP5St4TfVwqMmuqSkstSNDRC1XQpaGZm2d4=}</defaultValue>
+        </hudson.model.PasswordParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>LICENSE_KEY</name>
+          <description>The server license key.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>EXPIRY_DATE</name>
+          <description>(Optional)
+The expiry date for temporary licenses - e.g. 25-May-24</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3883.vb_3ff2a_e3eea_f">
+    <script>node(&quot;ansible-master&quot;) {
+  stage(&apos;Run playbook&apos;){
+    sh &apos;ansible-playbook {{ base_dir }}/playbooks/apply_is_license.yaml&apos;
+  }
+}</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

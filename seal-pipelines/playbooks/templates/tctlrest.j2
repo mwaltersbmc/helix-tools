@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: tctl
+  name: {{ job_name }}
+  namespace: {{ hp_namespace }}
+spec:
+  backoffLimit: 1
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: {{ job_name }}
+    spec:
+      containers:
+      - env:
+        - name: SERVICE_PORT
+          value: "8000"
+        - name: APP_URL
+          value: http://tms:8000
+        - name: CLIENT_ID
+          value: "123"
+        - name: CLIENT_SECRET
+          value: "123"
+        - name: RSSO_URL
+          valueFrom:
+            configMapKeyRef:
+              key: rssourl
+              name: rsso-admin-tas
+        - name: COMMAND
+          value: {{ command }}
+        image: {{ tctl_image }}
+        imagePullPolicy: IfNotPresent
+        name: tctl
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          limits:
+            cpu: 512m
+            memory: 512Mi
+          requests:
+            cpu: 256m
+            memory: 256Mi
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: bmc-dtrhub

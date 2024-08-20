@@ -1,0 +1,12 @@
+- name: Delete job {{ job_name }} in {{ hp_namespace }}
+  kubernetes.core.k8s:
+    state: absent
+    name: "{{ job_name }}"
+    kind: Job
+    namespace: "{{ hp_namespace }}"
+    wait: "{{ with_wait }}"
+    delete_options:
+      propagationPolicy: "{{ prop_pol }}"
+  vars:
+    prop_pol: "Orphan"
+    with_wait: false

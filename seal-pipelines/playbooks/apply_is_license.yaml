@@ -1,0 +1,105 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+
+    is_namespace: "{{ lookup('env', 'IS_NAMESPACE') }}"
+    ar_admin_user: "{{ lookup('env', 'AR_ADMIN_USER') }}"
+    ar_admin_password: "{{ lookup('env', 'AR_ADMIN_PASSWORD') }}"
+    license_key: "{{ lookup('env', 'LICENSE_KEY') }}"
+    expiry_date: "{{ lookup('env', 'EXPIRY_DATE') }}"
+    lic_create_form: AR%20System%20Licenses
+    lictype_formqual: AR%20System%20Licenses?q=%27Key%27%3D%22{{ license_key }}%22&fields=values(Key)
+
+  tasks:
+
+    - name: Check namespace
+      include_tasks: tasks/check_namespace.yaml
+      vars:
+        k8s_object_type: Deployment
+        k8s_object_name: midtier-user
+        namespace_type: "Helix IS"
+        namespace_name: "{{ is_namespace }}"
+
+    - name: Get RESTAPI URL
+      shell: "kubectl -n {{ is_namespace }} get ingress platform-int -o jsonpath='{.spec.rules[0].host}'"
+      register: results
+
+    - set_fact:
+        restapi_url: 'https://{{ results.stdout}}'
+
+    - name: Set other URL variables
+      set_fact:
+        admin_url: '{{ restapi_url }}/api/jwt/login'
+        api_url: '{{ restapi_url }}/api/arsys/v1/entry'
+
+    - name: Check that IS is running and accessible
+      uri:
+        url: '{{ restapi_url }}'
+        validate_certs: false
+        status_code: 401
+      register: is_response
+
+    - debug: msg="{{ is_response }}"
+
+    - name: Get JWT token
+      uri:
+        url: '{{ admin_url }}'
+        validate_certs: false
+        method: POST
+        body_format: form-urlencoded
+        body:
+          username: '{{ ar_admin_user }}'
+          password: '{{ ar_admin_password }}'
+        return_content: yes
+      register: login_response
+
+    - name: Set JWT variable
+      set_fact:
+        jwt: "{{ login_response.content }}"
+
+    - name: Get licensetype from IS
+      uri:
+        url: '{{ api_url }}/{{ lictype_formqual }}'
+        validate_certs: false
+        method: GET
+        headers:
+          Authorization: 'AR-JWT {{ jwt }}'
+        return_content: yes
+      register: lictype_response
+
+    - name: Stop if server is already licensed
+      block:
+        - fail:
+            msg: "Server is already licensed"
+          when: lictype_response.json.entries[0]['values'].Key == license_key
+      when: lictype_response.json.entries[0] is defined
+
+    - name: Create full license JSON
+      set_fact:
+        license_json: '{"values":{"License Type":"AR Server","Number of Licenses":1,"Key":"{{ license_key }}"}}'
+      when: expiry_date| length == 0
+
+    - name: Create demo license JSON
+      set_fact:
+        license_json: '{"values":{"License Type":"AR Server","Number of Licenses":1,"Key":"{{ license_key }}","Expiration Date":"{{ expiry_date }}"}}'
+      when: expiry_date| length > 0
+
+    - debug: msg="{{ license_json }}"
+
+    - name: Create license form record
+      uri:
+        url: '{{ api_url }}/{{ lic_create_form }}'
+        validate_certs: false
+        method: POST
+        headers:
+          Authorization: 'AR-JWT {{ jwt }}'
+          Content-Type: application/json
+        body_format: json
+        body: '{{ license_json }}'
+        return_content: yes
+        status_code: 201
+      register: create_response
+
+    - debug: msg="{{ create_response }}"

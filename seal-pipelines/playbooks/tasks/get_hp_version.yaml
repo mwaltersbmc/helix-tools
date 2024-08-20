@@ -1,0 +1,12 @@
+- name: Get Helix Platform version
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    name: helix-on-prem-config
+    namespace: "{{ hp_namespace }}"
+  register: hp_config
+
+- set_fact:
+    hp_version: "{{ hp_config.resources[0].data.version|split('\n')|first }}"
+
+- name: HP version
+  debug: msg="Helix Platform version - {{ hp_version }}"

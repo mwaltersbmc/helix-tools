@@ -1,0 +1,54 @@
+# Adds WRITE_VALUES_TO_FILE option to HELIX_ONPREM_DEPLOYMENT pipeline for ITSM use
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    repo_target_path: /tmp/seal-repo
+    itsm_repo_path: "{{ lookup('env', 'ITSM_REPO_PATH') }}"
+    hct_try_string: "     setPipelineProperties"
+    hct_params_string: "SIDECAR_FLUENT_SPLUNK_EVENT_SOURCETYPE', trim: true\\)"
+    hct_comma_string: "SIDECAR_FLUENT_SPLUNK_EVENT_SOURCETYPE', trim: true)"
+
+  tasks:
+
+    - name: Make sure {{ repo_target_path }} is empty
+      ansible.builtin.file:
+        path: '{{ repo_target_path }}'
+        state: absent
+
+    - name: Read-write git checkout from github
+      ansible.builtin.git:
+        repo: '{{ itsm_repo_path }}'
+        dest: '{{ repo_target_path }}'
+        clone: yes
+
+    - name: Insert params code block
+      ansible.builtin.blockinfile:
+        path: '{{ repo_target_path }}/pipeline/jenkinsfile/HELIX_ONPREM_DEPLOYMENT.jenkinsfile'
+        insertafter: '{{ hct_params_string }}'
+        marker: "// params ANSIBLE MANAGED BLOCK {mark}"
+        block: |
+          separator(name: "SEPARATOR_CODE", sectionHeader: "HEALTHCHECKTOOL",sectionHeaderStyle: """background-color: #FAD7A0;text-align: center;padding: 4px;color: #343434;font-size: 22px;font-weight: normal;text-transform: uppercase;font-family: 'Orienta', sans-serif;letter-spacing: 1px;font-style: italic;"""),
+          booleanParam(defaultValue: 'false', description: '', name: 'WRITE_VALUES_TO_FILE'),
+          stringParam(defaultValue: '/tmp/pipeline_values.config', description: 'File to save the pipeline values in.', name: 'PIPELINE_VALUES_FILE')
+
+    - name: Insert shell call to create pipeline_values.config file
+      ansible.builtin.blockinfile:
+        path: '{{ repo_target_path }}/pipeline/jenkinsfile/HELIX_ONPREM_DEPLOYMENT.jenkinsfile'
+        insertbefore: '{{ hct_try_string }}'
+        marker: "// try ANSIBLE MANAGED BLOCK {mark}"
+        block: |
+          if (WRITE_VALUES_TO_FILE == "true"){
+            log.info("Saving pipeline values to ${PIPELINE_VALUES_FILE}")
+            sh '''env > ${PIPELINE_VALUES_FILE}'''
+            return
+          }
+
+    - name: Add trailing comma to last parameter
+      ansible.builtin.shell:
+        cmd: sed -i "s/{{ hct_comma_string }}/{{ hct_comma_string }},/g" {{ repo_target_path }}/pipeline/jenkinsfile/HELIX_ONPREM_DEPLOYMENT.jenkinsfile
+
+    - name: Commit back to repo
+      ansible.builtin.shell:
+        cmd: git add . && git commit -m "Add HCT options to HELIX_ONPREM_DEPLOYMENT.jenkinsfile" && git push origin
+        chdir: '{{ repo_target_path }}'

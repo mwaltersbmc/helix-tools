@@ -1,0 +1,133 @@
+# Ansible playbook to create and update SEAL Pipeline jobs in Jenkins
+---
+- hosts: localhost
+
+  vars:
+    jenkins_username: ""
+    jenkins_password: ""
+    pipelines_foldername: "SEAL-Pipelines"
+    jenkins_port: 8080
+    jenkins_hostname: "{{ ansible_hostname }}"
+    base_dir: "{{ lookup('env', 'PWD') }}"
+
+  tasks:
+
+    - debug:
+        msg: "Jenkins URL is http://{{ jenkins_hostname }}:{{ jenkins_port }}"
+
+    - name: Check that Jenkins is running and accessible
+      uri:
+        url: http://{{ jenkins_hostname }}:{{ jenkins_port }}
+        status_code: 403, 200        
+      register: j_response
+      ignore_errors: true
+
+    - assert:
+        that: not j_response.failed
+        fail_msg: "Jenkins not found at http://{{ jenkins_hostname }}:{{ jenkins_port }}"
+
+    - debug: msg="Jenkins version - {{ j_response.x_jenkins }}"
+
+    - name: Get list of pipeline directories
+      ansible.builtin.set_fact:
+        pipelines: "{{ pipelines | default([]) + [ item.path ] }}"
+      with_filetree: pipelines/
+      when: item.state == "directory"
+
+    - name: Jenkins - get crumb
+      uri:
+        url: 'http://{{ jenkins_hostname }}:{{ jenkins_port }}/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,":",//crumb)'
+        user: "{{ jenkins_username }}"
+        password: "{{ jenkins_password }}"
+        force_basic_auth: true
+        return_content: yes
+      register: crumb
+
+    - name: Jenkins - check if jobs exist
+      uri:
+        method: GET
+        url: 'http://{{ jenkins_hostname }}:{{ jenkins_port }}/job/{{ pipelines_foldername }}/job/{{ item | urlencode }}/config.xml'
+        user: "{{ jenkins_username }}"
+        password: "{{ jenkins_password }}"
+        force_basic_auth: true
+        headers:
+          Cookie: "{{ crumb.cookies_string }}"
+          Jenkins-Crumb: "{{ crumb.content.split(':')[1] }}"
+        status_code: 404, 200
+      loop: "{{ pipelines }}"
+      register: jenkins_jobs
+
+    - name: Build list of jobs, their URLs, and status
+      set_fact:
+        pipelines_list: "{{  pipelines_list | default([]) + [ {'name': item.item, 'url': item.url, 'status': item.status} ] }}"
+      with_items:
+        - "{{ jenkins_jobs.results }}"
+
+    - debug:
+        msg: "Pipeline: {{ item }}"
+      with_items: "{{ pipelines_list }}"
+
+    - name: Jenkins - create {{ pipelines_foldername }} folder
+      uri:
+        method: POST
+        url: 'http://{{ jenkins_hostname }}:{{ jenkins_port }}/createItem?name={{ pipelines_foldername }}&mode=com.cloudbees.hudson.plugins.folder.Folder&from=&json=%7B%22name%22%3A%22{{ pipelines_foldername }}%22%2C%22mode%22%3A%22com.cloudbees.hudson.plugins.folder.Folder%22%2C%22from%22%3A%22%22%2C%22Submit%22%3A%22OK%22%7D&Submit=OK'
+        user: "{{ jenkins_username }}"
+        password: "{{ jenkins_password }}"
+        force_basic_auth: true
+        headers:
+          Cookie: "{{ crumb.cookies_string }}"
+          Jenkins-Crumb: "{{ crumb.content.split(':')[1] }}"
+          Content-Type: application/x-www-form-urlencoded
+        status_code: 302, 400
+
+    - name: Jenkins - update existing jobs from xml files
+      uri:
+        method: POST
+        url: "{{ item.url }}"
+        user: "{{ jenkins_username }}"
+        password: "{{ jenkins_password }}"
+        force_basic_auth: true
+        headers:
+          Cookie: "{{ crumb.cookies_string }}"
+          Jenkins-Crumb: "{{ crumb.content.split(':')[1] }}"
+          Content-Type: text/xml
+        body: "{{ lookup('ansible.builtin.template','pipelines/{{ item.name }}/config.xml.j2') }}"
+        status_code: 200
+      loop: "{{ pipelines_list }}"
+      when: item.status == 200
+
+    - name: Jenkins - create new jobs from xml files
+      uri:
+        method: POST
+        url: 'http://{{ jenkins_hostname }}:{{ jenkins_port }}/job/{{ pipelines_foldername }}/createItem?name={{ item.name | urlencode }}'
+        user: "{{ jenkins_username }}"
+        password: "{{ jenkins_password }}"
+        force_basic_auth: true
+        headers:
+          Cookie: "{{ crumb.cookies_string }}"
+          Jenkins-Crumb: "{{ crumb.content.split(':')[1] }}"
+          Content-Type: text/xml
+        body: "{{ lookup('ansible.builtin.template','pipelines/{{ item.name }}/config.xml.j2') }}"
+        status_code: 200
+      loop: "{{ pipelines_list }}"
+      when: item.status == 404
+
+    - name: Read git config
+      community.general.git_config:
+        list_all: true
+      register: git_res
+
+    - name: git config block
+      block:
+        - name: Add email ~/.gitconfig
+          community.general.git_config:
+            name: user.email
+            scope: global
+            value: git@localhost
+
+        - name: Add email ~/.gitconfig
+          community.general.git_config:
+            name: user.name
+            scope: global
+            value: git
+      when: git_res.config_values|length == 0

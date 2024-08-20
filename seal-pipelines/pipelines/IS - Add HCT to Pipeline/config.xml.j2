@@ -1,0 +1,33 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1400.v7fd111b_ec82f">
+  <actions/>
+  <description>Add option to save values to the HELIX_ONPREM_DEPLOYMENT pipeline for use with the Health Check Tool.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@330.v645b_7df10e2a_">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>ITSM_REPO_PATH</name>
+          <description>Full path to ITSM_REPO/itsm-on-premise-installer.git</description>
+          <defaultValue>/home/git/git_repo/ITSM_REPO/itsm-on-premise-installer.git</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3889.v937e0b_3412d3">
+    <script>node(&quot;ansible-master&quot;) {
+  stage(&quot;Process cacerts&quot;) {
+    sh &apos;ansible-playbook {{ base_dir }}/playbooks/add_hct.yaml&apos;
+  }
+}
+      </script>
+    <sandbox>false</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

@@ -1,0 +1,66 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1400.v7fd111b_ec82f">
+  <actions/>
+  <description>Installs/upgrades K8s tools.&#xd;
+Requires use of sudo if the target directory is not writable by the git user.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.plugins.jira.JiraProjectProperty plugin="jira@3.13"/>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@330.v645b_7df10e2a_">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>TARGET_DIR</name>
+          <description>The directory where the downloaded files will be installed. Note - use of sudo is required if the directory is not writable by the git user.</description>
+          <defaultValue>/usr/local/bin</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>INSTALL_KUBECTL</name>
+          <description>Install kubectl?</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>KUBECTL_VERSION</name>
+          <description>The version to upgrade to - eg 1.28.6 - https://kubernetes.io/releases</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>INSTALL_HELM</name>
+          <description>Install helm?</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>HELM_VERSION</name>
+          <description>The version to upgrade to - eg 3.11.0 - https://github.com/helm/helm/releases</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>INSTALL_KUBE_CAPACITY</name>
+          <description>A simple CLI that provides an overview of the resource requests, limits, and utilization in a Kubernetes cluster - https://github.com/robscott/kube-capacity</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>INSTALL_K9S</name>
+          <description>K9s is a terminal based UI to interact with your Kubernetes clusters - https://k9scli.io</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3883.vb_3ff2a_e3eea_f">
+    <script>
+        node(&quot;ansible-master&quot;) {
+          stage(&apos;K3s upgrade&apos;){
+            sh &apos;ansible-playbook {{ base_dir }}/playbooks/update_k8s_tools.yaml&apos;
+          }
+        }
+      </script>
+    <sandbox>false</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

@@ -1,0 +1,47 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+
+    itsm_repo_path:  "{{ lookup('env', 'ITSM_REPO_PATH') }}"
+    de_cacerts_file: "{{ lookup('env', 'DE_CACERTS_FILE') }}"
+    repo_target_path: /tmp/seal-repo
+
+  tasks:
+
+    - name: Set cacerts_file
+      ansible.builtin.set_fact:
+        cacerts_file: "{{ de_cacerts_file if de_cacerts_file | length > 0 else '/tmp/cacerts' }}"
+
+    - name: Check cacerts file is present
+      ansible.builtin.stat:
+        path: "{{ cacerts_file }}"
+      register: register_cacerts
+
+    - name: Fail if {{ cacerts_file }} is missing
+      ansible.builtin.fail:
+        msg: "Missing file - {{ cacerts_file }}"
+      when: not register_cacerts.stat.exists
+
+    - name: Make sure {{ repo_target_path }} is empty
+      ansible.builtin.file:
+        path: '{{ repo_target_path }}'
+        state: absent
+
+    - name: Read-write git checkout from github
+      ansible.builtin.git:
+        repo: '{{ itsm_repo_path }}'
+        dest: '{{ repo_target_path }}'
+        clone: yes
+
+    - name: Update cacerts file
+      ansible.builtin.copy:
+        src: "{{ cacerts_file }}"
+        dest:  "{{ repo_target_path }}/pipeline/tasks/cacerts"
+        force: true
+
+    - name: Commit cacerts back to repo
+      ansible.builtin.shell:
+        cmd: git add . && git commit -m "Add updated cacerts file" && git push origin
+        chdir: '{{ repo_target_path }}'

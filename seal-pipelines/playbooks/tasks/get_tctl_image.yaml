@@ -1,0 +1,13 @@
+- name: Get tctl image
+  kubernetes.core.k8s_info:
+    kind: Job
+    name: tenantonboarding
+    namespace: "{{ hp_namespace }}"
+  register: tenantonboarding
+
+- name: Set tctl_image
+  ansible.builtin.set_fact:
+    tctl_image: "{{ tenantonboarding.resources[0].spec.template.spec.containers[0].image }}"
+
+- name: tctl image
+  debug: msg="tctl_image - {{ tctl_image }}"

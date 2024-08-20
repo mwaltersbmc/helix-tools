@@ -1,0 +1,53 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1400.v7fd111b_ec82f">
+  <actions/>
+  <description>Deploy a job to run TCTL commands for the Helix Platform.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.plugins.jira.JiraProjectProperty plugin="jira@3.13"/>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@330.v645b_7df10e2a_">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>HELIX_PLATFORM_NAMESPACE</name>
+          <description>The Helix Platform namespace name.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>TCTL_COMMAND</name>
+          <description>The tctl command to run.  View the build Console Output to see the results - e.g.
+get tenant
+get service
+get tenant-service
+update tenant-service TENANTID -i SERVICEID -v -{\&quot;status\&quot;:\&quot;INACTIVE\&quot;}
+
+JSON notes:
+- escape double quotes with \
+- no spaces around the colon between variable name and value
+- e.g. {\&quot;JSON\&quot;:\&quot;STRING\&quot;}</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3883.vb_3ff2a_e3eea_f">
+    <script>node(&quot;ansible-master&quot;) {
+  stage(&quot;Run playbook&quot;) {
+    ansiblePlaybook(
+      playbook: &apos;{{ base_dir }}/playbooks/deploy_tctlrest_job.yaml&apos;,
+      extraVars: [
+        hp_namespace: &apos;${HELIX_PLATFORM_NAMESPACE}&apos;,
+        command: &apos;${TCTL_COMMAND}&apos;,
+        delete_pod: &apos;${DELETE_POD}&apos;
+      ]
+    )
+  }
+}</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

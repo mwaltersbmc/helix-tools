@@ -1,0 +1,11 @@
+- name: Check {{ namespace_name }} is a valid {{ namespace_type }} namespace
+  kubernetes.core.k8s_info:
+    kind: "{{ k8s_object_type }}"
+    name: "{{ k8s_object_name }}"
+    namespace: "{{ namespace_name }}"
+  register: chk_res
+
+- assert:
+    that: chk_res.resources|length >0
+    fail_msg: "Error - {{ namespace_name }} does not appear to be a valid {{ namespace_type }} namespace."
+    success_msg: "{{ namespace_type }} namespace - {{ namespace_name }}"
