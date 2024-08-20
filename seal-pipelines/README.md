@@ -16,14 +16,12 @@ This is a collection of utility and troubleshooting pipeline jobs for the Jenkin
 
 ## Installing the Pipelines
 
-Start by unzipping the **seal-pipelines.zip** file in a directory that is accessible by the **git user** you used when setting up Jenkins - e.g. `/home/git/seal-pipelines`
+Start by using git to download the **seal-pipelines** files to a directory that is accessible to the **git-user** that installed Jenkins. For example:
 
-```
-For internal BMC use:
+```sh
 cd /home/git
-git clone https://github/mwaltersbmc/helix-tools/seal-pipelines
-cd seal-pipelines
-ansible-playbook create-pipelines.yaml
+git clone https://github.com/mwaltersbmc/helix-tools
+cd helix-tools/seal-pipelines
 ```
 
 The pipelines are installed using the **create-pipelines.yaml** Ansible playbook.  There are several options that can be set by editing the playbook or passing values on the command line. The default values are:
@@ -40,7 +38,7 @@ Update and save the file or pass the values when running the playbook using the 
 ansible-playbook create-pipelines.yaml -e "jenkins_username=admin" -e "jenkins_password=mysecretpwd"
 ```
 
-The playbook will create a new folder in Jenkins where the pipelines will be available and may be rerun to add or update pipelines if future versions are released.
+The playbook will create a new folder in Jenkins for the pipelines and it may be rerun to add or update pipelines if future versions are released.
 
 ## Pipeline Details
 
