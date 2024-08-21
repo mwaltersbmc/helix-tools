@@ -1235,7 +1235,7 @@ buildJISQLcmd() {
 }
 
 testNetConnection () {
-  if ! ${NC_BIN} -z "${1}" "${2}"; then
+  if ! ${NC_BIN} -z -w 5 "${1}" "${2}"; then
     return 1
   else
     return 0
