@@ -18,7 +18,7 @@
     - name: Check that Jenkins is running and accessible
       uri:
         url: http://{{ jenkins_hostname }}:{{ jenkins_port }}
-        status_code: 403, 200        
+        status_code: 403, 200
       register: j_response
       ignore_errors: true
 
@@ -119,13 +119,13 @@
 
     - name: git config block
       block:
-        - name: Add email ~/.gitconfig
+        - name: Add email to ~/.gitconfig
           community.general.git_config:
             name: user.email
             scope: global
             value: git@localhost
 
-        - name: Add email ~/.gitconfig
+        - name: Add user to ~/.gitconfig
           community.general.git_config:
             name: user.name
             scope: global
