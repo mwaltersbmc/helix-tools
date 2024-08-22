@@ -12,7 +12,7 @@
 
   tasks:
 
-    - name: Check namespace
+    - name: Check HP namespace
       include_tasks: tasks/check_namespace.yaml
       vars:
         k8s_object_type: Deployment
@@ -20,12 +20,12 @@
         namespace_type: "Helix Platform"
         namespace_name: "{{ hp_namespace }}"
 
-    - name: Check namespace
+    - name: Check IS namespace
       include_tasks: tasks/check_namespace.yaml
       vars:
-        k8s_object_type: Deployment
-        k8s_object_name: midtier-user
-        namespace_type: "Helix IS"
+        k8s_object_type: ""
+        k8s_object_name: ""
+        namespace_type: "exists"
         namespace_name: "{{ is_namespace }}"
 
     - name: Get RSSO URL/user
@@ -56,13 +56,15 @@
 
     - set_fact:
         cluster_domain: "{{ lookup('ini', 'DOMAIN type=properties file={{ infra_config }}') }}"
-        company_name: "{{ lookup('ini', 'COMPANY_NAME type=properties file={{ infra_config }}') }}"
+        company_name: "{{ lookup('ini', 'COMPANY_NAME type=properties file={{ infra_config }}')|default('') }}"
+        tenant_name:  "{{ lookup('ini', 'TENANT_NAME type=properties file={{ infra_config }}')|default('') }}"
 
     - debug:
         msg: "{{ rsso_url }} / {{ rsso_username }} / {{ rsso_password }} / {{ cluster_domain }}"
 
     - name: Set RSSO realm variables
       set_fact:
+        company_name: "{{ company_name if company_name|length > 0 else tenant_name }}"
         realm_name: "{{ customer_service }}-{{ environment_name }}"
         realm_url: "{{ customer_service if environment_name == 'prod' else customer_service + '-' + environment_name }}"
 
