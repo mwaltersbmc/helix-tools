@@ -30,7 +30,11 @@ spec:
               key: rssourl
               name: rsso-admin-tas
         - name: COMMAND
-          value: {{ command }}
+          value: '{{ command }}'
+        - name: FLAG
+          value: '{{ tctl_flag }}'
+        - name: JSON_VALUE
+          value: '{{ tctl_json }}'
         image: {{ tctl_image }}
         imagePullPolicy: IfNotPresent
         name: tctl

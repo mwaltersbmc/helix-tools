@@ -5,8 +5,8 @@
   vars:
     hp_namespace: ""
     command: ""
-    entity: ""
-    tctl_args: ""
+    tctl_flag: ""
+    tctl_json: ""
     hp_version: ""
     tctl_image: ""
     delete_pod: false
@@ -37,6 +37,11 @@
       include_tasks: tasks/delete_job.yaml
       vars:
         with_wait: yes
+
+    - name: Add FLAG if JSON present
+      set_fact:
+        tctl_flag: "-v"
+      when: tctl_json|length > 0
 
     - name: Deploy tctl job
       kubernetes.core.k8s:
