@@ -451,6 +451,7 @@ checkTenantRealms() {
 }
 
 validateRealm() {
+  logMessage "Using realm - ${REALM_NAME}"
   # Parse realm data
   REALM_ARHOST=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arHost)
   if [ "${REALM_ARHOST}" != "platform-user-ext.${IS_NAMESPACE}" ]; then
@@ -484,7 +485,7 @@ validateRealmDomains() {
   # Special case when IS_ENVIRONMENT is "prod"
   if [ "${IS_ENVIRONMENT}" == "prod" ]; then
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}"
-    logMessage "ENVIRONMENT value is prod - IS hostnames prefix will be \"${IS_ALIAS_PREFIX}-\""
+    logMessage "ENVIRONMENT value is 'prod' - IS hostnames prefix is \"${IS_ALIAS_PREFIX}-\""
   else
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
     logMessage "IS hostnames prefix is \"${IS_ALIAS_PREFIX}\""
@@ -494,7 +495,7 @@ validateRealmDomains() {
     logError "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} not found in Application Domains."
     BAD_DOMAINS=1
   else
-    logMessage "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} found."
+    logMessage "  - ${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} found."
   fi
   # Check for other IS aliases
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
@@ -503,7 +504,7 @@ validateRealmDomains() {
       logError "${TARGET} not found in Application Domains."
       BAD_DOMAINS=1
     else
-      logMessage "${TARGET}.${CLUSTER_DOMAIN} found."
+      logMessage "  - ${TARGET}.${CLUSTER_DOMAIN} found."
     fi
   done
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
