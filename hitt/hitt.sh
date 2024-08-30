@@ -37,7 +37,7 @@ JENKINS_PASSWORD="${JENKINS_PASSWORD}"
 JENKINS_HOSTNAME=localhost
 JENKINS_PORT=8080
 
-# Required Tools - set full path to binary if not already present on path
+# Required Tools - set full path to binary if not present on path
 KUBECTL_BIN=kubectl
 CURL_BIN=curl
 KEYTOOL_BIN=keytool
@@ -250,7 +250,7 @@ getVersions() {
       ADE_CS_ENABLED=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="ADE_CS_ENABLED")].value}')
       [[ ! -z "${ADE_CS_ENABLED}" ]] && ADE_CS_OK=1
     fi
-    [[ "${ADE_CS_OK}" == "0" ]] && logError "Helix Plaform credential service is not installed or disabled in the TMS deployment.  Please see the 'Known and corrected issues' documentation."
+    [[ "${ADE_CS_OK}" == "0" ]] && logError "Helix Platform credential service is not installed or disabled in the TMS deployment.  Please see the 'Known and corrected issues' documentation."
   fi
 }
 
@@ -285,7 +285,7 @@ checkHelixLoggingDeployed() {
   else
     logMessage "Helix Logging is not installed."
     if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o jsonpath='{.data.bmc_helix_logging_config}' | grep -q 'ENABLE_LOG_SHIPPER_IN_PODS=true'; then
-      logWarning "ENABLE_LOG_SHIPPER_IN_PODS=true - consider installing Helix Logging to minimize error messages in Helix Plaform pod logs."
+      logWarning "ENABLE_LOG_SHIPPER_IN_PODS=true - consider installing Helix Logging to reduce error messages in Helix Platform pod logs."
     fi
   fi
 }
@@ -317,7 +317,7 @@ getTenantDetails() {
   fi
   logMessage "Helix Platform tenant is ${HP_TENANT}."
   PORTAL_HOSTNAME=$(echo "${TENANT_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${HP_TENANT}'").host')
-  logMessage "Helix portal hostname is ${PORTAL_HOSTNAME}."
+  logMessage "Helix Portal hostname is ${PORTAL_HOSTNAME}."
   HP_COMPANY_NAME=$(echo "${HP_TENANT%%.*}")
   logMessage "Helix Platform ${HP_COMPANY_NAME_LABEL} is ${HP_COMPANY_NAME}."
 }
@@ -508,7 +508,7 @@ validateRealmDomains() {
   done
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}" ; then
-    logWarning "${PORTAL_HOSTNAME} not found in Application Domains. This is expected until the HELIX_ITSM_INTEROPS pipeline has been run."
+    logWarning "${PORTAL_HOSTNAME} not found in Application Domains. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
 }
 
@@ -622,11 +622,12 @@ getISDetailsFromJenkins() {
   checkJenkinsIsRunning
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   checkJenkinsConfig
+  logMessage "Downloading jenkins-cli.jar from Jenkins..."
+  downloadJenkinsCLIJar
   logMessage "Reading values from Jenkins..."
   JENKINS_JSON=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
   checkJenkinsJobResult
   JENKINS_PARAMS=$(echo "${JENKINS_JSON}" | ${JQ_BIN} -r '.actions[] | select(._class=="hudson.model.ParametersAction") .parameters[]')
-
   getPipelineValues
 }
 
@@ -671,6 +672,7 @@ createPipelineVarsArray() {
     DB_PORT
     DATABASE_HOST_NAME
     DATABASE_ADMIN_USER
+    ORACLE_SERVICE_NAME
     DATABASE_RESTORE
     LOGS_ELASTICSEARCH_HOSTNAME
     LOGS_ELASTICSEARCH_TLS
@@ -715,12 +717,38 @@ createInputFileVarsArray() {
   )
 }
 
+downloadJenkinsCLIJar() {
+  ${CURL_BIN} -sk "http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
+}
+
+getPipelinePasswords() {
+  ${JAVA_BIN} -jar jenkins-cli.jar -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF >&1
+  import jenkins.model.*
+  import hudson.model.*
+  def jobName = 'HELIX_ONPREM_DEPLOYMENT'
+  def jenkins = Jenkins.instance
+  def job = jenkins.getItemByFullName(jobName)
+  def lastBuild = job.getLastBuild()
+  def parametersAction = lastBuild.getAction(ParametersAction)
+  def parameters = lastBuild.getAction(ParametersAction.class)?.getParameters()
+  def paramMap = [:]
+  if (parameters != null) {
+      parameters.each { param ->
+          if (param.getName() ==~ ".*PASSWORD.*") {
+            paramMap[param.getName()] = param.getValue()
+          }
+      }
+  }
+  def jsonOutput = new groovy.json.JsonBuilder(paramMap).toPrettyString()
+  println(jsonOutput)
+EOF
+}
+
 getPipelineValues() {
   createPipelineVarsArray
   for i in "${PIPELINE_VARS[@]}"; do
     eval "IS_$i=$(parseJenkinsParam ${i})"
   done
-
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
   ISP_ENVIRONMENT=$(parseJenkinsParam ENVIRONMENT)
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
@@ -729,6 +757,7 @@ getPipelineValues() {
   if [ "${IS_CUSTOMER_SIZE}" == "M" ] || [ "${IS_CUSTOMER_SIZE}" == "L" ] || [ "${IS_CUSTOMER_SIZE}" == "XL" ]; then
     IS_PLATFORM_INT=1
   fi
+  IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
   cloneCustomerConfigsRepo
 }
 
@@ -908,10 +937,13 @@ validateISDetails() {
       logMessage "INTEROPS BMC_HELIX_ITSM_INSIGHTS and HELIX_ITSM_INSIGHTS product options are consistent."
     fi
 
-    if [ "${IS_SIDECAR_SUPPORT_ASSISTANT_FPACK}" != "true " ]; then
+    if [ "${IS_SUPPORT_ASSISTANT_TOOL}" != "true" ]; then
+      logWarning "SUPPORT_ASSISTANT_TOOL not selected - Support Assistant Tool is recommended to provide access to application logs"
+    fi
+    if [ "${IS_SIDECAR_SUPPORT_ASSISTANT_FPACK}" != "true" ]; then
       logWarning "SIDECAR_SUPPORT_ASSISTANT_FPACK not selected - Support Assistant Tool will not be able to access application logs."
     fi
-    if [ "${IS_SUPPORT_ASSISTANT_CREATE_ROLE}" != "true " ]; then
+    if [ "${IS_SUPPORT_ASSISTANT_CREATE_ROLE}" != "true" ]; then
       logWarning "SUPPORT_ASSISTANT_CREATE_ROLE not selected - Support Assistant Tool will not be able to access application logs unless the role/rolebinding are manaually created."
     fi
 
@@ -957,11 +989,11 @@ validateISDetails() {
       checkIsValidElastic "${IS_LOGS_ELASTICSEARCH_HOSTNAME}" "LOGS_ELASTICSEARCH_HOSTNAME"
     fi
 
-#    if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${HP_REGISTRY_PASSWORD}" ]; then
-#      logError "IMAGE_REGISTRY_PASSWORD does not match the Helix Platform registry password."
-#    else
-#      logMessage "IMAGE_REGISTRY_PASSWORD matches the Helix Platform registry password."
-#    fi
+    if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${HP_REGISTRY_PASSWORD}" ]; then
+      logError "IMAGE_REGISTRY_PASSWORD does not match the Helix Platform registry password."
+    else
+      logMessage "IMAGE_REGISTRY_PASSWORD matches the Helix Platform registry password."
+    fi
 
     if [ "$IS_VC_RKM_USER_NAME" == "${IS_VC_PROXY_USER_LOGIN_NAME}" ] || [ -z "$IS_VC_RKM_USER_NAME" ] || [ -z "${IS_VC_PROXY_USER_LOGIN_NAME}" ]; then
       logError "VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME must be different and cannot be blank."
@@ -1222,7 +1254,7 @@ buildJISQLcmd() {
     oracle)
       # Note SQL in section below has newline before go command to workaround Java OOM error for jisql with Oracle
       JISQLJAR=ojdbc8.jar
-      JISQLURL=jdbc:oracle:thin:@//${IS_DATABASE_HOST_NAME}:${IS_DB_PORT}/${IS_AR_DB_NAME}
+      JISQLURL=jdbc:oracle:thin:@//${IS_DATABASE_HOST_NAME}:${IS_DB_PORT}/${IS_ORACLE_SERVICE_NAME}
       JISQLDRIVER=oraclethin
       ;;
     postgres)
@@ -1412,7 +1444,12 @@ checkISDockerLogin() {
   fi
 
   if ! docker ps > /dev/null 2>&1; then
-    logWarning "'docker' command not found or failed - skipping registry credentials check."
+    if ! which docker > /dev/null 2>&1 ; then
+      LOG_MSG="'docker' command not found in path"
+    else
+      LOG_MSG="'docker' command returned an error"
+    fi
+    logWarning "${LOG_MSG} - skipping registry credentials check."
     return
   fi
   if docker login "${IS_SECRET_HARBOR_REGISTRY_HOST}" -u "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" -p "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" > /dev/null 2>&1 ; then
