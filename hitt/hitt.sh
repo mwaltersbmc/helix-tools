@@ -713,7 +713,6 @@ createInputFileVarsArray() {
     PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USER_PASSWORD
     PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USERNAME
     PLATFORM_COMMON_CACERTS_SSL_TRUSTSTORE_PASSWORD
-    IMAGE_REGISTRY_PASSWORD
     SIDECAR_FLUENT_PASSWORD
   )
 }
@@ -1361,7 +1360,7 @@ checkKubeconfig() {
 }
 
 logStatus() {
-  echo "${BOLD}${1}${NORMAL}"
+  echo -e "${BOLD}${1}${NORMAL}"
 }
 
 getRegistryDetailsFromHP() {
@@ -1464,14 +1463,14 @@ dumpVARs() {
   [[ "${DUMPVARS}" = "" ]] && return
   # Debug mode to print all variables
   if [ "${MODE}" == "pre-is" ]; then
-    logMessage "${BOLD}PIPELINE_VARS...${NORMAL}"
+    logStatus "\nPipeline values are:"
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       echo "${i}=${!v}"
     done
   fi
   if [ "${MODE}" == "post-is" ]; then
-    logMessage "${BOLD}K8S_VARS...${NORMAL}"
+    logStatus "\nKubernetes values are:"
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       if [ "${!v}" != "" ]; then
@@ -1593,11 +1592,24 @@ checkJenkinsCredentials() {
     fi
   done
 }
+
+checkForNewHITT() {
+  if [  $(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' "${HITT_URL}") == "200" ]; then
+    REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
+    LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
+    if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
+    logMessage "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt${NORMAL}"
+    sleep 3
+    fi
+  fi
+}
+
 # FUNCTIONS End
 
 # MAIN Start
 SCRIPT_VERSION=1
 HITT_CONFIG_FILE=hitt.conf
+HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 FAIL=0
 WARN=0
 SKIP_JENKINS=0
@@ -1607,6 +1619,7 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 RED="\e[31m"
 YELLOW="\e[33m"
+GREEN="\e[32m"
 SEALTCTL=sealtctl
 KUBECTL_BIN=kubectl
 JQ_BIN=jq
@@ -1649,6 +1662,7 @@ if [ ! -f "${HITT_CONFIG_FILE}" ]; then
   createHITTconf
 fi
 source "${HITT_CONFIG_FILE}"
+checkForNewHITT
 
 # Validate action
 [[ "${MODE}" =~ ^post-hp$|^pre-is$|^post-is$ ]] || usage
