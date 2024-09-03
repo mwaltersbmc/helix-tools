@@ -131,3 +131,20 @@
             scope: global
             value: git
       when: git_res.config_values|length == 0
+
+    - name: Jenkins - get list of plugins
+      uri:
+        method: GET
+        url: 'http://{{ jenkins_hostname }}:{{ jenkins_port }}/pluginManager/api/json?depth=1'
+        user: "{{ jenkins_username }}"
+        password: "{{ jenkins_password }}"
+        force_basic_auth: true
+        headers:
+          Cookie: "{{ crumb.cookies_string }}"
+          Jenkins-Crumb: "{{ crumb.content.split(':')[1] }}"
+        status_code: 404, 200
+      register: jenkins_plugins
+
+    - name: Display message if Ansible plugin is not installed
+      debug: msg="Jenkins Ansible plugin is not installed but is required for the 'Run tctl Command' pipeline."
+      when:  jenkins_plugins.json.plugins is not search('Jenkins Ansible plugin')
