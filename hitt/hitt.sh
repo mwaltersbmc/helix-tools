@@ -121,8 +121,16 @@ checkToolVersion() {
         FAIL=1
       fi
       ;;
+    java)
+      REQUIRED_VERSION=11
+      INSTALLED_VERSION=$(${JAVA_BIN} -version 2>&1 | grep -oP 'version "?(1\.)?\K\d+')
+      if compare "$INSTALLED_VERSION < $REQUIRED_VERSION"; then
+        logError "java version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
+        FAIL=1
+      fi
+      ;;
     *)
-    ;;
+      ;;
   esac
 }
 
@@ -241,7 +249,7 @@ getVersions() {
   FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
   LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
   LOG_ELASTICSEARCH_USERNAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_USERNAME | @base64d')
-  FTS_ELASTIC_POD=$(${KUBECTL_BIN} get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
+  FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
 
   if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
     FTS_ELASTIC_POD_CONTAINER="-c opensearch"
@@ -439,7 +447,7 @@ spec:
 EOF
 
   # Wait for job to complete
-  if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete job/"${SEALTCTL}" > /dev/null 2>&1; then
+  if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete job/"${SEALTCTL}" --timeout=90s > /dev/null 2>&1; then
     logError "timed out waiting for job ${SEALTCTL} to complete."
     return 1
   else
@@ -1629,7 +1637,7 @@ checkForNewHITT() {
     REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
     LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
     if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
-    logMessage "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt${NORMAL}"
+    logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt${NORMAL}"
     sleep 3
     fi
   fi
