@@ -152,12 +152,24 @@ generateRandom() {
   echo "${STRING}"
 }
 
-checkNamespaceExists() {
-  # namespace_name - exit if not found
-  if ! ${KUBECTL_BIN} get ns "${1}" > /dev/null 2>&1 ; then
-    logError "${NS_TYPE} namespace ${1} not found." 1
+checkK8sAuth() {
+  if ${KUBECTL_BIN} auth can-i ${1} ${2} > /dev/null 2>&1 ; then
+    return 0
   else
-    logMessage "${NS_TYPE} namespace ${1} found."
+    return 1
+  fi
+}
+
+checkNamespaceExists() {
+  if checkK8sAuth get ns; then
+  # namespace_name - exit if not found
+    if ! ${KUBECTL_BIN} get ns "${1}" > /dev/null 2>&1 ; then
+      logError "${NS_TYPE} namespace ${1} not found." 1
+    else
+      logMessage "${NS_TYPE} namespace ${1} found."
+    fi
+  else
+    logWarning "Unable to run 'kubectl get ns' - skipping namespace validation."
   fi
 }
 
@@ -221,21 +233,27 @@ getVersions() {
         IS_DB_VERSION=201
         ;;
       *)
-        logError "Unknown Helix IS version (${IS_VERSION}) - check for script updates." 1
+        logError "Unknown Helix IS version (${IS_VERSION}) - check for HITT updates." 1
     esac
   fi
 
-  # Set service name for FTS ELasticservice based on HP version
-  case "${HP_VERSION%%.*}" in
-    22 | 23)
-      FTS_ELASTIC_SERVICENAME=elasticsearch-logs-opendistro-es-data-svc
-      FTS_ELASTIC_POD=elasticsearch-logs-opendistro-es-data-0
-      ;;
-    *)
-      FTS_ELASTIC_SERVICENAME=opensearch-logs-data
-      FTS_ELASTIC_POD=opensearch-logs-data-0
-      ;;
-  esac
+  LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
+  FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
+  LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
+  LOG_ELASTICSEARCH_USERNAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_USERNAME | @base64d')
+  FTS_ELASTIC_POD=$(${KUBECTL_BIN} get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
+
+  if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
+    FTS_ELASTIC_POD_CONTAINER="-c opensearch"
+  fi
+#  case "${HP_VERSION%%.*}" in
+#    22 | 23)
+#      FTS_ELASTIC_POD=elasticsearch-logs-opendistro-es-data-0
+#      ;;
+#    *)
+#      FTS_ELASTIC_POD=opensearch-logs-data-0
+#      ;;
+#  esac
 
   HP_COMPANY_NAME_LABEL="COMPANY_NAME"
   if compare "${HP_VERSION%.*} >= 24.2" ; then
@@ -291,7 +309,7 @@ checkHelixLoggingDeployed() {
 }
 
 checkEFKClusterHealth() {
-  EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" -- sh -c 'curl -sk -u elastic:"'"${HELIX_LOGGING_PASSWORD}"'" -X GET https://"'"${EFK_ELASTIC_SERVICENAME}"'":9200/_cluster/health')
+  EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c 'curl -sk -u elastic:"'"${HELIX_LOGGING_PASSWORD}"'" -X GET https://"'"${EFK_ELASTIC_SERVICENAME}"'":9200/_cluster/health')
   EFK_ELASTIC_STATUS=$(echo "${EFK_ELASTIC_JSON}" | ${JQ_BIN} -r '.status')
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
     logError "Helix Logging Elasticsearch problem - ${EFK_ELASTIC_STATUS} - check ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
@@ -532,12 +550,11 @@ checkServiceDetails() {
     logMessage "ITSM Insights services found in Helix Platform."
     ITSM_INSIGHTS=0
   fi
-
   deleteTCTLJob
 }
 
 checkFTSElasticStatus() {
-  FTS_ELASTIC_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" -- sh -c 'curl -sk -u admin:admin -X GET https://localhost:9200/_cluster/health?pretty | grep status')
+  FTS_ELASTIC_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c 'curl -sk -u admin:admin -X GET https://localhost:9200/_cluster/health?pretty | grep status')
   if ! echo "${FTS_ELASTIC_STATUS}" | grep -q green ; then
     logError "FTS Elasticsearch problem - ${FTS_ELASTIC_STATUS} - check ${FTS_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
@@ -893,10 +910,14 @@ validateISDetails() {
       logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid (${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT})."
     fi
 
-    if isBlank "${IS_INGRESS_CLASS}" || ! ${KUBECTL_BIN} get ingressclasses.networking.k8s.io "${IS_INGRESS_CLASS}" > /dev/null 2>&1 ; then
-      logError "INGRESS_CLASS (${IS_INGRESS_CLASS})is blank or not valid."
+    if checkK8sAuth get ingressclasses; then
+      if isBlank "${IS_INGRESS_CLASS}" || ! ${KUBECTL_BIN} get ingressclasses "${IS_INGRESS_CLASS}" > /dev/null 2>&1 ; then
+        logError "INGRESS_CLASS (${IS_INGRESS_CLASS})is blank or not valid."
+      else
+        logMessage "INGRESS_CLASS (${IS_INGRESS_CLASS}) appears valid."
+      fi
     else
-      logMessage "INGRESS_CLASS (${IS_INGRESS_CLASS}) appears valid."
+      logWarning "Unable to list ingressclasses - skipping INGRESS_CLASS checks."
     fi
 
     if [ "${IS_CLUSTER_DOMAIN}" != "${CLUSTER_DOMAIN}" ]; then
@@ -1168,20 +1189,30 @@ checkFTSElasticSettings() {
     logError "FTS_ELASTICSEARCH_SECURE (${IS_FTS_ELASTICSEARCH_SECURE}) is not the expected value of true."
     BAD_FTS_ELASTIC=1
   else
-    logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of true."
+    logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of 'true'."
   fi
 
-  if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" != "admin" ]; then
-    logError "FTS_ELASTICSEARCH_USERNAME (${IS_FTS_ELASTICSEARCH_USERNAME}) is not the expected value of admin."
-    BAD_FTS_ELASTIC=1
-  else
-    logMessage "FTS_ELASTICSEARCH_USERNAME is the expected value of admin."
+# Not expected as FTS user is not a pipeline var.
+#  if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" != "admin" ] || [ "${IS_FTS_ELASTICSEARCH_USERNAME}" != "bmcuser" ]; then
+#    logError "Unexpected value for FTS_ELASTICSEARCH_USERNAME."
+#    BAD_FTS_ELASTIC=1
+#  fi
+
+  if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "admin" ]; then
+    if  [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "admin" ]; then
+      logError "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value when FTS_ELASTICSEARCH_USERNAME is 'admin'."
+      BAD_FTS_ELASTIC=1
+    fi
   fi
 
-  if [ -n "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" ] && [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "admin" ]; then
-    logError "FTS_ELASTICSEARCH_USER_PASSWORD (${IS_FTS_ELASTICSEARCH_USER_PASSWORD}) is not the expected value."
-    BAD_FTS_ELASTIC=1
-  else
+  if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "bmcuser" ]; then
+    if [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
+      logError "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of LOG_ES_PASSWD from the Helix Platform secrets.txt."
+      BAD_FTS_ELASTIC=1
+    fi
+  fi
+
+  if [ "${BAD_FTS_ELASTIC}" == "0" ]; then
     logMessage "FTS_ELASTICSEARCH_USER_PASSWORD is the expected value."
   fi
 
