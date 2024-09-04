@@ -1609,6 +1609,7 @@ checkJenkinsPlugins() {
     workflow-step-api
     workflow-support
     ws-cleanup
+    pipeline-utility-steps
     pipeline-stage-view
     pipeline-rest-api
     )
