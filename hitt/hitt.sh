@@ -129,6 +129,14 @@ checkToolVersion() {
         FAIL=1
       fi
       ;;
+    kubectl)
+      REQUIRED_VERSION=1.20
+      INSTALLED_VERSION=$(${KUBECTL_BIN} version -o json | ${JQ_BIN} -r '.clientVersion.major + "." + .clientVersion.minor')
+      if compare "$INSTALLED_VERSION < $REQUIRED_VERSION"; then
+        logError "kubectl version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
+        FAIL=1
+      fi
+      ;;
     *)
       ;;
   esac
