@@ -8,7 +8,6 @@ This is a collection of utility and troubleshooting pipeline jobs for the Jenkin
 |DE - Install K8s Clients | Installs/upgrades K8s clients and tools
 |DE - Run kubectl Command | Run `kubectl` commands from the Deployment Engine
 |HP - Run tctl Command | Run `tctl` commands for the Helix Platform
-|IS - Add HCT to pipeline | Adds HCT options to the HELIX_ONPREM_DEPLOYMENT pipeline
 |IS - Apply IS Server License | Apply an IS server license via the RESTAPI
 |IS - Create Realm in SSO | Creates a realm for Helix IS in the Helix Platform SSO
 |IS - Generate DBID for IS Server | Generate the DB ID used for IS licensing
@@ -72,14 +71,6 @@ Run the Helix Platform **tctl** tool using a job container to avoid having to do
 |----------------|-------------------------------
 |HELIX_PLATFORM_NAMESPACE | The Helix Platform namespace name
 |TCTL_COMMAND | The `tctl`  command to run - e.g. get tenant.  Accepts JSON input strings
-
-### IS - Add HCT to Pipeline
-Adds options to save the HELIX_ONPREM_DEPLOYMENT pipeline values to a file for use by the Health Check tool.\
-See https://community.bmc.com/s/news/aA33n0000000RiHCAU/bmc-helix-onprem-health-check-tool-for-validating-itsm-jenkin-pipeline-input
-
-| Parameter            |Description
-|----------------|-------------------------------
-|ITSM_REPO_PATH | The path to the `ITSM_REPO/itsm-on-premise-installer.git` directory
 
 #### IS - Apply IS Server License
 Uses the IS RESTAPI to add a server license.
