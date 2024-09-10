@@ -538,7 +538,7 @@ validateRealmDomains() {
       logError "${TARGET} not found in Application Domains."
       BAD_DOMAINS=1
     else
-      logMessage "  - ${TARGET}.${CLUSTER_DOMAIN} found."
+      logMessage "  - ${TARGET} found."
     fi
   done
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
@@ -1118,13 +1118,27 @@ validateCacerts() {
 
   # Convert JKS to pem
   logMessage "Processing cacerts..."
+  VALID_CACERTS=0
   ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
   ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
-  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem ; then
-    logError "cacerts file does not appear to contain all the certificates required to connect to Helix."
-  else
+  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
+    logError "cacerts file does not appear to contain the certifcates required to connect to the Helix Platform LB_HOST."
+    VALID_CACERTS=1
+  fi
+  for i in "${IS_ALIAS_SUFFIXES[@]}"; do
+    TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
+    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
+      logError "certificate for ${TARGET} not found in cacerts."
+      VALID_CACERTS=1
+    else
+      logMessage "  - valid certificate for ${TARGET} found in cacerts file."
+    fi
+  done
+
+  if [ "${VALID_CACERTS}" == 0 ]; then
     logMessage "cacerts file appears valid."
   fi
+
 }
 
 checkISFTSElasticHost() {
@@ -1314,7 +1328,7 @@ buildJISQLcmd() {
 }
 
 testNetConnection () {
-  if ! ${NC_BIN} -z -w 5 "${1}" "${2}"; then
+  if ! ${NC_BIN} -z -w 5 "${1}" "${2}" > /dev/null 2>&1; then
     return 1
   else
     return 0
