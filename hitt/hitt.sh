@@ -253,6 +253,7 @@ getVersions() {
     esac
   fi
 
+  LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" helixingress-master -o jsonpath='{.spec.rules[0].host}')
   LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
   FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
   LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
@@ -1118,16 +1119,19 @@ validateCacerts() {
 
   # Convert JKS to pem
   logMessage "Processing cacerts..."
+  unpackSSLPoke
   VALID_CACERTS=0
-  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
-  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
-  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
+#  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
+#  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
+#  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
+  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts SSLPoke "${LB_HOST}" 443 > /dev/null 2>&1 ; then
     logError "cacerts file does not appear to contain the certifcates required to connect to the Helix Platform LB_HOST."
     VALID_CACERTS=1
   fi
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
-    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
+#    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
+    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts SSLPoke "${TARGET}" 443 > /dev/null 2>&1 ; then
       logError "certificate for ${TARGET} not found in cacerts."
       VALID_CACERTS=1
     else
@@ -1666,6 +1670,10 @@ checkForNewHITT() {
   fi
 }
 
+unpackSSLPoke() {
+  echo "${SSLPOKE_PAYLOAD}" | tr -d ' ' | base64 -d > SSLPoke.class
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -1688,6 +1696,39 @@ JQ_BIN=jq
 ERROR_ARRAY=()
 WARN_ARRAY=()
 JENKINS_CREDENTIALS=""
+SSLPOKE_PAYLOAD="
+yv66vgAAADcAbQoAFgAjCQAkACUHACYKACcAKBIAAAAsCgAtAC4KACQALwoACQAwBwAxCgAyADMK
+AAkANAcANQoADAA2CgAMADcKACAAOAoAHwA5CgAfADoKAC0AOwgAPAcAPQoAFAA+BwA/AQAGPGlu
+aXQ+AQADKClWAQAEQ29kZQEAD0xpbmVOdW1iZXJUYWJsZQEABG1haW4BABYoW0xqYXZhL2xhbmcv
+U3RyaW5nOylWAQANU3RhY2tNYXBUYWJsZQcAQAcAQQcAQgEAClNvdXJjZUZpbGUBAAxTU0xQb2tl
+LmphdmEMABcAGAcAQwwARABFAQAHU1NMUG9rZQcARgwARwBIAQAQQm9vdHN0cmFwTWV0aG9kcw8G
+AEkIAEoMAEsATAcATQwATgBPDABQAFEMAFIAUwEAHmphdmF4L25ldC9zc2wvU1NMU29ja2V0RmFj
+dG9yeQcAVAwAVQBWDABXAFgBABdqYXZheC9uZXQvc3NsL1NTTFNvY2tldAwAWQBaDABbAFwMAF0A
+UQwAXgBfDABgAF8MAGEAUQEAFlN1Y2Nlc3NmdWxseSBjb25uZWN0ZWQBABNqYXZhL2xhbmcvRXhj
+ZXB0aW9uDABiABgBABBqYXZhL2xhbmcvT2JqZWN0AQATW0xqYXZhL2xhbmcvU3RyaW5nOwEAE2ph
+dmEvaW8vSW5wdXRTdHJlYW0BABRqYXZhL2lvL091dHB1dFN0cmVhbQEAEGphdmEvbGFuZy9TeXN0
+ZW0BAANvdXQBABVMamF2YS9pby9QcmludFN0cmVhbTsBAA9qYXZhL2xhbmcvQ2xhc3MBAAdnZXRO
+YW1lAQAUKClMamF2YS9sYW5nL1N0cmluZzsKAGMAZAEAFlVzYWdlOiABIDxob3N0PiA8cG9ydD4B
+ABdtYWtlQ29uY2F0V2l0aENvbnN0YW50cwEAJihMamF2YS9sYW5nL1N0cmluZzspTGphdmEvbGFu
+Zy9TdHJpbmc7AQATamF2YS9pby9QcmludFN0cmVhbQEAB3ByaW50bG4BABUoTGphdmEvbGFuZy9T
+dHJpbmc7KVYBAARleGl0AQAEKEkpVgEACmdldERlZmF1bHQBABsoKUxqYXZheC9uZXQvU29ja2V0
+RmFjdG9yeTsBABFqYXZhL2xhbmcvSW50ZWdlcgEACHBhcnNlSW50AQAVKExqYXZhL2xhbmcvU3Ry
+aW5nOylJAQAMY3JlYXRlU29ja2V0AQAmKExqYXZhL2xhbmcvU3RyaW5nO0kpTGphdmEvbmV0L1Nv
+Y2tldDsBAA5nZXRJbnB1dFN0cmVhbQEAFygpTGphdmEvaW8vSW5wdXRTdHJlYW07AQAPZ2V0T3V0
+cHV0U3RyZWFtAQAYKClMamF2YS9pby9PdXRwdXRTdHJlYW07AQAFd3JpdGUBAAlhdmFpbGFibGUB
+AAMoKUkBAARyZWFkAQAFcHJpbnQBAA9wcmludFN0YWNrVHJhY2UHAGUMAEsAaQEAJGphdmEvbGFu
+Zy9pbnZva2UvU3RyaW5nQ29uY2F0RmFjdG9yeQcAawEABkxvb2t1cAEADElubmVyQ2xhc3NlcwEA
+mChMamF2YS9sYW5nL2ludm9rZS9NZXRob2RIYW5kbGVzJExvb2t1cDtMamF2YS9sYW5nL1N0cmlu
+ZztMamF2YS9sYW5nL2ludm9rZS9NZXRob2RUeXBlO0xqYXZhL2xhbmcvU3RyaW5nO1tMamF2YS9s
+YW5nL09iamVjdDspTGphdmEvbGFuZy9pbnZva2UvQ2FsbFNpdGU7BwBsAQAlamF2YS9sYW5nL2lu
+dm9rZS9NZXRob2RIYW5kbGVzJExvb2t1cAEAHmphdmEvbGFuZy9pbnZva2UvTWV0aG9kSGFuZGxl
+cwAhAAMAFgAAAAAAAgABABcAGAABABkAAAAdAAEAAQAAAAUqtwABsQAAAAEAGgAAAAYAAQAAAAkA
+CQAbABwAAQAZAAAA9gAEAAUAAABsKr4FnwAXsgACEgO2AAS6AAUAALYABgS4AAe4AAjAAAlMKyoD
+MioEMrgACrYAC8AADE0stgANTiy2AA46BBkEBLYADy22ABCeABCyAAIttgARtgASp//vsgACEhO2
+AAanAAxMK7YAFQS4AAexAAEAGgBfAGIAFAACABoAAABCABAAAAALAAYADAAWAA0AGgAQACEAEQAy
+ABMANwAUAD0AFwBDABkASgAaAFcAHABfACEAYgAeAGMAHwBnACAAawAiAB0AAAAoAAUa/wAoAAUH
+AB4HAAkHAAwHAB8HACAAABP/AAoAAQcAHgABBwAUCAADACEAAAACACIAaAAAAAoAAQBmAGoAZwAZ
+ACkAAAAIAAEAKgABACs="
 
 while getopts "m:f:" options; do
   case "${options}" in
