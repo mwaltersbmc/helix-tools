@@ -58,6 +58,9 @@ $ kubectl create secret -n IS-NS generic cacerts --from-file=cacerts --dry-run=c
 Extract cacerts from secret
 $ kubectl get secret -n IS-NS cacerts -o jsonpath='{.data.cacerts}' | base64 -d > cacerts
 
+Import pem file to cacerts
+$ keytool -importcert -v -alias <alias name> -file <certificatefilename> -keystore cacerts
+
 Get certs from LB/Ingress
 $ openssl s_client -showcerts -connect LB_HOST:443
 
