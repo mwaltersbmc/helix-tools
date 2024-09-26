@@ -996,6 +996,9 @@ validateISDetails() {
       logMessage "INTEROPS BMC_HELIX_ITSM_INSIGHTS and HELIX_ITSM_INSIGHTS product options are consistent."
     fi
 
+#    if [ "${IS_SUPPORT_ASSISTANT_TOOL}" != "true" ]; then
+#      logWarning "SUPPORT_ASSISTANT_TOOL not selected - Support Assistant Tool is recommended to provide access to application logs."
+#    fi
     if [ "${IS_SIDECAR_SUPPORT_ASSISTANT_FPACK}" != "true" ]; then
       logWarning "SIDECAR_SUPPORT_ASSISTANT_FPACK not selected - Support Assistant Tool will not be able to access application logs."
     fi
@@ -1079,12 +1082,6 @@ validateISDetails() {
       logError "HELIX_PLATFORM_CUSTOMER_NAME (${IS_HELIX_PLATFORM_CUSTOMER_NAME}) is not the expected value of ${HP_COMPANY_NAME}."
     else
       logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of ${HP_COMPANY_NAME}."
-    fi
-  fi
-
-  if [ "${MODE}" == "post-is" ]; then
-    if [ "${IS_SUPPORT_ASSISTANT_TOOL}" != "true" ]; then
-      logWarning "SUPPORT_ASSISTANT_TOOL not selected - Support Assistant Tool is recommended to provide access to application logs."
     fi
   fi
 }
