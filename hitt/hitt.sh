@@ -232,7 +232,6 @@ checkPodStatus() {
 
 getVersions() {
   HP_VERSION=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o jsonpath='{.data.version}' | head -1)
-  EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
   logMessage "Helix Platform version - ${HP_VERSION}."
     if [ "${MODE}" == "post-is" ]; then
     IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
@@ -252,8 +251,11 @@ getVersions() {
         logError "Unknown Helix IS version (${IS_VERSION}) - check for HITT updates." 1
     esac
   fi
+}
 
-  LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" helixingress-master -o jsonpath='{.spec.rules[0].host}')
+setVarsFromPlatform() {
+  EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
+  LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helixingress-master -o jsonpath='{.spec.rules[0].host}')
   LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
   FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
   LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
@@ -571,7 +573,8 @@ checkServiceDetails() {
 }
 
 checkFTSElasticStatus() {
-  FTS_ELASTIC_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c 'curl -sk -u admin:admin -X GET https://localhost:9200/_cluster/health?pretty | grep status')
+  set -x
+  FTS_ELASTIC_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c "curl -sk -u \"${LOG_ELASTICSEARCH_USERNAME}:${LOG_ELASTICSEARCH_PASSWORD}\" -X GET https://localhost:9200/_cluster/health?pretty | grep status")
   if ! echo "${FTS_ELASTIC_STATUS}" | grep -q green ; then
     logError "FTS Elasticsearch problem - ${FTS_ELASTIC_STATUS} - check ${FTS_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
@@ -652,6 +655,16 @@ checkJenkinsIsRunning() {
 fi
 }
 
+getLastBuildFromJenkins() {
+  # PIPELINE_NAME
+  BUILD_NUMBER=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${PIPELINE_NAME}/lastBuild/buildNumber")
+}
+
+savePipelineConsoleOutput() {
+  # PIPELINE_NAME / BUILD_NUMBER
+  ${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/${2}/consoleText" > "${1}-${2}.log"
+}
+
 getISDetailsFromJenkins() {
   [[ "${MODE}" != "pre-is" ]] && return
   checkJenkinsIsRunning
@@ -668,7 +681,9 @@ getISDetailsFromJenkins() {
 
 checkJenkinsJobResult() {
   if ! echo "${JENKINS_JSON}" | ${JQ_BIN} -r .result | grep -q "SUCCESS"; then
-    logWarning "Last build of HELIX_ONPREM_DEPLOYMENT was not successful. Please review the console output for both this and the HELIX_GENERATE_CONFIG pipelines."
+    logWarning "Last build of the HELIX_ONPREM_DEPLOYMENT was not successful. Please review the console output for both this and the HELIX_GENERATE_CONFIG pipelines."
+    savePipelineConsoleOutput HELIX_ONPREM_DEPLOYMENT lastBuild
+    savePipelineConsoleOutput HELIX_GENERATE_CONFIG lastBuild
   fi
 }
 
@@ -1153,7 +1168,7 @@ checkISFTSElasticHost() {
     else
       logWarning "Recommend using servicename.namespace format instead of an exposed IP address for FTS_ELASTICSEARCH_HOSTNAME."
       # Try and confirm IP is a valid ES
-      ES_HEALTH=$(${CURL_BIN} -sk -u admin:admin -X GET https://"${1}":9200/_cluster/health)
+      ES_HEALTH=$(${CURL_BIN} -sk -u "${LOG_ELASTICSEARCH_USERNAME}:${LOG_ELASTICSEARCH_PASSWORD}" -X GET https://"${1}":9200/_cluster/health)
       if [ -z "${ES_HEALTH}" ]; then
         logError "${1} does not appear to be a valid Elasticsearch server IP address."
       else
@@ -1802,6 +1817,7 @@ if [ "${MODE}" != "post-hp" ]; then
 fi
 logStatus "Getting versions..."
 getVersions
+setVarsFromPlatform
 checkHelixLoggingDeployed
 logStatus "Checking Helix Platform registry details..."
 checkHPRegistryDetails
