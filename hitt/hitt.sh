@@ -48,6 +48,7 @@ GIT_BIN=git
 JAVA_BIN=java
 TAR_BIN=tar
 NC_BIN=nc
+HOST_BIN=host
 EOF
 }
 
@@ -525,7 +526,7 @@ validateRealm() {
 }
 
 validateRealmDomains() {
-  logMessage "Checking for expected hostname aliases in realm Application Domains list..."
+  logMessage "Checking for expected hostname aliases in realm Application Domains & DNS..."
   # Special case when IS_ENVIRONMENT is "prod"
   if [ "${IS_ENVIRONMENT}" == "prod" ]; then
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}"
@@ -536,11 +537,12 @@ validateRealmDomains() {
   fi
   # Check for midtier alias
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}" ; then
-    logError "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} not found in Application Domains."
+    logError "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} not found in realm Application Domains."
     BAD_DOMAINS=1
   else
-    logMessage "  - ${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} found."
+    logMessage "  - ${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} found in realm Application Domains."
   fi
+  validateDomainInDNS "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}"
   # Check for other IS aliases
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
@@ -548,12 +550,22 @@ validateRealmDomains() {
       logError "${TARGET} not found in Application Domains."
       BAD_DOMAINS=1
     else
-      logMessage "  - ${TARGET} found."
+      logMessage "  - ${TARGET} found in realm Application Domains."
     fi
+    validateDomainInDNS "${TARGET}"
   done
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}" ; then
-    logWarning "${PORTAL_HOSTNAME} not found in Application Domains. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
+    logWarning "${PORTAL_HOSTNAME} not found in realm Application Domains. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
+  fi
+}
+
+validateDomainInDNS() {
+  # hostname to check
+  if ! ${HOST_BIN} ${1} > /dev/null 2>&1; then
+    logError "entry for ${1} not found in DNS."
+  else
+    logMessage "  - ${1} found in DNS."
   fi
 }
 
