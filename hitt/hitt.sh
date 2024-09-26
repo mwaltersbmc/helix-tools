@@ -152,6 +152,7 @@ checkBinary() {
 }
 
 cleanUp() {
+  if [ ! -z "${SKIP_CLEANUP}" ]; then return; fi
   for i in sealcacerts sealstore.p12 sealstore.pem; do
     [[ -f ${i} ]] &&  rm -f ${i}
   done
@@ -254,6 +255,7 @@ getVersions() {
 }
 
 setVarsFromPlatform() {
+  FTS_ELASTIC_CERTNAME="esnode"
   EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
   LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helixingress-master -o jsonpath='{.spec.rules[0].host}')
   LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
@@ -289,6 +291,11 @@ setVarsFromPlatform() {
     fi
     [[ "${ADE_CS_OK}" == "0" ]] && logError "Helix Platform credential service is not installed or disabled in the TMS deployment.  Please see the 'Known and corrected issues' documentation."
   fi
+
+  if compare "${HP_VERSION%.*} >= 24.3" ; then
+    FTS_ELASTIC_CERTNAME="esnodeopensearch2"
+  fi
+
 }
 
 getRSSODetails() {
@@ -1128,10 +1135,10 @@ validateCacerts() {
     logMessage "cacerts file is a valid Java keystore."
   fi
 
-  if ! ${KEYTOOL_BIN} --list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias esnode > /dev/null 2>&1 ; then
-    logError "cacerts file does not contain the expected esnode certificate required for FTS Elasticsearch connection."
+  if ! ${KEYTOOL_BIN} --list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
+    logError "cacerts file does not contain the expected ${FTS_ELASTIC_CERTNAME} certificate required for FTS Elasticsearch connection."
   else
-    logMessage "cacerts file contains Elasticsearch esnode certificate."
+    logMessage "cacerts file contains the expected Elasticsearch ${FTS_ELASTIC_CERTNAME} certificate."
   fi
 
   # Convert JKS to pem
