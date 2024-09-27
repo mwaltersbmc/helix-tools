@@ -1707,6 +1707,16 @@ unpackSSLPoke() {
   echo "${SSLPOKE_PAYLOAD}" | tr -d ' ' | base64 -d > SSLPoke.class
 }
 
+checkHITTconf() {
+  CONF_UPDATED=0
+  while IFS="=" read -r param value; do
+    if ! grep "^${param}" "${1}" >/dev/null 2>&1; then
+      echo "${param}=${value}" >> "${1}"
+      CONF_UPDATED=1
+    fi
+  done < <(grep '.=' .hitt.conf)
+  [[ $CONF_UPDATED == 1 ]] && logStatus "${GREEN}HITT config file (${1}) has been updated with a new parameter.${NORMAL}"
+}
 # FUNCTIONS End
 
 # MAIN Start
@@ -1796,6 +1806,9 @@ if [ ! -f "${HITT_CONFIG_FILE}" ]; then
   logStatus "Please use the following steps to configure the HITT and create your config file..."
   getConfValues
   createHITTconf "${HITT_CONFIG_FILE}"
+else
+  createHITTconf ".hitt.conf"
+  checkHITTconf "${HITT_CONFIG_FILE}"
 fi
 source "${HITT_CONFIG_FILE}"
 checkForNewHITT
