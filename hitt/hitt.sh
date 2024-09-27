@@ -19,7 +19,7 @@ getConfValues() {
 }
 
 createHITTconf() {
-  cat << EOF > "${HITT_CONFIG_FILE}"
+  cat << EOF > "${1}"
 # This is the config file for the Helix IS Triage Tool script.
 
 # REQUIRED SETTINGS
@@ -1788,14 +1788,14 @@ checkKubeconfig
 # config file checks
 if [ ! -f "${HITT_CONFIG_FILE}" ]; then
   if ! ${KUBECTL_BIN} get ns > /dev/null 2>&1 ; then
-    createHITTconf
+    createHITTconf "${HITT_CONFIG_FILE}"
     logError "'kubectl get namespaces' command returned unexpected results - please update the HITT config file (${HITT_CONFIG_FILE}) manually." 1
   fi
   NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
   logStatus "HITT config file (${HITT_CONFIG_FILE}) not found - creating..."
   logStatus "Please use the following steps to configure the HITT and create your config file..."
   getConfValues
-  createHITTconf
+  createHITTconf "${HITT_CONFIG_FILE}"
 fi
 source "${HITT_CONFIG_FILE}"
 checkForNewHITT
