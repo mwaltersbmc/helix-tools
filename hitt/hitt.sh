@@ -699,7 +699,7 @@ getISDetailsFromJenkins() {
 
 checkJenkinsJobResult() {
   if ! echo "${JENKINS_JSON}" | ${JQ_BIN} -r .result | grep -q "SUCCESS"; then
-    logWarning "Last build of the HELIX_ONPREM_DEPLOYMENT was not successful. Please review the console output for both this and the HELIX_GENERATE_CONFIG pipelines."
+    logWarning "Last build of the HELIX_ONPREM_DEPLOYMENT pipeline was not successful. Please review the console output for this and the HELIX_GENERATE_CONFIG pipelines - saved in the HITT directory."
     savePipelineConsoleOutput HELIX_ONPREM_DEPLOYMENT lastBuild
     savePipelineConsoleOutput HELIX_GENERATE_CONFIG lastBuild
   fi
