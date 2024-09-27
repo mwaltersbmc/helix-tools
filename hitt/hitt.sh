@@ -723,6 +723,7 @@ createPipelineVarsArray() {
     INPUT_CONFIG_METHOD
     CUSTOMER_SIZE
     HELM_NODE
+    PLATFORM_HELM_VERSION
     HELIX_ITSM_INSIGHTS
     HELIX_BWF
     HELIX_DWP
@@ -825,6 +826,7 @@ getPipelineValues() {
     IS_PLATFORM_INT=1
   fi
   IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
+  IS_PIPELINE_VERSION="${IS_PLATFORM_HELM_VERSION:2:2}.${IS_PLATFORM_HELM_VERSION:4:1}.${IS_PLATFORM_HELM_VERSION:5:2}"
   cloneCustomerConfigsRepo
 }
 
@@ -923,6 +925,7 @@ validateISDetails() {
 
   # PRE mode only
   if [ "${MODE}" == "pre-is" ]; then
+    logMessage "ITSM pipeline version is ${IS_PLATFORM_HELM_VERSION}."
     if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
       logWarning "CUSTOM_BINARY_PATH option is selected - this is not usually required and may be a mistake."
     fi
