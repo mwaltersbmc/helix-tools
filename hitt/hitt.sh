@@ -1268,21 +1268,18 @@ checkFTSElasticSettings() {
 #    BAD_FTS_ELASTIC=1
 #  fi
 
-  if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "admin" ]; then
-    if  [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "admin" ]; then
-      logError "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value when FTS_ELASTICSEARCH_USERNAME is 'admin'."
-      BAD_FTS_ELASTIC=1
-    fi
-  fi
+#  if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "admin" ]; then
+#    if  [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "admin" ]; then
+#      logError "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value when FTS_ELASTICSEARCH_USERNAME is 'admin'."
+#      BAD_FTS_ELASTIC=1
+#    fi
+#  fi
 
-  if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "bmcuser" ]; then
-    if [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
-      logError "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of LOG_ES_PASSWD from the Helix Platform secrets.txt."
-      BAD_FTS_ELASTIC=1
-    fi
-  fi
-
-  if [ "${BAD_FTS_ELASTIC}" == "0" ]; then
+  #if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "bmcuser" ]; then
+  if [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
+    logError "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of ${LOG_ELASTICSEARCH_PASSWORD}."
+    BAD_FTS_ELASTIC=1
+  else
     logMessage "FTS_ELASTICSEARCH_USER_PASSWORD is the expected value."
   fi
 
