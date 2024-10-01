@@ -830,7 +830,7 @@ getPipelineValues() {
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
   ISP_ENVIRONMENT=$(parseJenkinsParam ENVIRONMENT)
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
-    logError "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all requried values in the HELIX_ONPREM_DEPLOYMENT pipeline." 1
+    logError "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all required values in the HELIX_ONPREM_DEPLOYMENT pipeline." 1
   fi
   if [ "${IS_CUSTOMER_SIZE}" == "M" ] || [ "${IS_CUSTOMER_SIZE}" == "L" ] || [ "${IS_CUSTOMER_SIZE}" == "XL" ]; then
     IS_PLATFORM_INT=1
@@ -948,7 +948,7 @@ validateISDetails() {
     fi
 
     if [ "${IS_CLOUD}" == "true" ]; then
-      logWarning "IS_CLOUD option is selected - this will cause public cloud systems to provision external an load balancer."
+      logWarning "IS_CLOUD option is selected - this will cause public cloud systems to provision an external load balancer."
     fi
 
     if [ "${IS_ROUTE_ENABLED}" == "true" ] || [ "${IS_ROUTE_TLS_ENABLED}" == "true" ]; then
@@ -1028,7 +1028,7 @@ validateISDetails() {
       logWarning "SIDECAR_SUPPORT_ASSISTANT_FPACK not selected - Support Assistant Tool will not be able to access application logs."
     fi
     if [ "${IS_SUPPORT_ASSISTANT_CREATE_ROLE}" != "true" ]; then
-      logWarning "SUPPORT_ASSISTANT_CREATE_ROLE not selected - Support Assistant Tool will not be able to access application logs unless the role/rolebinding are manaually created."
+      logWarning "SUPPORT_ASSISTANT_CREATE_ROLE not selected - Support Assistant Tool will not be able to access application logs unless the role/rolebinding are created manually."
     fi
 
     if [ "${IS_REGISTRY_TYPE}" != "DTR" ]; then
@@ -1171,7 +1171,7 @@ validateCacerts() {
 #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
 #  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
   if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts SSLPoke "${LB_HOST}" 443 > /dev/null 2>&1 ; then
-    logError "cacerts file does not appear to contain the certifcates required to connect to the Helix Platform LB_HOST."
+    logError "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
     VALID_CACERTS=1
   fi
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
@@ -1405,7 +1405,7 @@ checkISDBSettings() {
     go" 2>&1)
 
     if echo "${SQL_RESULT}" | grep -q ErrorCode ; then
-     logError "problem connnecting to database - please review the following message."
+     logError "problem connecting to database - please review the following message."
      echo "${SQL_RESULT}"
     else
       DB_VERSION=$(echo "${SQL_RESULT}" | awk '{print $1}')
@@ -1850,7 +1850,7 @@ checkRequiredTools
 cleanUp
 logStatus "Checking namespaces..."
 if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
-  logError "Helix Platform and Helix IS must be installled in seperate namespaces." 1
+  logError "Helix Platform and Helix IS should be installed in their own namespaces." 1
 fi
 checkHPNamespace "${HP_NAMESPACE}"
 if [ "${MODE}" != "post-hp" ]; then
