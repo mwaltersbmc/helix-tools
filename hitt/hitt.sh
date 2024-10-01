@@ -256,7 +256,7 @@ getVersions() {
         IS_DB_VERSION=201
         ;;
       *)
-        logError "Unknown Helix IS version (${IS_VERSION}) - check for HITT updates." 1
+        logError "Unknown Helix IS version (${IS_VERSION}) - check https://bit.ly/gethitt for HITT updates." 1
     esac
   fi
 }
