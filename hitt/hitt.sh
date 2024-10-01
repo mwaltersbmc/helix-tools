@@ -233,9 +233,15 @@ checkPodStatus() {
 }
 
 getVersions() {
-  HP_VERSION=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o jsonpath='{.data.version}' | head -1)
-  logMessage "Helix Platform version - ${HP_VERSION}."
-    if [ "${MODE}" == "post-is" ]; then
+  HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json)
+  HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
+  HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
+  logMessage "Helix Platform version - ${HP_VERSION} using DEPLOYMENT_SIZE ${HP_DEPLOYMENT_SIZE}."
+  if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
+    logWarning "Helix Platform DEPLOYMENT_SIZE is ${HP_DEPLOYMENT_SIZE} - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products to be installed."
+  fi
+
+  if [ "${MODE}" == "post-is" ]; then
     IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
     logMessage "Helix IS version - ${IS_VERSION}."
     # Set expected currDBVersion
