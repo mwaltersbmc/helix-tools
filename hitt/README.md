@@ -1,14 +1,14 @@
-The Helix IS Triage Tool (aka HITT) is a shell script that tests for many common configuration problems that may cause issues during installation and use of Helix IS Service Management applications.  The script should be run as the git user on the Deployment Engine system where Jenkins is installed.
+The Helix IS Triage Tool (**HITT**) is a shell script that tests for many common configuration problems that cause issues during the installation and use of Helix IS Service Management applications.  The script should be run as the git user on the Deployment Engine system where Jenkins is installed.
 
 HITT has three operating modes, all of which require that the Helix Platform installation has been completed.
 
 **post-hp**	- used after the Helix Platform has been installed and the SSO realm for Helix IS has been created.\
-**pre-is**	- used when the Jenkins HELIX_ONPREM_DEPLOYMENT and HELIX_GENERATE_CONFIG pipelines have been run with all the required parameters populated.\
+**pre-is**	- used after the Jenkins HELIX_ONPREM_DEPLOYMENT and HELIX_GENERATE_CONFIG pipelines have been run with all the installation values populated.\
 **post-is**	- used after the installation of Helix IS has been completed.
 
-In all modes the HITT script requires minimal configuration and will read additional information from Kubernetes, Jenkins and the CUSTOMER_CONFIGS git repository.
+In all modes the HITT script requires minimal manual configuration and will read the information it needs from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
 
-There are additional, optional, tests that will attempt to validate the Helix IS database that require the use of a Java SQL client called JISQL, and JDBC drivers for each database type.  To enable these tests, download the dbjars.tgz file and save it in the same directory as the hitt.sh script.  HITT will detect, unpack, and enable the SQL checks when this file is present.
+There are some optional tests that will attempt to validate the Helix IS database.  These require the use of a Java SQL client, called JISQL, and JDBC drivers for each database type.  To enable these tests, download the dbjars.tgz file and save it in the same directory as the hitt.sh script.  HITT will run the SQL checks when this file is present.
 
 **Installation**
 
@@ -23,7 +23,7 @@ $ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjar
 
 **Configuration**
 
-HITT is configured by a file called hitt.conf which will be created the first time the script is run. If you need to change any values after the first run, either delete or edit this file and enter the four required variables manually. There is also a section where you can enter details about Jenkins.  This may be left as-is unless your Jenkins requires credentials or is running on a non-default port. If your Jenkins password includes special characters enclose the value in double quotes.
+HITT is configured by a file called **hitt.conf** which is created the first time the script is run. If you need to change any values after the first run, either delete or edit this file and enter the four required variables manually. There is also a section where you can enter details about your Jenkins which may be left as-is unless it requires credentials, or is running on a non-default port. Enclose the JENKINS_USERNAME and JENKINS_PASSWORD values in double quotes.
 
 ```
 # First run to configure HITT
@@ -47,7 +47,7 @@ JENKINS_HOSTNAME=localhost
 JENKINS_PORT=8080
 ```
 
-Finally, there is a section for the command line tools which the script uses.  It is assumed that these are installed and available in directories that are included in the PATH environment variable of the user running the script.  HITT will check that these tools are present and report any that can't be found.  Missing tools must be installed, or the full path to their location set if they are not on the PATH.
+Finally, there is a section for the command line tools that the script uses.  It is assumed that these are installed and available in directories that are included in the PATH environment variable of the user running the script.  HITT will check that these tools are present and report any that can't be found.  Missing tools must be installed, or the full path to their location set, if they are not in the PATH.
 
 **Running HITT**
 
@@ -65,7 +65,7 @@ HITT requires one command line option (-m) to specify the operating mode and wil
 ```
 $ bash hitt.sh
 Helix IS Triage Tool (HITT)
-Usage: bash hitt.sh -m <post-hp|pre-is|post-is> [-f HITT_CONFIG_FILE]
+Usage: bash hitt.sh -m <post-hp|pre-is|post-is>
 
 Examples:
 bash hitt.sh -m post-hp  - run post HP installation only checks
@@ -75,23 +75,22 @@ OR
 bash hitt.sh -m post-is  - run IS post-installation checks
 ```
 
-Use post-hp after successfully installing the Helix Platform but before using Jenkins.
-Use pre-is after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS.
+Use post-hp after installing and configuring the Helix Platform but before using Jenkins.
+Use pre-is after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting the deployment of Helix IS.
 Use post-is for troubleshooting after IS deployment.
-Optional -f to use a different config file.
 
-HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages.
+HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages and summarised at the end.
 
-<span style="color:red">ERRORS</span> indicate problems which likely need to be addressed before installation will be successful or may be the cause of problems post-install.\
-<span style="color:yellow">WARNINGS</span> highlight potential problems or settings which may be appropriate under some conditions but are usually recommended to be different.
+<span style="color:red">ERRORS</span> indicate problems which may cause installation to fail or result in problems post-install.\
+<span style="color:yellow">WARNINGS</span> highlight potential problems or settings which may be appropriate under some conditions, but are usually recommended to be different.
 
-Where the test being run includes additional output, pod status for example, this is displayed after the related ERROR or WARNING.
+When the test being run produces additional output, pod status for example, this is displayed after the related ERROR or WARNING.
 
 All of the tests are read-only and will not make changes to the system.  However, please note that the checks which discover the tenant and service details from the Helix Platform deploy a tctl job/pod in the same way as the Jenkins HELIX_ITSM_INTEROPS pipeline.  The job/pod are deleted after use.
 
 **Checks Summary**
 
-Not all groups of checks are run, and some run different tests, depending on the operating mode and discovered information.  Some groups query information which is then used by other checks.
+Different groups of tests and checks are run depending on the operating mode and discovered information.  Some groups query information which is then used by other checks.
 
 Checking for required tools in path...
 	Verify that the required command line tools and versions are available.
