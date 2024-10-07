@@ -664,7 +664,7 @@ getValueFromPlatformSecret() {
 }
 
 checkJenkinsIsRunning() {
-  if ! "${CURL_BIN}" -s "http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
+  if ! "${CURL_BIN}" -sk "http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
     logError "Jenkins not found on http://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
     SKIP_JENKINS=1
   else
@@ -749,6 +749,7 @@ createPipelineVarsArray() {
     DB_TYPE
     DB_SSL_ENABLED
     DB_PORT
+    DATABASE_RESTORE
     DATABASE_HOST_NAME
     DATABASE_ADMIN_USER
     ORACLE_SERVICE_NAME
@@ -757,6 +758,7 @@ createPipelineVarsArray() {
     LOGS_ELASTICSEARCH_TLS
     AR_DB_NAME
     AR_DB_USER
+    AR_DB_CASE_SENSITIVE
     FTS_ELASTICSEARCH_HOSTNAME
     FTS_ELASTICSEARCH_PORT
     FTS_ELASTICSEARCH_SECURE
@@ -800,7 +802,7 @@ downloadJenkinsCLIJar() {
 }
 
 getPipelinePasswords() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF >&1
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertficateCheck -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF >&1
   import jenkins.model.*
   import hudson.model.*
   def jobName = 'HELIX_ONPREM_DEPLOYMENT'
@@ -1052,6 +1054,21 @@ validateISDetails() {
     if [ "${IS_DB_SSL_ENABLED}" == "true" ]; then
         logError "DB_SSL_ENABLED should not be selected."
     fi
+
+#    if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ] && [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
+#      case "${IS_DB_TYPE}" in
+#        postgres)
+#          if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
+#            logWarning "AR_DB_CASE_SENSITIVE is selected - please ensure the case sensitive database dump has been used."
+#          fi
+#          ;;
+#        oracle)
+#          if [ "${1}" != "${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
+#            logError "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
+#          fi
+#          ;;
+#        esac
+#    fi
 
     if [ "$HELIX_LOGGING_DEPLOYED" == 0 ]; then
       if [ "${IS_SIDECAR_FLUENTBIT}" == true ]; then
@@ -1596,7 +1613,7 @@ checkJenkinsConfig() {
 }
 
 checkJenkinsNodes() {
-  NODE_STATUS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/manage/computer/api/json?depth=1")
+  NODE_STATUS=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/manage/computer/api/json?depth=1")
   OFFLINE_NODES=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[]| select(.offline=='true').displayName')
   if [ ! -z "${OFFLINE_NODES}" ] ; then
     logError "One or more Jenkins nodes found in an 'offline' state."
@@ -1682,7 +1699,7 @@ checkJenkinsPlugins() {
     pipeline-stage-view
     pipeline-rest-api
     )
-  JK_PLUGINS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
+  JK_PLUGINS=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
   for i in "${EXPECTED_PLUGINS[@]}" ; do
     if ! echo "${JK_PLUGINS}" | grep -wq "${i}" ; then
       logError "Jenkins plugin '${i}' is missing."
@@ -1694,7 +1711,7 @@ checkJenkinsCredentials() {
   # Get list of credentials and check for expected IDs
   EXPECTED_CREDENTIALS=(github ansible_host ansible kubeconfig TOKENS)
    #password_vault_apikey)
-  JK_CREDS=$(${CURL_BIN} -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
+  JK_CREDS=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
   for i in "${EXPECTED_CREDENTIALS[@]}" ; do
     if ! echo "${JK_CREDS}" | grep -wq "${i}" ; then
       logError "Jenkins credentials with id '${i}' is missing."
