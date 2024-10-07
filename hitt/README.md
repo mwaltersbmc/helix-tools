@@ -12,7 +12,7 @@ There are some optional tests that will attempt to validate the Helix IS databas
 
 **Installation**
 
-Log in as the git user, create a new directory, cd to it and download the script and, if required, the dbjars.tgz file.
+Log in as the git user, create a new directory, cd to it and download the script along with, if required, the dbjars.tgz file.
 
 ```
 $ mkdir hitt
@@ -23,7 +23,7 @@ $ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjar
 
 **Configuration**
 
-HITT is configured by a file called **hitt.conf** which is created the first time the script is run. If you need to change any values after the first run, either delete or edit this file and enter the four required variables manually. There is also a section where you can enter details about your Jenkins which may be left as-is unless it requires credentials, or is running on a non-default port. Enclose the JENKINS_USERNAME and JENKINS_PASSWORD values in double quotes.
+HITT is configured by a file called **hitt.conf** which is created the first time the script is run. If you need to change any values after the first run, delete or edit this file and enter the four required variables manually. There is also a section where you can enter details about your Jenkins which may be left as-is unless it requires credentials, uses https, or is running on a non-default port. Enclose the **JENKINS_USERNAME** and **JENKINS_PASSWORD** values in double quotes.  If your Jenkins is configured to use SSL change the **JENKINS_PROTOCOL** to **https** and set the **JENKINS_PORT** appropriately.
 
 ```
 # First run to configure HITT
@@ -44,6 +44,7 @@ IS_ENVIRONMENT=
 JENKINS_USERNAME=
 JENKINS_PASSWORD=
 JENKINS_HOSTNAME=localhost
+JENKINS_PROTOCOL=http
 JENKINS_PORT=8080
 ```
 
