@@ -35,6 +35,7 @@ IS_ENVIRONMENT=${IS_ENVIRONMENT}
 JENKINS_USERNAME="${JENKINS_USERNAME}"
 JENKINS_PASSWORD="${JENKINS_PASSWORD}"
 JENKINS_HOSTNAME=localhost
+JENKINS_PROTOCOL=http
 JENKINS_PORT=8080
 
 # Required Tools - set full path to binary if not present on path
@@ -664,14 +665,14 @@ getValueFromPlatformSecret() {
 }
 
 checkJenkinsIsRunning() {
-  if ! "${CURL_BIN}" -sk "http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
-    logError "Jenkins not found on http://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
+  if ! "${CURL_BIN}" -sk "${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
+    logError "Jenkins not found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
     SKIP_JENKINS=1
   else
-    JENKINS_RESPONSE=$(${CURL_BIN} -sI "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
+    JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
     JENKINS_VERSION=$(echo "${JENKINS_RESPONSE}" | grep -i 'X-Jenkins:' | awk '{print $2}' | tr -d '\r')
     JENKINS_HTTP_CODE=$(echo "${JENKINS_RESPONSE}" | grep "^HTTP" | cut -f 2 -d ' '| tr -d '\r')
-    logMessage "Jenkins version ${JENKINS_VERSION} found on http://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
+    logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
     if [ "${JENKINS_HTTP_CODE}" != "200" ]; then
       logError "Jenkins authentication is enabled but the credentials in hitt.conf are blank or wrong.  Please set correct credentials in the HITT config file (${HITT_CONFIG_FILE})." 1
       SKIP_JENKINS=1
@@ -681,13 +682,13 @@ fi
 
 getLastBuildFromJenkins() {
   # PIPELINE_NAME
-  BUILD_NUMBER=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/lastBuild/buildNumber")
+  BUILD_NUMBER=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/lastBuild/buildNumber")
   echo "${BUILD_NUMBER}"
 }
 
 savePipelineConsoleOutput() {
   # PIPELINE_NAME / BUILD_NUMBER
-  ${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/${2}/consoleText" > "${1}-${2}.log"
+  ${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/${2}/consoleText" > "${1}-${2}.log"
 }
 
 getISDetailsFromJenkins() {
@@ -698,7 +699,7 @@ getISDetailsFromJenkins() {
   logMessage "Downloading jenkins-cli.jar from Jenkins..."
   downloadJenkinsCLIJar
   logMessage "Reading values from Jenkins..."
-  JENKINS_JSON=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
+  JENKINS_JSON=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
   checkJenkinsJobResult
   JENKINS_ONPREM_DEPLOYMENT_LASTBUILD=$(getLastBuildFromJenkins HELIX_ONPREM_DEPLOYMENT)
   JENKINS_GENERATE_CONFIG_LASTBUILD=$(getLastBuildFromJenkins HELIX_GENERATE_CONFIG)
@@ -798,11 +799,11 @@ createInputFileVarsArray() {
 }
 
 downloadJenkinsCLIJar() {
-  ${CURL_BIN} -sk "http://${JENKINS_HOSTNAME}:${JENKINS_PORT}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
+  ${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
 }
 
 getPipelinePasswords() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertficateCheck -s "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF >&1
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertficateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF >&1
   import jenkins.model.*
   import hudson.model.*
   def jobName = 'HELIX_ONPREM_DEPLOYMENT'
@@ -1000,7 +1001,7 @@ validateISDetails() {
     if isBlank "${IS_HELM_NODE}" ; then
       logError "HELM_NODE is blank."
     else
-      NODE_ARRAY=($(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json" | ${JQ_BIN} -r .computer[].displayName | grep -v Built ))
+      NODE_ARRAY=($(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json" | ${JQ_BIN} -r .computer[].displayName | grep -v Built ))
       NODE_MATCH=0
       for i in "${NODE_ARRAY[@]}"; do
         if [ "${IS_HELM_NODE}" == "${i}" ]; then NODE_MATCH=1; fi
@@ -1613,7 +1614,7 @@ checkJenkinsConfig() {
 }
 
 checkJenkinsNodes() {
-  NODE_STATUS=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/manage/computer/api/json?depth=1")
+  NODE_STATUS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/manage/computer/api/json?depth=1")
   OFFLINE_NODES=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[]| select(.offline=='true').displayName')
   if [ ! -z "${OFFLINE_NODES}" ] ; then
     logError "One or more Jenkins nodes found in an 'offline' state."
@@ -1699,7 +1700,7 @@ checkJenkinsPlugins() {
     pipeline-stage-view
     pipeline-rest-api
     )
-  JK_PLUGINS=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
+  JK_PLUGINS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
   for i in "${EXPECTED_PLUGINS[@]}" ; do
     if ! echo "${JK_PLUGINS}" | grep -wq "${i}" ; then
       logError "Jenkins plugin '${i}' is missing."
@@ -1711,7 +1712,7 @@ checkJenkinsCredentials() {
   # Get list of credentials and check for expected IDs
   EXPECTED_CREDENTIALS=(github ansible_host ansible kubeconfig TOKENS)
    #password_vault_apikey)
-  JK_CREDS=$(${CURL_BIN} -sk "http://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
+  JK_CREDS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
   for i in "${EXPECTED_CREDENTIALS[@]}" ; do
     if ! echo "${JK_CREDS}" | grep -wq "${i}" ; then
       logError "Jenkins credentials with id '${i}' is missing."
