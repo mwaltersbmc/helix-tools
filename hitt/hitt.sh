@@ -803,7 +803,7 @@ downloadJenkinsCLIJar() {
 }
 
 getPipelinePasswords() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertficateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF >&1
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>/dev/null >&1
   import jenkins.model.*
   import hudson.model.*
   def jobName = 'HELIX_ONPREM_DEPLOYMENT'
