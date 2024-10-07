@@ -1433,6 +1433,7 @@ checkISDBSettings() {
     if echo "${SQL_RESULT}" | grep -q ErrorCode ; then
      logError "problem connecting to database - please review the following message."
      echo "${SQL_RESULT}"
+     return
     else
       DB_VERSION=$(echo "${SQL_RESULT}" | awk '{print $1}')
       if [ ! -z "${IS_DB_VERSION}" ]; then
@@ -1445,6 +1446,21 @@ checkISDBSettings() {
         logMessage "Database currDbVersion is ${DB_VERSION}."
       fi
     fi
+
+    # Specific DB type checks
+    case "${IS_DB_TYPE}" in
+      mssql)
+        SQL_RESULT=$("$JISQLCMD" "SELECT name FROM sys.synonyms
+        go" 2>&1)
+        if ! echo "${SQL_RESULT}" | grep -q trace_xe_action_map; then
+            logError "Missing 'trace_xe_action_map' synonym in database - please refer to the BMC docs."
+        fi
+        if ! echo "${SQL_RESULT}" | grep -q trace_xe_event_map; then
+            logError "Missing 'trace_xe_event_map' synonym in database - please refer to the BMC docs."
+        fi
+        ;;
+    esac
+
   else
     logMessage "DB jar files not found - skipping checks.  Download dbjars.tgz to the HITT directory to enable them..."
   fi
