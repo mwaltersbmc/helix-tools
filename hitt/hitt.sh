@@ -1450,7 +1450,7 @@ checkISDBSettings() {
     # Specific DB type checks
     case "${IS_DB_TYPE}" in
       mssql)
-        SQL_RESULT=$("$JISQLCMD" "SELECT name FROM sys.synonyms
+        SQL_RESULT=$(${JISQLCMD} "SELECT name FROM sys.synonyms
         go" 2>&1)
         if ! echo "${SQL_RESULT}" | grep -q trace_xe_action_map; then
             logError "Missing 'trace_xe_action_map' synonym in database - please refer to the BMC docs."
