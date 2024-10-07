@@ -627,9 +627,17 @@ getISDetailsFromK8s() {
 
   IS_AR_DB_NAME=$(getValueFromPlatformSecret "AR_DB_NAME")
   IS_AR_DB_PASSWORD=$(getValueFromPlatformSecret "AR_SERVER_DB_USER_PASSWORD")
-  IS_FTS_ELASTICSEARCH_USERNAME=$(getValueFromPlatformSecret "FTS_ELASTIC_SEARCH_USERNAME")
-  IS_FTS_ELASTICSEARCH_USER_PASSWORD=$(getValueFromPlatformSecret "FTS_ELASTIC_SEARCH_USER_PASSWORD")
   IS_AR_DB_USER=$(getValueFromPlatformSecret "AR_SERVER_DB_USERNAME")
+
+  # 23.3.03+ update for new FTS ES creds
+  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret helix-es-secret > /dev/null 2>&1; then
+    ES_SECRET_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret helix-es-secret -o jsonpath='{.data}')
+    IS_FTS_ELASTICSEARCH_USERNAME=$(echo "${ES_SECRET_JSON}" | ${JQ_BIN} '.ELASTIC_SEARCH_INDEX_USERNAME |@base64d')
+    IS_FTS_ELASTICSEARCH_USER_PASSWORD=$(echo "${ES_SECRET_JSON}" | ${JQ_BIN} '.ELASTIC_SEARCH_INDEX_USER_PASSWORD |@base64d')
+  else
+    IS_FTS_ELASTICSEARCH_USERNAME=$(getValueFromPlatformSecret "FTS_ELASTIC_SEARCH_USERNAME")
+    IS_FTS_ELASTICSEARCH_USER_PASSWORD=$(getValueFromPlatformSecret "FTS_ELASTIC_SEARCH_USER_PASSWORD")
+  fi
 
   IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_PLATFORM_SECRET}" | ${JQ_BIN} -r '.CACERTS_SSL_TRUSTSTORE_PASSWORD')
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "null" ]; then
@@ -1284,7 +1292,7 @@ checkFTSElasticSettings() {
   fi
 
   if [ "${IS_FTS_ELASTICSEARCH_SECURE}" != "true" ]; then
-    logError "FTS_ELASTICSEARCH_SECURE (${IS_FTS_ELASTICSEARCH_SECURE}) is not the expected value of true."
+    logError "FTS_ELASTICSEARCH_SECURE (${IS_FTS_ELASTICSEARCH_SECURE}) is not the expected value of 'true'."
     BAD_FTS_ELASTIC=1
   else
     logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of 'true'."
@@ -1304,7 +1312,7 @@ checkFTSElasticSettings() {
 #  fi
 
   #if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "bmcuser" ]; then
-  if [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
+  if [ "${MODE}" == "pre-is" ] && [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
     logError "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of ${LOG_ELASTICSEARCH_PASSWORD}."
     BAD_FTS_ELASTIC=1
   else
