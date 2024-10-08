@@ -673,7 +673,7 @@ getValueFromPlatformSecret() {
 }
 
 checkJenkinsIsRunning() {
-  if ! "${CURL_BIN}" -sk "${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
+  if ! "${CURL_BIN}" -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
     logError "Jenkins not found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
     SKIP_JENKINS=1
   else
@@ -807,7 +807,7 @@ createInputFileVarsArray() {
 }
 
 downloadJenkinsCLIJar() {
-  ${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
+  ${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
 }
 
 getPipelinePasswords() {
