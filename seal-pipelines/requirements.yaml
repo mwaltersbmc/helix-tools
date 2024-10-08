@@ -1,0 +1,6 @@
+# Collections required by playbooks
+# Install using "ansible-galaxy collection install -r requirements.yaml"
+---
+collections:
+  - community.general
+  - kubernetes.core
