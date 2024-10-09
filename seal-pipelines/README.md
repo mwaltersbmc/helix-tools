@@ -23,6 +23,11 @@ git clone https://github.com/mwaltersbmc/helix-tools
 cd helix-tools/seal-pipelines
 ```
 
+The pipelines require several additional Ansible modules which need to be installed by running:
+```sh
+ansible-galaxy collection install -r requirements.yaml
+```
+
 The pipelines are installed using the **create-pipelines.yaml** Ansible playbook.  There are several options that can be set by editing the playbook or passing values on the command line. The default values are:
 
 jenkins_username: ""\
