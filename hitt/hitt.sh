@@ -226,7 +226,7 @@ checkISNamespace() {
 
 checkPodStatus() {
   if [ $(${KUBECTL_BIN} -n "${1}"  get pods -o custom-columns=":metadata.name,:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>" | wc -l) != "1" ]; then
-     logError "one or more pods in namespace ${1} found in a non-ready state."
+     logError "One or more pods in namespace ${1} found in a non-ready state."
      ${KUBECTL_BIN} -n "${1}" get pods -o custom-columns="POD:metadata.name,STATE:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>"
   else
     logMessage "No unheathly pods found in ${1} namespace."
@@ -474,7 +474,7 @@ EOF
 
   # Wait for job to complete
   if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete job/"${SEALTCTL}" --timeout=90s > /dev/null 2>&1; then
-    logError "timed out waiting for job ${SEALTCTL} to complete."
+    logError "Timed out waiting for job ${SEALTCTL} to complete."
     return 1
   else
     return 0
@@ -570,7 +570,7 @@ validateRealmDomains() {
 validateDomainInDNS() {
   # hostname to check
   if ! ${HOST_BIN} ${1} > /dev/null 2>&1; then
-    logError "entry for ${1} not found in DNS."
+    logError "Entry for ${1} not found in DNS."
   else
     logMessage "  - ${1} found in DNS."
   fi
@@ -1154,7 +1154,7 @@ getCacertsFile() {
   if [ "${MODE}" == "post-is" ]; then
     logMessage "Extracting cacerts file from Helix IS cacerts secret..."
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts > /dev/null 2>&1; then
-      logError "cacerts secret not found in Helix IS namespace."
+      logError "'cacerts' secret not found in Helix IS namespace."
       SKIP_CACERTS=1
       return
     fi
@@ -1205,7 +1205,7 @@ validateCacerts() {
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
 #    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
     if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts SSLPoke "${TARGET}" 443 > /dev/null 2>&1 ; then
-      logError "certificate for ${TARGET} not found in cacerts."
+      logError "Certificate for ${TARGET} not found in cacerts."
       VALID_CACERTS=1
     else
       logMessage "  - valid certificate for ${TARGET} found in cacerts file."
@@ -1327,7 +1327,7 @@ checkFTSElasticSettings() {
 checkISLicenseStatus() {
   getISAdminCreds
   if ! getISJWT; then
-    logError "failed to authenticate user ${IS_ADMIN_USER} - can't check IS license status."
+    logError "Failed to authenticate user ${IS_ADMIN_USER} - can't check IS license status."
     return
   fi
   getISLicense
@@ -1432,14 +1432,14 @@ checkISDBSettings() {
     go" 2>&1)
 
     if echo "${SQL_RESULT}" | grep -q ErrorCode ; then
-     logError "problem connecting to database - please review the following message."
+     logError "Problem connecting to database - please review the following message."
      echo "${SQL_RESULT}"
      return
     else
       DB_VERSION=$(echo "${SQL_RESULT}" | awk '{print $1}')
       if [ ! -z "${IS_DB_VERSION}" ]; then
         if [ "${DB_VERSION}" != "${IS_DB_VERSION}" ]; then
-          logError "database is not the expected version - found ${DB_VERSION} but should be ${IS_DB_VERSION}."
+          logError "Database is not the expected version - found ${DB_VERSION} but should be ${IS_DB_VERSION}."
         else
           logMessage "Database is the expected version - ${DB_VERSION}."
         fi
@@ -1528,7 +1528,7 @@ getRegistryDetailsFromSecret() {
   REGISTRY_PASSWORD=""
   IMAGESECRET_JSON=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o jsonpath='{.data.\.dockerconfigjson}' | ${BASE64_BIN} -d)
   if [ "${IMAGESECRET_JSON}" = "" ]; then
-    logError "couldn't get registry details from ${2} secret in ${1} namespace."
+    logError "Failed to get registry details from ${2} secret in ${1} namespace."
     SKIP_REGISTRY=1
     return
   fi
@@ -1538,6 +1538,10 @@ getRegistryDetailsFromSecret() {
 }
 
 getRegistryDetailsFromIS() {
+  if [ "${IS_IMAGESECRET_NAME}" = "" ]; then
+    SKIP_REGISTRY=1
+    return
+  fi
   getRegistryDetailsFromSecret "${IS_NAMESPACE}" "${IS_IMAGESECRET_NAME}"
   IS_SECRET_HARBOR_REGISTRY_HOST="${REGISTRY_SERVER}"
   IS_SECRET_IMAGE_REGISTRY_USERNAME="${REGISTRY_USERNAME}"
@@ -1575,7 +1579,7 @@ checkISDockerLogin() {
   SKIP_REGISTRY=0
   getRegistryDetailsFromIS
   if [ "${SKIP_REGISTRY}" == "1" ]; then
-    logError "failed to get IS registry details - skipping checks."
+    logError "Failed to get IS registry details - skipping checks."
     return
   fi
 
