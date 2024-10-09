@@ -874,6 +874,7 @@ grepInputFile() {
 
 cloneCustomerConfigsRepo() {
   SKIP_REPO=0
+  GIT_SSH_COMMAND="ssh -oBatchMode=yes"
   GIT_REPO_DIR=$(parseJenkinsParam GIT_REPO_DIR)
   INPUT_CONFIG_FILE="configsrepo/customer/${IS_CUSTOMER_SERVICE}/${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}.sh"
   if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
