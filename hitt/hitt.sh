@@ -1877,6 +1877,7 @@ if [ "${MODE}" == "post-hp" ]; then
   SKIP_JENKINS=1
 else
   if [ -n "${JENKINS_USERNAME}" ]; then
+    JENKINS_PASSWORD=$(printf %s "${JENKINS_PASSWORD}" | ${JQ_BIN} -sRr @uri)
     JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
   fi
 fi
