@@ -519,7 +519,7 @@ validateRealm() {
   fi
   REALM_TENANT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .tenantDomain)
   if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
-    logError "Invalid TENANT in realm - expected ${HP_TENANT} but found ${REALM_TENANT}."
+    logWarning "Unexpected TENANT in realm - recommended value is ${HP_TENANT} but found ${REALM_TENANT}."
   else
     logMessage "Tenant ${REALM_TENANT} is the expected value."
   fi
@@ -874,7 +874,7 @@ grepInputFile() {
 
 cloneCustomerConfigsRepo() {
   SKIP_REPO=0
-  GIT_SSH_COMMAND="ssh -oBatchMode=yes"
+  export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
   GIT_REPO_DIR=$(parseJenkinsParam GIT_REPO_DIR)
   INPUT_CONFIG_FILE="configsrepo/customer/${IS_CUSTOMER_SERVICE}/${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}.sh"
   if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
@@ -909,10 +909,10 @@ checkBlank() {
 validateISDetails() {
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   # Common to pre and post
-  if [ "${IS_TENANT_DOMAIN}" != "${HP_TENANT}" ]; then
-    logError "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform tenant (${HP_TENANT})."
+  if [ "${IS_TENANT_DOMAIN}" != "${REALM_TENANT}" ]; then
+    logError "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform realm Tenant (${REALM_TENANT})."
   else
-    logMessage "TENANT_DOMAIN is the expected value of ${HP_TENANT}."
+    logMessage "TENANT_DOMAIN matches the realm Tenant (${REALM_TENANT})."
   fi
 
   if [ "${IS_RSSO_URL}" != "${RSSO_URL}" ]; then
