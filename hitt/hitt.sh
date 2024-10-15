@@ -1629,7 +1629,6 @@ dumpVARs() {
   [[ ${CREATE_LOGS} -eq 0 ]] && return
   # Debug mode to print all variables
   if [ "${MODE}" == "pre-is" ]; then
-    echo "Pipeline values are:" >> "${HITT_LOG_FILE}"
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       echo "${i}=${!v}" >> "${HITT_LOG_FILE}"
@@ -1637,7 +1636,6 @@ dumpVARs() {
   fi
   if [ "${MODE}" == "post-is" ]; then
     createPipelineVarsArray
-    echo "Deployed values are:" >> "${HITT_LOG_FILE}"
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       if [ "${!v}" != "" ]; then
