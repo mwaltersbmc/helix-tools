@@ -1631,7 +1631,7 @@ dumpVARs() {
   if [ "${MODE}" == "pre-is" ]; then
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
-      echo "${i}=${!v}" >> "${HITT_LOG_FILE}"
+      echo "${i}=${!v}" > "${VALUES_LOG_FILE}"
     done
   fi
   if [ "${MODE}" == "post-is" ]; then
@@ -1639,7 +1639,7 @@ dumpVARs() {
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       if [ "${!v}" != "" ]; then
-        echo "${i}=${!v}" >> "${HITT_LOG_FILE}"
+        echo "${i}=${!v}" > "${VALUES_LOG_FILE}"
       fi
     done
   fi
@@ -1926,6 +1926,7 @@ HITT_CONFIG_FILE=hitt.conf
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 CREATE_LOGS=1
 HITT_LOG_FILE=hitt.log
+VALUES_LOG_FILE=values.log
 FAIL=0
 WARN=0
 SKIP_JENKINS=0

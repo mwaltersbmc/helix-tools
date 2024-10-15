@@ -89,6 +89,12 @@ When the test being run produces additional output, pod status for example, this
 
 All of the tests are read-only and will not make changes to the system.  However, please note that the checks which discover the tenant and service details from the Helix Platform deploy a tctl job/pod in the same way as the Jenkins HELIX_ITSM_INTEROPS pipeline.  The job/pod are deleted after use.
 
+**Logging**
+
+HITT records the script output in a file called **hitt.log**.  It also creates a **values.log** with the pipeline input values in pre-is mode, or values read from the cluster for post-is. Log files for each of the Jenkins pipelines, containing the console output of the last build, are created as PIPELINE_NAME.log.  All of these files are added to **hittlogs.zip** which can be sent to BMC Support if needed.
+
+NOTE - password values are not logged.
+
 **Checks Summary**
 
 Different groups of tests and checks are run depending on the operating mode and discovered information.  Some groups query information which is then used by other checks.
