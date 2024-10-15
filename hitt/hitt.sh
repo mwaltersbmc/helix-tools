@@ -1627,11 +1627,12 @@ checkISDockerLogin() {
 
 dumpVARs() {
   [[ ${CREATE_LOGS} -eq 0 ]] && return
+  rm -f "${VALUES_LOG_FILE}"
   # Debug mode to print all variables
   if [ "${MODE}" == "pre-is" ]; then
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
-      echo "${i}=${!v}" > "${VALUES_LOG_FILE}"
+      echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
     done
   fi
   if [ "${MODE}" == "post-is" ]; then
@@ -1639,7 +1640,7 @@ dumpVARs() {
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       if [ "${!v}" != "" ]; then
-        echo "${i}=${!v}" > "${VALUES_LOG_FILE}"
+        echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
       fi
     done
   fi
