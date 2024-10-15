@@ -50,6 +50,7 @@ JAVA_BIN=java
 TAR_BIN=tar
 NC_BIN=nc
 HOST_BIN=host
+ZIP_BIN=zip
 EOF
 }
 
@@ -73,6 +74,10 @@ logWarning() {
 logMessage() {
   # Print message
   echo -e "\t${1}"
+}
+
+logStatus() {
+  echo -e "${BOLD}${1}${NORMAL}"
 }
 
 usage() {
@@ -234,6 +239,11 @@ checkPodStatus() {
 }
 
 getVersions() {
+  if [ -f /etc/os-release ]; then
+    OS_NAME=$(grep "^NAME=" /etc/os-release | cut -d '=' -f2)
+    OS_VERSION=$(grep "^VERSION=" /etc/os-release | cut -d '=' -f2)
+    logMessage "Running on ${OS_NAME} version ${OS_VERSION}."
+  fi
   HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json)
   HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
@@ -696,7 +706,14 @@ getLastBuildFromJenkins() {
 
 savePipelineConsoleOutput() {
   # PIPELINE_NAME / BUILD_NUMBER
-  ${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/${2}/consoleText" > "${1}-${2}.log"
+  ${CURL_BIN} -skf "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/${2}/consoleText" > "${1}.log"
+}
+
+saveAllPipelineConsoleOutput() {
+  createPipelineNamesArray
+  for i in "${PIPELINE_NAMES[@]}"; do
+    savePipelineConsoleOutput "${i}" "lastBuild"
+  done
 }
 
 getISDetailsFromJenkins() {
@@ -719,8 +736,6 @@ getISDetailsFromJenkins() {
 checkJenkinsJobResult() {
   if ! echo "${JENKINS_JSON}" | ${JQ_BIN} -r .result | grep -q "SUCCESS"; then
     logWarning "Last build of the HELIX_ONPREM_DEPLOYMENT pipeline was not successful. Please review the console output for this and the HELIX_GENERATE_CONFIG pipelines - saved in the HITT directory."
-    savePipelineConsoleOutput HELIX_ONPREM_DEPLOYMENT lastBuild
-    savePipelineConsoleOutput HELIX_GENERATE_CONFIG lastBuild
   fi
 }
 
@@ -1510,10 +1525,6 @@ checkKubeconfig() {
   fi
 }
 
-logStatus() {
-  echo -e "${BOLD}${1}${NORMAL}"
-}
-
 getRegistryDetailsFromHP() {
   getRegistryDetailsFromSecret "${HP_NAMESPACE}" "bmc-dtrhub"
   HP_REGISTRY_SERVER="${REGISTRY_SERVER}"
@@ -1615,21 +1626,22 @@ checkISDockerLogin() {
 }
 
 dumpVARs() {
-  [[ "${DUMPVARS}" = "" ]] && return
+  [[ ${CREATE_LOGS} -eq 0 ]] && return
   # Debug mode to print all variables
   if [ "${MODE}" == "pre-is" ]; then
-    logStatus "\nPipeline values are:"
+    echo "Pipeline values are:" >> "${HITT_LOG_FILE}"
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
-      echo "${i}=${!v}"
+      echo "${i}=${!v}" >> "${HITT_LOG_FILE}"
     done
   fi
   if [ "${MODE}" == "post-is" ]; then
-    logStatus "\nKubernetes values are:"
+    createPipelineVarsArray
+    echo "Deployed values are:" >> "${HITT_LOG_FILE}"
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       if [ "${!v}" != "" ]; then
-        echo "${i}=${!v}"
+        echo "${i}=${!v}" >> "${HITT_LOG_FILE}"
       fi
     done
   fi
@@ -1774,81 +1786,29 @@ checkHITTconf() {
   done < <(grep '.=' .hitt.conf)
   [[ $CONF_UPDATED == 1 ]] && logStatus "${GREEN}HITT config file (${1}) has been updated with a new parameter.${NORMAL}"
 }
+
+createPipelineNamesArray() {
+  PIPELINE_NAMES=(
+    HELIX_ONPREM_DEPLOYMENT
+    HELIX_GENERATE_CONFIG
+    HELIX_PLATFORM_DEPLOY
+    HELIX_NON_PLATFORM_DEPLOY
+    HELIX_CONFIGURE_ITSM
+    HELIX_SMARTAPPS_DEPLOY
+    HELIX_ITSM_INTEROPS
+    SUPPORT_ASSISTANT_TOOL
+    HELIX_FULL_STACK_UPGRADE
+    HELIX_PLATFORM_UPDATE
+    HELIX_NON_PLATFORM_UPDATE
+  )
+}
 # FUNCTIONS End
 
 # MAIN Start
-SCRIPT_VERSION=1
-HITT_CONFIG_FILE=hitt.conf
-HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
-FAIL=0
-WARN=0
-SKIP_JENKINS=0
-REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc)
-IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
-BOLD=$(tput bold)
-NORMAL=$(tput sgr0)
-RED="\e[31m"
-YELLOW="\e[33m"
-GREEN="\e[32m"
-SEALTCTL=sealtctl
-KUBECTL_BIN=kubectl
-JQ_BIN=jq
-ERROR_ARRAY=()
-WARN_ARRAY=()
-JENKINS_CREDENTIALS=""
-SSLPOKE_PAYLOAD="
-yv66vgAAADcAbQoAFgAjCQAkACUHACYKACcAKBIAAAAsCgAtAC4KACQALwoACQAwBwAxCgAyADMK
-AAkANAcANQoADAA2CgAMADcKACAAOAoAHwA5CgAfADoKAC0AOwgAPAcAPQoAFAA+BwA/AQAGPGlu
-aXQ+AQADKClWAQAEQ29kZQEAD0xpbmVOdW1iZXJUYWJsZQEABG1haW4BABYoW0xqYXZhL2xhbmcv
-U3RyaW5nOylWAQANU3RhY2tNYXBUYWJsZQcAQAcAQQcAQgEAClNvdXJjZUZpbGUBAAxTU0xQb2tl
-LmphdmEMABcAGAcAQwwARABFAQAHU1NMUG9rZQcARgwARwBIAQAQQm9vdHN0cmFwTWV0aG9kcw8G
-AEkIAEoMAEsATAcATQwATgBPDABQAFEMAFIAUwEAHmphdmF4L25ldC9zc2wvU1NMU29ja2V0RmFj
-dG9yeQcAVAwAVQBWDABXAFgBABdqYXZheC9uZXQvc3NsL1NTTFNvY2tldAwAWQBaDABbAFwMAF0A
-UQwAXgBfDABgAF8MAGEAUQEAFlN1Y2Nlc3NmdWxseSBjb25uZWN0ZWQBABNqYXZhL2xhbmcvRXhj
-ZXB0aW9uDABiABgBABBqYXZhL2xhbmcvT2JqZWN0AQATW0xqYXZhL2xhbmcvU3RyaW5nOwEAE2ph
-dmEvaW8vSW5wdXRTdHJlYW0BABRqYXZhL2lvL091dHB1dFN0cmVhbQEAEGphdmEvbGFuZy9TeXN0
-ZW0BAANvdXQBABVMamF2YS9pby9QcmludFN0cmVhbTsBAA9qYXZhL2xhbmcvQ2xhc3MBAAdnZXRO
-YW1lAQAUKClMamF2YS9sYW5nL1N0cmluZzsKAGMAZAEAFlVzYWdlOiABIDxob3N0PiA8cG9ydD4B
-ABdtYWtlQ29uY2F0V2l0aENvbnN0YW50cwEAJihMamF2YS9sYW5nL1N0cmluZzspTGphdmEvbGFu
-Zy9TdHJpbmc7AQATamF2YS9pby9QcmludFN0cmVhbQEAB3ByaW50bG4BABUoTGphdmEvbGFuZy9T
-dHJpbmc7KVYBAARleGl0AQAEKEkpVgEACmdldERlZmF1bHQBABsoKUxqYXZheC9uZXQvU29ja2V0
-RmFjdG9yeTsBABFqYXZhL2xhbmcvSW50ZWdlcgEACHBhcnNlSW50AQAVKExqYXZhL2xhbmcvU3Ry
-aW5nOylJAQAMY3JlYXRlU29ja2V0AQAmKExqYXZhL2xhbmcvU3RyaW5nO0kpTGphdmEvbmV0L1Nv
-Y2tldDsBAA5nZXRJbnB1dFN0cmVhbQEAFygpTGphdmEvaW8vSW5wdXRTdHJlYW07AQAPZ2V0T3V0
-cHV0U3RyZWFtAQAYKClMamF2YS9pby9PdXRwdXRTdHJlYW07AQAFd3JpdGUBAAlhdmFpbGFibGUB
-AAMoKUkBAARyZWFkAQAFcHJpbnQBAA9wcmludFN0YWNrVHJhY2UHAGUMAEsAaQEAJGphdmEvbGFu
-Zy9pbnZva2UvU3RyaW5nQ29uY2F0RmFjdG9yeQcAawEABkxvb2t1cAEADElubmVyQ2xhc3NlcwEA
-mChMamF2YS9sYW5nL2ludm9rZS9NZXRob2RIYW5kbGVzJExvb2t1cDtMamF2YS9sYW5nL1N0cmlu
-ZztMamF2YS9sYW5nL2ludm9rZS9NZXRob2RUeXBlO0xqYXZhL2xhbmcvU3RyaW5nO1tMamF2YS9s
-YW5nL09iamVjdDspTGphdmEvbGFuZy9pbnZva2UvQ2FsbFNpdGU7BwBsAQAlamF2YS9sYW5nL2lu
-dm9rZS9NZXRob2RIYW5kbGVzJExvb2t1cAEAHmphdmEvbGFuZy9pbnZva2UvTWV0aG9kSGFuZGxl
-cwAhAAMAFgAAAAAAAgABABcAGAABABkAAAAdAAEAAQAAAAUqtwABsQAAAAEAGgAAAAYAAQAAAAkA
-CQAbABwAAQAZAAAA9gAEAAUAAABsKr4FnwAXsgACEgO2AAS6AAUAALYABgS4AAe4AAjAAAlMKyoD
-MioEMrgACrYAC8AADE0stgANTiy2AA46BBkEBLYADy22ABCeABCyAAIttgARtgASp//vsgACEhO2
-AAanAAxMK7YAFQS4AAexAAEAGgBfAGIAFAACABoAAABCABAAAAALAAYADAAWAA0AGgAQACEAEQAy
-ABMANwAUAD0AFwBDABkASgAaAFcAHABfACEAYgAeAGMAHwBnACAAawAiAB0AAAAoAAUa/wAoAAUH
-AB4HAAkHAAwHAB8HACAAABP/AAoAAQcAHgABBwAUCAADACEAAAACACIAaAAAAAoAAQBmAGoAZwAZ
-ACkAAAAIAAEAKgABACs="
+main() {
 
-while getopts "m:f:" options; do
-  case "${options}" in
-    m)
-      MODE=${OPTARG}
-      ;;
-    f)
-      HITT_CONFIG_FILE=${OPTARG}
-      ;;
-    :)
-      echo "${BOLD}ERROR:${NORMAL} -${OPTARG} requires an argument."
-      usage
-      ;;
-    *)
-      usage
-      ;;
-  esac
-done
-
-logStatus "Welcome to the Helix IS Triage Tool."
+NOW=$(date)
+logStatus "Welcome to the Helix IS Triage Tool - ${NOW}."
 logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
 
@@ -1956,3 +1916,92 @@ cleanUp
 reportResults
 # DEBUG only
 dumpVARs
+if [ "${MODE}" != "post-hp" ]; then
+  saveAllPipelineConsoleOutput
+fi
+${ZIP_BIN} -q hittlogs.zip *.log
+}
+
+# Set vars and process command line
+SCRIPT_VERSION=1
+HITT_CONFIG_FILE=hitt.conf
+HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
+CREATE_LOGS=1
+HITT_LOG_FILE=hitt.log
+FAIL=0
+WARN=0
+SKIP_JENKINS=0
+REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip)
+IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
+BOLD=$(tput bold)
+NORMAL=$(tput sgr0)
+RED="\e[31m"
+YELLOW="\e[33m"
+GREEN="\e[32m"
+SEALTCTL=sealtctl
+KUBECTL_BIN=kubectl
+JQ_BIN=jq
+ERROR_ARRAY=()
+WARN_ARRAY=()
+JENKINS_CREDENTIALS=""
+SSLPOKE_PAYLOAD="
+yv66vgAAADcAbQoAFgAjCQAkACUHACYKACcAKBIAAAAsCgAtAC4KACQALwoACQAwBwAxCgAyADMK
+AAkANAcANQoADAA2CgAMADcKACAAOAoAHwA5CgAfADoKAC0AOwgAPAcAPQoAFAA+BwA/AQAGPGlu
+aXQ+AQADKClWAQAEQ29kZQEAD0xpbmVOdW1iZXJUYWJsZQEABG1haW4BABYoW0xqYXZhL2xhbmcv
+U3RyaW5nOylWAQANU3RhY2tNYXBUYWJsZQcAQAcAQQcAQgEAClNvdXJjZUZpbGUBAAxTU0xQb2tl
+LmphdmEMABcAGAcAQwwARABFAQAHU1NMUG9rZQcARgwARwBIAQAQQm9vdHN0cmFwTWV0aG9kcw8G
+AEkIAEoMAEsATAcATQwATgBPDABQAFEMAFIAUwEAHmphdmF4L25ldC9zc2wvU1NMU29ja2V0RmFj
+dG9yeQcAVAwAVQBWDABXAFgBABdqYXZheC9uZXQvc3NsL1NTTFNvY2tldAwAWQBaDABbAFwMAF0A
+UQwAXgBfDABgAF8MAGEAUQEAFlN1Y2Nlc3NmdWxseSBjb25uZWN0ZWQBABNqYXZhL2xhbmcvRXhj
+ZXB0aW9uDABiABgBABBqYXZhL2xhbmcvT2JqZWN0AQATW0xqYXZhL2xhbmcvU3RyaW5nOwEAE2ph
+dmEvaW8vSW5wdXRTdHJlYW0BABRqYXZhL2lvL091dHB1dFN0cmVhbQEAEGphdmEvbGFuZy9TeXN0
+ZW0BAANvdXQBABVMamF2YS9pby9QcmludFN0cmVhbTsBAA9qYXZhL2xhbmcvQ2xhc3MBAAdnZXRO
+YW1lAQAUKClMamF2YS9sYW5nL1N0cmluZzsKAGMAZAEAFlVzYWdlOiABIDxob3N0PiA8cG9ydD4B
+ABdtYWtlQ29uY2F0V2l0aENvbnN0YW50cwEAJihMamF2YS9sYW5nL1N0cmluZzspTGphdmEvbGFu
+Zy9TdHJpbmc7AQATamF2YS9pby9QcmludFN0cmVhbQEAB3ByaW50bG4BABUoTGphdmEvbGFuZy9T
+dHJpbmc7KVYBAARleGl0AQAEKEkpVgEACmdldERlZmF1bHQBABsoKUxqYXZheC9uZXQvU29ja2V0
+RmFjdG9yeTsBABFqYXZhL2xhbmcvSW50ZWdlcgEACHBhcnNlSW50AQAVKExqYXZhL2xhbmcvU3Ry
+aW5nOylJAQAMY3JlYXRlU29ja2V0AQAmKExqYXZhL2xhbmcvU3RyaW5nO0kpTGphdmEvbmV0L1Nv
+Y2tldDsBAA5nZXRJbnB1dFN0cmVhbQEAFygpTGphdmEvaW8vSW5wdXRTdHJlYW07AQAPZ2V0T3V0
+cHV0U3RyZWFtAQAYKClMamF2YS9pby9PdXRwdXRTdHJlYW07AQAFd3JpdGUBAAlhdmFpbGFibGUB
+AAMoKUkBAARyZWFkAQAFcHJpbnQBAA9wcmludFN0YWNrVHJhY2UHAGUMAEsAaQEAJGphdmEvbGFu
+Zy9pbnZva2UvU3RyaW5nQ29uY2F0RmFjdG9yeQcAawEABkxvb2t1cAEADElubmVyQ2xhc3NlcwEA
+mChMamF2YS9sYW5nL2ludm9rZS9NZXRob2RIYW5kbGVzJExvb2t1cDtMamF2YS9sYW5nL1N0cmlu
+ZztMamF2YS9sYW5nL2ludm9rZS9NZXRob2RUeXBlO0xqYXZhL2xhbmcvU3RyaW5nO1tMamF2YS9s
+YW5nL09iamVjdDspTGphdmEvbGFuZy9pbnZva2UvQ2FsbFNpdGU7BwBsAQAlamF2YS9sYW5nL2lu
+dm9rZS9NZXRob2RIYW5kbGVzJExvb2t1cAEAHmphdmEvbGFuZy9pbnZva2UvTWV0aG9kSGFuZGxl
+cwAhAAMAFgAAAAAAAgABABcAGAABABkAAAAdAAEAAQAAAAUqtwABsQAAAAEAGgAAAAYAAQAAAAkA
+CQAbABwAAQAZAAAA9gAEAAUAAABsKr4FnwAXsgACEgO2AAS6AAUAALYABgS4AAe4AAjAAAlMKyoD
+MioEMrgACrYAC8AADE0stgANTiy2AA46BBkEBLYADy22ABCeABCyAAIttgARtgASp//vsgACEhO2
+AAanAAxMK7YAFQS4AAexAAEAGgBfAGIAFAACABoAAABCABAAAAALAAYADAAWAA0AGgAQACEAEQAy
+ABMANwAUAD0AFwBDABkASgAaAFcAHABfACEAYgAeAGMAHwBnACAAawAiAB0AAAAoAAUa/wAoAAUH
+AB4HAAkHAAwHAB8HACAAABP/AAoAAQcAHgABBwAUCAADACEAAAACACIAaAAAAAoAAQBmAGoAZwAZ
+ACkAAAAIAAEAKgABACs="
+
+while getopts "lm:f:" options; do
+  case "${options}" in
+    m)
+      MODE=${OPTARG}
+      ;;
+    l)
+      CREATE_LOGS=0
+      ;;
+    f)
+      HITT_CONFIG_FILE=${OPTARG}
+      ;;
+    :)
+      echo "${BOLD}ERROR:${NORMAL} -${OPTARG} requires an argument."
+      usage
+      ;;
+    *)
+      usage
+      ;;
+  esac
+done
+
+# Call main()
+if [ ${CREATE_LOGS} -eq 1 ]; then
+  main | tee "${HITT_LOG_FILE}"
+else
+  main
+fi
