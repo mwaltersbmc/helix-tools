@@ -1,12 +1,14 @@
 The Helix IS Triage Tool (**HITT**) is a shell script that tests for many common configuration problems that cause issues during the installation and use of Helix IS Service Management applications.  The script should be run as the git user on the Deployment Engine system where Jenkins is installed.
 
-HITT has three operating modes, all of which require that the Helix Platform installation has been completed.
+HITT has three main operating modes and a tctl command option, all of which require that the Helix Platform installation has been completed.
+
+The main modes are:
 
 **post-hp**	- used after the Helix Platform has been installed and the SSO realm for Helix IS has been created.\
 **pre-is**	- used after the Jenkins HELIX_ONPREM_DEPLOYMENT and HELIX_GENERATE_CONFIG pipelines have been run with all the installation values populated.\
 **post-is**	- used after the installation of Helix IS has been completed.
 
-In all modes the HITT script requires minimal manual configuration and will read the information it needs from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
+The HITT script requires minimal manual configuration and will read the information it needs from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
 
 There are some optional tests that will attempt to validate the Helix IS database.  These require the use of a Java SQL client, called JISQL, and JDBC drivers for each database type.  To enable these tests, download the dbjars.tgz file and save it in the same directory as the hitt.sh script.  HITT will run the SQL checks when this file is present.
 
@@ -61,7 +63,7 @@ $ chmod a+x hitt.sh
 $ ./hitt.sh
 ```
 
-HITT requires one command line option (-m) to specify the operating mode and will print a usage message if this is not provided.
+HITT requires one command line option (-m) to specify the operating mode, unless being used for tctl commands, and will print a usage message if this is not provided.
 
 ```
 $ bash hitt.sh
@@ -76,9 +78,9 @@ OR
 bash hitt.sh -m post-is  - run IS post-installation checks
 ```
 
-Use post-hp after installing and configuring the Helix Platform but before using Jenkins.
-Use pre-is after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting the deployment of Helix IS.
-Use post-is for troubleshooting after IS deployment.
+Use **post-hp** after installing and configuring the Helix Platform but before using Jenkins.
+Use **pre-is** after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting the deployment of Helix IS.
+Use **post-is** for troubleshooting after IS deployment.
 
 HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages and summarised at the end.
 
@@ -94,6 +96,19 @@ All of the tests are read-only and will not make changes to the system.  However
 HITT records the script output in a file called **hitt.log**.  It also creates a **values.log** with the pipeline input values in pre-is mode, or values read from the cluster for post-is. Log files for each of the Jenkins pipelines, containing the console output of the last build, are created as PIPELINE_NAME.log.  All of these files are added to **hittlogs.zip** which can be sent to BMC Support if needed.
 
 NOTE - password values are not logged.
+
+**tctl Mode**
+
+HITT may also be used to run simple **tctl** commands such as **get tenant** and **get service**.  This deploys the same job and pod used by the Jenkins HELIX_ITSM_INTEROPS pipeline and avoids having to download and configure the tctl client on a local system.  The command uses the **-t** switch:
+
+```
+$ bash hitt.sh -t "tctl command"
+Examples:
+$ bash hitt.sh -t "get tenant"
+$ bash hitt.sh -t "get tenant 1912102789 -o json"
+```
+
+The tctl commands must be enclosed in double quotes and the output will be displayed on the console when the job completes.
 
 **Checks Summary**
 

@@ -401,7 +401,11 @@ getTCTLOutput() {
   if [ $(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} | grep "^HTTP" | cut -f 4 -d ' ') != "200" ] ; then
     logError "tctl job failed." 1
   fi
-  TCTL_OUTPUT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} | sed -n -e '/^NAME/,$p' | tail -n +2)
+  if [ "${1}" != "full" ]; then
+    TCTL_OUTPUT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} | sed -n -e '/^NAME/,$p' | tail -n +2)
+  else
+    TCTL_OUTPUT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL})
+  fi
 }
 
 setTCTLRESTImageName() {
@@ -1829,6 +1833,18 @@ fi
 source "${HITT_CONFIG_FILE}"
 checkForNewHITT
 
+# Run tctl command and then exit
+if [[ ! -z "${TCTL_CMD}" ]]; then
+  logStatus "Running in tctl only mode..."
+  deleteTCTLJob
+  deployTCTL "${TCTL_CMD}"
+  logMessage "tctl output is...\n"
+  getTCTLOutput full
+  echo "${TCTL_OUTPUT}"
+  deleteTCTLJob
+  exit
+fi
+
 # Validate action
 [[ "${MODE}" =~ ^post-hp$|^pre-is$|^post-is$ ]] || usage
 
@@ -1978,13 +1994,16 @@ ABMANwAUAD0AFwBDABkASgAaAFcAHABfACEAYgAeAGMAHwBnACAAawAiAB0AAAAoAAUa/wAoAAUH
 AB4HAAkHAAwHAB8HACAAABP/AAoAAQcAHgABBwAUCAADACEAAAACACIAaAAAAAoAAQBmAGoAZwAZ
 ACkAAAAIAAEAKgABACs="
 
-while getopts "lm:f:" options; do
+while getopts "lm:f:t:" options; do
   case "${options}" in
     m)
       MODE=${OPTARG}
       ;;
     l)
       CREATE_LOGS=0
+      ;;
+    t)
+      TCTL_CMD=${OPTARG}
       ;;
     f)
       HITT_CONFIG_FILE=${OPTARG}
