@@ -424,7 +424,7 @@ deployTCTL() {
     logError "Unable to get TCTL image name from job ${TCTL_JOB_NAME}."
     return 1
   fi
-  logMessage "Deploying job ${SEALTCTL} and waiting for it to complete..."
+  logMessage "Deploying '${SEALTCTL}' job and waiting for it to complete..."
   cat <<EOF | ${KUBECTL_BIN} -n "${HP_NAMESPACE}" apply -f - >/dev/null
 ---
 apiVersion: batch/v1
@@ -459,7 +459,7 @@ spec:
               key: rssourl
               name: rsso-admin-tas
         - name: COMMAND
-          value: get ${TCTL_COMMAND}
+          value: ${TCTL_COMMAND}
         image: ${TCTL_IMAGE}
         imagePullPolicy: IfNotPresent
         name: ${SEALTCTL}
@@ -588,7 +588,7 @@ validateDomainInDNS() {
 
 checkServiceDetails() {
   deleteTCTLJob
-  if ! deployTCTL service; then
+  if ! deployTCTL "get service"; then
     logError "Failed to get Helix Platform ARSERVICES status."
     return
   fi
