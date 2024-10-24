@@ -282,6 +282,17 @@ setVarsFromPlatform() {
   LOG_ELASTICSEARCH_USERNAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_USERNAME | @base64d')
   FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
 
+  # Catch cases where the LB_HOST is the same as the IS CUSTOMER_SERVICE-ENVIRONMENT.CLUSTER_DOMAIN
+  if [ "${IS_ENVIRONMENT}" == "prod" ]; then
+    IS_PREFIX="${IS_CUSTOMER_SERVICE}"
+  else
+    IS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
+  fi
+  if [ "${LB_HOST}" == "${IS_PREFIX}.${LB_HOST#*.}" ]; then
+    logError "LB_HOST value '${LB_HOST}' conflicts with the derived MidTier alias '${IS_PREFIX}.${LB_HOST#*.}'."
+    logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
+  fi
+
   if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
     FTS_ELASTIC_POD_CONTAINER="-c opensearch"
   fi
