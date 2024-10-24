@@ -160,7 +160,7 @@ checkBinary() {
 
 cleanUp() {
   if [ ! -z "${SKIP_CLEANUP}" ]; then return; fi
-  for i in sealcacerts sealstore.p12 sealstore.pem; do
+  for i in sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins; do
     [[ -f ${i} ]] &&  rm -f ${i}
   done
   for i in configsrepo; do
@@ -831,24 +831,24 @@ downloadJenkinsCLIJar() {
 
 getPipelinePasswords() {
   ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>/dev/null >&1
-  import jenkins.model.*
-  import hudson.model.*
-  def jobName = 'HELIX_ONPREM_DEPLOYMENT'
-  def jenkins = Jenkins.instance
-  def job = jenkins.getItemByFullName(jobName)
-  def lastBuild = job.getLastBuild()
-  def parametersAction = lastBuild.getAction(ParametersAction)
-  def parameters = lastBuild.getAction(ParametersAction.class)?.getParameters()
-  def paramMap = [:]
-  if (parameters != null) {
-      parameters.each { param ->
-          if (param.getName() ==~ ".*PASSWORD.*") {
-            paramMap[param.getName()] = param.getValue()
-          }
-      }
-  }
-  def jsonOutput = new groovy.json.JsonBuilder(paramMap).toPrettyString()
-  println(jsonOutput)
+    import jenkins.model.*
+    import hudson.model.*
+    def jobName = 'HELIX_ONPREM_DEPLOYMENT'
+    def jenkins = Jenkins.instance
+    def job = jenkins.getItemByFullName(jobName)
+    def lastBuild = job.getLastBuild()
+    def parametersAction = lastBuild.getAction(ParametersAction)
+    def parameters = lastBuild.getAction(ParametersAction.class)?.getParameters()
+    def paramMap = [:]
+    if (parameters != null) {
+        parameters.each { param ->
+            if (param.getName() ==~ ".*PASSWORD.*") {
+              paramMap[param.getName()] = param.getValue()
+            }
+        }
+    }
+    def jsonOutput = new groovy.json.JsonBuilder(paramMap).toPrettyString()
+    println(jsonOutput)
 EOF
 }
 
@@ -1805,6 +1805,75 @@ createPipelineNamesArray() {
     HELIX_NON_PLATFORM_UPDATE
   )
 }
+
+getKubeconfigFromJenkins() {
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2> /dev/null > kubeconfig.jenkins
+    import com.cloudbees.plugins.credentials.*;
+    import com.cloudbees.plugins.credentials.domains.Domain;
+    import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl;
+    def fileName = "kubeconfig"
+    SystemCredentialsProvider.getInstance().getCredentials().stream().
+      filter { cred -> cred instanceof FileCredentialsImpl }.
+      map { fileCred -> (FileCredentialsImpl) fileCred }.
+      filter { fileCred -> fileName.equals( fileCred.getFileName() ) }.
+      forEach { fileCred ->
+        String s = new String( fileCred.getSecretBytes().getPlainData() )
+        println ""
+        println s
+        println ""
+      }
+EOF
+}
+
+validateJenkinsKubeconfig() {
+  getKubeconfigFromJenkins
+  if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>&1; then
+    logError "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
+  else
+    logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file."
+  fi
+}
+
+getJenkinsCredentials() {
+  JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2> /dev/null
+    import com.cloudbees.plugins.credentials.CredentialsProvider
+    import com.cloudbees.plugins.credentials.domains.Domain
+    import groovy.json.JsonOutput
+    def allCredentials = CredentialsProvider.lookupCredentials(
+        com.cloudbees.plugins.credentials.Credentials.class
+    )
+    def credentialsList = allCredentials.collect { cred ->
+        [
+            id: cred.id,
+            description: cred.description,
+            type: cred.getClass().getSimpleName()
+        ]
+    }
+    def jsonOutput = JsonOutput.toJson(credentialsList)
+    println JsonOutput.prettyPrint(jsonOutput)
+EOF
+)
+}
+
+validatJenkinsCredentials() {
+  getJenkinsCredentials
+  MISSING_CREDS=""
+  for i in "${JENKINS_CREDS[@]}" ; do
+    ID=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").id')
+    if [ "${ID}" != "${i}" ]; then
+      MISSING_CREDS+=" '${i}'"
+    fi
+  done
+  if [ "${MISSING_CREDS}" != "" ]; then
+    logError "One or more Jenkins credentials not found -${MISSING_CREDS}"
+  else
+    logMessage "Expected credentials found in Jenkins."
+  fi
+
+  if echo "${MISSING_CREDS}" | grep -q kubecconfig ; then
+    validateJenkinsKubeconfig
+  fi
+}
 # FUNCTIONS End
 
 # MAIN Start
@@ -1914,6 +1983,9 @@ if [ "${MODE}" != "post-hp" ]; then
 fi
 
 if [ "${SKIP_JENKINS}" == "0" ]; then
+  logStatus "Validating Jenkins credentials..."
+  validatJenkinsCredentials
+  validateJenkinsKubeconfig
   logStatus "Checking IS FTS Elastic settings..."
   checkFTSElasticSettings
   logStatus "Checking IS DB settings..."
@@ -1949,6 +2021,7 @@ WARN=0
 SKIP_JENKINS=0
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
+JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 RED="\e[31m"
