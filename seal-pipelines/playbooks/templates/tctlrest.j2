@@ -32,9 +32,9 @@ spec:
         - name: COMMAND
           value: '{{ command }}'
         - name: FLAG
-          value: '{{ tctl_flag }}'
+          value: '{{ tctl_flag|default('') }}'
         - name: JSON_VALUE
-          value: '{{ tctl_json }}'
+          value: '{{ tctl_json|default('') }}'
         image: {{ tctl_image }}
         imagePullPolicy: IfNotPresent
         name: tctl
