@@ -1885,6 +1885,17 @@ validatJenkinsCredentials() {
     validateJenkinsKubeconfig
   fi
 }
+
+checkPlatformAdminExtSvc() {
+PLATFORM_EXT_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get svc platform-admin-ext -o jsonpath='{.spec.externalIPs}')
+PLATFORM_EXT_IP=$(echo ${PLATFORM_EXT_JSON} | ${JQ_BIN} length)
+if [ -z "${PLATFORM_EXT_IP}" ]; then
+  logWarning "Helix IS platform-admin-ext service does not appear to have an external IP assigned."
+else
+  logMessage "Exposed IP addresses are ${PLATFORM_EXT_JSON}."
+fi
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -2004,6 +2015,8 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
 fi
 
 if [ "${MODE}" == "post-is" ]; then
+  logStatus "Checking Helix IS platform-admin-ext service has an exposed IP address."
+  checkPlatformAdminExtSvc
   logStatus "Checking IS license status..."
   checkISLicenseStatus
   logStatus "Checking Support Assistant Tool..."
