@@ -83,7 +83,7 @@ logStatus() {
 usage() {
     echo ""
     echo "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
-    echo "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is> [-f HITT_CONFIG_FILE]${NORMAL}"
+    echo "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is>${NORMAL}"
     echo ""
     echo "Examples:"
     echo "bash $0 -m post-hp   - run post HP installation only checks"
@@ -95,7 +95,6 @@ usage() {
     echo "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
     echo "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
     echo "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
-    echo "Optional -f to use a different config file."
     exit 1
 }
 
