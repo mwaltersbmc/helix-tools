@@ -2028,7 +2028,7 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
 fi
 
 if [ "${MODE}" == "post-is" ]; then
-  logStatus "Checking Helix IS platform-admin-ext service has an exposed IP address."
+  logStatus "Checking Helix IS platform-admin-ext service..."
   checkPlatformAdminExtSvc
   logStatus "Checking IS license status..."
   checkISLicenseStatus
