@@ -2120,6 +2120,9 @@ while getopts "lm:f:t:" options; do
       ;;
     t)
       TCTL_CMD=${OPTARG}
+      if [ $# -ne 2 ]; then
+        logError "tctl commands must be enclosed double quotes - eg hitt.sh -t \"get tenant\"" 1
+      fi
       ;;
     f)
       HITT_CONFIG_FILE=${OPTARG}
