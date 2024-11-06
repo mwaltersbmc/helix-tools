@@ -879,6 +879,7 @@ getPipelineValues() {
   fi
   IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
   IS_PIPELINE_VERSION="${IS_PLATFORM_HELM_VERSION:2:2}.${IS_PLATFORM_HELM_VERSION:4:1}.${IS_PLATFORM_HELM_VERSION:5:2}"
+  IS_VERSION="${IS_PLATFORM_HELM_VERSION:0:7}"
   cloneCustomerConfigsRepo
 }
 
@@ -1004,10 +1005,15 @@ validateISDetails() {
       logMessage "IS_NAMESPACE is the expected value (${IS_NAMESPACE})."
     fi
 
-    if [ "${#IS_IS_NAMESPACE}" -gt 33 ]; then
-      logError "IS_NAMESPACE is too long - maximum of 33 characters."
+    if [ "${IS_VERSION}" -ge 203303 ]; then
+      IS_NS_MAX_LEN=23
     else
-      logMessage "IS_NAMESPACE length is 33 characters or less."
+      IS_NS_MAX_LEN=33
+    fi
+    if [ "${#IS_IS_NAMESPACE}" -gt ${IS_NS_MAX_LEN} ]; then
+      logError "IS_NAMESPACE name is too long - maximum of ${IS_NS_MAX_LEN} characters."
+    else
+      logMessage "IS_NAMESPACE name length is ${IS_NS_MAX_LEN} characters or less."
     fi
 
     if [ "${ISP_CUSTOMER_SERVICE}-${ISP_ENVIRONMENT}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
