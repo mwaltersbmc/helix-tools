@@ -653,6 +653,7 @@ getISDetailsFromK8s() {
   IS_AR_DB_NAME=$(getValueFromPlatformSecret "AR_DB_NAME")
   IS_AR_DB_PASSWORD=$(getValueFromPlatformSecret "AR_SERVER_DB_USER_PASSWORD")
   IS_AR_DB_USER=$(getValueFromPlatformSecret "AR_SERVER_DB_USERNAME")
+  IS_ORACLE_SERVICE_NAME=$(getValueFromPlatformSecret "AR_DB_INSTANCE")
 
   # 23.3.03+ update for new FTS ES creds
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret helix-es-secret > /dev/null 2>&1; then
