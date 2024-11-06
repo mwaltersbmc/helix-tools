@@ -77,7 +77,7 @@ logMessage() {
 }
 
 logStatus() {
-  echo -e "${BOLD}${1}${NORMAL}"
+  echo -e "\n${BOLD}${1}${NORMAL}"
 }
 
 usage() {
@@ -123,7 +123,7 @@ checkToolVersion() {
     jq)
       REQUIRED_VERSION=1.6
       INSTALLED_VERSION=$(${JQ_BIN} --version | tr -d 'jq-')
-      if compare "$INSTALLED_VERSION < $REQUIRED_VERSION"; then
+      if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
         logError "jq version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed.  Please upgrade from https://jqlang.github.io/jq/download"
         FAIL=1
       fi
@@ -131,15 +131,18 @@ checkToolVersion() {
     java)
       REQUIRED_VERSION=11
       INSTALLED_VERSION=$(${JAVA_BIN} -version 2>&1 | grep -oP 'version "?(1\.)?\K\d+')
-      if compare "$INSTALLED_VERSION < $REQUIRED_VERSION"; then
+      if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
         logError "java version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
         FAIL=1
       fi
       ;;
     kubectl)
       REQUIRED_VERSION=1.20
-      INSTALLED_VERSION=$(${KUBECTL_BIN} version -o json 2>/dev/null | ${JQ_BIN} -r '.clientVersion.major + "." + .clientVersion.minor')
-      if compare "$INSTALLED_VERSION < $REQUIRED_VERSION"; then
+      KUBECTL_JSON=$(${KUBECTL_BIN} version -o json 2>/dev/null)
+      INSTALLED_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.major + "." + .clientVersion.minor')
+      KUBECTL_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.gitVersion')
+      K8S_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.serverVersion.gitVersion')
+      if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
         logError "kubectl version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
         FAIL=1
       fi
@@ -239,6 +242,8 @@ checkPodStatus() {
 }
 
 getVersions() {
+  logMessage "Kubernetes version ${K8S_VERSION}."
+  logMessage "kubectl version ${KUBECTL_VERSION}."
   if [ -f /etc/os-release ]; then
     OS_NAME=$(grep "^NAME=" /etc/os-release | cut -d '=' -f2)
     OS_VERSION=$(grep "^VERSION=" /etc/os-release | cut -d '=' -f2)
@@ -265,6 +270,9 @@ getVersions() {
         ;;
       23)
         IS_DB_VERSION=201
+        ;;
+      25)
+        IS_DB_VERSION=202
         ;;
       *)
         logError "Unknown Helix IS version (${IS_VERSION}) - check https://bit.ly/gethitt for HITT updates." 1
@@ -1974,7 +1982,7 @@ fi
 
 # Check required variables are settings
 checkVars
-echo "${BOLD}Starting HITT in ${MODE} mode...${NORMAL}"
+logStatus "${BOLD}Starting HITT in ${MODE} mode...${NORMAL}"
 
 # Check command line tools present
 logStatus "Checking for required tools in path..."
@@ -2121,7 +2129,7 @@ while getopts "lm:f:t:" options; do
     t)
       TCTL_CMD=${OPTARG}
       if [ $# -ne 2 ]; then
-        logError "tctl commands must be enclosed double quotes - eg hitt.sh -t \"get tenant\"" 1
+        logError "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
       fi
       ;;
     f)
