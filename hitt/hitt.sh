@@ -1888,13 +1888,25 @@ validatJenkinsCredentials() {
 }
 
 checkPlatformAdminExtSvc() {
-PLATFORM_EXT_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get svc platform-admin-ext -o jsonpath='{.spec.externalIPs}')
-PLATFORM_EXT_IP=$(echo ${PLATFORM_EXT_JSON} | ${JQ_BIN} length)
-if [ -z "${PLATFORM_EXT_IP}" ]; then
-  logWarning "Helix IS platform-admin-ext service does not appear to have an external IP assigned."
-else
-  logMessage "Exposed IP addresses are ${PLATFORM_EXT_JSON}."
-fi
+PLATFORM_EXT_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get svc platform-admin-ext -o json)
+PLATFORM_EXT_SVC_TYPE=$(echo ${PLATFORM_EXT_JSON} | ${JQ_BIN} -r '.spec.type' )
+
+case "${PLATFORM_EXT_SVC_TYPE}" in
+  ClusterIP)
+    PLATFORM_EXT_IP=$(echo ${PLATFORM_EXT_JSON} | ${JQ_BIN} '.spec.externalIPs | length' )
+    if [ "${PLATFORM_EXT_IP}" == "0" ]; then
+      logWarning "Helix IS platform-admin-ext service is of type ClusterIP but does not appear to have an externalIP assigned."
+    else
+      logMessage "Helix IS platform-admin-ext service is of type ClusterIP."
+    fi
+    ;;
+  NodePort)
+    logMessage "Helix IS platform-admin-ext service is of type NodePort."
+    ;;
+  *)
+    logWarning "Helix IS platform-admin-ext service is of type '${PLATFORM_EXT_SVC_TYPE}' and not the expected ClusterIP or NodePort."
+    ;;
+esac
 }
 
 # FUNCTIONS End
