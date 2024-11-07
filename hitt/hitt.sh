@@ -1113,32 +1113,22 @@ validateISDetails() {
     fi
 
     if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ]; then
-      if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
-        case "${IS_DB_TYPE}" in
-          postgres)
-            if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
-              logWarning "AR_DB_CASE_SENSITIVE is selected - please ensure that the case sensitive database dump has been restored."
-            fi
-            ;;
-          oracle)
-            logWarning "AR_DB_CASE_SENSITIVE is selected - please ensure that the case sensitive database dump has been restored."
-            ;;
-          mssql)
-            logError "AR_DB_CASE_SENSITIVE is selected - this option is not valid for MSSQL databases and should be unchecked."
-            ;;
-          esac
-      else
-        case "${IS_DB_TYPE}" in
-          postgres)
-            if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
-              logWarning "AR_DB_CASE_SENSITIVE is not selected - please ensure that the case insensitive database dump has been restored."
-            fi
-            ;;
-          oracle)
-            logWarning "AR_DB_CASE_SENSITIVE is not selected - please ensure that the case insensitive database dump has been restored."
-            ;;
-        esac
+      if [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "true" ]; then
+        if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
+          logMessage "Case sensitive database will be restored."
+        else
+          logMessage "Case insensitive database will be restored."
+        fi
       fi
+      if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
+        if ([ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "false" ]) || ([ "${IS_DB_TYPE}" != "postgres" ]); then
+          logWarning "AR_DB_CASE_SENSITIVE is selected but will be ignored as it is only relevant when the database type is Postgres and the DATABASE_RESTORE option is selected."
+        fi
+      fi
+    fi
+
+    if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ] && [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
+      logMessage "Case sensitive database will be restored."
     fi
 
     if [ "$HELIX_LOGGING_DEPLOYED" == 0 ]; then
