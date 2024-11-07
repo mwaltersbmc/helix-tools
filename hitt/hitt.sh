@@ -13,7 +13,7 @@ getConfValues() {
   logStatus "Please enter your HELIX_ONPREM_DEPLOYMENT pipeline CUSTOMER_SERVICE and ENVIRONMENT values:"
   read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE
   read -p "ENVIRONMENT : " IS_ENVIRONMENT
-  logStatus "Please enter your Jenkins usernamne and password if required, otherwise just press return:"
+  logStatus "Please enter your Jenkins username and password if required, otherwise just press return:"
   read -p "Username : " JENKINS_USERNAME
   read -s -p "Password : " JENKINS_PASSWORD
 }
@@ -778,6 +778,7 @@ createPipelineVarsArray() {
     INGRESS_CLASS
     CLUSTER_DOMAIN
     INPUT_CONFIG_METHOD
+    DEPLOYMENT_MODE
     CUSTOMER_SIZE
     HELM_NODE
     PLATFORM_HELM_VERSION
@@ -987,6 +988,8 @@ validateISDetails() {
   # PRE mode only
   if [ "${MODE}" == "pre-is" ]; then
     logMessage "ITSM pipeline version is ${IS_PLATFORM_HELM_VERSION}."
+    logMessage "CUSTOMER_SIZE is ${IS_CUSTOMER_SIZE}."
+    logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
     if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
       logWarning "CUSTOM_BINARY_PATH option is selected - this is not usually required and may be a mistake."
     fi
