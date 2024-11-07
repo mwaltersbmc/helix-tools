@@ -1109,20 +1109,34 @@ validateISDetails() {
         logError "DB_SSL_ENABLED should not be selected."
     fi
 
-#    if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ] && [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
-#      case "${IS_DB_TYPE}" in
-#        postgres)
-#          if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
-#            logWarning "AR_DB_CASE_SENSITIVE is selected - please ensure the case sensitive database dump has been used."
-#          fi
-#          ;;
-#        oracle)
-#          if [ "${1}" != "${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-#            logError "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
-#          fi
-#          ;;
-#        esac
-#    fi
+    if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ]; then
+      if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
+        case "${IS_DB_TYPE}" in
+          postgres)
+            if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
+              logWarning "AR_DB_CASE_SENSITIVE is selected - please ensure that the case sensitive database dump has been restored."
+            fi
+            ;;
+          oracle)
+            logWarning "AR_DB_CASE_SENSITIVE is selected - please ensure that the case sensitive database dump has been restored."
+            ;;
+          mssql)
+            logError "AR_DB_CASE_SENSITIVE is selected - this option is not valid for MSSQL databases and should be unchecked."
+            ;;
+          esac
+      else
+        case "${IS_DB_TYPE}" in
+          postgres)
+            if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
+              logWarning "AR_DB_CASE_SENSITIVE is not selected - please ensure that the case insensitive database dump has been restored."
+            fi
+            ;;
+          oracle)
+            logWarning "AR_DB_CASE_SENSITIVE is not selected - please ensure that the case insensitive database dump has been restored."
+            ;;
+        esac
+      fi
+    fi
 
     if [ "$HELIX_LOGGING_DEPLOYED" == 0 ]; then
       if [ "${IS_SIDECAR_FLUENTBIT}" == true ]; then
