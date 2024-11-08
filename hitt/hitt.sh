@@ -1070,14 +1070,17 @@ validateISDetails() {
       fi
     fi
 
-    if [ "${ITSM_INSIGHTS}" == "1" ] && ([ "${IS_BMC_HELIX_ITSM_INSIGHTS}" == "true" ] || [ "${IS_HELIX_ITSM_INSIGHTS}" == "true" ]) ; then
-        logWarning "BMC_HELIX_ITSM_INSIGHTS and/or HELIX_ITSM_INSIGHTS are selected but ITSM Insights is not installed in the Helix Platform."
+    if [ "${ITSM_INSIGHTS}" == "1" ]; then
+      if  [ "${IS_HELIX_ITSM_INSIGHTS}" == "true" ] ; then
+        logWarning "HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
+      fi
+      if [ "${IS_BMC_HELIX_ITSM_INSIGHTS}" == "true" ]; then
+        logError "BMC_HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
+      fi
     fi
 
     if [ "${IS_BMC_HELIX_ITSM_INSIGHTS}" == "true" ] && [ "${IS_HELIX_ITSM_INSIGHTS}" == "false" ] ; then
       logWarning "BMC_HELIX_ITSM_INSIGHTS is selected in the INTEROPS section but HELIX_ITSM_INSIGHTS is not selected as a product to install."
-    else
-      logMessage "INTEROPS BMC_HELIX_ITSM_INSIGHTS and HELIX_ITSM_INSIGHTS product options are consistent."
     fi
 
 #    if [ "${IS_SUPPORT_ASSISTANT_TOOL}" != "true" ]; then
