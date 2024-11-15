@@ -1932,6 +1932,12 @@ case "${PLATFORM_EXT_SVC_TYPE}" in
 esac
 }
 
+getPods() {
+  # ns name
+  logMessage "Getting pods from ${1}..."
+  ${KUBECTL_BIN} -n ${1} get pods -o wide > k8s_get_pods_${1}.log
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -2003,8 +2009,10 @@ if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
   logError "Helix Platform and Helix IS should be installed in their own namespaces." 1
 fi
 checkHPNamespace "${HP_NAMESPACE}"
+getPods ${HP_NAMESPACE}
 if [ "${MODE}" != "post-hp" ]; then
   checkISNamespace "${IS_NAMESPACE}"
+  getPods ${IS_NAMESPACE}
 fi
 logStatus "Getting versions..."
 getVersions
