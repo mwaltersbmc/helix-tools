@@ -78,8 +78,8 @@ OR
 bash hitt.sh -m post-is  - run IS post-installation checks
 ```
 
-Use **post-hp** after installing and configuring the Helix Platform but before using Jenkins.
-Use **pre-is** after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting the deployment of Helix IS.
+Use **post-hp** after installing and configuring the Helix Platform but before using Jenkins.\
+Use **pre-is** after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting the deployment of Helix IS.\
 Use **post-is** for troubleshooting after IS deployment.
 
 HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages and summarised at the end.
@@ -93,7 +93,14 @@ All of the tests are read-only and will not make changes to the system.  However
 
 **Logging**
 
-HITT records the script output in a file called **hitt.log**.  It also creates a **values.log** with the pipeline input values in pre-is mode, or values read from the cluster for post-is. Log files for each of the Jenkins pipelines, containing the console output of the last build, are created as PIPELINE_NAME.log.  All of these files are added to **hittlogs.zip** which can be sent to BMC Support if needed.
+HITT creates various log files in the directory that the script is run from:
+
+- **hitt.log** - script output.
+- **values.log** - the pipeline input values in pre-is mode, or values read from the cluster for post-is.
+- **PIPELINE_NAME.log** - console output for each of the Jenkins pipelines.
+- **k8s\*.log** - output from various kubectl commands such as 'get pods'.
+
+All of the files are added to **hittlogs.zip** which can be sent to BMC Support if needed.
 
 NOTE - password values are not logged.
 
