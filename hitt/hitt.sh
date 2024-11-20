@@ -64,11 +64,12 @@ logError() {
 }
 
 logWarning() {
-  # Print warning message
-  MSG="${BOLD}${YELLOW}WARNING${NORMAL} - ${1}"
+  # Print warning message MSG_ID MSG
+  MSG="${BOLD}${YELLOW}WARNING${NORMAL} - ${2}"
   echo -e "${MSG}"
   ((WARN++))
-  WARN_ARRAY+=(" - ${1}")
+  WARN_ARRAY+=(" - ${2}")
+  logMessageDetails "${1}" "${MSG}"
 }
 
 logMessage() {
@@ -162,7 +163,11 @@ checkBinary() {
 
 cleanUp() {
   if [ ! -z "${SKIP_CLEANUP}" ]; then return; fi
-  for i in sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins; do
+  CLEANUP_START_FILES=""
+  if [ "${1}" == "start" ]; then
+    CLEANUP_START_FILES="${MSG_FILE}"
+  fi
+  for i in sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins "${CLEANUP_START_FILES}"; do
     [[ -f ${i} ]] &&  rm -f ${i}
   done
   for i in configsrepo; do
@@ -195,7 +200,7 @@ checkNamespaceExists() {
       logMessage "${NS_TYPE} namespace ${1} found."
     fi
   else
-    logWarning "Unable to run 'kubectl get ns' - skipping namespace validation."
+    logWarning "001" "Unable to run 'kubectl get ns' - skipping namespace validation."
   fi
 }
 
@@ -253,7 +258,7 @@ getVersions() {
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
   logMessage "Helix Platform version - ${HP_VERSION} using DEPLOYMENT_SIZE ${HP_DEPLOYMENT_SIZE}."
   if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
-    logWarning "Helix Platform DEPLOYMENT_SIZE is ${HP_DEPLOYMENT_SIZE} - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products to be installed."
+    logWarning "002" "Helix Platform DEPLOYMENT_SIZE is ${HP_DEPLOYMENT_SIZE} - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products to be installed."
   fi
 
   if [ "${MODE}" == "post-is" ]; then
@@ -365,7 +370,7 @@ checkHelixLoggingDeployed() {
   else
     logMessage "Helix Logging is not installed."
     if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o jsonpath='{.data.bmc_helix_logging_config}' | grep -q 'ENABLE_LOG_SHIPPER_IN_PODS=true'; then
-      logWarning "ENABLE_LOG_SHIPPER_IN_PODS=true - consider installing Helix Logging to reduce error messages in Helix Platform pod logs."
+      logWarning "003" "ENABLE_LOG_SHIPPER_IN_PODS=true - consider installing Helix Logging to reduce error messages in Helix Platform pod logs."
     fi
   fi
 }
@@ -551,7 +556,7 @@ validateRealm() {
   fi
   REALM_TENANT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .tenantDomain)
   if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
-    logWarning "Unexpected TENANT in realm - recommended value is ${HP_TENANT} but found ${REALM_TENANT}."
+    logWarning "004" "Unexpected TENANT in realm - recommended value is ${HP_TENANT} but found ${REALM_TENANT}."
   else
     logMessage "Tenant ${REALM_TENANT} is the expected value."
   fi
@@ -595,7 +600,7 @@ validateRealmDomains() {
   done
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}" ; then
-    logWarning "${PORTAL_HOSTNAME} not found in realm Application Domains. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
+    logWarning "005" "${PORTAL_HOSTNAME} not found in realm Application Domains. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
 }
 
@@ -758,7 +763,7 @@ getISDetailsFromJenkins() {
 
 checkJenkinsJobResult() {
   if ! echo "${JENKINS_JSON}" | ${JQ_BIN} -r .result | grep -q "SUCCESS"; then
-    logWarning "Last build of the HELIX_ONPREM_DEPLOYMENT pipeline was not successful. Please review the console output for this and the HELIX_GENERATE_CONFIG pipelines - saved in the HITT directory."
+    logWarning "006" "Last build of the HELIX_ONPREM_DEPLOYMENT pipeline was not successful. Please review the console output for this and the HELIX_GENERATE_CONFIG pipelines - saved in the HITT directory."
   fi
 }
 
@@ -981,7 +986,7 @@ validateISDetails() {
 
   if [ "${IS_PLATFORM_INT}" == "1" ] ; then
     if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "false" ]; then
-      logWarning "platform-int pods are enabled but ENABLE_PLATFORM_INT_NORMALIZATION is not selected."
+      logWarning "007" "platform-int pods are enabled but ENABLE_PLATFORM_INT_NORMALIZATION is not selected."
     fi
   fi
 
@@ -991,7 +996,7 @@ validateISDetails() {
     logMessage "CUSTOMER_SIZE is ${IS_CUSTOMER_SIZE}."
     logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
     if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
-      logWarning "CUSTOM_BINARY_PATH option is selected - this is not usually required and may be a mistake."
+      logWarning "008" "CUSTOM_BINARY_PATH option is selected - this is not usually required and may be a mistake."
     fi
 
     if ! ${KUBECTL_BIN} config get-contexts "${IS_CLUSTER}" > /dev/null 2>&1; then
@@ -1002,11 +1007,11 @@ validateISDetails() {
     fi
 
     if [ "${IS_CLOUD}" == "true" ]; then
-      logWarning "IS_CLOUD option is selected - this will cause public cloud systems to provision an external load balancer."
+      logWarning "009" "IS_CLOUD option is selected - this will cause public cloud systems to provision an external load balancer."
     fi
 
     if [ "${IS_ROUTE_ENABLED}" == "true" ] || [ "${IS_ROUTE_TLS_ENABLED}" == "true" ]; then
-      logWarning "ROUTE_ENABLED and/or ROUTE_TLS_ENABLED are selected but should not be."
+      logWarning "010" "ROUTE_ENABLED and/or ROUTE_TLS_ENABLED are selected but should not be."
     fi
 
     if [ "${IS_IS_NAMESPACE}" != "${IS_NAMESPACE}" ]; then
@@ -1039,7 +1044,7 @@ validateISDetails() {
         logMessage "INGRESS_CLASS (${IS_INGRESS_CLASS}) appears valid."
       fi
     else
-      logWarning "Unable to list ingressclasses - skipping INGRESS_CLASS checks."
+      logWarning "011" "Unable to list ingressclasses - skipping INGRESS_CLASS checks."
     fi
 
     if [ "${IS_CLUSTER_DOMAIN}" != "${CLUSTER_DOMAIN}" ]; then
@@ -1072,7 +1077,7 @@ validateISDetails() {
 
     if [ "${ITSM_INSIGHTS}" == "1" ]; then
       if  [ "${IS_HELIX_ITSM_INSIGHTS}" == "true" ] ; then
-        logWarning "HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
+        logWarning "012" "HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
       fi
       if [ "${IS_BMC_HELIX_ITSM_INSIGHTS}" == "true" ]; then
         logError "BMC_HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
@@ -1080,17 +1085,17 @@ validateISDetails() {
     fi
 
     if [ "${IS_BMC_HELIX_ITSM_INSIGHTS}" == "true" ] && [ "${IS_HELIX_ITSM_INSIGHTS}" == "false" ] ; then
-      logWarning "BMC_HELIX_ITSM_INSIGHTS is selected in the INTEROPS section but HELIX_ITSM_INSIGHTS is not selected as a product to install."
+      logWarning "013" "BMC_HELIX_ITSM_INSIGHTS is selected in the INTEROPS section but HELIX_ITSM_INSIGHTS is not selected as a product to install."
     fi
 
 #    if [ "${IS_SUPPORT_ASSISTANT_TOOL}" != "true" ]; then
 #      logWarning "SUPPORT_ASSISTANT_TOOL not selected - Support Assistant Tool is recommended to provide access to application logs."
 #    fi
     if [ "${IS_SIDECAR_SUPPORT_ASSISTANT_FPACK}" != "true" ]; then
-      logWarning "SIDECAR_SUPPORT_ASSISTANT_FPACK not selected - Support Assistant Tool will not be able to access application logs."
+      logWarning "014 ""SIDECAR_SUPPORT_ASSISTANT_FPACK not selected - Support Assistant Tool will not be able to access application logs."
     fi
     if [ "${IS_SUPPORT_ASSISTANT_CREATE_ROLE}" != "true" ]; then
-      logWarning "SUPPORT_ASSISTANT_CREATE_ROLE not selected - Support Assistant Tool will not be able to access application logs unless the role/rolebinding are created manually."
+      logWarning "015" "SUPPORT_ASSISTANT_CREATE_ROLE not selected - Support Assistant Tool will not be able to access application logs unless the role/rolebinding are created manually."
     fi
 
     if [ "${IS_REGISTRY_TYPE}" != "DTR" ]; then
@@ -1125,7 +1130,7 @@ validateISDetails() {
       fi
       if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
         if ([ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "false" ]) || ([ "${IS_DB_TYPE}" != "postgres" ]); then
-          logWarning "AR_DB_CASE_SENSITIVE is selected but will be ignored as it is only relevant when the database type is Postgres and the DATABASE_RESTORE option is selected."
+          logWarning "024" "AR_DB_CASE_SENSITIVE is selected but will be ignored as it is only relevant when the database type is Postgres and the DATABASE_RESTORE option is selected."
         fi
       fi
     fi
@@ -1136,7 +1141,7 @@ validateISDetails() {
 
     if [ "$HELIX_LOGGING_DEPLOYED" == 0 ]; then
       if [ "${IS_SIDECAR_FLUENTBIT}" == true ]; then
-        logWarning "SIDECAR_FLUENTBIT selected but Helix Logging is not installed."
+        logWarning "016" "SIDECAR_FLUENTBIT selected but Helix Logging is not installed."
       fi
     fi
 
@@ -1200,7 +1205,7 @@ getCacertsFile() {
       logMessage "cacerts file found in CUSTOMER_CONFIGS repo."
       return
     else
-      logWarning "cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
+      logWarning "017" "cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
       SKIP_CACERTS=1
     fi
   fi
@@ -1278,7 +1283,7 @@ checkISFTSElasticHost() {
     if [ $(getSvcFromExternalIP "${1}") == "1" ]; then
       logError "FTS_ELASTICSEARCH_HOSTNAME IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
     else
-      logWarning "Recommend using servicename.namespace format instead of an exposed IP address for FTS_ELASTICSEARCH_HOSTNAME."
+      logWarning "018" "Recommend using 'servicename.namespace' format instead of an exposed IP address for FTS_ELASTICSEARCH_HOSTNAME."
       # Try and confirm IP is a valid ES
       ES_HEALTH=$(${CURL_BIN} -sk -u "${LOG_ELASTICSEARCH_USERNAME}:${LOG_ELASTICSEARCH_PASSWORD}" -X GET https://"${1}":9200/_cluster/health)
       if [ -z "${ES_HEALTH}" ]; then
@@ -1308,7 +1313,7 @@ checkIsValidElastic() {
       logError "${2} IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
       return
     else
-      logWarning "Recommend using servicename.namespace format instead of an exposed IP address for ${2}."
+      logWarning "019" "Recommend using 'servicename.namespace' format instead of an exposed IP address for ${2}."
       # Try and confirm IP is a valid ES
       ES_HEALTH=$(${CURL_BIN} -sk -u "${3}:${4}" -X GET https://"${1}":9200/_cluster/health)
       if [ -z "${ES_HEALTH}" ]; then
@@ -1399,7 +1404,7 @@ getISJWT() {
 getISLicense() {
   IS_LICENSE_TYPE=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Administration%3A%20Server%20Information?q=%27configurationName%27%3D%22%25%22&fields=values(licensetype)" -H "Authorization: AR-JWT $ARJWT" | ${JQ_BIN} -r '.entries[0].values.licensetype')
   if [ "${IS_LICENSE_TYPE}" != "AR Server" ]; then
-    logWarning "IS Server does not have a permanent license - current license type is ${IS_LICENSE_TYPE}."
+    logWarning "020" "IS Server does not have a permanent license - current license type is ${IS_LICENSE_TYPE}."
   else
     logMessage "IS Server is licensed."
   fi
@@ -1472,7 +1477,7 @@ checkISDBSettings() {
   fi
   checkISDBLatency
   if [ -z "${IS_AR_DB_USER}" ] || [ -z "${IS_AR_DB_PASSWORD}" ]; then
-    logWarning "One or more DB settings are blank - skipping checks."
+    logWarning "021" "One or more DB settings are blank - skipping checks."
     return
   fi
   if [ -f dbjars.tgz ]; then
@@ -1532,7 +1537,7 @@ isIPAddress() {
 reportResults() {
   echo ""
   if [ $FAIL -gt 0 ] || [ $WARN -gt 0 ] ; then
-    echo "${BOLD}${FAIL} errors / ${WARN} warnings found - please review output for details.${NORMAL}"
+    echo -e "${BOLD}${FAIL} errors / ${WARN} warnings found - please review the ${MSG_FILE} file for more details and suggested fixes.${NORMAL}"
     if [ "${#ERROR_ARRAY[@]}" != "0" ]; then
       echo -e "${BOLD}${RED}ERRORS:${NORMAL}"
       printf '%s\n' "${ERROR_ARRAY[@]}"
@@ -1654,7 +1659,7 @@ checkISDockerLogin() {
     else
       LOG_MSG="'docker' command returned an error"
     fi
-    logWarning "${LOG_MSG} - skipping registry credentials check."
+    logWarning "022" "${LOG_MSG} - skipping registry credentials check."
     return
   fi
   if docker login "${IS_SECRET_HARBOR_REGISTRY_HOST}" -u "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" -p "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" > /dev/null 2>&1 ; then
@@ -1918,7 +1923,7 @@ case "${PLATFORM_EXT_SVC_TYPE}" in
   ClusterIP)
     PLATFORM_EXT_IP=$(echo ${PLATFORM_EXT_JSON} | ${JQ_BIN} '.spec.externalIPs | length' )
     if [ "${PLATFORM_EXT_IP}" == "0" ]; then
-      logWarning "Helix IS platform-admin-ext service is of type ClusterIP but does not appear to have an externalIP assigned."
+      logWarning "025" "Helix IS platform-admin-ext service is of type ClusterIP but does not appear to have an externalIP assigned."
     else
       logMessage "Helix IS platform-admin-ext service is of type ClusterIP."
     fi
@@ -1927,7 +1932,7 @@ case "${PLATFORM_EXT_SVC_TYPE}" in
     logMessage "Helix IS platform-admin-ext service is of type NodePort."
     ;;
   *)
-    logWarning "Helix IS platform-admin-ext service is of type '${PLATFORM_EXT_SVC_TYPE}' and not the expected ClusterIP or NodePort."
+    logWarning "026" "Helix IS platform-admin-ext service is of type '${PLATFORM_EXT_SVC_TYPE}' and not the expected ClusterIP or NodePort."
     ;;
 esac
 }
@@ -1936,6 +1941,33 @@ getPods() {
   # ns name
   logMessage "Getting pods from ${1}..."
   ${KUBECTL_BIN} -n ${1} get pods -o wide > k8s_get_pods_${1}.log
+}
+
+getMessageJSON() {
+  # msg id
+  MSG_JSON=$(echo "${ALL_MSGS_JSON}" | jq '.[] | select(.id=="'"${1}"'")')
+  if [ -z "${MSG_JSON}" ]; then
+    MSG_JSON="{\"id\": \"$1\",\"cause\": \"Message details not found for id $1.\", \"impact\": \"Message details cannot be displayed.\", \"remediation\": \"Please report to 'mark_walters@bmc.com'\"}"
+  fi
+}
+
+getMessageDetails() {
+  eval "export $(printf "%s\n" "${MSG_JSON}" | ${JQ_BIN} -r 'to_entries | map("\(.key)=\(.value)") | @sh')"
+}
+
+printMessageDetails() {
+  printf "\n"
+  printf "${BOLD}Message: (${id})${NORMAL} ${MSG}\n"
+  printf "${BOLD}${YELLOW}Cause:${NORMAL} ${cause}\n"
+  printf "${BOLD}${RED}Impact:${NORMAL} ${impact}\n"
+  printf "${BOLD}${GREEN}Remediation:${NORMAL} ${remediation}\n"
+}
+
+logMessageDetails() {
+  # MSG_ID
+  getMessageJSON "${1}"
+  getMessageDetails
+  printMessageDetails >> "${MSG_FILE}"
 }
 
 # FUNCTIONS End
@@ -2003,7 +2035,7 @@ logStatus "${BOLD}Starting HITT in ${MODE} mode...${NORMAL}"
 logStatus "Checking for required tools in path..."
 checkRequiredTools
 # Remove
-cleanUp
+cleanUp start
 logStatus "Checking namespaces..."
 if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
   logError "Helix Platform and Helix IS should be installed in their own namespaces." 1
@@ -2067,7 +2099,7 @@ if [ "${MODE}" == "post-is" ]; then
   checkAssistTool
 fi
 
-cleanUp
+cleanUp stop
 reportResults
 # DEBUG only
 dumpVARs
@@ -2083,6 +2115,7 @@ HITT_CONFIG_FILE=hitt.conf
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 CREATE_LOGS=1
 HITT_LOG_FILE=hitt.log
+MSG_FILE=hittmsgs.log
 VALUES_LOG_FILE=values.log
 FAIL=0
 WARN=0
@@ -2090,8 +2123,8 @@ SKIP_JENKINS=0
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
 JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
-BOLD=$(tput bold)
-NORMAL=$(tput sgr0)
+BOLD="\e[1m"
+NORMAL="\e[0m"
 RED="\e[31m"
 YELLOW="\e[33m"
 GREEN="\e[32m"
@@ -2134,6 +2167,164 @@ AAanAAxMK7YAFQS4AAexAAEAGgBfAGIAFAACABoAAABCABAAAAALAAYADAAWAA0AGgAQACEAEQAy
 ABMANwAUAD0AFwBDABkASgAaAFcAHABfACEAYgAeAGMAHwBnACAAawAiAB0AAAAoAAUa/wAoAAUH
 AB4HAAkHAAwHAB8HACAAABP/AAoAAQcAHgABBwAUCAADACEAAAACACIAaAAAAAoAAQBmAGoAZwAZ
 ACkAAAAIAAEAKgABACs="
+ALL_MSGS_JSON="[
+  {
+    \"id\": \"001\",
+    \"cause\": \"The kubectl command used to list namespaces in the cluster did not return the expected list of namespace names.\",
+    \"impact\": \"Some later tests to validate the namespaces will not be run.\",
+    \"remediation\": \"Verify the output by running kubectl get ns at the command prompt and check with cluster admins if additional permissions are needed.\"
+  },
+  {
+    \"id\": \"002\",
+    \"cause\": \"The DEPLOYMENT_SIZE used for the Helix Platform is expected to be one of itsmcompact/itsmsmall/itsmxlarge if the Platform is only providing the common services used by Helix Service Management. Other options are valid if additional ITOM components, such as BHOM or BHCO, are in use or planned.\",
+    \"impact\": \"Additional cluster resources may be used if the sizing is incorrect.\",
+    \"remediation\": \"Confirm the Helix Platform sizing choice and redeploy if a change is required.\"
+  },
+  {
+    \"id\": \"003\",
+    \"cause\": \"Helix Logging is not installed but the option to enable the log shipper is set in the bmc-helix-logging.config file.\",
+    \"impact\": \"Helix Platform pod log output will include a lot of errors reporting that fluent-bit is not available which makes it difficult to use for troubleshooting.\",
+    \"remediation\": \"Install Helix Logging or set the ENABLE_LOG_SHIPPER_IN_PODS option to false in helix-on-prem-deployment-manager/configs/bmc-helix-logging.config file and redeploy.\"
+  },
+  {
+    \"id\": \"004\",
+    \"cause\": \"The Tenant value in the RSSO realm created for Helix Service Management is recommended to be set to the tenant ID using the name.number format.\",
+    \"impact\": \"Other values are valid but you must use this as the TENANT_DOMAIN in the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline. If these values are different there will be issues with Helix Service Management apps logins.\",
+    \"remediation\": \"Use the recommended name.number format or ensure that the same value is used as the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline TENANT_DOMAIN value.\"
+  },
+  {
+    \"id\": \"005\",
+    \"cause\": \"The Helix Portal alias is not present in the Helix Service Management RSSO realm. This alias is added during the Jenkins HELIX_ITSM_INTEROPS pipeline run.\",
+    \"impact\": \"The alias is not present until the Jenkins HELIX_ITSM_INTEROPS pipeline is run but, if it is missing after this, there will be errors when logging in.\",
+    \"remediation\": \"If the alias has been removed after the Jenkins HELIX_ITSM_INTEROPS pipeline has been run, add the full portal FQDN to the Applications Domain in the Helix Service Management SSO realm.\"
+  },
+  {
+    \"id\": \"006\",
+    \"cause\": \"The last build of the HELIX_ONPREM_DEPLOYMENT pipeline, or one of the deployment pipelines it runs, was not successful.\",
+    \"impact\": \"The problematic pipeline may not have completed all the stages necessary to deploy the Helix Service Management products.\",
+    \"remediation\": \"Review the pipeline console output in Jenkins, or the log files in the HITT directory, to try and identify the cause. Other HITT errors are likley to help with this.\"
+  },
+  {
+    \"id\": \"007\",
+    \"cause\": \"The Helix Service Management deployment size is M or above which means that platform-int pods will be created. By default, these pods do not run the normalization plugin which may be called by some types of activity.\",
+    \"impact\": \"API calls to the platform-int pods which invoke the Atrium normalization engine plugin will fail with an error such as ERROR (8760): Cannot establish a network connection to the AR System Plug-In server; platform-int-0.platform-int:9555\",
+    \"remediation\": \"Select the ENABLE_PLATFORM_INT_NORMALIZATION option to enable the plugin for the platform-int pods. If deployment is complete see KA000405995 for changes to the ENABLE_AR_SERVICES variable in the platform-int statefulset.\"
+  },
+  {
+    \"id\": \"008\",
+    \"cause\": \"The CUSTOM_BINARY_PATH option in the HELIX_ONPREM_DEPLOYMENT pipeline is selected but this is rarely required.\",
+    \"impact\": \"Deployment may fail unless the CUSTOM_BINARY_PATH is a valid path that provides the expected binary files.\",
+    \"remediation\": \"Deselect the CUSTOM_BINARY_PATH option unless you are certain that it is required.\"
+  },
+  {
+    \"id\": \"009\",
+    \"cause\": \"The IS_CLOUD option is selected which will cause public cloud systems to provision an external load balancer.\",
+    \"impact\": \"This setting is used with public cloud providers to automatically provision a load balancer for the environment.\",
+    \"remediation\": \"The option may be valid if you want your cloud provider to create a load balancer for you.\"
+  },
+  {
+    \"id\": \"010\",
+    \"cause\": \"The ROUTE_ENABLED and/or ROUTE_TLS_ENABLED options are selected but it is documented that they should be left unselected.\",
+    \"impact\": \"These options are not valid for onprem use and should not be selected.\",
+    \"remediation\": \"Deselect the options.\"
+  },
+  {
+    \"id\": \"011\",
+    \"cause\": \"The kubectl get ingressclasses command to list ingressclasses in the cluster did not work as expected.\",
+    \"impact\": \"Some later tests to validate ingresses will not be run.\",
+    \"remediation\": \"Verify the output by running kubectl get ingressclasses at the command prompt and check with cluster admins if additional permissions are needed.\"
+  },
+  {
+    \"id\": \"012\",
+    \"cause\": \"The HELIX_ITSM_INSIGHTS application is selected for installation but the ITSM Insights services are not installed in the Helix Platform.\",
+    \"impact\": \"The ITSM Insights application will not work.\",
+    \"remediation\": \"Deselect the HELIX_ITSM_INSIGHTS option or install ITSM Insights services in the Helix Platform.\"
+  },
+  {
+    \"id\": \"013\",
+    \"cause\": \"The option to integrate ITSM Insights with the Helix Platform is selected but HELIX_ITSM_INSIGHTS is not selected to install the application.\",
+    \"impact\": \"A link to launch ITSM Insights will be added to the Helix Portal but the application will be not installed.\",
+    \"remediation\": \"Select, or deselect, both BMC_HELIX_ITSM_INSIGHTS and HELIX_ITSM_INSIGHTS depending on whether ITSM Insights is required.\"
+  },
+  {
+    \"id\": \"014\",
+    \"cause\": \"The option to enable the Support Assistant fpackager sidecar containers is not selected. This is required for Support Assistant to be able to access Helix Service Management application logs.\",
+    \"impact\": \"Support Assistant Tool will not be able to access application logs.\",
+    \"remediation\": \"Select the SIDECAR_SUPPORT_ASSISTANT_FPACK option.\"
+  },
+  {
+    \"id\": \"015\",
+    \"cause\": \"The option to create the role and rolebinding required for the Support Assistant Tool is not selected.\",
+    \"impact\": \"Support Assistant Tool will not be able to access application logs unless the steps to create them manually are followed.\",
+    \"remediation\": \"Select the SUPPORT_ASSISTANT_CREATE_ROLE or see the product documentation for steps to create the role and rolebinding manually.\"
+  },
+  {
+    \"id\": \"016\",
+    \"cause\": \"The option to deploy the fluent-bit sidecar pods is enabled but Helix Logging is not installed.\",
+    \"impact\": \"The fluent-bit sidecars will be created but will not send the logs they monitor to the Helix Logging Elasticsearch for viewing via Kibana.\",
+    \"remediation\": \"Deselect the SIDECAR_FLUENTBIT option unless you plan to install Helix Logging later.\"
+  },
+  {
+    \"id\": \"017\",
+    \"cause\": \"The cacerts Java keystore file was not attached to the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline. Most customers are expected to attach this file.\",
+    \"impact\": \"If custom CA signed certificates are in use the deployment will fail.\",
+    \"remediation\": \"Attach the cacerts with your custom CA certificate chain added using the CACERTS_FILE option in Jenkins. This may not be necessary if using certificates puchased direct from Digicert.\"
+  },
+  {
+    \"id\": \"018\",
+    \"cause\": \"The FTS_ELASTICSEARCH_HOSTNAME value is an IP address rather than the recommended servicename.namespace format.\",
+    \"impact\": \"An IP address is valid if the service has been exposed but it is recommended to use the servicename.namespace format.\",
+    \"remediation\": \"Either servicename.namespace or an IP address is valid but the former avoids having to add an externalIP to the service used for FTS.\"
+  },
+  {
+    \"id\": \"019\",
+    \"cause\": \"The value is an IP address rather than the recommended servicename.namespace format.\",
+    \"impact\": \"An IP address is valid if the service has been exposed but it is recommended to use the servicename.namespace format.\",
+    \"remediation\": \"Either servicename.namespace or an IP address is valid but the former avoids having to add an externalIP to the service.\"
+  },
+  {
+    \"id\": \"020\",
+    \"cause\": \"The IS server does not have a permanent license.\",
+    \"impact\": \"If not already completed, the HELIX_SMARTAPPS_DEPLOY and HELIX_ITSM_INTEROPS pipelines may fail as the temporary 3 day server license has expired.\",
+    \"remediation\": \"The temporary IS server license, valid for three days from the first time the server is started, has expired. Apply a valid server license.\"
+  },
+  {
+    \"id\": \"021\",
+    \"cause\": \"Either or both the AR_DB_USER and AR_DB_PASSWORD values are blank.\",
+    \"impact\": \"This will cause a fresh installation to fail and prevent HITT from running some later checks.\",
+    \"remediation\": \"Set the values in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+  },
+  {
+    \"id\": \"022\",
+    \"cause\": \"Either the docker command was not found or docker login to the IMAGE_REGISTRY_HOST failed.\",
+    \"impact\": \"The registry server credentials will not be validated.\",
+    \"remediation\": \"Run the docker login command from the command prompt and resolve the error to enable the checks.\"
+  },
+  {
+    \"id\": \"023\",
+    \"cause\": \"The platform-admin-ext service in the Helix Service Management namespace does not have an externalIP assigned.\",
+    \"impact\": \"Developer Studio and other AR API clients will not be able to connect to the system. Upgrades will fail as they require this type of connectivity.\",
+    \"remediation\": \"See the post installation configuration steps in the documentation for steps to expose an externalIP or set the PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the pipeline.\"
+  },
+  {
+    \"id\": \"024\",
+    \"cause\": \"The AR_DB_CASE_SENSITIVE option is selected but the database type is not Postgres and/or the DATABASE_RESTORE option is not selected. This option is only valid when the pipeline is used to restore a Postgres database.\",
+    \"impact\": \"For MSSQL/Oracle databases this option is always ignored and the case-sensitivity of the system is determined by the database dump that was restored. For Postgres the option controls which dump is restored by the pipeline, it is ignored unless DATABASE_RESTORE is also selected.\",
+    \"remediation\": \"Ensure you have selected the correct options, or restored the appropriate database dump, to achieve the required case-sensitivity for your system.\"
+  },
+  {
+    \"id\": \"025\",
+    \"cause\": \"The platform-admin-ext service does not have an external IP address assigned.\",
+    \"impact\": \"Connectivity via the service for AR API clients such as Developer Studio will not be possible and upgrades will fail.\",
+    \"remediation\": \"Use the steps in the Performing the postinstallation configurations documentation to add an externalIP to the service.\"
+  },
+  {
+    \"id\": \"026\",
+    \"cause\": \"The platform-admim-ext service is not one of the expected types of ClusterIP or NodePort.\",
+    \"impact\": \"Connectivity via the service for AR API clients such as Developer Studio may not be possible and upgrades may fail.\",
+    \"remediation\": \"Review the platform-admim-ext service configuration in the cluster and revert any customisations.\"
+  }
+]"
 
 while getopts "lm:f:t:" options; do
   case "${options}" in
