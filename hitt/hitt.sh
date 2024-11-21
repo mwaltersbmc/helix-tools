@@ -133,6 +133,7 @@ checkToolVersion() {
     java)
       REQUIRED_VERSION=11
       INSTALLED_VERSION=$(${JAVA_BIN} -version 2>&1 | grep -oP 'version "?(1\.)?\K\d+')
+      JAVA_VERSION="${INSTALLED_VERSION}"
       if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
         logError "101" "java version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
         FAIL=1
@@ -753,6 +754,7 @@ getISDetailsFromJenkins() {
   checkJenkinsConfig
   logMessage "Downloading jenkins-cli.jar from Jenkins..."
   downloadJenkinsCLIJar
+  checkJenkinsCLIJavaVersion
   logMessage "Reading values from Jenkins..."
   JENKINS_JSON=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
   checkJenkinsJobResult
@@ -1975,6 +1977,13 @@ logMessageDetails() {
   printMessageDetails >> "${MSG_FILE}"
 }
 
+checkJenkinsCLIJavaVersion() {
+  REQUIRED_VERSION=$(${UNZIP_BIN} -p jenkins-cli.jar META-INF/MANIFEST.MF | grep ^Build-Jdk-Spec | cut -d ' ' -f2)
+  if compare "${JAVA_VERSION} < ${REQUIRED_VERSION}"; then
+    logError "207" "The installed version of Jenkins requires Java 17 but version ${JAVA_VERSION} is being used by HITT so some checks will fail. Please install, or configure HITT to use, Java ${REQUIRED_VERSION}."
+  fi
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -2904,6 +2913,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"BMC_HELIX_ITSM_INSIGHTS is selected to integrate with the Helix Platform but ITSM Insights is not installed in the Helix Platform.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
     \"remediation\": \"Deselect BMC_HELIX_ITSM_INSIGHTS or install ITSM Insights in the Helix Platform before deployment of Helix Service Management.\"
+  },
+  {
+    \"id\": \"207\",
+    \"cause\": \"The Java version used by HITT is older than that required to use the jenkins-cli.jar command line client.\",
+    \"impact\": \"Checks that use the jenkins-cli client will fail.\",
+    \"remediation\": \"Update the Java used by HITT to the version indicated in the error message.\"
   }
 ]"
 
