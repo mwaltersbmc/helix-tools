@@ -51,24 +51,26 @@ TAR_BIN=tar
 NC_BIN=nc
 HOST_BIN=host
 ZIP_BIN=zip
+UNZIP_BIN=unzip
 EOF
 }
 
 logError() {
-  # Print error message / exit if value of 1 passed as second parameter
-  MSG="${BOLD}${RED}ERROR${NORMAL} - ${1}"
+  # Print error message MSG_ID MSG / exit if value of 1 passed as third parameter
+  MSG="${BOLD}${RED}ERROR${NORMAL} (${1}) - ${2}"
   echo -e "${MSG}"
-  [[ ${2} == 1 ]] && exit 1
   ((FAIL++))
-  ERROR_ARRAY+=(" - ${1}")
+  ERROR_ARRAY+=("(${1}) - ${2}")
+  logMessageDetails "${1}" "${MSG}"
+  [[ ${3} == 1 ]] && exit 1
 }
 
 logWarning() {
   # Print warning message MSG_ID MSG
-  MSG="${BOLD}${YELLOW}WARNING${NORMAL} - ${2}"
+  MSG="${BOLD}${YELLOW}WARNING${NORMAL} (${1}) - ${2}"
   echo -e "${MSG}"
   ((WARN++))
-  WARN_ARRAY+=(" - ${2}")
+  WARN_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
 }
 
@@ -83,8 +85,8 @@ logStatus() {
 
 usage() {
     echo ""
-    echo "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
-    echo "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is>${NORMAL}"
+    echo -e "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
+    echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is>${NORMAL}"
     echo ""
     echo "Examples:"
     echo "bash $0 -m post-hp   - run post HP installation only checks"
@@ -93,15 +95,15 @@ usage() {
     echo "OR"
     echo "bash $0 -m post-is  - run post-installation checks"
     echo ""
-    echo "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
-    echo "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
-    echo "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
+    echo -e "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
+    echo -e "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
+    echo -e "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
     exit 1
 }
 
 checkVars() {
   if [ -z "${HP_NAMESPACE}" ] || [ -z "${IS_NAMESPACE}" ] || [ -z "${IS_CUSTOMER_SERVICE}" ] || [ -z "${IS_ENVIRONMENT}" ] ; then
-    logError "Please set the namespace and IS variables in the ${HITT_CONFIG_FILE} file." 1
+    logError "100" "Please set the namespace and IS variables in the ${HITT_CONFIG_FILE} file." 1
   fi
 }
 
@@ -124,7 +126,7 @@ checkToolVersion() {
       REQUIRED_VERSION=1.6
       INSTALLED_VERSION=$(${JQ_BIN} --version | tr -d 'jq-')
       if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
-        logError "jq version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed.  Please upgrade from https://jqlang.github.io/jq/download"
+        logError "101" "jq version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed.  Please upgrade from https://jqlang.github.io/jq/download"
         FAIL=1
       fi
       ;;
@@ -132,7 +134,7 @@ checkToolVersion() {
       REQUIRED_VERSION=11
       INSTALLED_VERSION=$(${JAVA_BIN} -version 2>&1 | grep -oP 'version "?(1\.)?\K\d+')
       if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
-        logError "java version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
+        logError "101" "java version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
         FAIL=1
       fi
       ;;
@@ -143,7 +145,7 @@ checkToolVersion() {
       KUBECTL_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.gitVersion')
       K8S_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.serverVersion.gitVersion')
       if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
-        logError "kubectl version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
+        logError "101" "kubectl version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
         FAIL=1
       fi
       ;;
@@ -154,7 +156,7 @@ checkToolVersion() {
 
 checkBinary() {
   if ! which "${1}" > /dev/null 2>&1 ; then
-    logError "${1} command not found in path. Please set ${1^^}_BIN variable with the full path to the file."
+    logError "105" "${1} command not found in path. Please set ${1^^}_BIN variable with the full path to the file."
   else
     logMessage "${1} command found ($(which ${1}))."
     checkToolVersion "${1}"
@@ -195,7 +197,7 @@ checkNamespaceExists() {
   if checkK8sAuth get ns; then
   # namespace_name - exit if not found
     if ! ${KUBECTL_BIN} get ns "${1}" > /dev/null 2>&1 ; then
-      logError "${NS_TYPE} namespace ${1} not found." 1
+      logError "106" "${NS_TYPE} namespace ${1} not found." 1
     else
       logMessage "${NS_TYPE} namespace ${1} found."
     fi
@@ -210,7 +212,7 @@ checkHPNamespace() {
   NS_TYPE="Helix Platform"
   checkNamespaceExists "${1}"
   if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
-    logError "Deployment ${DEPLOYMENT} not found in ${1} - please check the ${NS_TYPE} namespace name." 1
+    logError "107" "Deployment ${DEPLOYMENT} not found in ${1} - please check the ${NS_TYPE} namespace name." 1
   else
     logMessage "${1} is a valid ${NS_TYPE} namespace."
   fi
@@ -224,12 +226,12 @@ checkISNamespace() {
   checkNamespaceExists "${1}"
   if [ "${MODE}" == "pre-is" ]; then
     if [ $(${KUBECTL_BIN} -n "${1}" get secret --field-selector type=kubernetes.io/dockerconfigjson 2>&1 | wc -l) == "1" ]; then
-      logError "Registry secret not found in ${1} namespace - HELIX_GENERATE_CONFIG pipeline must have been run before ${MODE} checks." 1
+      logError "108" "Registry secret not found in ${1} namespace - HELIX_GENERATE_CONFIG pipeline must have been run before ${MODE} checks." 1
     fi
   fi
   if [ "${MODE}" == "post-is" ]; then
     if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
-      logError "Deployment ${DEPLOYMENT} not found in ${1} - please check the ${NS_TYPE} namespace name." 1
+      logError "107" "Deployment ${DEPLOYMENT} not found in ${1} - please check the ${NS_TYPE} namespace name." 1
     fi
   fi
   logMessage "${1} appears to be a valid ${NS_TYPE} namespace."
@@ -238,7 +240,7 @@ checkISNamespace() {
 
 checkPodStatus() {
   if [ $(${KUBECTL_BIN} -n "${1}"  get pods -o custom-columns=":metadata.name,:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>" | wc -l) != "1" ]; then
-     logError "One or more pods in namespace ${1} found in a non-ready state."
+     logError "102" "One or more pods in namespace ${1} found in a non-ready state."
      ${KUBECTL_BIN} -n "${1}" get pods -o custom-columns="POD:metadata.name,STATE:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>"
   else
     logMessage "No unheathly pods found in ${1} namespace."
@@ -279,7 +281,7 @@ getVersions() {
         IS_DB_VERSION=202
         ;;
       *)
-        logError "Unknown Helix IS version (${IS_VERSION}) - check https://bit.ly/gethitt for HITT updates." 1
+        logError "109" "Unknown Helix IS version (${IS_VERSION}) - check https://bit.ly/gethitt for HITT updates." 1
     esac
   fi
 }
@@ -301,8 +303,8 @@ setVarsFromPlatform() {
     IS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
   fi
   if [ "${LB_HOST}" == "${IS_PREFIX}.${LB_HOST#*.}" ]; then
-    logError "LB_HOST value '${LB_HOST}' conflicts with the derived MidTier alias '${IS_PREFIX}.${LB_HOST#*.}'."
-    logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
+    logError "110" "LB_HOST value '${LB_HOST}' conflicts with the derived MidTier alias '${IS_PREFIX}.${LB_HOST#*.}'."
+    #logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
   fi
 
   if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
@@ -330,7 +332,7 @@ setVarsFromPlatform() {
       ADE_CS_ENABLED=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="ADE_CS_ENABLED")].value}')
       [[ ! -z "${ADE_CS_ENABLED}" ]] && ADE_CS_OK=1
     fi
-    [[ "${ADE_CS_OK}" == "0" ]] && logError "Helix Platform credential service is not installed or disabled in the TMS deployment.  Please see the 'Known and corrected issues' documentation."
+    [[ "${ADE_CS_OK}" == "0" ]] && logError "111" "The Helix Platform credential service is not installed or disabled in the TMS deployment.  Please see the 'Known and corrected issues' documentation."
   fi
 
   if compare "${HP_VERSION%.*} >= 24.3" ; then
@@ -351,7 +353,7 @@ getRSSODetails() {
     RSSO_TOKEN=$(echo "${RSSO_TOKEN_JSON}" | ${JQ_BIN} -r .admin_token)
     logMessage "RSSO login OK - got admin token."
   else
-    logError "Unable to get RSSO admin token. RSSO response: ${RSSO_TOKEN_JSON}" 1
+    logError "112" "Unable to get the RSSO admin token. RSSO response: ${RSSO_TOKEN_JSON}" 1
   fi
 }
 
@@ -379,7 +381,7 @@ checkEFKClusterHealth() {
   EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c 'curl -sk -u elastic:"'"${HELIX_LOGGING_PASSWORD}"'" -X GET https://"'"${EFK_ELASTIC_SERVICENAME}"'":9200/_cluster/health')
   EFK_ELASTIC_STATUS=$(echo "${EFK_ELASTIC_JSON}" | ${JQ_BIN} -r '.status')
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
-    logError "Helix Logging Elasticsearch problem - ${EFK_ELASTIC_STATUS} - check ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
+    logError "113" "Helix Logging Elasticsearch problem - ${EFK_ELASTIC_STATUS} - check ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
     logMessage "Helix Logging Elasticsearch (${EFK_ELASTIC_SERVICENAME}) appears healthy."
   fi
@@ -389,7 +391,7 @@ getTenantDetails() {
   TENANT_JSON=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/tenant -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} .tenants)
   TENANT_ARRAY=($(echo "${TENANT_JSON}" | ${JQ_BIN} -r .[].name | grep -v SAAS_TENANT))
   if [ "${#TENANT_ARRAY[@]}" == "0" ]; then
-    logError "No tenants, or only the SAAS_TENANT, found in SSO. Please review the Helix Platform deployment.log." 1
+    logError "114" "No tenants, or only the SAAS_TENANT, found in SSO. Please review the Helix Platform deployment.log." 1
   fi
   if [ "${#TENANT_ARRAY[@]}" != "1" ]; then
 #    echo "${TENANT_ARRAY}"
@@ -422,7 +424,7 @@ deleteTCTLJob() {
 getTCTLOutput() {
   TCTL_OUTPUT=""
   if [ $(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} | grep "^HTTP" | cut -f 4 -d ' ') != "200" ] ; then
-    logError "tctl job failed." 1
+    logError "115" "tctl job failed." 1
   fi
   if [ "${1}" != "full" ]; then
     TCTL_OUTPUT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} | sed -n -e '/^NAME/,$p' | tail -n +2)
@@ -443,12 +445,12 @@ setTCTLRESTImageName() {
 deployTCTL() {
   TCTL_COMMAND="${1}"
   if ! setTCTLRESTImageName ; then
-    logError "Unable to find job with TCTL image details."
+    logError "202" "Unable to find job with TCTL image details."
     return 1
   fi
   TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o jsonpath='{.spec.template.spec.containers[0].image}')
   if [ -z "${TCTL_IMAGE}" ]; then
-    logError "Unable to get TCTL image name from job ${TCTL_JOB_NAME}."
+    logError "203" "Unable to get TCTL image name from job ${TCTL_JOB_NAME}."
     return 1
   fi
   logMessage "Deploying '${SEALTCTL}' job and waiting for it to complete..."
@@ -511,7 +513,7 @@ EOF
 
   # Wait for job to complete
   if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete job/"${SEALTCTL}" --timeout=90s > /dev/null 2>&1; then
-    logError "Timed out waiting for job ${SEALTCTL} to complete."
+    logError "204" "Timed out waiting for job ${SEALTCTL} to complete."
     return 1
   else
     return 0
@@ -524,7 +526,7 @@ getRealmDetails() {
   if echo "${RSSO_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     echo "Realms found in RSSO are:"
     ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN}
-    logError "Realm ${REALM_NAME} not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values." 1
+    logError "116" "Realm ${REALM_NAME} not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values." 1
   else
     logMessage "RSSO realm ${REALM_NAME} found for the SAAS_TENANT."
   fi
@@ -533,7 +535,7 @@ getRealmDetails() {
 checkTenantRealms() {
   TENANT_REALM=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}" -H "X-RSSO-TENANT-IMP: ${PORTAL_HOSTNAME}")
   if ! echo "${TENANT_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
-    logError "Helix IS realm (${REALM_NAME}) exists for tenant ${HP_TENANT} when it should be configured for the SAAS_TENANT."
+    logError "117" "Helix IS realm (${REALM_NAME}) exists for tenant ${HP_TENANT} when it should be configured for the SAAS_TENANT."
   else
     logMessage "Verified Helix IS realm (${REALM_NAME}) is not configured for tenant ${HP_TENANT}."
   fi
@@ -544,13 +546,13 @@ validateRealm() {
   # Parse realm data
   REALM_ARHOST=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arHost)
   if [ "${REALM_ARHOST}" != "platform-user-ext.${IS_NAMESPACE}" ]; then
-    logError "Invalid arHost in realm - expected platform-user-ext.${IS_NAMESPACE} but found ${REALM_ARHOST}."
+    logError "118" "Invalid arHost vaslue in realm - expected platform-user-ext.${IS_NAMESPACE} but found ${REALM_ARHOST}."
   else
     logMessage "AR host ${REALM_ARHOST} is the expected value."
   fi
   REALM_ARPORT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arPort)
   if [ "${REALM_ARPORT}" != "46262" ]; then
-    logError "Invalid arPort in realm - expected 46262 but found ${REALM_ARPORT}."
+    logError "119" "Invalid arPort in realm - expected 46262 but found ${REALM_ARPORT}."
   else
     logMessage "AR port ${REALM_ARPORT} is the expected value."
   fi
@@ -581,33 +583,33 @@ validateRealmDomains() {
   fi
   # Check for midtier alias
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}" ; then
-    logError "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} not found in realm Application Domains."
+    logError "120" "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} not found in the realm Application Domains list."
     BAD_DOMAINS=1
   else
-    logMessage "  - ${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} found in realm Application Domains."
+    logMessage "  - ${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} found in the realm Application Domains list."
   fi
   validateDomainInDNS "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}"
   # Check for other IS aliases
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
     if ! echo "${REALM_DOMAINS[@]}" | grep -q "${TARGET}" ; then
-      logError "${TARGET} not found in Application Domains."
+      logError "120" "${TARGET} not found in Application Domains list."
       BAD_DOMAINS=1
     else
-      logMessage "  - ${TARGET} found in realm Application Domains."
+      logMessage "  - ${TARGET} found in realm Application Domains list."
     fi
     validateDomainInDNS "${TARGET}"
   done
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}" ; then
-    logWarning "005" "${PORTAL_HOSTNAME} not found in realm Application Domains. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
+    logWarning "005" "${PORTAL_HOSTNAME} not found in the realm Application Domains list. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
 }
 
 validateDomainInDNS() {
   # hostname to check
   if ! ${HOST_BIN} ${1} > /dev/null 2>&1; then
-    logError "Entry for ${1} not found in DNS."
+    logError "122" "Entry for ${1} not found in DNS."
   else
     logMessage "  - ${1} found in DNS."
   fi
@@ -616,12 +618,12 @@ validateDomainInDNS() {
 checkServiceDetails() {
   deleteTCTLJob
   if ! deployTCTL "get service"; then
-    logError "Failed to get Helix Platform ARSERVICES status."
+    logError "123" "Failed to get Helix Platform ARSERVICES status."
     return
   fi
   getTCTLOutput
   if ! echo "${TCTL_OUTPUT}" | grep -q "^ITSM "  ; then
-    logError "ITSM services not found in Helix Platform - please check that ARSERVICES=yes is set in your infra.config file."
+    logError "124" "ITSM services not found in Helix Platform - please check that ARSERVICES=yes was set in your deployment.config file."
   else
     logMessage "ITSM services found in Helix Platform."
   fi
@@ -638,7 +640,7 @@ checkServiceDetails() {
 checkFTSElasticStatus() {
   FTS_ELASTIC_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c "curl -sk -u \"${LOG_ELASTICSEARCH_USERNAME}:${LOG_ELASTICSEARCH_PASSWORD}\" -X GET https://localhost:9200/_cluster/health?pretty | grep status")
   if ! echo "${FTS_ELASTIC_STATUS}" | grep -q green ; then
-    logError "FTS Elasticsearch problem - ${FTS_ELASTIC_STATUS} - check ${FTS_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
+    logError "125" "FTS Elasticsearch problem - ${FTS_ELASTIC_STATUS} - check ${FTS_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
     logMessage "FTS Elasticsearch (${FTS_ELASTIC_SERVICENAME}) appears healthy."
   fi
@@ -712,7 +714,7 @@ getValueFromPlatformSecret() {
 
 checkJenkinsIsRunning() {
   if ! "${CURL_BIN}" -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
-    logError "Jenkins not found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
+    logError "126" "Jenkins not found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
     SKIP_JENKINS=1
   else
     JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
@@ -720,7 +722,7 @@ checkJenkinsIsRunning() {
     JENKINS_HTTP_CODE=$(echo "${JENKINS_RESPONSE}" | grep "^HTTP" | cut -f 2 -d ' '| tr -d '\r')
     logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
     if [ "${JENKINS_HTTP_CODE}" != "200" ]; then
-      logError "Jenkins authentication is enabled but the credentials in hitt.conf are blank or wrong.  Please set correct credentials in the HITT config file (${HITT_CONFIG_FILE})." 1
+      logError "127" "Jenkins authentication is enabled but the credentials in hitt.conf are blank or wrong.  Please set correct credentials in the HITT config file (${HITT_CONFIG_FILE})." 1
       SKIP_JENKINS=1
     fi
 fi
@@ -885,7 +887,7 @@ getPipelineValues() {
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
   ISP_ENVIRONMENT=$(parseJenkinsParam ENVIRONMENT)
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
-    logError "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all required values in the HELIX_ONPREM_DEPLOYMENT pipeline." 1
+    logError "128" "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all required values in the HELIX_ONPREM_DEPLOYMENT pipeline." 1
   fi
   if [ "${IS_CUSTOMER_SIZE}" == "M" ] || [ "${IS_CUSTOMER_SIZE}" == "L" ] || [ "${IS_CUSTOMER_SIZE}" == "XL" ]; then
     IS_PLATFORM_INT=1
@@ -923,14 +925,14 @@ cloneCustomerConfigsRepo() {
   GIT_REPO_DIR=$(parseJenkinsParam GIT_REPO_DIR)
   INPUT_CONFIG_FILE="configsrepo/customer/${IS_CUSTOMER_SERVICE}/${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}.sh"
   if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
-    logError "Failed to clone ${GIT_REPO_DIR}/CUSTOMER_CONFIGS/onprem-remedyserver-config.git"
+    logError "129" "Failed to clone ${GIT_REPO_DIR}/CUSTOMER_CONFIGS/onprem-remedyserver-config.git"
     SKIP_REPO=1
     return
   else
     logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory."
   fi
   if [ ! -f "${INPUT_CONFIG_FILE}" ]; then
-    logError "Input config file (${INPUT_CONFIG_FILE}) not found. Has the HELIX_GENERATE_CONFIG pipeline been run successfully?"
+    logError "130" "Input configuration file (${INPUT_CONFIG_FILE}) not found. Has the HELIX_GENERATE_CONFIG pipeline been run successfully?"
     SKIP_REPO=1
     return
   else
@@ -945,7 +947,7 @@ isBlank() {
 
 checkBlank() {
   if isBlank "${!1}"; then
-    logError "Value for ${1:3} is not expected to be blank."
+    logError "131" "Value for ${1:3} is not expected to be blank."
   else
     logMessage "Value set for ${1:3}."
   fi
@@ -955,31 +957,31 @@ validateISDetails() {
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   # Common to pre and post
   if [ "${IS_TENANT_DOMAIN}" != "${REALM_TENANT}" ]; then
-    logError "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform realm Tenant (${REALM_TENANT})."
+    logError "132" "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform realm Tenant (${REALM_TENANT})."
   else
     logMessage "TENANT_DOMAIN matches the realm Tenant (${REALM_TENANT})."
   fi
 
   if [ "${IS_RSSO_URL}" != "${RSSO_URL}" ]; then
-    logError "IS RSSO_URL (${IS_RSSO_URL}) does not match the Helix Platform RSSO_URL (${RSSO_URL})."
+    logError "133" "The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline (${IS_RSSO_URL}) does not match the Helix Platform RSSO_URL (${RSSO_URL})."
   else
     logMessage "IS RSSO_URL is the expected value of ${RSSO_URL}."
   fi
 
   if [ "${#IS_AR_SERVER_APP_SERVICE_PASSWORD}" -gt 19 ]; then
-    logError "AR_SERVER_APP_SERVICE_PASSWORD is too long - maximum of 19 characters."
+    logError "134" "AR_SERVER_APP_SERVICE_PASSWORD is too long - maximum of 19 characters."
   else
     logMessage "AR_SERVER_APP_SERVICE_PASSWORD length is 19 characters or less."
   fi
 
   if [ "${#IS_AR_SERVER_DSO_USER_PASSWORD}" -gt 20 ]; then
-    logError "AR_SERVER_DSO_USER_PASSWORD is too long - maximum of 20 characters."
+    logError "135" "AR_SERVER_DSO_USER_PASSWORD is too long - maximum of 20 characters."
   else
     logMessage "AR_SERVER_DSO_USER_PASSWORD length is 20 characters or less."
   fi
 
   if [ "${#IS_AR_SERVER_MIDTIER_SERVICE_PASSWORD}" -gt 20 ]; then
-    logError "AR_SERVER_MIDTIER_SERVICE_PASSWORD is too long - maximum of 20 characters."
+    logError "135" "AR_SERVER_MIDTIER_SERVICE_PASSWORD is too long - maximum of 20 characters."
   else
     logMessage "AR_SERVER_MIDTIER_SERVICE_PASSWORD length is 20 characters or less."
   fi
@@ -1000,7 +1002,7 @@ validateISDetails() {
     fi
 
     if ! ${KUBECTL_BIN} config get-contexts "${IS_CLUSTER}" > /dev/null 2>&1; then
-      logError "CLUSTER (${IS_CLUSTER}) is not a valid context in your kubeconfig file. Available contexts are:"
+      logError "137" "CLUSTER (${IS_CLUSTER}) is not a valid context in your kubeconfig file. Available contexts are:"
       ${KUBECTL_BIN} config get-contexts
     else
       logMessage "CLUSTER (${IS_CLUSTER}) is a valid kubeconfig context."
@@ -1015,7 +1017,7 @@ validateISDetails() {
     fi
 
     if [ "${IS_IS_NAMESPACE}" != "${IS_NAMESPACE}" ]; then
-      logError "Pipeline IS_NAMESPACE (${IS_IS_NAMESPACE}) does not match IS_NAMESPACE defined in this script (${IS_NAMESPACE})."
+      logError "138" "The IS_NAMESPACE value (${IS_IS_NAMESPACE}) does not match the IS_NAMESPACE defined in the hitt.conf file (${IS_NAMESPACE})."
     else
       logMessage "IS_NAMESPACE is the expected value (${IS_NAMESPACE})."
     fi
@@ -1026,20 +1028,20 @@ validateISDetails() {
       IS_NS_MAX_LEN=33
     fi
     if [ "${#IS_IS_NAMESPACE}" -gt ${IS_NS_MAX_LEN} ]; then
-      logError "IS_NAMESPACE name is too long - maximum of ${IS_NS_MAX_LEN} characters."
+      logError "139" "IS_NAMESPACE name is too long - maximum of ${IS_NS_MAX_LEN} characters."
     else
       logMessage "IS_NAMESPACE name length is ${IS_NS_MAX_LEN} characters or less."
     fi
 
     if [ "${ISP_CUSTOMER_SERVICE}-${ISP_ENVIRONMENT}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
-      logError "CUSTOMER_SERVICE (${ISP_CUSTOMER_SERVICE}) or ENVIRONMENT (${ISP_ENVIRONMENT}) do not match values defined in this script (${IS_CUSTOMER_SERVICE} and ${IS_ENVIRONMENT})."
+      logError "140" "CUSTOMER_SERVICE (${ISP_CUSTOMER_SERVICE}) or ENVIRONMENT (${ISP_ENVIRONMENT}) do not match values defined in this script (${IS_CUSTOMER_SERVICE} and ${IS_ENVIRONMENT})."
     else
       logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid (${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT})."
     fi
 
     if checkK8sAuth get ingressclasses; then
       if isBlank "${IS_INGRESS_CLASS}" || ! ${KUBECTL_BIN} get ingressclasses "${IS_INGRESS_CLASS}" > /dev/null 2>&1 ; then
-        logError "INGRESS_CLASS (${IS_INGRESS_CLASS})is blank or not valid."
+        logError "141" "INGRESS_CLASS (${IS_INGRESS_CLASS})is blank or not valid."
       else
         logMessage "INGRESS_CLASS (${IS_INGRESS_CLASS}) appears valid."
       fi
@@ -1048,19 +1050,19 @@ validateISDetails() {
     fi
 
     if [ "${IS_CLUSTER_DOMAIN}" != "${CLUSTER_DOMAIN}" ]; then
-      logError "CLUSTER_DOMAIN (${IS_CLUSTER_DOMAIN}) does not match that used for the Helix Platform (${CLUSTER_DOMAIN})."
+      logError "142" "CLUSTER_DOMAIN (${IS_CLUSTER_DOMAIN}) does not match that used for the Helix Platform (${CLUSTER_DOMAIN})."
     else
       logMessage "CLUSTER_DOMAIN has the expected value of ${CLUSTER_DOMAIN}."
     fi
 
     if [ "${IS_INPUT_CONFIG_METHOD}" != "Generate_Input_File" ]; then
-      logError "INPUT_CONFIG_METHOD should be Generate_Input_File."
+      logError "143" "INPUT_CONFIG_METHOD should be Generate_Input_File."
     else
       logMessage "INPUT_CONFIG_METHOD has the expected value of Generate_Input_File."
     fi
 
     if isBlank "${IS_HELM_NODE}" ; then
-      logError "HELM_NODE is blank."
+      logError "144" "HELM_NODE is blank."
     else
       NODE_ARRAY=($(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json" | ${JQ_BIN} -r .computer[].displayName | grep -v Built ))
       NODE_MATCH=0
@@ -1070,7 +1072,7 @@ validateISDetails() {
       if [ "${NODE_MATCH}" == 1"" ]; then
         logMessage "HELM_NODE (${IS_HELM_NODE}) is a valid node in Jenkins."
       else
-        logError "HELM_NODE (${IS_HELM_NODE}) not found as a Jenkins node.  Available nodes are:"
+        logError "145" "HELM_NODE (${IS_HELM_NODE}) not found as a Jenkins node.  Available nodes are:"
         printf '%s\n' "${NODE_ARRAY[@]}"
       fi
     fi
@@ -1099,25 +1101,25 @@ validateISDetails() {
     fi
 
     if [ "${IS_REGISTRY_TYPE}" != "DTR" ]; then
-      logError "REGISTRY_TYPE must be DTR."
+      logError "146" "REGISTRY_TYPE must be DTR."
     else
       logMessage "REGISTRY_TYPE is the expected value of DTR."
     fi
 
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${HP_REGISTRY_SERVER}" ]; then
-      logError "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the Helix Platform registry server (${HP_REGISTRY_SERVER})."
+      logError "147" "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the Helix Platform registry server (${HP_REGISTRY_SERVER})."
     else
       logMessage "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) matches the Helix Platform registry server (${HP_REGISTRY_SERVER})."
     fi
 
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${HP_REGISTRY_USERNAME}" ]; then
-      logError "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the Helix Platform registry username (${HP_REGISTRY_USERNAME})."
+      logError "148" "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the Helix Platform registry username (${HP_REGISTRY_USERNAME})."
     else
       logMessage "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) matches the Helix Platform registry username (${HP_REGISTRY_USERNAME})."
     fi
 
     if [ "${IS_DB_SSL_ENABLED}" == "true" ]; then
-        logError "DB_SSL_ENABLED should not be selected."
+        logError "149" "DB_SSL_ENABLED should not be selected."
     fi
 
     if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ]; then
@@ -1147,12 +1149,12 @@ validateISDetails() {
 
     if [ "$HELIX_LOGGING_DEPLOYED" == 1 ]; then
       if [ "${IS_LOGS_ELASTICSEARCH_TLS}" != "true" ]; then
-        logError "LOGS_ELASTICSEARCH_TLS (${IS_LOGS_ELASTICSEARCH_TLS}) is not the expected value of true."
+        logError "151" "LOGS_ELASTICSEARCH_TLS (${IS_LOGS_ELASTICSEARCH_TLS}) is not the expected value of true."
       else
         logMessage "LOGS_ELASTICSEARCH_TLS is the expected value of true."
       fi
       if [ "${IS_LOGS_ELASTICSEARCH_PASSWORD}" != "${HELIX_LOGGING_PASSWORD}" ]; then
-        logError "LOGS_ELASTICSEARCH_PASSWORD does not match the Helix Platform KIBANA_PASSWORD."
+        logError "152" "LOGS_ELASTICSEARCH_PASSWORD does not match the Helix Platform KIBANA_PASSWORD."
       else
         logMessage "LOGS_ELASTICSEARCH_PASSWORD matches the Helix Platform KIBANA_PASSWORD."
       fi
@@ -1160,37 +1162,37 @@ validateISDetails() {
     fi
 
     if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${HP_REGISTRY_PASSWORD}" ]; then
-      logError "IMAGE_REGISTRY_PASSWORD does not match the Helix Platform registry password."
+      logError "153" "IMAGE_REGISTRY_PASSWORD does not match the Helix Platform registry password."
     else
       logMessage "IMAGE_REGISTRY_PASSWORD matches the Helix Platform registry password."
     fi
 
     if [ "$IS_VC_RKM_USER_NAME" == "${IS_VC_PROXY_USER_LOGIN_NAME}" ] || [ -z "$IS_VC_RKM_USER_NAME" ] || [ -z "${IS_VC_PROXY_USER_LOGIN_NAME}" ]; then
-      logError "VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME must be different and cannot be blank."
+      logError "154" "VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME must be different and cannot be blank."
     else
       logMessage "VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME appear valid."
     fi
 
     if [ -n "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" ] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ ^\[.* ]] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ .*\]$ ]]; then
-      logError "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}) does not match the expected format of [x.x.x.x] - missing square brackets?"
+      logError "155" "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}) does not match the expected format of [x.x.x.x] - missing square brackets?"
     else
       logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS})."
     fi
 
     if [ "${IS_RSSO_ADMIN_USER,,}" != "${RSSO_USERNAME,,}" ]; then
-      logError "RSSO_ADMIN_USER (${IS_RSSO_ADMIN_USER}) does not match the Helix Platform RSSO_ADMIN_USER (${RSSO_USERNAME})."
+      logError "156" "RSSO_ADMIN_USER (${IS_RSSO_ADMIN_USER}) does not match the Helix Platform RSSO_ADMIN_USER (${RSSO_USERNAME})."
     else
       logMessage "RSSO_ADMIN_USER is the expected value of ${IS_RSSO_ADMIN_USER}."
     fi
 
     if [ "${IS_HELIX_PLATFORM_NAMESPACE}" != "${HP_NAMESPACE}" ]; then
-      logError "HELIX_PLATFORM_NAMESPACE (${IS_HELIX_PLATFORM_NAMESPACE}) is not the expected value of ${HP_NAMESPACE}."
+      logError "157" "HELIX_PLATFORM_NAMESPACE (${IS_HELIX_PLATFORM_NAMESPACE}) is not the expected value of ${HP_NAMESPACE}."
     else
       logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of ${HP_NAMESPACE}."
     fi
 
     if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ]; then
-      logError "HELIX_PLATFORM_CUSTOMER_NAME (${IS_HELIX_PLATFORM_CUSTOMER_NAME}) is not the expected value of ${HP_COMPANY_NAME}."
+      logError "158" "HELIX_PLATFORM_CUSTOMER_NAME (${IS_HELIX_PLATFORM_CUSTOMER_NAME}) is not the expected value of ${HP_COMPANY_NAME}."
     else
       logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of ${HP_COMPANY_NAME}."
     fi
@@ -1213,14 +1215,14 @@ getCacertsFile() {
   if [ "${MODE}" == "post-is" ]; then
     logMessage "Extracting cacerts file from Helix IS cacerts secret..."
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts > /dev/null 2>&1; then
-      logError "'cacerts' secret not found in Helix IS namespace."
+      logError "159" "'cacerts' secret not found in Helix IS namespace."
       SKIP_CACERTS=1
       return
     fi
     IS_CACERTS_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o json)
     IS_CACERTS=$(echo "${IS_CACERTS_JSON}" | ${JQ_BIN} -r '.data.cacerts')
     if [ "${IS_CACERTS}" == "null" ]; then
-      logError "Required file 'cacerts' not found in the cacerts secret. File(s) in the secret are:"
+      logError "160" "Required file 'cacerts' not found in the cacerts secret. File(s) in the secret are:"
       echo "${IS_CACERTS_JSON}" | ${JQ_BIN} '.data | keys'
       SKIP_CACERTS=1
     else
@@ -1237,14 +1239,14 @@ validateCacerts() {
   fi
   CACERTS_FILETYPE=$(file sealcacerts | cut -f 2- -d ' ')
   if [ "${CACERTS_FILETYPE,,}" != "java keystore" ]; then
-    logError "cacerts file is of type ${CACERTS_FILETYPE} and not the expected Java keystore."
+    logError "161" "cacerts file is of type ${CACERTS_FILETYPE} and not the expected Java keystore."
     return
   else
     logMessage "cacerts file is a valid Java keystore."
   fi
 
   if ! ${KEYTOOL_BIN} --list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
-    logError "cacerts file does not contain the expected ${FTS_ELASTIC_CERTNAME} certificate required for FTS Elasticsearch connection."
+    logError "162" "cacerts file does not contain the expected ${FTS_ELASTIC_CERTNAME} certificate required for FTS Elasticsearch connection."
   else
     logMessage "cacerts file contains the expected Elasticsearch ${FTS_ELASTIC_CERTNAME} certificate."
   fi
@@ -1257,14 +1259,14 @@ validateCacerts() {
 #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
 #  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
   if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts SSLPoke "${LB_HOST}" 443 > /dev/null 2>&1 ; then
-    logError "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
+    logError "163" "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
     VALID_CACERTS=1
   fi
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
 #    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
     if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts SSLPoke "${TARGET}" 443 > /dev/null 2>&1 ; then
-      logError "Certificate for ${TARGET} not found in cacerts."
+      logError "164" "Certificate for ${TARGET} not found in cacerts."
       VALID_CACERTS=1
     else
       logMessage "  - valid certificate for ${TARGET} found in cacerts file."
@@ -1281,16 +1283,16 @@ checkISFTSElasticHost() {
   # IP/service.ns pipeline_param_name
   if [ $(isIPAddress "${1}") == "0" ]; then
     if [ $(getSvcFromExternalIP "${1}") == "1" ]; then
-      logError "FTS_ELASTICSEARCH_HOSTNAME IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
+      logError "165" "FTS_ELASTICSEARCH_HOSTNAME IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
     else
       logWarning "018" "Recommend using 'servicename.namespace' format instead of an exposed IP address for FTS_ELASTICSEARCH_HOSTNAME."
       # Try and confirm IP is a valid ES
       ES_HEALTH=$(${CURL_BIN} -sk -u "${LOG_ELASTICSEARCH_USERNAME}:${LOG_ELASTICSEARCH_PASSWORD}" -X GET https://"${1}":9200/_cluster/health)
       if [ -z "${ES_HEALTH}" ]; then
-        logError "${1} does not appear to be a valid Elasticsearch server IP address."
+        logError "166" "${1} does not appear to be a valid Elasticsearch server IP address."
       else
         if ! echo "${ES_HEALTH}" | ${JQ_BIN} -r '.cluster_name' | grep -q 'logs$' ; then
-          logError "${1} does not appear to be the expected Elasticsearch service instance for FTS."
+          logError "167" "${1} does not appear to be the expected Elasticsearch service instance for FTS."
           echo "${ES_HEALTH}" | ${JQ_BIN} -r '.cluster_name'
         else
           logMessage "${1} appears to be a valid Elasticsearch service instance for FTS."
@@ -1299,7 +1301,7 @@ checkISFTSElasticHost() {
     fi
   else
     if [ "${1}" != "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-      logError "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
+      logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
     else
       logMessage "FTS_ELASTICSEARCH_HOSTNAME appears valid (${1})."
     fi
@@ -1310,14 +1312,14 @@ checkIsValidElastic() {
   BAD_ELASTIC=0
   if [ $(isIPAddress "${1}") == "0" ]; then
     if [ $(getSvcFromExternalIP "${1}") == "1" ]; then
-      logError "${2} IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
+      logError "169" "${2} IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
       return
     else
       logWarning "019" "Recommend using 'servicename.namespace' format instead of an exposed IP address for ${2}."
       # Try and confirm IP is a valid ES
       ES_HEALTH=$(${CURL_BIN} -sk -u "${3}:${4}" -X GET https://"${1}":9200/_cluster/health)
       if [ -z "${ES_HEALTH}" ]; then
-        logError "${1} does not appear to be a valid Elasticsearch server IP address."
+        logError "170" "${1} does not appear to be a valid Elasticsearch server IP address."
         return
       fi
     fi
@@ -1325,12 +1327,12 @@ checkIsValidElastic() {
     case "${2}" in
       FTS_ELASTICSEARCH_HOSTNAME)
         if [ "${1}" != "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
+          logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
         fi
         ;;
       LOGS_ELASTICSEARCH_HOSTNAME)
         if [ "${1}" != "${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
+          logError "172" "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
         fi
         ;;
     esac
@@ -1345,14 +1347,14 @@ getSvcFromExternalIP() {
 checkFTSElasticSettings() {
   BAD_FTS_ELASTIC=0
   if [ "${IS_FTS_ELASTICSEARCH_PORT}" != "9200" ]; then
-    logError "FTS_ELASTICSEARCH_PORT (${IS_FTS_ELASTICSEARCH_PORT}) is not the expected value of 9200."
+    logError "173 ""FTS_ELASTICSEARCH_PORT (${IS_FTS_ELASTICSEARCH_PORT}) is not the expected value of 9200."
     BAD_FTS_ELASTIC=1
   else
     logMessage "FTS_ELASTICSEARCH_PORT is the expected value of 9200."
   fi
 
   if [ "${IS_FTS_ELASTICSEARCH_SECURE}" != "true" ]; then
-    logError "FTS_ELASTICSEARCH_SECURE (${IS_FTS_ELASTICSEARCH_SECURE}) is not the expected value of 'true'."
+    logError "174" "FTS_ELASTICSEARCH_SECURE (${IS_FTS_ELASTICSEARCH_SECURE}) is not the expected value of 'true'."
     BAD_FTS_ELASTIC=1
   else
     logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of 'true'."
@@ -1373,7 +1375,7 @@ checkFTSElasticSettings() {
 
   #if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "bmcuser" ]; then
   if [ "${MODE}" == "pre-is" ] && [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
-    logError "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of ${LOG_ELASTICSEARCH_PASSWORD}."
+    logError "175" "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of ${LOG_ELASTICSEARCH_PASSWORD}."
     BAD_FTS_ELASTIC=1
   else
     logMessage "FTS_ELASTICSEARCH_USER_PASSWORD is the expected value."
@@ -1386,7 +1388,7 @@ checkFTSElasticSettings() {
 checkISLicenseStatus() {
   getISAdminCreds
   if ! getISJWT; then
-    logError "Failed to authenticate user ${IS_ADMIN_USER} - can't check IS license status."
+    logError "176" "Failed to authenticate user ${IS_ADMIN_USER} - can't check IS license status."
     return
   fi
   getISLicense
@@ -1419,17 +1421,17 @@ checkAssistTool() {
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get deployment assisttool-dep > /dev/null 2>&1 ; then
     logMessage "Support Assistant Tool found - checking for fpackager sidecar containers..."
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[*].name}' | grep -q fpackager ; then
-      logError "fpackager sidecar containers not found - Support Assistant will not be able to access application logs."
+      logError "177" "fpackager sidecar containers not found - Support Assistant will not be able to access application logs."
     else
       logMessage "fpackager sidecar containers are present."
     fi
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get role assisttool-rl > /dev/null 2>&1 ; then
-      logError "assisttool-rl role not found - Support Assistant will not be able to access application logs."
+      logError "178" "assisttool-rl role not found - Support Assistant will not be able to access application logs."
     else
       logMessage "assisttool-rl role present in Helix IS namespace."
     fi
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get rolebinding assisttool-rlb > /dev/null 2>&1 ; then
-      logError "assisttool-rlb rolebinding not found - Support Assistant will not be able to access application logs."
+      logError "178" "assisttool-rlb rolebinding not found - Support Assistant will not be able to access application logs."
     else
       logMessage "assisttool-rlb rolebinding present in Helix IS namespace."
     fi
@@ -1470,7 +1472,7 @@ fi
 
 checkISDBSettings() {
   if ! testNetConnection "${IS_DATABASE_HOST_NAME}" "${IS_DB_PORT}"; then
-    logError "IS DB server (${IS_DATABASE_HOST_NAME}) is not reachable on port ${IS_DB_PORT} - skipping DB checks."
+    logWarning "027" "IS DB server (${IS_DATABASE_HOST_NAME}) is not reachable on port ${IS_DB_PORT} - skipping DB checks."
     return
   else
     logMessage "IS DB server (${IS_DATABASE_HOST_NAME}) is reachable on port ${IS_DB_PORT}."
@@ -1491,14 +1493,14 @@ checkISDBSettings() {
     go" 2>&1)
 
     if echo "${SQL_RESULT}" | grep -q ErrorCode ; then
-     logError "Problem connecting to database - please review the following message."
+     logError "180" "Problem connecting to database - please review the following message."
      echo "${SQL_RESULT}"
      return
     else
       DB_VERSION=$(echo "${SQL_RESULT}" | awk '{print $1}')
       if [ ! -z "${IS_DB_VERSION}" ]; then
         if [ "${DB_VERSION}" != "${IS_DB_VERSION}" ]; then
-          logError "Database is not the expected version - found ${DB_VERSION} but should be ${IS_DB_VERSION}."
+          logError "181" "Database is not the expected version - found ${DB_VERSION} but should be ${IS_DB_VERSION}."
         else
           logMessage "Database is the expected version - ${DB_VERSION}."
         fi
@@ -1513,10 +1515,10 @@ checkISDBSettings() {
         SQL_RESULT=$(${JISQLCMD} "SELECT name FROM sys.synonyms
         go" 2>&1)
         if ! echo "${SQL_RESULT}" | grep -q trace_xe_action_map; then
-            logError "Missing 'trace_xe_action_map' synonym in database - please refer to the BMC docs."
+            logError "182" "Missing 'trace_xe_action_map' synonym in database - please refer to the BMC docs."
         fi
         if ! echo "${SQL_RESULT}" | grep -q trace_xe_event_map; then
-            logError "Missing 'trace_xe_event_map' synonym in database - please refer to the BMC docs."
+            logError "182" "Missing 'trace_xe_event_map' synonym in database - please refer to the BMC docs."
         fi
         ;;
     esac
@@ -1536,8 +1538,11 @@ isIPAddress() {
 
 reportResults() {
   echo ""
+  logStatus "HITT Summary Report"
+  echo "==================="
   if [ $FAIL -gt 0 ] || [ $WARN -gt 0 ] ; then
     echo -e "${BOLD}${FAIL} errors / ${WARN} warnings found - please review the ${MSG_FILE} file for more details and suggested fixes.${NORMAL}"
+    echo ""
     if [ "${#ERROR_ARRAY[@]}" != "0" ]; then
       echo -e "${BOLD}${RED}ERRORS:${NORMAL}"
       printf '%s\n' "${ERROR_ARRAY[@]}"
@@ -1547,21 +1552,21 @@ reportResults() {
       printf '%s\n' "${WARN_ARRAY[@]}"
     fi
   else
-    echo "${BOLD}Tests complete - no errors or warnings found.${NORMAL}"
+    echo -e "${BOLD}Tests complete - no errors or warnings found.${NORMAL}"
   fi
 }
 
 checkKubeconfig() {
   KUBECONFIG_ERROR=0
   if ! ${KUBECTL_BIN} version > /dev/null 2>&1; then
-    logError "'kubectl version' command returned an error - unable to continue." 1
+    logError "184" "'kubectl version' command returned an error - unable to continue." 1
   fi
   if [ ! -z "${KUBECONFIG}" ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
-    logError "KUBECONFIG environment variable is set (${KUBECONFIG}) but is not the default of ${HOME}/.kube/config required by Jenkins."
+    logError "185" "KUBECONFIG environment variable is set (${KUBECONFIG}) but is not the default of ${HOME}/.kube/config required by Jenkins."
     KUBECONFIG_ERROR=1
   fi
   if [ ! -f ~/.kube/config ]; then
-    logError "Default KUBECONFIG file (~/home/.kube/config) required by Jenkins pipelines not found."
+    logError "186" "Default KUBECONFIG file (~/home/.kube/config) required by Jenkins pipelines not found."
     KUBECONFIG_ERROR=1
   fi
   if [ ${KUBECONFIG_ERROR} == "0" ]; then
@@ -1583,7 +1588,7 @@ getRegistryDetailsFromSecret() {
   REGISTRY_PASSWORD=""
   IMAGESECRET_JSON=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o jsonpath='{.data.\.dockerconfigjson}' | ${BASE64_BIN} -d)
   if [ "${IMAGESECRET_JSON}" = "" ]; then
-    logError "Failed to get registry details from ${2} secret in ${1} namespace."
+    logError "187" "Failed to get registry details from ${2} secret in ${1} namespace."
     SKIP_REGISTRY=1
     return
   fi
@@ -1625,7 +1630,7 @@ checkISDBLatency() {
       if compare "${IS_DB_LATENCY} < 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted."; fi ; return
       if compare "${IS_DB_LATENCY} > 6" ; then logMessage "Latency is ${BOLD}VERY POOR${NORMAL}. Performance will be impacted."; fi ; return
     else
-      logError "Unexpected response from IS DB ping test ${PING_RESULT}."
+      logError "188" "Unexpected response from IS DB ping test ${PING_RESULT}."
     fi
   fi
 }
@@ -1634,17 +1639,17 @@ checkISDockerLogin() {
   SKIP_REGISTRY=0
   getRegistryDetailsFromIS
   if [ "${SKIP_REGISTRY}" == "1" ]; then
-    logError "Failed to get IS registry details - skipping checks."
+    logError "189" "Failed to get IS registry details - skipping checks."
     return
   fi
 
   if [ "${MODE}" == "pre-is" ]; then
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${IS_SECRET_HARBOR_REGISTRY_HOST}" ]; then
-      logError "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the value in the registry secret (${IS_SECRET_HARBOR_REGISTRY_HOST})."
+      logError "190" "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the value in the registry secret (${IS_SECRET_HARBOR_REGISTRY_HOST})."
       return
     fi
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" ]; then
-      logError "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the value in the registry secret (${IS_SECRET_IMAGE_REGISTRY_USERNAME})."
+      logError "190" "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the value in the registry secret (${IS_SECRET_IMAGE_REGISTRY_USERNAME})."
       return
     fi
 #    if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" ]; then
@@ -1665,7 +1670,7 @@ checkISDockerLogin() {
   if docker login "${IS_SECRET_HARBOR_REGISTRY_HOST}" -u "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" -p "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" > /dev/null 2>&1 ; then
     logMessage "IMAGE_REGISTRY credentials are valid - docker login to ${IS_SECRET_HARBOR_REGISTRY_HOST} was successful."
   else
-    logError "'docker login' to ${IS_SECRET_HARBOR_REGISTRY_HOST} failed - please check credentials."
+    logError "192" "'docker login' to ${IS_SECRET_HARBOR_REGISTRY_HOST} failed - please check credentials."
   fi
 }
 
@@ -1701,13 +1706,13 @@ checkJenkinsNodes() {
   NODE_STATUS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/manage/computer/api/json?depth=1")
   OFFLINE_NODES=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[]| select(.offline=='true').displayName')
   if [ ! -z "${OFFLINE_NODES}" ] ; then
-    logError "One or more Jenkins nodes found in an 'offline' state."
+    logError "193" "One or more Jenkins nodes found in an 'offline' state."
     printf '%s\n' "${OFFLINE_NODES}"
   fi
 
   NODE_LABELS=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[].assignedLabels[].name')
   if ! echo "${NODE_LABELS}" | grep -q 'ansible-master' ; then
-    logError "No Jenkins nodes found with the 'ansible-master' label."
+    logError "194" "No Jenkins nodes found with the 'ansible-master' label."
   fi
 }
 
@@ -1787,7 +1792,7 @@ checkJenkinsPlugins() {
   JK_PLUGINS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
   for i in "${EXPECTED_PLUGINS[@]}" ; do
     if ! echo "${JK_PLUGINS}" | grep -wq "${i}" ; then
-      logError "Jenkins plugin '${i}' is missing."
+      logError "195" "Jenkins plugin '${i}' is missing."
     fi
   done
 }
@@ -1799,7 +1804,7 @@ checkJenkinsCredentials() {
   JK_CREDS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
   for i in "${EXPECTED_CREDENTIALS[@]}" ; do
     if ! echo "${JK_CREDS}" | grep -wq "${i}" ; then
-      logError "Jenkins credentials with id '${i}' is missing."
+      logError "196" "Jenkins credentials with id '${i}' is missing."
     fi
   done
 }
@@ -1868,7 +1873,7 @@ EOF
 validateJenkinsKubeconfig() {
   getKubeconfigFromJenkins
   if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>&1; then
-    logError "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
+    logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
   else
     logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file."
   fi
@@ -1905,7 +1910,7 @@ validatJenkinsCredentials() {
     fi
   done
   if [ "${MISSING_CREDS}" != "" ]; then
-    logError "One or more Jenkins credentials not found -${MISSING_CREDS}"
+    logError "198" "One or more Jenkins credentials not found -${MISSING_CREDS}"
   else
     logMessage "Expected credentials found in Jenkins."
   fi
@@ -1957,7 +1962,7 @@ getMessageDetails() {
 
 printMessageDetails() {
   printf "\n"
-  printf "${BOLD}Message: (${id})${NORMAL} ${MSG}\n"
+  printf "${BOLD}Message:${NORMAL} ${MSG}\n"
   printf "${BOLD}${YELLOW}Cause:${NORMAL} ${cause}\n"
   printf "${BOLD}${RED}Impact:${NORMAL} ${impact}\n"
   printf "${BOLD}${GREEN}Remediation:${NORMAL} ${remediation}\n"
@@ -1984,7 +1989,7 @@ checkKubeconfig
 if [ ! -f "${HITT_CONFIG_FILE}" ]; then
   if ! ${KUBECTL_BIN} get ns > /dev/null 2>&1 ; then
     createHITTconf "${HITT_CONFIG_FILE}"
-    logError "'kubectl get namespaces' command returned unexpected results - please update the HITT config file (${HITT_CONFIG_FILE}) manually." 1
+    logError "199" "'kubectl get namespaces' command returned unexpected results - please update the HITT config file (${HITT_CONFIG_FILE}) manually." 1
   fi
   NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
   logStatus "HITT config file (${HITT_CONFIG_FILE}) not found - creating..."
@@ -2015,7 +2020,7 @@ fi
 
 # MODE is required
 if [[ -z ${MODE} ]]; then
-  logError "Mode must be specified with -m <post-hp|pre-is|post-is>" 1
+  logError "200" "Mode must be specified with -m <post-hp|pre-is|post-is>" 1
 fi
 
 if [ "${MODE}" == "post-hp" ]; then
@@ -2038,7 +2043,7 @@ checkRequiredTools
 cleanUp start
 logStatus "Checking namespaces..."
 if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
-  logError "Helix Platform and Helix IS should be installed in their own namespaces." 1
+  logError "201" "Helix Platform and Helix IS should be installed in their own namespaces." 1
 fi
 checkHPNamespace "${HP_NAMESPACE}"
 getPods ${HP_NAMESPACE}
@@ -2323,6 +2328,582 @@ ALL_MSGS_JSON="[
     \"cause\": \"The platform-admim-ext service is not one of the expected types of ClusterIP or NodePort.\",
     \"impact\": \"Connectivity via the service for AR API clients such as Developer Studio may not be possible and upgrades may fail.\",
     \"remediation\": \"Review the platform-admim-ext service configuration in the cluster and revert any customisations.\"
+  },
+  {
+    \"id\": \"027\",
+    \"cause\": \"The DATABASE_HOST_NAME is not reachable from the Deployment Engine on the DB_PORT.\",
+    \"impact\": \"Later checks to validate the database will not be run and deployment will fail if either of the values are wrong.\",
+    \"remediation\": \"Verify the DATABASE_HOST_NAME/DB_PORT values and enable connectivity from the Deployment Engine if possible.\"
+  },
+  {
+    \"id\": \"100\",
+    \"cause\": \"The hitt.conf file exists but is missing some required values.\",
+    \"impact\": \"The HITT script cannot run with an incomplete configuration.\",
+    \"remediation\": \"Edit the hitt.conf file and enter the missing values or delete the file and rerun the script to be prompted for them.\"
+  },
+  {
+    \"id\": \"101\",
+    \"cause\": \"The wrong version of a required tool is installed. HITT requires a specific version, or later, of this tool to run.\",
+    \"impact\": \"The HITT script cannot run with the currently installed version.\",
+    \"remediation\": \"Install the required version.\"
+  },
+  {
+    \"id\": \"105\",
+    \"cause\": \"One of command line tools that HITT requires to run has not been found.\",
+    \"impact\": \"HITT cannot run without this command line tool.\",
+    \"remediation\": \"Install the missing tool or update the hitt.conf file with the full path to the tool it is already installed.\"
+  },
+  {
+    \"id\": \"106\",
+    \"cause\": \"One of the Helix namespaces cannot be found in the cluster.\",
+    \"impact\": \"HITT requires valid namespaces names to be able to run.\",
+    \"remediation\": \"Create the namespace or set the correct value in the hitt.conf file.\"
+  },
+  {
+    \"id\": \"107\",
+    \"cause\": \"A check used to validate the namespace type failed to find the expected components in the namespace.\",
+    \"impact\": \"HITT requires valid namespaces names to be able to run.\",
+    \"remediation\": \"Update the hitt.conf file with the correct name for the namespace.\"
+  },
+  {
+    \"id\": \"108\",
+    \"cause\": \"The HELIX_GENERATE_CONFIG pipeline must have been run to create the image registry secret specified in the IMAGESECRET_NAME value.\",
+    \"impact\": \"When run in this mode HITT requires that the IMAGESECRET_NAME image registry secret has been created.\",
+    \"remediation\": \"Populate the values in the HELIX_ONPREM_DEPLOYMENT pipeline and build it with the HELIX_GENERATE_CONFIG option selected.\"
+  },
+  {
+    \"id\": \"102\",
+    \"cause\": \"At least one pod in the namespace is not in a ready state.\",
+    \"impact\": \"Installation may fail if one of the pods that the applications depend on are not ready.\",
+    \"remediation\": \"Check the namespace to understand why the reported pod is not ready. Note there are some cronjob pods which run every few minutes and seeing one of these in a ContainerCreating state is not likely to cause a problem.\"
+  },
+  {
+    \"id\": \"109\",
+    \"cause\": \"An unknown version of the Helix Service Management applications has been found.\",
+    \"impact\": \"HITT is unable to run as it does not know which checks are valid for this version.\",
+    \"remediation\": \"Check the HITT website for an update that supports this version.\"
+  },
+  {
+    \"id\": \"110\",
+    \"cause\": \"The value of the LB_HOST setting in the Helix Platform is the same as the alias that will be used for the Helix Service Management MidTier.\",
+    \"impact\": \"Installation will complete but the MidTier will not be usable due to the conflict.\",
+    \"remediation\": \"Either redeploy the Helix Platform with a different LB_HOST or change one/both of the CUSTOMER_SERVICE and ENVIRONMENT values to make the MidTier alias different to the LB_HOST.\"
+  },
+  {
+    \"id\": \"111\",
+    \"cause\": \"This version of the Helix Platform uses a new credentials service which must be installed, or the use of disabled in the TMS deployment, before the HELIX_ITSM_INTEROPS pipeline can be run.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail due to the missing/misconfigured service.\",
+    \"remediation\": \"See the steps in the 'Known and corrected issues' section of the documentation for steps set the ADE_CS_ENABLED to false and disable the use of the credentials service.\"
+  },
+  {
+    \"id\": \"112\",
+    \"cause\": \"The RSSO system did not return the expected admin token.\",
+    \"impact\": \"HITT is unable to continue without the RSSO admin token which is needed to read values from the Helix Platform.\",
+    \"remediation\": \"Resolve the issue reported in the message and rerun the HITT script.\"
+  },
+  {
+    \"id\": \"113\",
+    \"cause\": \"The Helix Logging Elasticsearch system did not return the expected 'green' response to a health check query.\",
+    \"impact\": \"Helix Logging may not be functional but this will not prevent the installation of Helix Service Management.\",
+    \"remediation\": \"Helix Service Management may be installed but the problem should be investigated.\"
+  },
+  {
+    \"id\": \"114\",
+    \"cause\": \"No valid tenants were found in the Helix Platform.\",
+    \"impact\": \"HITT cannot continue without the tenant details.\",
+    \"remediation\": \"Review the Helix Platform deployment.log for issues and use the tctl command to verify the tenant status.\"
+  },
+  {
+    \"id\": \"115\",
+    \"cause\": \"The sealtctl Kubernetes job used to read the tenant details from the Helix Platform failed to run.\",
+    \"impact\": \"HITT cannot continue without the tenant details which are needed for later checks.\",
+    \"remediation\": \"Review the Helix Platform pods for issues and use the tctl command to verify the tenant status.\"
+  },
+  {
+    \"id\": \"116\",
+    \"cause\": \"The expected realm name was not found under the SAAS_TENANT in SSO.\",
+    \"impact\": \"HITT cannot continue without a valid realm to use for checks.\",
+    \"remediation\": \"Make sure that the realm was created for the SAAS_TENANT and that the IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values in the hitt.conf file are correct.\"
+  },
+  {
+    \"id\": \"117\",
+    \"cause\": \"The Helix Service Management realm was found under the Helix Platform tenant in SSO when it should be configured for the SAAS_TENANT.\",
+    \"impact\": \"Helix Service Management logins will fail.\",
+    \"remediation\": \"Delete the realm under the Helix Platform tenant and create it for the SAAS_TENANT.\"
+  },
+  {
+    \"id\": \"118\",
+    \"cause\": \"The arHost value for the realm is not the expected value of platform-user-ext.HELIX-IS-NAMESPACE.\",
+    \"impact\": \"Helix Service Management logins will fail.\",
+    \"remediation\": \"Correct the arHost value to the expected value.\"
+  },
+  {
+    \"id\": \"119\",
+    \"cause\": \"The arPort value for the realm is not the required value.\",
+    \"impact\": \"Helix Service Management logins will fail.\",
+    \"remediation\": \"Correct the arPort value in the realm Authentication page to 46262.\"
+  },
+  {
+    \"id\": \"120\",
+    \"cause\": \"One of the Helix Service Management aliases is missing from the Application Domains list in the realm.\",
+    \"impact\": \"The missing service will not be usable.\",
+    \"remediation\": \"Add the missing alias to the Application Domains list in the realm.\"
+  },
+  {
+    \"id\": \"122\",
+    \"cause\": \"A DNS entry for the specified alias was not found or the use of the 'host' command to validate the alias failed.\",
+    \"impact\": \"Installation may fail and the application accessed via the alias may not be accessible.\",
+    \"remediation\": \"Add the missing alias to DNS if needed or check the output of the command 'host alias' to see what the error was.\"
+  },
+  {
+    \"id\": \"123\",
+    \"cause\": \"The sealtcl Kubernetes job used to confirm that the required ARSERVICES are installed in the Helix Platform failed to return the expected response.\",
+    \"impact\": \"If the Helix Platform was installed with ARSERVICES=no the HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"If the Helix Platform was installed with ARSERVICES=yes in the deployment.config file this error can be ignored, otherwise you should update the Helix Platform to install them.\"
+  },
+  {
+    \"id\": \"124\",
+    \"cause\": \"The required ITSM services are not installed in the Helix Platform, likely because the ARSERVICES option in the deployment.config was not set to yes.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Rerun the Helix Platform deployment-manager.sh script with ARSERVICES=yes to install the missing services.\"
+  },
+  {
+    \"id\": \"125\",
+    \"cause\": \"The Helix Platform service used provide FTS indexing has not returned the expected response to health check.\",
+    \"impact\": \"The Helix Service Management platform-* pods will not be able to start and installation will fail or the applications will be unavailable.\",
+    \"remediation\": \"Check the status of the pods providing the service and address any issues.\"
+  },
+  {
+    \"id\": \"126\",
+    \"cause\": \"A running Jenkins server was not found at the URL shown.\",
+    \"impact\": \"Jenkins data and configuration tests cannot be run.\",
+    \"remediation\": \"Confirm that Jenkins is running and that the related settings in the hitt.conf file are correct.\"
+  },
+  {
+    \"id\": \"127\",
+    \"cause\": \"The Jenkins server requires authentication but HITT was not able to login using the credentials in the hitt.conf file.\",
+    \"impact\": \"Jenkins data and configuration tests cannot be run.\",
+    \"remediation\": \"Review the Jenkins settings in the hitt.conf file and update them if needed.  Remember to enclose the password in double quotes to avoid problems with special characters.\"
+  },
+  {
+    \"id\": \"128\",
+    \"cause\": \"One or both of the CUSTOMER_SERVICE/ENVIRONMENT values in the HELIX_ONPREM_DEPLOYMENT pipeline are blank.\",
+    \"impact\": \"HITT cannot continue without the missing values.\",
+    \"remediation\": \"Rebuild the HELIX_ONPREM_DEPLOYMENT pipeline, enter the missing values, then rerun HITT.\"
+  },
+  {
+    \"id\": \"129\",
+    \"cause\": \"The git command to clone the CUSTOMER_CONFIGS repository failed to run as expected.\",
+    \"impact\": \"Some checks which validate data from the CUSTOMER_CONFIGS repo will not be run.\",
+    \"remediation\": \"Run the 'git clone path_to_customer_configs_repo' command manually and resolve any problems reported before rerunning HITT.\"
+  },
+  {
+    \"id\": \"130\",
+    \"cause\": \"The input configuration file created by the HELIX_GENERATE_CONFIG pipeline was not found in the CUSTOMER_CONFIGS git repository.\",
+    \"impact\": \"Some later checks to validate values in the input configuration file will not be run.\",
+    \"remediation\": \"Ensure that the HELIX_GENERATE_CONFIG pipeline has been run to create the input configuration file.\"
+  },
+  {
+    \"id\": \"131\",
+    \"cause\": \"A required value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank.\",
+    \"impact\": \"Helix Service Management deployment may fail.\",
+    \"remediation\": \"Rebuild the HELIX_ONPREM_DEPLOYMENT pipeline, enter the missing values, then rerun HITT.\"
+  },
+  {
+    \"id\": \"132\",
+    \"cause\": \"The TENANT_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT pipeline is not the same as the Tenant value in the SSO realm.\",
+    \"impact\": \"Helix Service Management logins will fail.\",
+    \"remediation\": \"Correct the TENANT_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT so that it matches the Tenant value in the SSO realm.\"
+  },
+  {
+    \"id\": \"133\",
+    \"cause\": \"The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match that used by the Helix Platform.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Correct the RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+  },
+  {
+    \"id\": \"134\",
+    \"cause\": \"The AR_SERVER_APP_SERVICE_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline is too long. The maximum length is 19 characters.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Shorten the value to no more than 19 characters.\"
+  },
+  {
+    \"id\": \"135\",
+    \"cause\": \"The password value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.  The maximum length is 20 characters.\",
+    \"impact\": \"Helix Service Management deployment may fail.\",
+    \"remediation\": \"Shorten the value to no more than 20 characters.\"
+  },
+  {
+    \"id\": \"136\",
+    \"cause\": \"The AR_SERVER_MIDTIER_SERVICE_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.\",
+    \"impact\": \"Helix Service Management deployment may fail.\",
+    \"remediation\": \"Shorten the value to no more than 20 characters.\"
+  },
+  {
+    \"id\": \"137\",
+    \"cause\": \"The CLUSTER value in the HELIX_ONPREM_DEPLOYMENT pipeline is not found as a context in the kubeconfig file.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Update the CLUSTER value in the HELIX_ONPREM_DEPLOYMENT pipeline to the correct context from your kubeconfig file. Use 'kubectl config get-contexts' to list valid options.\"
+  },
+  {
+    \"id\": \"138\",
+    \"cause\": \"The IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match the IS_NAMESPACE set in the hitt.conf file.\",
+    \"impact\": \"Some HITT checks may be invalid or fail.\",
+    \"remediation\": \"Set the correct IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline or update the hitt.conf file.\"
+  },
+  {
+    \"id\": \"139\",
+    \"cause\": \"The IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Use a namespace name that is no longer than the value in the message.\"
+  },
+  {
+    \"id\": \"140\",
+    \"cause\": \"The CUSTOMER_SERVICE and/or ENVIRONMENT values in the HELIX_ONPREM_DEPLOYMENT pipeline do not match those set in the hitt.conf file.\",
+    \"impact\": \"Some HITT checks may be invalid or fail.\",
+    \"remediation\": \"Set the correct values in the HELIX_ONPREM_DEPLOYMENT pipeline or update the hitt.conf file.\"
+  },
+  {
+    \"id\": \"141\",
+    \"cause\": \"The INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank or is not a valid ingressclass in the cluster.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Set the correct INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+  },
+  {
+    \"id\": \"142\",
+    \"cause\": \"The CLUSTER_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT pipeline is different to the DOMAIN used for the Helix Platform.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"The Helix Service Management and Helix Platform are expected to use the same domain. Verify and correct the CLUSTER_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+  },
+  {
+    \"id\": \"143\",
+    \"cause\": \"For onprem deployments the only valid option for the INPUT_CONFIG_METHOD in the HELIX_ONPREM_DEPLOYMENT pipeline is 'Generate_Input_File'.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Set INPUT_CONFIG_METHOD in the HELIX_ONPREM_DEPLOYMENT pipeline to 'Generate_Input_File'.\"
+  },
+  {
+    \"id\": \"144\",
+    \"cause\": \"The HELM_NODE value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank but should be set to a valid node name.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Set the HELM_NODE to a valid value as detailed in the BMC documentation.\"
+  },
+  {
+    \"id\": \"145\",
+    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT pipeline value for HELM_NODE is not a valid node in Jenkins.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Set the HELM_NODE to a valid value as detailed in the BMC documentation.\"
+  },
+  {
+    \"id\": \"146\",
+    \"cause\": \"For onprem deployment the only valid option for the REGISTRY_TYPE in the HELIX_ONPREM_DEPLOYMENT pipeline is 'DTR'.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Set the REGISTRY_TYPE in the HELIX_ONPREM_DEPLOYMENT pipeline to 'DTR'.\"
+  },
+  {
+    \"id\": \"147\",
+    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT pipelines deploy some containers in the Helix Platform namespace which requires that the HARBOR_REGISTRY_HOST and IMAGE_REGISTRY_HOST are the same.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Use the same value for the HARBOR_REGISTRY_HOST in the HELIX_ONPREM_DEPLOYMENT pipeline as the Helix Platform IMAGE_REGISTRY_HOST.\"
+  },
+  {
+    \"id\": \"148\",
+    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT pipeline value for the IMAGE_REGISTRY_USERNAME is different to the value used for the Helix Platform which will cause problems with the HELIX_ITSM_INTEROPS pipeline.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Use the same value for the IMAGE_REGISTRY_USERNAME in the HELIX_ONPREM_DEPLOYMENT pipeline as set in the Helix Platform infra.config file.\"
+  },
+  {
+    \"id\": \"149\",
+    \"cause\": \"The DB_SSL_ENABLED option in the HELIX_ONPREM_DEPLOYMENT pipeline is selected but this is not currently supported for onprem use.\",
+    \"impact\": \"Helix Service Management deployment may fail.\",
+    \"remediation\": \"Deselect the DB_SSL_ENABLED option in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+  },
+  {
+    \"id\": \"151\",
+    \"cause\": \"The LOGS_ELASTICSEARCH_TLS option in the HELIX_ONPREM_DEPLOYMENT pipeline is not selected but this is required.\",
+    \"impact\": \"Logs will not be sent to the Helix Logging system.\",
+    \"remediation\": \"Select the LOGS_ELASTICSEARCH_TLS option in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+  },
+  {
+    \"id\": \"152\",
+    \"cause\": \"The LOGS_ELASTICSEARCH_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline must match the KIBANA_PASSWORD set in the Helix Platform secrets.txt.\",
+    \"impact\": \"Logs will not be sent to the Helix Logging system.\",
+    \"remediation\": \"Set the LOGS_ELASTICSEARCH_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline to the same value as the KIBANA_PASSWORD set in the Helix Platform secrets.txt and efk-elasticsearch-kibana secret.\"
+  },
+  {
+    \"id\": \"153\",
+    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT pipeline value for the IMAGE_REGISTRY_PASSWORD is different to the value used for the Helix Platform which will cause problems with the HELIX_ITSM_INTEROPS pipeline.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Use the same value for the IMAGE_REGISTRY_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline as set in the Helix Platform secrets.txt file.\"
+  },
+  {
+    \"id\": \"154\",
+    \"cause\": \"The VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME in the HELIX_ONPREM_DEPLOYMENT pipeline are the same or blank when they must be set to different values.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Set VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME to different values.\"
+  },
+  {
+    \"id\": \"155\",
+    \"cause\": \"The PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the HELIX_ONPREM_DEPLOYMENT pipeline should be blank, or one or more, comma separated IP addresses enclosed in square brackets.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Set the PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value to the correct format - for example [192.1.2.100]\"
+  },
+  {
+    \"id\": \"156\",
+    \"cause\": \"The RSSO_ADMIN_USER value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match the value found in the Helix Platform rsso-admin-tas secret.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Set value of RSSO_ADMIN_USER in the HELIX_ONPREM_DEPLOYMENT pipeline to that used in the Helix Platform.\"
+  },
+  {
+    \"id\": \"157\",
+    \"cause\": \"The value of HELIX_PLATFORM_NAMESPACE in the HELIX_ONPREM_DEPLOYMENT pipeline is not the name of the Helix Platform namespace.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Correct the value of HELIX_PLATFORM_NAMESPACE and set it to the name of the Helix Platform namespace.\"
+  },
+  {
+    \"id\": \"158\",
+    \"cause\": \"The HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline must be the same as the TENANT_NAME/COMPANY_NAME in the Helix Platform infra.config file.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Change the HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline to that of the Helix Platform TENANT_NAME/COMPANY_NAME.\"
+  },
+  {
+    \"id\": \"159\",
+    \"cause\": \"The cacerts secret required by the Helix Service Management applications is missing from the Helix IS namespace.\",
+    \"impact\": \"Helix Service Management applications will be inaccessible.\",
+    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation.\"
+  },
+  {
+    \"id\": \"160\",
+    \"cause\": \"The cacerts secret in the Helix Service Management namespace does not contain the Java keystore in a file named 'cacerts'.\",
+    \"impact\": \"Helix Service Management applications will be inaccessible.\",
+    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation and ensure that the Java keystore file is named 'cacerts'.\"
+  },
+  {
+    \"id\": \"161\",
+    \"cause\": \"The cacerts file in the cacerts secret in the Helix Service Management namespace must be a Java keystore and not any other type of certificate file.\",
+    \"impact\": \"Helix Service Management applications will be inaccessible.\",
+    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation and ensure that the cacerts file is a Java keystore.\"
+  },
+  {
+    \"id\": \"162\",
+    \"cause\": \"The cacerts file in the cacerts secret in the Helix Service Management namespace must contain the certificate used to the access the FTS Elasticsearch system.\",
+    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
+    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation.\"
+  },
+  {
+    \"id\": \"163\",
+    \"cause\": \"The cacerts file in the cacerts secret in the Helix Service Management namespace must contain the certificate chain that allows access to the Helix Platform applications such as RSSO.\",
+    \"impact\": \"The Helix Service Management applications will not be accessible.\",
+    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation and ensure the Helix Platform certificate chain is included.\"
+  },
+  {
+    \"id\": \"164\",
+    \"cause\": \"The certificate chain required to validate the connection to the named alias are is present in the cacerts file used for the Helix Service Management deployment.\",
+    \"impact\": \"The Helix Service Management applications accessed via the alias will not be accessible.\",
+    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation and ensure the required certificate chain is included.\"
+  },
+  {
+    \"id\": \"165\",
+    \"cause\": \"The IP address entered as the FTS_ELASTICSEARCH_HOSTNAME has not been found as an externalIP for any service in the Helix Platform namespace.\",
+    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
+    \"remediation\": \"Verify that the correct IP address has been used and that the service is exposed, or use the recommended service.namespace format for the value.\"
+  },
+  {
+    \"id\": \"166\",
+    \"cause\": \"The IP address entered for the FTS_ELASTICSEARCH_HOSTNAME does not appear to connect to the expected Elasticsearch system in the Helix Platform.\",
+    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
+    \"remediation\": \"Verify that the correct IP address has been entered or use the recommended service.namespace format for the value.\"
+  },
+  {
+    \"id\": \"167\",
+    \"cause\": \"The value entered for the FTS_ELASTICSEARCH_HOSTNAME does not appear to connect to the expected Elasticsearch system.\",
+    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
+    \"remediation\": \"Verify that the correct IP address has been entered or use the recommended service.namespace format for the value.\"
+  },
+  {
+    \"id\": \"168\",
+    \"cause\": \"The value entered for the FTS_ELASTICSEARCH_HOSTNAME is not the expected service.namespace indicated in the message.\",
+    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
+    \"remediation\": \"Update the FTS_ELASTICSEARCH_HOSTNAME value to the correct value.\"
+  },
+  {
+    \"id\": \"169\",
+    \"cause\": \"The IP address entered for the reported parameter has not been found as an externalIP for any service in the Helix Platform namespace.\",
+    \"impact\": \"The Helix Service Management platform pods may not be able to start and the applications may not be accessible.\",
+    \"remediation\": \"Verify that the correct IP address has been used and that the service is exposed, or use the recommended service.namespace format for the value.\"
+  },
+  {
+    \"id\": \"170\",
+    \"cause\": \"An attempt to validate that the IP address provided connects to an Elasticsearch server did not return the expected results.\",
+    \"impact\": \"The Helix Service Management platform pods may not be able to start and the applications may not be accessible.\",
+    \"remediation\": \"Verify that the correct IP address has been used and that the Elasticsearch service is running.\"
+  },
+  {
+    \"id\": \"172\",
+    \"cause\": \"The value entered for the LOGS_ELASTICSEARCH_HOSTNAME is not the expected service.namespace indicated in the message.\",
+    \"impact\": \"Helix Service Management logs will not be sent to Helix Logging.\",
+    \"remediation\": \"Update the LOGS_ELASTICSEARCH_HOSTNAME value to the correct value.\"
+  },
+  {
+    \"id\": \"173\",
+    \"cause\": \"The FTS_ELASTICSEARCH_PORT must be 9200.\",
+    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be accessible.\",
+    \"remediation\": \"Set the value to 9200.\"
+  },
+  {
+    \"id\": \"174\",
+    \"cause\": \"The FTS_ELASTICSEARCH_SECURE option must be selected.\",
+    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be accessible.\",
+    \"remediation\": \"Select the value.\"
+  },
+  {
+    \"id\": \"175\",
+    \"cause\": \"The FTS_ELASTICSEARCH_USER_PASSWORD value does not match the value set in the Helix Platform.\",
+    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be accessible.\",
+    \"remediation\": \"Set the value to the correct password.\"
+  },
+  {
+    \"id\": \"176\",
+    \"cause\": \"An attempt to login to the Helix Service Management apps via the RESTAPI failed and so the server license could not be checked.\",
+    \"impact\": \"License validation has not been possible and some later checks will be skipped.\",
+    \"remediation\": \"Check that the hannah_admin user is enabled and that the correct password is stored in the atriumwebsvc secret.\"
+  },
+  {
+    \"id\": \"177\",
+    \"cause\": \"The fpackager sidecar containers used by the Support Assistant Tool to access pod logs have not been found.\",
+    \"impact\": \"The Support Assistant Tool will not be able to access application logs.\",
+    \"remediation\": \"Select the SIDECAR_SUPPORT_ASSISTANT_FPACK option to enable during deployment or when running the HELIX_ONPREM_DEPLOYMENT pipeline in service mode.\"
+  },
+  {
+    \"id\": \"178\",
+    \"cause\": \"The role or rolebinding reported in the message has not been found in the Helix Service Management namespace.\",
+    \"impact\": \"The Support Assistant Tool will not be able to access application logs.\",
+    \"remediation\": \"Use the SUPPORT_ASSISTANT_CREATE_ROLE option in the HELIX_ONPREM_DEPLOYMENT pipeline or follow the steps in the product documentation to create the role/rolebinding manually.\"
+  },
+  {
+    \"id\": \"180\",
+    \"cause\": \"An attempt to connect to the database using the pipeline values failed. Additional error details may have been included in the main HITT output.\",
+    \"impact\": \"Later database checks will not be run and deployment may fail if there is an issue with the database of pipeline values.\",
+    \"remediation\": \"Use the additional error details to make changes to resolve the issue.\"
+  },
+  {
+    \"id\": \"181\",
+    \"cause\": \"Different versions of the Helix Service Management database are identified using the currDBVersion value in the control table. The discovered value is not the expected one for this version of Helix Service Management.\",
+    \"impact\": \"Helix Service Management deployment will fail or the server will not start.\",
+    \"remediation\": \"If this is a fresh install verify that the correct database dump was restored. If this is an upgrade issue please contact BMC Support.\"
+  },
+  {
+    \"id\": \"182\",
+    \"cause\": \"When using an MSSQL database for the Helix Service Management applications it is required to create several synonyms but the one named in the error is missing.\",
+    \"impact\": \"Helix Service Management deployment may fail.\",
+    \"remediation\": \"Create the missing synonym as detailed in the product documentation.\"
+  },
+  {
+    \"id\": \"184\",
+    \"cause\": \"The HITT script makes extensive use of the kubectl command but was not able to run it successfully.\",
+    \"impact\": \"The HITT script cannot continue without a working kubectl.\",
+    \"remediation\": \"Make sure that kubectl works as expected for the git user and that commands such as 'kubectl version' return results.\"
+  },
+  {
+    \"id\": \"185\",
+    \"cause\": \"A KUBECONFIG environment variable is set and references a non-default file.  Commands run by the pipelines during deployment may not inherit this environment variable and will not work as expected.\",
+    \"impact\": \"Helix Service Management deployment may fail.\",
+    \"remediation\": \"Copy a valid kubeconfig file to the location reported in the error message.\"
+  },
+  {
+    \"id\": \"186\",
+    \"cause\": \"Commands run during the Helix Service Management deployment require a valid kubeconfig file in ~/.kube/config but this was not found.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Copy a valid kubeconfig file to the location reported in the error message.\"
+  },
+  {
+    \"id\": \"187\",
+    \"cause\": \"A 'kubectl get secret' command failed to return the expected results.\",
+    \"impact\": \"Some later checks will not run and deployment may fail.\",
+    \"remediation\": \"Run the 'kubectl get secret' command for the secret and namespace in the error message and resolve any issues reported.\"
+  },
+  {
+    \"id\": \"188\",
+    \"cause\": \"An attempt to ping the IS database server from a pod failed to return the expected results.  More details may be included in the main HITT output.\",
+    \"impact\": \"The cluster to IS database server latency has not been tested.\",
+    \"remediation\": \"This test may fail due to security restrictions in the cluster and is for information only.\"
+  },
+  {
+    \"id\": \"189\",
+    \"cause\": \"A 'kubectl get secret' command failed to return the expected results.\",
+    \"impact\": \"Some later checks will not be run.\",
+    \"remediation\": \"Run the 'kubectl get secret' command for the secret and namespace in the error message and resolve any issues reported.\"
+  },
+  {
+    \"id\": \"190\",
+    \"cause\": \"The registry server parameter reported in the error message does not match what is currently set in the registry secret in the Helix IS namespace.\",
+    \"impact\": \"The pipeline operation may fail.\",
+    \"remediation\": \"Verify the value with that in the secret.\"
+  },
+  {
+    \"id\": \"192\",
+    \"cause\": \"The HITT script attempted a 'docker login' to the registry server using the credentials in the IMAGESECRET_NAME secret but failed.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Verify that the IMAGESECRET_NAME secret in the Helix Service Management namespace contains valid credentials.\"
+  },
+  {
+    \"id\": \"193\",
+    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT process uses several Jenkins nodes to perform product installation but one, or more, of these is not available.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins go to Manage Jenkins -> Nodes and enable the offline node(s). This may indicate an ssh or git credentials password issue. See the product documentation for full details.\"
+  },
+  {
+    \"id\": \"194\",
+    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT process requires a Jenkins node with the label 'ansible-master' to perform the product installation but one was not found.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins go to Manage Jenkins -> Nodes and ensure that there is a node with this label. This is usually the node named after the Deployment Engine hostname. See the product documentation for full details.\"
+  },
+  {
+    \"id\": \"195\",
+    \"cause\": \"The named plugin is required but missing from Jenkins.\",
+    \"impact\": \"Helix Service Management deployment may fail.\",
+    \"rmediation\": \"In Jenkins go to Manage Jenkins -> Plugins -> Available Plugins and install the missing plugin.\"
+  },
+  {
+    \"id\": \"196\",
+    \"cause\": \"The named credentials item is required but missing from Jenkins.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and create the missing item. See the product documentation for full details.\"
+  },
+  {
+    \"id\": \"197\",
+    \"cause\": \"A command to validate the KUBECONFIG credential in Jenkins failed. The credentials item is expected to contain a valid kubeconfig file but it is missing or is not valid for the cluster.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and update the KUBECONFIG credential with a valid file. See the product documentation for full details.\"
+  },
+  {
+    \"id\": \"198\",
+    \"cause\": \"Several different credentials objects must exist in Jenkins before the HELIX_ONPREM_DEPLOYMENT pipeline can be used to deploy the products but one, or more, are missing.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and add the missing items. See the product documentation for full details.\"
+  },
+  {
+    \"id\": \"199\",
+    \"cause\": \"The command list namespaces in the cluster did not return the expected results needed to provide a list to select from.\",
+    \"impact\": \"HITT cannot run until the hitt.conf file is updated.\",
+    \"remediation\": \"Update the hitt.conf file and set the namespace names.\"
+  },
+  {
+    \"id\": \"200\",
+    \"cause\": \"You must specify the mode to use when running HITT.\",
+    \"impact\": \"HITT requires a mode to run.\",
+    \"remediation\": \"Specify the mode on the command line.\"
+  },
+  {
+    \"id\": \"201\",
+    \"cause\": \"The Helix Platform and Helix IS namespaces are set to the same value in the hitt.conf file.\",
+    \"impact\": \"Helix Platform and Helix IS should be installed in separate namespaces.\",
+    \"remediation\": \"Update the namespaces in the hitt.conf file.\"
+  },
+  {
+    \"id\": \"205\",
+    \"cause\": \"BMC_HELIX_ITSM_INSIGHTS is selected to integrate with the Helix Platform but ITSM Insights is not installed in the Helix Platform.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Deselect BMC_HELIX_ITSM_INSIGHTS or install ITSM Insights in the Helix Platform before deployment of Helix Service Management.\"
   }
 ]"
 
@@ -2337,14 +2918,14 @@ while getopts "lm:f:t:" options; do
     t)
       TCTL_CMD=${OPTARG}
       if [ $# -ne 2 ]; then
-        logError "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
+        logError "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
       fi
       ;;
     f)
       HITT_CONFIG_FILE=${OPTARG}
       ;;
     :)
-      echo "${BOLD}ERROR:${NORMAL} -${OPTARG} requires an argument."
+      echo -e "${BOLD}ERROR:${NORMAL} -${OPTARG} requires an argument."
       usage
       ;;
     *)
