@@ -109,7 +109,8 @@ checkVars() {
 
 checkRequiredTools() {
   for i in "${REQUIRED_TOOLS[@]}"; do
-    checkBinary "${i}"
+    BINARY="${i^^}_BIN"
+    checkBinary "${!BINARY}"
   done
   if [ $FAIL -gt 0 ] ; then
     exit 1
@@ -157,7 +158,7 @@ checkToolVersion() {
 
 checkBinary() {
   if ! which "${1}" > /dev/null 2>&1 ; then
-    logError "105" "${1} command not found in path. Please set ${1^^}_BIN variable with the full path to the file."
+    logError "105" "${1} command not found in path. Please set ${BINARY} variable with the full path to the file."
   else
     logMessage "${1} command found ($(which ${1}))."
     checkToolVersion "${1}"
@@ -608,7 +609,7 @@ validateRealmDomains() {
 
 validateDomainInDNS() {
   # hostname to check
-  if ! ${HOST_BIN} ${1} > /dev/null 2>&1; then
+  if ! ${HOST_BIN} ${1} > /dev/null 2>${HITT_DBG_FILE}; then
     logError "122" "Entry for ${1} not found in DNS."
   else
     logMessage "  - ${1} found in DNS."
