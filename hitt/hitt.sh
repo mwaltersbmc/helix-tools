@@ -141,7 +141,7 @@ checkToolVersion() {
       ;;
     kubectl)
       REQUIRED_VERSION=1.20
-      KUBECTL_JSON=$(${KUBECTL_BIN} version -o json 2>/dev/null)
+      KUBECTL_JSON=$(${KUBECTL_BIN} version -o json 2>${HITT_DBG_FILE})
       INSTALLED_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.major + "." + .clientVersion.minor')
       KUBECTL_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.gitVersion')
       K8S_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.serverVersion.gitVersion')
@@ -858,7 +858,7 @@ downloadJenkinsCLIJar() {
 }
 
 getPipelinePasswords() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>/dev/null >&1
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>${HITT_DBG_FILE} >&1
     import jenkins.model.*
     import hudson.model.*
     def jobName = 'HELIX_ONPREM_DEPLOYMENT'
@@ -1853,7 +1853,7 @@ createPipelineNamesArray() {
 }
 
 getKubeconfigFromJenkins() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>/dev/null > kubeconfig.jenkins
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>${HITT_DBG_FILE} > kubeconfig.jenkins
     import com.cloudbees.plugins.credentials.*;
     import com.cloudbees.plugins.credentials.domains.Domain;
     import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl;
@@ -1881,7 +1881,7 @@ validateJenkinsKubeconfig() {
 }
 
 getJenkinsCredentials() {
-  JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>/dev/null
+  JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>${HITT_DBG_FILE}
     import com.cloudbees.plugins.credentials.CredentialsProvider
     import com.cloudbees.plugins.credentials.domains.Domain
     import groovy.json.JsonOutput
@@ -1951,7 +1951,7 @@ getPods() {
 
 getMessageJSON() {
   # msg id
-  MSG_JSON=$(echo "${ALL_MSGS_JSON}" | jq '.[] | select(.id=="'"${1}"'")')
+  MSG_JSON=$(echo "${ALL_MSGS_JSON}" | ${JQ_BIN} '.[] | select(.id=="'"${1}"'")')
   if [ -z "${MSG_JSON}" ]; then
     MSG_JSON="{\"id\": \"$1\",\"cause\": \"Message details not found for id $1.\", \"impact\": \"Message details cannot be displayed.\", \"remediation\": \"Please report to 'mark_walters@bmc.com'\"}"
   fi
@@ -1978,8 +1978,8 @@ logMessageDetails() {
 
 checkJenkinsCLIJavaVersion() {
   REQUIRED_VERSION=$(${UNZIP_BIN} -p jenkins-cli.jar META-INF/MANIFEST.MF | grep ^Build-Jdk-Spec | cut -d ' ' -f2)
-  if compare "${JAVA_VERSION} < ${REQUIRED_VERSION}"; then
-    logError "207" "The installed version of Jenkins requires Java 17 but version ${JAVA_VERSION} is being used by HITT so some checks will fail. Please install, or configure HITT to use, Java ${REQUIRED_VERSION}."
+  if compare "${JAVA_VERSION} < ${REQUIRED_VERSION//[^[:alnum:]]/}"; then
+    logError "207" "Jenkins CLI tool requires Java ${REQUIRED_VERSION//[^[:alnum:]]/} but HITT is using Java ${JAVA_VERSION}. Please install, or configure HITT to use, the later version."
   fi
 }
 
@@ -2137,7 +2137,7 @@ VALUES_LOG_FILE=values.log
 CLEANUP_DIRS=(configsrepo)
 CLEANUP_FILES=(sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins)
 CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}")
-REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip)
+REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
 JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
 BOLD="\e[1m"
