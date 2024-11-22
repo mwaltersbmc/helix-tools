@@ -166,14 +166,13 @@ checkBinary() {
 
 cleanUp() {
   if [ ! -z "${SKIP_CLEANUP}" ]; then return; fi
-  CLEANUP_START_FILES=""
   if [ "${1}" == "start" ]; then
-    CLEANUP_START_FILES="${MSG_FILE}"
+      CLEANUP_FILES=("${CLEANUP_FILES[@]}" "${CLEANUP_START_FILES[@]}")
   fi
-  for i in sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins "${CLEANUP_START_FILES}"; do
+  for i in "${CLEANUP_FILES[@]}"; do
     [[ -f ${i} ]] &&  rm -f ${i}
   done
-  for i in configsrepo; do
+  for i in "${CLEANUP_DIRS[@]}"; do
     [[ -d ${i} ]] &&  rm -rf ${i}
   done
 }
@@ -1543,7 +1542,7 @@ reportResults() {
   logStatus "HITT Summary Report"
   echo "==================="
   if [ $FAIL -gt 0 ] || [ $WARN -gt 0 ] ; then
-    echo -e "${BOLD}${FAIL} errors / ${WARN} warnings found - please review the ${MSG_FILE} file for more details and suggested fixes.${NORMAL}"
+    echo -e "${BOLD}${FAIL} errors / ${WARN} warnings found - please review the ${HITT_MSG_FILE} file for more details and suggested fixes.${NORMAL}"
     echo ""
     if [ "${#ERROR_ARRAY[@]}" != "0" ]; then
       echo -e "${BOLD}${RED}ERRORS:${NORMAL}"
@@ -1854,7 +1853,7 @@ createPipelineNamesArray() {
 }
 
 getKubeconfigFromJenkins() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2> /dev/null > kubeconfig.jenkins
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>/dev/null > kubeconfig.jenkins
     import com.cloudbees.plugins.credentials.*;
     import com.cloudbees.plugins.credentials.domains.Domain;
     import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl;
@@ -1882,7 +1881,7 @@ validateJenkinsKubeconfig() {
 }
 
 getJenkinsCredentials() {
-  JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2> /dev/null
+  JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>/dev/null
     import com.cloudbees.plugins.credentials.CredentialsProvider
     import com.cloudbees.plugins.credentials.domains.Domain
     import groovy.json.JsonOutput
@@ -1974,7 +1973,7 @@ logMessageDetails() {
   # MSG_ID
   getMessageJSON "${1}"
   getMessageDetails
-  printMessageDetails >> "${MSG_FILE}"
+  printMessageDetails >> "${HITT_MSG_FILE}"
 }
 
 checkJenkinsCLIJavaVersion() {
@@ -2127,13 +2126,17 @@ ${ZIP_BIN} -q hittlogs.zip *.log
 SCRIPT_VERSION=1
 HITT_CONFIG_FILE=hitt.conf
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
-CREATE_LOGS=1
-HITT_LOG_FILE=hitt.log
-MSG_FILE=hittmsgs.log
-VALUES_LOG_FILE=values.log
 FAIL=0
 WARN=0
 SKIP_JENKINS=0
+CREATE_LOGS=1
+HITT_LOG_FILE=hitt.log
+HITT_DBG_FILE=hittdebug.log
+HITT_MSG_FILE=hittmsgs.log
+VALUES_LOG_FILE=values.log
+CLEANUP_DIRS=(configsrepo)
+CLEANUP_FILES=(sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins)
+CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}")
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
 JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
