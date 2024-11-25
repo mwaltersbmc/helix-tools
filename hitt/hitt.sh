@@ -142,7 +142,7 @@ checkToolVersion() {
       ;;
     kubectl)
       REQUIRED_VERSION=1.20
-      KUBECTL_JSON=$(${KUBECTL_BIN} version -o json 2>${HITT_DBG_FILE})
+      KUBECTL_JSON=$(${KUBECTL_BIN} version -o json 2>>${HITT_DBG_FILE})
       INSTALLED_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.major + "." + .clientVersion.minor')
       KUBECTL_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.gitVersion')
       K8S_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.serverVersion.gitVersion')
@@ -609,7 +609,7 @@ validateRealmDomains() {
 
 validateDomainInDNS() {
   # hostname to check
-  if ! ${HOST_BIN} ${1} > /dev/null 2>${HITT_DBG_FILE}; then
+  if ! ${HOST_BIN} ${1} > /dev/null 2>>${HITT_DBG_FILE}; then
     logError "122" "Entry for ${1} not found in DNS."
   else
     logMessage "  - ${1} found in DNS."
@@ -859,7 +859,7 @@ downloadJenkinsCLIJar() {
 }
 
 getPipelinePasswords() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>${HITT_DBG_FILE} >&1
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE} >&1
     import jenkins.model.*
     import hudson.model.*
     def jobName = 'HELIX_ONPREM_DEPLOYMENT'
@@ -1854,7 +1854,7 @@ createPipelineNamesArray() {
 }
 
 getKubeconfigFromJenkins() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>${HITT_DBG_FILE} > kubeconfig.jenkins
+  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE} > kubeconfig.jenkins
     import com.cloudbees.plugins.credentials.*;
     import com.cloudbees.plugins.credentials.domains.Domain;
     import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl;
@@ -1882,7 +1882,7 @@ validateJenkinsKubeconfig() {
 }
 
 getJenkinsCredentials() {
-  JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>${HITT_DBG_FILE}
+  JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE}
     import com.cloudbees.plugins.credentials.CredentialsProvider
     import com.cloudbees.plugins.credentials.domains.Domain
     import groovy.json.JsonOutput
