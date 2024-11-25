@@ -385,7 +385,7 @@ checkEFKClusterHealth() {
   EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c 'curl -sk -u elastic:"'"${HELIX_LOGGING_PASSWORD}"'" -X GET https://"'"${EFK_ELASTIC_SERVICENAME}"'":9200/_cluster/health')
   EFK_ELASTIC_STATUS=$(echo "${EFK_ELASTIC_JSON}" | ${JQ_BIN} -r '.status')
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
-    logError "113" "Helix Logging Elasticsearch problem - ${EFK_ELASTIC_STATUS} - check ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
+    logError "113" "Helix Logging Elasticsearch problem. Check the ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
     logMessage "Helix Logging Elasticsearch (${EFK_ELASTIC_SERVICENAME}) appears healthy."
   fi
