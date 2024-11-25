@@ -82,7 +82,7 @@ Use **post-hp** after installing and configuring the Helix Platform but before u
 Use **pre-is** after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting the deployment of Helix IS.\
 Use **post-is** for troubleshooting after IS deployment.
 
-HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages and summarised at the end.
+HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages and summarised at the end.  A **hittmgs.log** file is created which contains more detailed information, including the impact and suggested fix, for each error/warning.
 
 <span style="color:red">ERRORS</span> indicate problems which may cause installation to fail or result in problems post-install.\
 <span style="color:yellow">WARNINGS</span> highlight potential problems or settings which may be appropriate under some conditions, but are usually recommended to be different.
