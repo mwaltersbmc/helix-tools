@@ -12,7 +12,7 @@ The HITT script requires minimal manual configuration and will read the informat
 
 There are some optional tests that will attempt to validate the Helix IS database.  These require the use of a Java SQL client, called JISQL, and JDBC drivers for each database type.  To enable these tests, download the dbjars.tgz file and save it in the same directory as the hitt.sh script.  HITT will run the SQL checks when this file is present.
 
-**Installation**
+### Installation ###
 
 Log in as the git user, create a new directory, cd to it and download the script along with, if required, the dbjars.tgz file.
 
@@ -23,7 +23,7 @@ $ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.
 $ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz
 ```
 
-**Configuration**
+### Configuration ###
 
 HITT is configured by a file called **hitt.conf** which is created the first time the script is run. If you need to change any values after the first run, delete or edit this file and enter the four required variables manually. There is also a section where you can enter details about your Jenkins which may be left as-is unless it requires credentials, uses https, or is running on a non-default port. Enclose the **JENKINS_USERNAME** and **JENKINS_PASSWORD** values in double quotes.  If your Jenkins is configured to use SSL change the **JENKINS_PROTOCOL** to **https** and set the **JENKINS_PORT** appropriately.
 
@@ -52,7 +52,7 @@ JENKINS_PORT=8080
 
 Finally, there is a section for the command line tools that the script uses.  It is assumed that these are installed and available in directories that are included in the PATH environment variable of the user running the script.  HITT will check that these tools are present and report any that can't be found.  Missing tools must be installed, or the full path to their location set, if they are not in the PATH.
 
-**Running HITT**
+### Running HITT ###
 
 Run the script using bash or make it executable with chmod if preferred.
 
@@ -91,20 +91,22 @@ When the test being run produces additional output, pod status for example, this
 
 All of the tests are read-only and will not make changes to the system.  However, please note that the checks which discover the tenant and service details from the Helix Platform deploy a tctl job/pod in the same way as the Jenkins HELIX_ITSM_INTEROPS pipeline.  The job/pod are deleted after use.
 
-**Logging**
+### Logging ###
 
 HITT creates various log files in the directory that the script is run from:
 
+- **hittmsgs.log** - additional details on the cause, impact and steps to fix, warnings and errors reported by the script.
 - **hitt.log** - script output.
 - **values.log** - the pipeline input values in pre-is mode, or values read from the cluster for post-is.
 - **PIPELINE_NAME.log** - console output for each of the Jenkins pipelines.
 - **k8s\*.log** - output from various kubectl commands such as 'get pods'.
+- **hittdebug.log** - error messages from commands run by the script which may be useful if it does not work as expected.
 
 All of the files are added to **hittlogs.zip** which can be sent to BMC Support if needed.
 
 NOTE - password values are not logged.
 
-**tctl Mode**
+### tctl Mode ###
 
 HITT may also be used to run simple **tctl** commands such as **get tenant** and **get service**.  This deploys the same job and pod used by the Jenkins HELIX_ITSM_INTEROPS pipeline and avoids having to download and configure the tctl client on a local system.  The command uses the **-t** switch:
 
@@ -117,7 +119,7 @@ $ bash hitt.sh -t "get tenant 1912102789 -o json"
 
 The tctl commands must be enclosed in double quotes and the output will be displayed on the console when the job completes.
 
-**Checks Summary**
+### Checks Summary ###
 
 Different groups of tests and checks are run depending on the operating mode and discovered information.  Some groups query information which is then used by other checks.
 
