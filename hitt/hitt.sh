@@ -1858,11 +1858,11 @@ getKubeconfigFromJenkins() {
     import com.cloudbees.plugins.credentials.*;
     import com.cloudbees.plugins.credentials.domains.Domain;
     import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl;
-    def fileName = "kubeconfig"
+    def idName = "kubeconfig"
     SystemCredentialsProvider.getInstance().getCredentials().stream().
       filter { cred -> cred instanceof FileCredentialsImpl }.
       map { fileCred -> (FileCredentialsImpl) fileCred }.
-      filter { fileCred -> fileName.equals( fileCred.getFileName() ) }.
+      filter { fileCred -> idName.equals( fileCred.getId() ) }.
       forEach { fileCred ->
         String s = new String( fileCred.getSecretBytes().getPlainData() )
         println ""
@@ -1874,6 +1874,10 @@ EOF
 
 validateJenkinsKubeconfig() {
   getKubeconfigFromJenkins
+  if [ ! -s ./kubeconfig.jenkins ]; then
+    logWarning "028" "Failed to extract kubeconfig file from Jenkins - skipping validation."
+    return
+  fi
   if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>&1; then
     logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
   else
@@ -1902,7 +1906,7 @@ EOF
 )
 }
 
-validatJenkinsCredentials() {
+validateJenkinsCredentials() {
   getJenkinsCredentials
   MISSING_CREDS=""
   for i in "${JENKINS_CREDS[@]}" ; do
@@ -1917,7 +1921,7 @@ validatJenkinsCredentials() {
     logMessage "Expected credentials found in Jenkins."
   fi
 
-  if echo "${MISSING_CREDS}" | grep -q kubecconfig ; then
+  if echo "${MISSING_CREDS}" | grep -vq kubecconfig ; then
     validateJenkinsKubeconfig
   fi
 }
@@ -2096,8 +2100,7 @@ fi
 
 if [ "${SKIP_JENKINS}" == "0" ]; then
   logStatus "Validating Jenkins credentials..."
-  validatJenkinsCredentials
-  validateJenkinsKubeconfig
+  validateJenkinsCredentials
   logStatus "Checking IS FTS Elastic settings..."
   checkFTSElasticSettings
   logStatus "Checking IS DB settings..."
@@ -2347,6 +2350,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The DATABASE_HOST_NAME is not reachable from the Deployment Engine on the DB_PORT.\",
     \"impact\": \"Later checks to validate the database will not be run and deployment will fail if either of the values are wrong.\",
     \"remediation\": \"Verify the DATABASE_HOST_NAME/DB_PORT values and enable connectivity from the Deployment Engine if possible.\"
+  },
+  {
+    \"id\": \"028\",
+    \"cause\": \"A command to extract and save the kubeconfig file from the Jenkins kubeconfig credential failed to return the expected result.\",
+    \"impact\": \"A check to confirm that it is a valid kubeconfig file for the cluster will not be run.\",
+    \"remediation\": \"Confirm the kubconfig credential exists and has a valid file attached.\"
   },
   {
     \"id\": \"100\",
