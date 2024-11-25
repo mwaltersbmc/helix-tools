@@ -1084,7 +1084,7 @@ validateISDetails() {
         logWarning "012" "HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
       fi
       if [ "${IS_BMC_HELIX_ITSM_INSIGHTS}" == "true" ]; then
-        logError "BMC_HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
+        logError "205" "BMC_HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
       fi
     fi
 
