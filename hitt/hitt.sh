@@ -168,9 +168,12 @@ checkBinary() {
 cleanUp() {
   if [ ! -z "${SKIP_CLEANUP}" ]; then return; fi
   if [ "${1}" == "start" ]; then
-      CLEANUP_FILES=("${CLEANUP_FILES[@]}" "${CLEANUP_START_FILES[@]}")
+      CLEANUP_FILES_TO_RM=("${CLEANUP_FILES[@]}" "${CLEANUP_START_FILES[@]}")
   fi
-  for i in "${CLEANUP_FILES[@]}"; do
+  if [ "${1}" == "stop" ]; then
+      CLEANUP_FILES_TO_RM=("${CLEANUP_FILES[@]}" "${CLEANUP_STOP_FILES[@]}")
+  fi
+  for i in "${CLEANUP_FILES_TO_RM[@]}"; do
     [[ -f ${i} ]] &&  rm -f ${i}
   done
   for i in "${CLEANUP_DIRS[@]}"; do
@@ -2141,6 +2144,7 @@ VALUES_LOG_FILE=values.log
 CLEANUP_DIRS=(configsrepo)
 CLEANUP_FILES=(sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins)
 CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}")
+CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
 JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
