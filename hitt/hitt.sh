@@ -644,7 +644,7 @@ checkServiceDetails() {
 checkFTSElasticStatus() {
   FTS_ELASTIC_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c "curl -sk -u \"${LOG_ELASTICSEARCH_USERNAME}:${LOG_ELASTICSEARCH_PASSWORD}\" -X GET https://localhost:9200/_cluster/health?pretty | grep status")
   if ! echo "${FTS_ELASTIC_STATUS}" | grep -q green ; then
-    logError "125" "FTS Elasticsearch problem - ${FTS_ELASTIC_STATUS} - check ${FTS_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
+    logError "125" "FTS Elasticsearch problem. Check the ${FTS_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
     logMessage "FTS Elasticsearch (${FTS_ELASTIC_SERVICENAME}) appears healthy."
   fi
