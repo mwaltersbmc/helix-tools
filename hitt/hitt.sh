@@ -1027,7 +1027,7 @@ validateISDetails() {
       logMessage "IS_NAMESPACE is the expected value (${IS_NAMESPACE})."
     fi
 
-    if [ "${IS_VERSION}" -ge 203303 ]; then
+    if [ "${IS_VERSION}" -ge 2023303 ]; then
       IS_NS_MAX_LEN=23
     else
       IS_NS_MAX_LEN=33
@@ -1991,6 +1991,50 @@ checkJenkinsCLIJavaVersion() {
   fi
 }
 
+isJmespathInstalled() {
+  if ! ansible-playbook /dev/stdin << EOF >/dev/null 2>&1
+  - hosts: localhost
+    gather_facts: false
+    tasks:
+    - pip:
+        name: jmespath
+        state: present
+EOF
+  then
+    return 1
+  else
+    return 0
+  fi
+}
+
+versionFmt() {
+  printf "%03d%03d" $(echo "$1" | tr '.' ' ')
+}
+
+checkDERequirements() {
+# ansible checks
+  if ! which ansible > /dev/null 2>&1 ; then
+    logWarning "029" "'ansible' command not found - skipping checks."
+  else
+    IS_MAJOR_VERSION="${IS_VERSION:2:2}"
+    if [ "${IS_MAJOR_VERSION}" -eq 22 ]; then
+      MAX_ANSIBLE_VERSION="2.9"
+    elif [ "${IS_MAJOR_VERSION}" -eq 23 ]; then
+      MAX_ANSIBLE_VERSION="2.15"
+    fi
+    ANSIBLE_VERSION=$(ansible --version 2>/dev/null | head -1 | grep -oP '\d+.\d+')
+    if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
+      logError "208" "The installed version of ansible (${ANSIBLE_VERSION}) is not supported - required version must be no greater than ${MAX_ANSIBLE_VERSION}."
+    else
+      logMessage "Using ansible version - ${ANSIBLE_VERSION}"
+      if ! isJmespathInstalled ; then
+        ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed -n '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
+        logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible (${ANSIBLE_PYTHON_VERSION})."
+      fi
+    fi
+  fi
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -2099,6 +2143,11 @@ if [ "${MODE}" != "post-hp" ]; then
   checkISDockerLogin
   logStatus "Validating IS cacerts..."
   validateCacerts
+fi
+
+if [ "${MODE}" == "pre-is" ]; then
+  logStatus "Checking Deployment Engine setup..."
+  checkDERequirements
 fi
 
 if [ "${SKIP_JENKINS}" == "0" ]; then
@@ -2360,6 +2409,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"A command to extract and save the kubeconfig file from the Jenkins kubeconfig credential failed to return the expected result.\",
     \"impact\": \"A check to confirm that it is a valid kubeconfig file for the cluster will not be run.\",
     \"remediation\": \"Confirm the kubconfig credential exists and has a valid file attached.\"
+  },
+  {
+    \"id\": \"029\",
+    \"cause\": \"Ansible command was not found on the path of the user running HITT.\",
+    \"impact\": \"Checks to validate the ansible version and dependencies will not be run and Helix Service Management deployment will not be possible.\",
+    \"remediation\": \"Install the recommended version of ansible using the OS package manager.\"
   },
   {
     \"id\": \"100\",
@@ -2936,6 +2991,18 @@ ALL_MSGS_JSON="[
     \"cause\": \"The Java version used by HITT is older than that required to use the jenkins-cli.jar command line client.\",
     \"impact\": \"Checks that use the jenkins-cli client will fail.\",
     \"remediation\": \"Update the Java used by HITT to the version indicated in the error message.\"
+  },
+  {
+    \"id\": \"208\",
+    \"cause\": \"The currently installed version of ansible is not supported for this release of the Helix Service Management deployment pipelines.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Review the product documentation and install the supported version of ansible.\"
+  },
+  {
+    \"id\": \"209\",
+    \"cause\": \"The 'jmespath' module required by the Helix Service Management deployment scripts does not appear to be installed for the python version that ansible is using.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Install 'jmespath' for the python instance that Jenkins is using.\"
   }
 ]"
 
