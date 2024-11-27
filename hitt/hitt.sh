@@ -174,10 +174,10 @@ cleanUp() {
       CLEANUP_FILES_TO_RM=("${CLEANUP_FILES[@]}" "${CLEANUP_STOP_FILES[@]}")
   fi
   for i in "${CLEANUP_FILES_TO_RM[@]}"; do
-    [[ -f ${i} ]] &&  rm -f ${i}
+    rm -f ${i}
   done
   for i in "${CLEANUP_DIRS[@]}"; do
-    [[ -d ${i} ]] &&  rm -rf ${i}
+    rm -rf ${i}
   done
 }
 
@@ -2022,6 +2022,7 @@ checkDERequirements() {
     elif [ "${IS_MAJOR_VERSION}" -eq 23 ]; then
       MAX_ANSIBLE_VERSION="2.15"
     fi
+
     ANSIBLE_VERSION=$(ansible --version 2>/dev/null | head -1 | grep -oP '\d+.\d+')
     if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
       logError "208" "The installed version of ansible (${ANSIBLE_VERSION}) is not supported - required version must be no greater than ${MAX_ANSIBLE_VERSION}."
@@ -2030,6 +2031,24 @@ checkDERequirements() {
       if ! isJmespathInstalled ; then
         ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed -n '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
         logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible (${ANSIBLE_PYTHON_VERSION})."
+      fi
+    fi
+
+    ANSIBLE_CFG_FILE=/etc/ansible/ansible.cfg
+    ANSIBLE_CFG_MISSING=""
+    if [ ! -f "${ANSIBLE_CFG_FILE}" ]; then
+      logError "210" "Ansible configuration file (${ANSIBLE_CFG_FILE}) not found - skipping checks."
+    else
+      logMessage "Checking ansible configuration file - ${ANSIBLE_CFG_FILE}."
+      ANSIBLE_CFG_VALS=(bin_ansible_callbacks=true callback_whitelist=profile_tasks stdout_callback=yaml host_key_checking=false ssh_args=-ocontrolmaster=auto retries=3 pipelining=true)
+      ANSIBLE_CFG=$(cat /etc/ansible/ansible.cfg | tr -d ' ')
+      for i in "${ANSIBLE_CFG_VALS[@]}"; do
+      	if ! echo "${ANSIBLE_CFG}" |  grep -qi "${i}" ; then
+           ANSIBLE_CFG_MISSING+="${i%%=*}=, "
+        fi
+      done
+      if [ -n "${ANSIBLE_CFG_MISSING}" ]; then
+        logError "210" "One or more settings in the ansible configuration file are missing, or have an unexpected value - '${ANSIBLE_CFG_MISSING::-2}'."
       fi
     fi
   fi
@@ -2175,7 +2194,7 @@ dumpVARs
 if [ "${MODE}" != "post-hp" ]; then
   saveAllPipelineConsoleOutput
 fi
-${ZIP_BIN} -q hittlogs.zip *.log
+${ZIP_BIN} -q - *.log > hittlogs.zip
 }
 
 # Set vars and process command line
@@ -2192,7 +2211,7 @@ HITT_MSG_FILE=hittmsgs.log
 VALUES_LOG_FILE=values.log
 CLEANUP_DIRS=(configsrepo)
 CLEANUP_FILES=(sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins)
-CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}")
+CLEANUP_START_FILES=("*.log")
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
@@ -2414,7 +2433,7 @@ ALL_MSGS_JSON="[
     \"id\": \"029\",
     \"cause\": \"Ansible command was not found on the path of the user running HITT.\",
     \"impact\": \"Checks to validate the ansible version and dependencies will not be run and Helix Service Management deployment will not be possible.\",
-    \"remediation\": \"Install the recommended version of ansible using the OS package manager.\"
+    \"remediation\": \"Run the Deployment Engine setup script or install the recommended version of ansible using the OS package manager.\"
   },
   {
     \"id\": \"100\",
@@ -3003,6 +3022,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The 'jmespath' module required by the Helix Service Management deployment scripts does not appear to be installed for the python version that ansible is using.\",
     \"impact\": \"Helix Service Management deployment will fail.\",
     \"remediation\": \"Install 'jmespath' for the python instance that Jenkins is using.\"
+  },
+  {
+    \"id\": \"210\",
+    \"cause\": \"The ansible configuration file should have been updated by the Deployment Engine setup script but it is missing, or does not contain the expected settings.\",
+    \"impact\": \"Helix Service Management deployment may fail.\",
+    \"remediation\": \"Verify that the setup script ran as expected or contact BMC Support for further details.\"
   }
 ]"
 
