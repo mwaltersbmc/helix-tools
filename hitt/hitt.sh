@@ -2448,6 +2448,24 @@ ALL_MSGS_JSON="[
     \"remediation\": \"Install the required version.\"
   },
   {
+    \"id\": \"102\",
+    \"cause\": \"At least one pod in the namespace is not in a ready state.\",
+    \"impact\": \"Installation may fail if one of the pods that the applications depend on are not ready.\",
+    \"remediation\": \"Check the namespace to understand why the reported pod is not ready. Note there are some cronjob pods which run every few minutes and seeing one of these in a ContainerCreating state is not likely to cause a problem.\"
+  },
+  {
+    \"id\": \"103\",
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
+  },
+  {
+    \"id\": \"104\",
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
+  },
+  {
     \"id\": \"105\",
     \"cause\": \"One of command line tools that HITT requires to run has not been found.\",
     \"impact\": \"HITT cannot run without this command line tool.\",
@@ -2470,12 +2488,6 @@ ALL_MSGS_JSON="[
     \"cause\": \"The HELIX_GENERATE_CONFIG pipeline must have been run to create the image registry secret specified in the IMAGESECRET_NAME value.\",
     \"impact\": \"When run in this mode HITT requires that the IMAGESECRET_NAME image registry secret has been created.\",
     \"remediation\": \"Populate the values in the HELIX_ONPREM_DEPLOYMENT pipeline and build it with the HELIX_GENERATE_CONFIG option selected.\"
-  },
-  {
-    \"id\": \"102\",
-    \"cause\": \"At least one pod in the namespace is not in a ready state.\",
-    \"impact\": \"Installation may fail if one of the pods that the applications depend on are not ready.\",
-    \"remediation\": \"Check the namespace to understand why the reported pod is not ready. Note there are some cronjob pods which run every few minutes and seeing one of these in a ContainerCreating state is not likely to cause a problem.\"
   },
   {
     \"id\": \"109\",
@@ -2548,6 +2560,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"One of the Helix Service Management aliases is missing from the Application Domains list in the realm.\",
     \"impact\": \"The missing service will not be usable.\",
     \"remediation\": \"Add the missing alias to the Application Domains list in the realm.\"
+  },
+  {
+    \"id\": \"121\",
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
   },
   {
     \"id\": \"122\",
@@ -2718,6 +2736,12 @@ ALL_MSGS_JSON="[
     \"remediation\": \"Deselect the DB_SSL_ENABLED option in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
   },
   {
+    \"id\": \"150\",
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
+  },
+  {
     \"id\": \"151\",
     \"cause\": \"The LOGS_ELASTICSEARCH_TLS option in the HELIX_ONPREM_DEPLOYMENT pipeline is not selected but this is required.\",
     \"impact\": \"Logs will not be sent to the Helix Logging system.\",
@@ -2838,6 +2862,12 @@ ALL_MSGS_JSON="[
     \"remediation\": \"Verify that the correct IP address has been used and that the Elasticsearch service is running.\"
   },
   {
+    \"id\": \"171\",
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
+  },
+  {
     \"id\": \"172\",
     \"cause\": \"The value entered for the LOGS_ELASTICSEARCH_HOSTNAME is not the expected service.namespace indicated in the message.\",
     \"impact\": \"Helix Service Management logs will not be sent to Helix Logging.\",
@@ -2880,6 +2910,12 @@ ALL_MSGS_JSON="[
     \"remediation\": \"Use the SUPPORT_ASSISTANT_CREATE_ROLE option in the HELIX_ONPREM_DEPLOYMENT pipeline or follow the steps in the product documentation to create the role/rolebinding manually.\"
   },
   {
+    \"id\": \"179\",
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
+  },
+  {
     \"id\": \"180\",
     \"cause\": \"An attempt to connect to the database using the pipeline values failed. Additional error details may have been included in the main HITT output.\",
     \"impact\": \"Later database checks will not be run and deployment may fail if there is an issue with the database of pipeline values.\",
@@ -2896,6 +2932,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"When using an MSSQL database for the Helix Service Management applications it is required to create several synonyms but the one named in the error is missing.\",
     \"impact\": \"Helix Service Management deployment may fail.\",
     \"remediation\": \"Create the missing synonym as detailed in the product documentation.\"
+  },
+  {
+    \"id\": \"183\",
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
   },
   {
     \"id\": \"184\",
@@ -2938,6 +2980,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The registry server parameter reported in the error message does not match what is currently set in the registry secret in the Helix IS namespace.\",
     \"impact\": \"The pipeline operation may fail.\",
     \"remediation\": \"Verify the value with that in the secret.\"
+  },
+  {
+    \"id\": \"191\",
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
   },
   {
     \"id\": \"192\",
@@ -3000,10 +3048,34 @@ ALL_MSGS_JSON="[
     \"remediation\": \"Update the namespaces in the hitt.conf file.\"
   },
   {
+    \"id\": \"202\",
+    \"cause\": \"HITT failed to find an existing job to provide the tctl client image name.\",
+    \"impact\": \"Some later checks will not be run.\",
+    \"remediation\": \"No workaround available.\"
+  },
+  {
+    \"id\": \"203\",
+    \"cause\": \"HITT failed to find the name of the container image that provides the tctl client.\",
+    \"impact\": \"Some later checks will not be run.\",
+    \"remediation\": \"No workaround available.\"
+  },
+  {
+    \"id\": \"204\",
+    \"cause\": \"The job used to run tctl commands did not complete in the expected time for some reason.\",
+    \"impact\": \"Some later checks will not be run.\",
+    \"remediation\": \"Check the tctlseal job/pod events and logs to understand and resolve the issue.\"
+  },
+  {
     \"id\": \"205\",
     \"cause\": \"BMC_HELIX_ITSM_INSIGHTS is selected to integrate with the Helix Platform but ITSM Insights is not installed in the Helix Platform.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
     \"remediation\": \"Deselect BMC_HELIX_ITSM_INSIGHTS or install ITSM Insights in the Helix Platform before deployment of Helix Service Management.\"
+  },
+  {
+    \"id\": \"206\",
+    \"cause\": \"When using HITT's tctl mode you must remember to enclose the command options in double quotes as in the message.\",
+    \"impact\": \"HITT will not run the tctl command.\",
+    \"remediation\": \"Enclose the tctl commands in double quotes.\"
   },
   {
     \"id\": \"207\",
