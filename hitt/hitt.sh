@@ -2012,11 +2012,21 @@ versionFmt() {
 }
 
 checkDERequirements() {
-# ansible checks
+  IS_MAJOR_VERSION="${IS_VERSION:2:2}"
+
+  # if IS <=22.x then kubectl must be <= 1.27
+  if [ "${IS_MAJOR_VERSION}" -lt 23 ]; then
+    MAX_KUBECTL_VERSION="1.27"
+    INSTALLED_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.major + "." + .clientVersion.minor')
+    if compare "${INSTALLED_VERSION} > ${MAX_KUBECTL_VERSION}"; then
+      logError "103" "kubectl must be version ${MAX_KUBECTL_VERSION} or less to support the '--short' option - currently installed version is ${INSTALLED_VERSION}."
+    fi
+  fi
+
+  # ansible checks
   if ! which ansible > /dev/null 2>&1 ; then
     logWarning "029" "'ansible' command not found - skipping checks."
   else
-    IS_MAJOR_VERSION="${IS_VERSION:2:2}"
     if [ "${IS_MAJOR_VERSION}" -eq 22 ]; then
       MAX_ANSIBLE_VERSION="2.9"
     elif [ "${IS_MAJOR_VERSION}" -eq 23 ]; then
@@ -2455,9 +2465,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"103\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"The deployment scripts for this version of Helix Service Management use 'kubectl version --short=true' commands but the the '--short' flag has been removed from the installed version of kubectl.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Install version 1.27 of kubectl on the Deployment Engine.\"
   },
   {
     \"id\": \"104\",
