@@ -1001,7 +1001,11 @@ validateISDetails() {
   if [ "${MODE}" == "pre-is" ]; then
     logMessage "ITSM pipeline version is ${IS_PLATFORM_HELM_VERSION}."
     logMessage "CUSTOMER_SIZE is ${IS_CUSTOMER_SIZE}."
-    logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
+    if [ "${IS_DEPLOYMENT_MODE}" != "FRESH" ]; then
+      logWarning "030" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' and not the expected value of 'FRESH'."
+    else
+      logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
+    fi
     if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
       logWarning "008" "CUSTOM_BINARY_PATH option is selected - this is not usually required and may be a mistake."
     fi
@@ -1039,7 +1043,7 @@ validateISDetails() {
     fi
 
     if [ "${ISP_CUSTOMER_SERVICE}-${ISP_ENVIRONMENT}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
-      logError "140" "CUSTOMER_SERVICE (${ISP_CUSTOMER_SERVICE}) or ENVIRONMENT (${ISP_ENVIRONMENT}) do not match values defined in this script (${IS_CUSTOMER_SERVICE} and ${IS_ENVIRONMENT})."
+      logError "140" "CUSTOMER_SERVICE (${ISP_CUSTOMER_SERVICE}) and/or ENVIRONMENT (${ISP_ENVIRONMENT}) values do not match those set in the hitt.conf file - (${IS_CUSTOMER_SERVICE} and ${IS_ENVIRONMENT})."
     else
       logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid (${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT})."
     fi
@@ -2451,6 +2455,12 @@ ALL_MSGS_JSON="[
     \"remediation\": \"Run the Deployment Engine setup script or install the recommended version of ansible using the OS package manager.\"
   },
   {
+    \"id\": \"030\",
+    \"cause\": \"HITT 'pre-is' mode is used to validate the environment and HELIX_ONPREM_DEPLOYMENT pipeline values before deployment but the DEPLOYMENT_MODE is not the expected value of 'FRESH'.\",
+    \"impact\": \"HITT checks may return incorrect results.\",
+    \"remediation\": \"Conmfirm the DEPLOYMENT_MODE is correct and review any warnings/errors carefully as the results may be unreliable.\"
+  },
+  {
     \"id\": \"100\",
     \"cause\": \"The hitt.conf file exists but is missing some required values.\",
     \"impact\": \"The HITT script cannot run with an incomplete configuration.\",
@@ -2694,7 +2704,7 @@ ALL_MSGS_JSON="[
     \"id\": \"140\",
     \"cause\": \"The CUSTOMER_SERVICE and/or ENVIRONMENT values in the HELIX_ONPREM_DEPLOYMENT pipeline do not match those set in the hitt.conf file.\",
     \"impact\": \"Some HITT checks may be invalid or fail.\",
-    \"remediation\": \"Set the correct values in the HELIX_ONPREM_DEPLOYMENT pipeline or update the hitt.conf file.\"
+    \"remediation\": \"Set the correct values in the HELIX_ONPREM_DEPLOYMENT pipeline, or update the hitt.conf file, and rerun HITT.\"
   },
   {
     \"id\": \"141\",
