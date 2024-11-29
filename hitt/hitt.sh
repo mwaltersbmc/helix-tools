@@ -2213,7 +2213,9 @@ dumpVARs
 if [ "${MODE}" != "post-hp" ]; then
   saveAllPipelineConsoleOutput
 fi
-${ZIP_BIN} -q - *.log > hittlogs.zip
+[ -f "${HITT_LOG_FILE}" ] && cat "${HITT_LOG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hitt.txt
+[ -f "${HITT_MSG_FILE}" ] && cat "${HITT_MSG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hittmsgs.txt
+${ZIP_BIN} -q - *.log hitt*.txt > hittlogs.zip
 }
 
 # Set vars and process command line
