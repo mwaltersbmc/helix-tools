@@ -1691,6 +1691,8 @@ dumpVARs() {
   rm -f "${VALUES_LOG_FILE}"
   # Debug mode to print all variables
   if [ "${MODE}" == "pre-is" ]; then
+    echo "CUSTOMER_SERVICE=${ISP_CUSTOMER_SERVICE}" >> "${VALUES_LOG_FILE}"
+    echo "ENVIRONMENT=${ISP_ENVIRONMENT}" >> "${VALUES_LOG_FILE}"
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
