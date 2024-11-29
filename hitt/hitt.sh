@@ -247,7 +247,7 @@ checkPodStatus() {
      logError "102" "One or more pods in namespace ${1} found in a non-ready state."
      ${KUBECTL_BIN} -n "${1}" get pods -o custom-columns="POD:metadata.name,STATE:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>"
   else
-    logMessage "No unheathly pods found in ${1} namespace."
+    logMessage "No unhealthy pods found in ${1} namespace."
   fi
 }
 
@@ -550,7 +550,7 @@ validateRealm() {
   # Parse realm data
   REALM_ARHOST=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arHost)
   if [ "${REALM_ARHOST}" != "platform-user-ext.${IS_NAMESPACE}" ]; then
-    logError "118" "Invalid arHost vaslue in realm - expected platform-user-ext.${IS_NAMESPACE} but found ${REALM_ARHOST}."
+    logError "118" "Invalid arHost value in realm - expected platform-user-ext.${IS_NAMESPACE} but found ${REALM_ARHOST}."
   else
     logMessage "AR host ${REALM_ARHOST} is the expected value."
   fi
@@ -1929,7 +1929,7 @@ validateJenkinsCredentials() {
     logMessage "Expected credentials found in Jenkins."
   fi
 
-  if echo "${MISSING_CREDS}" | grep -vq kubecconfig ; then
+  if echo "${MISSING_CREDS}" | grep -vq kubeconfig ; then
     validateJenkinsKubeconfig
   fi
 }
@@ -2310,7 +2310,7 @@ ALL_MSGS_JSON="[
     \"id\": \"006\",
     \"cause\": \"The last build of the HELIX_ONPREM_DEPLOYMENT pipeline, or one of the deployment pipelines it runs, was not successful.\",
     \"impact\": \"The problematic pipeline may not have completed all the stages necessary to deploy the Helix Service Management products.\",
-    \"remediation\": \"Review the pipeline console output in Jenkins, or the log files in the HITT directory, to try and identify the cause. Other HITT errors are likley to help with this.\"
+    \"remediation\": \"Review the pipeline console output in Jenkins, or the log files in the HITT directory, to try and identify the cause. Other HITT errors are likely to help with this.\"
   },
   {
     \"id\": \"007\",
@@ -2376,7 +2376,7 @@ ALL_MSGS_JSON="[
     \"id\": \"017\",
     \"cause\": \"The cacerts Java keystore file was not attached to the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline. Most customers are expected to attach this file.\",
     \"impact\": \"If custom CA signed certificates are in use the deployment will fail.\",
-    \"remediation\": \"Attach the cacerts with your custom CA certificate chain added using the CACERTS_FILE option in Jenkins. This may not be necessary if using certificates puchased direct from Digicert.\"
+    \"remediation\": \"Attach the cacerts with your custom CA certificate chain added using the CACERTS_FILE option in Jenkins. This may not be necessary if using certificates purchased direct from Digicert.\"
   },
   {
     \"id\": \"018\",
@@ -2428,9 +2428,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"026\",
-    \"cause\": \"The platform-admim-ext service is not one of the expected types of ClusterIP or NodePort.\",
+    \"cause\": \"The platform-admin-ext service is not one of the expected types of ClusterIP or NodePort.\",
     \"impact\": \"Connectivity via the service for AR API clients such as Developer Studio may not be possible and upgrades may fail.\",
-    \"remediation\": \"Review the platform-admim-ext service configuration in the cluster and revert any customisations.\"
+    \"remediation\": \"Review the platform-admin-ext service configuration in the cluster and revert any customisations.\"
   },
   {
     \"id\": \"027\",
@@ -2442,7 +2442,7 @@ ALL_MSGS_JSON="[
     \"id\": \"028\",
     \"cause\": \"A command to extract and save the kubeconfig file from the Jenkins kubeconfig credential failed to return the expected result.\",
     \"impact\": \"A check to confirm that it is a valid kubeconfig file for the cluster will not be run.\",
-    \"remediation\": \"Confirm the kubconfig credential exists and has a valid file attached.\"
+    \"remediation\": \"Confirm the kubeconfig credential exists and has a valid file attached.\"
   },
   {
     \"id\": \"029\",
@@ -3024,7 +3024,7 @@ ALL_MSGS_JSON="[
     \"id\": \"195\",
     \"cause\": \"The named plugin is required but missing from Jenkins.\",
     \"impact\": \"Helix Service Management deployment may fail.\",
-    \"rmediation\": \"In Jenkins go to Manage Jenkins -> Plugins -> Available Plugins and install the missing plugin.\"
+    \"remediation\": \"In Jenkins go to Manage Jenkins -> Plugins -> Available Plugins and install the missing plugin.\"
   },
   {
     \"id\": \"196\",
