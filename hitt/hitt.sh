@@ -285,7 +285,7 @@ getVersions() {
         IS_DB_VERSION=202
         ;;
       *)
-        logError "109" "Unknown Helix IS version (${IS_VERSION}) - check https://bit.ly/gethitt for HITT updates." 1
+        logError "109" "Unknown Helix IS version (${IS_VERSION}) - please check https://bit.ly/gethitt for HITT updates." 1
     esac
   fi
 }
@@ -1822,8 +1822,10 @@ checkForNewHITT() {
     REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
     LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
     if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
-    logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt${NORMAL}"
-    sleep 3
+      logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -sL https://bit.ly/hitt-sh -o hitt.sh${NORMAL}"
+      echo
+      read -rsn1 -p"Press any key to continue or Ctrl+C to cancel..."
+      echo
     fi
   fi
 }
