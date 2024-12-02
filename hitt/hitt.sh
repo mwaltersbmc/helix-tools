@@ -798,6 +798,10 @@ createPipelineVarsArray() {
     HELIX_BWF
     HELIX_DWP
     HELIX_DWPA
+    HELIX_MCSM
+    HELIX_CLOUD_ACTIONS
+    HELIX_SMARTAPPS_CSM
+    HELIX_SMARTAPPS_FAS
     SIDECAR_SUPPORT_ASSISTANT_FPACK
     SUPPORT_ASSISTANT_CREATE_ROLE
     SUPPORT_ASSISTANT_TOOL
@@ -1087,6 +1091,30 @@ validateISDetails() {
       fi
     fi
 
+    if [ -n "${IS_HELIX_CLOUD_ACTIONS}" ]; then
+      if [ "${IS_HELIX_CLOUD_ACTIONS}" == "true" ] && [ "${IS_HELIX_DWPA}" != "true" ]; then
+        logError "104" "HELIX_CLOUD_ACTIONS is selected but this option requires HELIX_DWPA, which is not selected."
+      fi
+    fi
+
+    if [ -n "${IS_HELIX_MCSM}" ]; then
+      if [ "${IS_HELIX_MCSM}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
+        logError "104" "HELIX_MCSM is selected but this option requires HELIX_BWF, which is not selected."
+      fi
+    fi
+
+    if [ -n "${IS_HELIX_SMARTAPPS_CSM}" ]; then
+      if [ "${IS_HELIX_SMARTAPPS_CSM}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
+        logError "104" "HELIX_SMARTAPPS_CSM is selected but this option requires HELIX_BWF, which is not selected."
+      fi
+    fi
+
+    if [ -n "${IS_HELIX_SMARTAPPS_FAS}" ]; then
+      if [ "${IS_HELIX_SMARTAPPS_FAS}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
+        logError "104" "HELIX_SMARTAPPS_FAS is selected but this option requires HELIX_BWF, which is not selected."
+      fi
+    fi
+
     if [ "${ITSM_INSIGHTS}" == "1" ]; then
       if  [ "${IS_HELIX_ITSM_INSIGHTS}" == "true" ] ; then
         logWarning "012" "HELIX_ITSM_INSIGHTS is selected but ITSM Insights is not installed in the Helix Platform."
@@ -1136,7 +1164,7 @@ validateISDetails() {
       if [ "${IS_DB_TYPE}" != "mssql" ]; then
         logWarning "031" "IS_DATABASE_ALWAYS_ON is selected but this option is only valid for MSSQL databases and will be ignored."
       else
-        logWarning "032" "IS_DATABASE_ALWAYS_ON is selected, please make sure you are using an MSSQL AlwaysOn database cluster."
+        logWarning "032" "IS_DATABASE_ALWAYS_ON is selected, please make sure you are using an MSSQL AlwaysOn database cluster and that the other DB details are set correctly."
       fi
     fi
 
@@ -2483,7 +2511,7 @@ ALL_MSGS_JSON="[
     \"id\": \"032\",
     \"cause\": \"When the IS_DATABASE_ALWAYS_ON option is selected you must be using an MSSQL AlwaysOn database system.\",
     \"impact\": \"If the database is not an MSSQL AlwaysOn system then deployment will fail.\",
-    \"remediation\": \"Confirm the IS database is an MSSQL AlwaysOn system and, if it is not, deselect the option.\"
+    \"remediation\": \"Confirm the IS database is an MSSQL AlwaysOn system and that the other DB options refer to the AlwaysOn listener.\"
   },
   {
     \"id\": \"100\",
@@ -2511,9 +2539,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"104\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"The product option named in the error message has been selected but it depends on another product which has not been selected.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Review the product documentation and make sure that all dependent options are also selected.\"
   },
   {
     \"id\": \"105\",
