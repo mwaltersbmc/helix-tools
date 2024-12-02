@@ -1132,6 +1132,14 @@ validateISDetails() {
         logError "149" "DB_SSL_ENABLED should not be selected."
     fi
 
+    if [ "${IS_IS_DATABASE_ALWAYS_ON}" == "true" ]; then
+      if [ "${IS_DB_TYPE}" != "mssql" ]; then
+        logWarning "031" "IS_DATABASE_ALWAYS_ON is selected but this option is only valid for MSSQL databases and will be ignored."
+      else
+        logWarning "032" "IS_DATABASE_ALWAYS_ON is selected, please make sure you are using an MSSQL AlwaysOn database cluster."
+      fi
+    fi
+
     if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ]; then
       if [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "true" ]; then
         if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
@@ -2463,7 +2471,19 @@ ALL_MSGS_JSON="[
     \"id\": \"030\",
     \"cause\": \"HITT 'pre-is' mode is used to validate the environment and HELIX_ONPREM_DEPLOYMENT pipeline values before deployment but the DEPLOYMENT_MODE is not the expected value of 'FRESH'.\",
     \"impact\": \"HITT checks may return incorrect results.\",
-    \"remediation\": \"Conmfirm the DEPLOYMENT_MODE is correct and review any warnings/errors carefully as the results may be unreliable.\"
+    \"remediation\": \"Confirm the DEPLOYMENT_MODE is correct and review any warnings/errors carefully as the results may be unreliable.\"
+  },
+  {
+    \"id\": \"031\",
+    \"cause\": \"The IS_DATABASE_ALWAYS_ON option is only applicable when the DB_TYPE is 'mssql'.  It has no effect for other database types.\",
+    \"impact\": \"The setting will be ignored.\",
+    \"remediation\": \"Deselect the IS_DATABASE_ALWAYS_ON option.\"
+  },
+  {
+    \"id\": \"032\",
+    \"cause\": \"When the IS_DATABASE_ALWAYS_ON option is selected you must be using an MSSQL AlwaysOn database system.\",
+    \"impact\": \"If the database is not an MSSQL AlwaysOn system then deployment will fail.\",
+    \"remediation\": \"Confirm the IS database is an MSSQL AlwaysOn system and, if it is not, deselect the option.\"
   },
   {
     \"id\": \"100\",
