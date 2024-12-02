@@ -110,7 +110,7 @@ checkVars() {
 checkRequiredTools() {
   for i in "${REQUIRED_TOOLS[@]}"; do
     BINARY="${i^^}_BIN"
-    checkBinary "${!BINARY}"
+    checkBinary "${!BINARY}" "${i}"
   done
   if [ $FAIL -gt 0 ] ; then
     exit 1
@@ -161,7 +161,7 @@ checkBinary() {
     logError "105" "${1} command not found in path. Please set ${BINARY} variable with the full path to the file."
   else
     logMessage "${1} command found ($(which ${1}))."
-    checkToolVersion "${1}"
+    checkToolVersion "${2}"
   fi
 }
 
@@ -814,6 +814,7 @@ createPipelineVarsArray() {
     DATABASE_ADMIN_USER
     ORACLE_SERVICE_NAME
     DATABASE_RESTORE
+    IS_DATABASE_ALWAYS_ON
     LOGS_ELASTICSEARCH_HOSTNAME
     LOGS_ELASTICSEARCH_TLS
     AR_DB_NAME
