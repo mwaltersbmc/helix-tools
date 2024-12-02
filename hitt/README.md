@@ -29,7 +29,7 @@ HITT is configured by a file called **hitt.conf** which is created the first tim
 
 ```
 # First run to configure HITT
-$ bash -m hitt.sh
+$ bash hitt.sh
 ```
 The hitt.conf file:
 
