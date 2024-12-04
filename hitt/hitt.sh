@@ -1948,7 +1948,8 @@ getJenkinsCredentials() {
         [
             id: cred.id,
             description: cred.description,
-            type: cred.getClass().getSimpleName()
+            type: cred.getClass().getSimpleName(),
+            scope: cred.getScope()
         ]
     }
     def jsonOutput = JsonOutput.toJson(credentialsList)
@@ -1964,6 +1965,11 @@ validateJenkinsCredentials() {
     ID=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").id')
     if [ "${ID}" != "${i}" ]; then
       MISSING_CREDS+=" '${i}'"
+    else
+      SCOPE=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").scope')
+      if [ "${SCOPE}" != "GLOBAL" ]; then
+        logError "121" "The scope setting for the Jenkins credentials object '${ID}' is '${SCOPE}' but it should be 'GLOBAL'."
+      fi
     fi
   done
   if [ "${MISSING_CREDS}" != "" ]; then
@@ -2641,9 +2647,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"121\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"Jenkins credentials objects have a scope setting which should be set to 'GLOBAL' but this object has a different value.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins browse to Manage Jenkins -> Credentials, select the object named in the error message -> Update, and change the Scope to 'Global' via the drop down menu.\"
   },
   {
     \"id\": \"122\",
