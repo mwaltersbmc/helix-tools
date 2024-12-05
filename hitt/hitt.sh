@@ -1940,7 +1940,6 @@ validateJenkinsKubeconfig() {
   fi
 }
 
-
 getJenkinsGlobalLibs() {
   JLIBS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE}
     import groovy.json.JsonOutput
@@ -1975,27 +1974,27 @@ checkJenkinsGlobalLibs() {
       LIB_TYPE=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").retrieverType')
       LIB_IMPLICIT=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").implicit')
       if [ "${LIB_VERSION}" != "master" ]; then
-        logError "xxx" "The scope setting for the Jenkins credentials object '${ID}' is '${SCOPE}' but it should be 'GLOBAL'."
+        logError "150" "The 'Default version' of the '${LIB_NAME}' library is not the expected value of 'master'."
       fi
       if [ "${LIB_TYPE}" != "SCMSourceRetriever" ]; then
-        logError "xxx" "The scope setting for the Jenkins credentials object '${ID}' is '${SCOPE}' but it should be 'GLOBAL'."
+        logError "179" "The 'Retrieval method' of the '${LIB_NAME}' library is not the expected value 'Modern SCM'."
       fi
       case "${LIB_NAME}" in
         pipeline-framework)
           if [ "${LIB_IMPLICIT}" != "false" ]; then
-            logError "xxx" "The 'Load implicity' option for the global pipeline library '${LIB_NAME}' should not be selected."
+            logError "171" "The 'Load implicity' option of the '${LIB_NAME}' library should not be selected."
           fi
           ;;
         JENKINS-27413-workaround-library)
           if [ "${LIB_IMPLICIT}" != "true" ]; then
-            logError "xxx" "The 'Load implicity' option for the global pipeline library '${LIB_NAME}' should be selected."
+            logError "171" "The 'Load implicity' option of the '${LIB_NAME}' library should be selected."
           fi
           ;;
         esac
     fi
   done
   if [ "${MISSING_LIBS}" != "" ]; then
-    logError "xxx" "One or more Jenkins global pipeline libraries not found -${MISSING_LIBS}"
+    logError "183" "One or more Jenkins global pipeline libraries not found -${MISSING_LIBS}"
   else
     logMessage "Expected global pipeline libraries found in Jenkins."
   fi
@@ -2888,9 +2887,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"150\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"The named global pipeline library should have a 'Default version' of 'master' but it is set to something else.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins browse to Manage Jenkins -> System, find the pipeline library and change the 'Default version' to 'master'.\"
   },
   {
     \"id\": \"151\",
@@ -3014,9 +3013,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"171\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"The Jenkins global pipeline library configuration named in the message does not have the correct value for the 'Load implicitly' option.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins browse to Manage Jenkins -> System, find the pipeline library and set the 'Load implicitly' option as detailed in the message.\"
   },
   {
     \"id\": \"172\",
@@ -3062,9 +3061,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"179\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"The Jenkins global pipeline library configuration named in the message does not have the correct value for the 'Retrieval method' option.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins browse to Manage Jenkins -> System, find the pipeline library and set the 'Retrieval method' to 'Modern SCM'.\"
   },
   {
     \"id\": \"180\",
