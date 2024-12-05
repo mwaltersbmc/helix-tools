@@ -751,10 +751,9 @@ saveAllPipelineConsoleOutput() {
 }
 
 getISDetailsFromJenkins() {
-  [[ "${MODE}" != "pre-is" ]] && return
-  checkJenkinsIsRunning
-  [[ "${SKIP_JENKINS}" == "1" ]] && return
-  checkJenkinsConfig
+  if [ "${MODE}" != "pre-is" ] || [ "${SKIP_JENKINS}" == "1" ]; then
+    return
+  fi
   logMessage "Downloading jenkins-cli.jar from Jenkins..."
   downloadJenkinsCLIJar
   checkJenkinsCLIJavaVersion
@@ -1747,10 +1746,15 @@ dumpVARs() {
 }
 
 checkJenkinsConfig() {
-  logMessage "Checking expected plugins exist in Jenkins..."
+  [[ "${SKIP_JENKINS}" == 1 ]] && return
+  logMessage "Checking plugins..."
   checkJenkinsPlugins
-  logMessage "Checking nodes in Jenkins..."
+  logMessage "Checking nodes..."
   checkJenkinsNodes
+  logMessage "Checking global pipeline libraries..."
+  checkJenkinsGlobalLibs
+  logMessage "Checking credentials..."
+  validateJenkinsCredentials
 }
 
 checkJenkinsNodes() {
@@ -1933,6 +1937,67 @@ validateJenkinsKubeconfig() {
     logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
   else
     logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file."
+  fi
+}
+
+
+getJenkinsGlobalLibs() {
+  JLIBS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE}
+    import groovy.json.JsonOutput
+    import jenkins.model.Jenkins
+    import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
+    def jenkins = Jenkins.get()
+    def globalLibraries = GlobalLibraries.get()
+    def libraryDetails = globalLibraries.libraries.collect { lib ->
+        return [
+            name       : lib.name,
+            defaultVersion: lib.defaultVersion,
+            retrieverType : lib.retriever?.class?.simpleName,
+            implicit   : lib.implicit
+        ]
+    }
+    def jsonOutput = JsonOutput.toJson(libraryDetails)
+    println(JsonOutput.prettyPrint(jsonOutput))
+EOF
+)
+}
+
+checkJenkinsGlobalLibs() {
+  getJenkinsGlobalLibs
+  JENKINS_LIBS=(pipeline-framework JENKINS-27413-workaround-library)
+  MISSING_LIBS=""
+  for i in "${JENKINS_LIBS[@]}" ; do
+    LIB_NAME=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").name')
+    if [ "${LIB_NAME}" != "${i}" ]; then
+      MISSING_LIBS+=" '${i}'"
+    else
+      LIB_VERSION=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").defaultVersion')
+      LIB_TYPE=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").retrieverType')
+      LIB_IMPLICIT=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").implicit')
+      if [ "${LIB_VERSION}" != "master" ]; then
+        logError "xxx" "The scope setting for the Jenkins credentials object '${ID}' is '${SCOPE}' but it should be 'GLOBAL'."
+      fi
+      if [ "${LIB_TYPE}" != "SCMSourceRetriever" ]; then
+        logError "xxx" "The scope setting for the Jenkins credentials object '${ID}' is '${SCOPE}' but it should be 'GLOBAL'."
+      fi
+      case "${LIB_NAME}" in
+        pipeline-framework)
+          if [ "${LIB_IMPLICIT}" != "false" ]; then
+            logError "xxx" "The 'Load implicity' option for the global pipeline library '${LIB_NAME}' should not be selected."
+          fi
+          ;;
+        JENKINS-27413-workaround-library)
+          if [ "${LIB_IMPLICIT}" != "true" ]; then
+            logError "xxx" "The 'Load implicity' option for the global pipeline library '${LIB_NAME}' should be selected."
+          fi
+          ;;
+        esac
+    fi
+  done
+  if [ "${MISSING_LIBS}" != "" ]; then
+    logError "xxx" "One or more Jenkins global pipeline libraries not found -${MISSING_LIBS}"
+  else
+    logMessage "Expected global pipeline libraries found in Jenkins."
   fi
 }
 
@@ -2213,18 +2278,22 @@ checkFTSElasticStatus
 logStatus "Getting realm details from RSSO..."
 getRealmDetails
 checkTenantRealms
-logStatus "Validating realm..."
+logStatus "Checking realm..."
 validateRealm
 
 if [ "${MODE}" != "post-hp" ]; then
+  logStatus "Checking Jenkins is accessible..."
+  checkJenkinsIsRunning
+  logStatus "Checking Jenkins configuration..."
+  checkJenkinsConfig
   logStatus "Getting IS details..."
   getISDetailsFromK8s
   getISDetailsFromJenkins
-  logStatus "Validating IS details..."
+  logStatus "Checking IS details..."
   validateISDetails
   logStatus "Checking IS registry details..."
   checkISDockerLogin
-  logStatus "Validating IS cacerts..."
+  logStatus "Checking IS cacerts..."
   validateCacerts
 fi
 
@@ -2234,8 +2303,6 @@ if [ "${MODE}" == "pre-is" ]; then
 fi
 
 if [ "${SKIP_JENKINS}" == "0" ]; then
-  logStatus "Validating Jenkins credentials..."
-  validateJenkinsCredentials
   logStatus "Checking IS FTS Elastic settings..."
   checkFTSElasticSettings
   logStatus "Checking IS DB settings..."
