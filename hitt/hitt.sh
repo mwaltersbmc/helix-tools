@@ -279,7 +279,8 @@ getVersions() {
         IS_DB_VERSION=200
         ;;
       23)
-        IS_DB_VERSION=201
+        [[ "${IS_VERSION}" == "23.3.03" ]] && IS_DB_VERSION=201
+        [[ "${IS_VERSION}" == "23.3.04" ]] && IS_DB_VERSION=203
         ;;
       25)
         IS_DB_VERSION=202
