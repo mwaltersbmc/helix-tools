@@ -2002,22 +2002,33 @@ checkJenkinsGlobalLibs() {
 
 getJenkinsCredentials() {
   JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE}
-    import com.cloudbees.plugins.credentials.CredentialsProvider
-    import com.cloudbees.plugins.credentials.domains.Domain
-    import groovy.json.JsonOutput
-    def allCredentials = CredentialsProvider.lookupCredentials(
-        com.cloudbees.plugins.credentials.Credentials.class
-    )
-    def credentialsList = allCredentials.collect { cred ->
-        [
-            id: cred.id,
-            description: cred.description,
-            type: cred.getClass().getSimpleName(),
-            scope: cred.getScope()
-        ]
+    import jenkins.model.*
+    import com.cloudbees.plugins.credentials.*
+    import com.cloudbees.plugins.credentials.domains.*
+    def credentialsStore = Jenkins.instance.getExtensionList(
+        'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
+    ).first().getStore()
+    def credentialsList = []
+    credentialsStore.getDomains().each {
+        domain -> credentialsStore.getCredentials(domain).each {
+            credential -> if (credential instanceof com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials) {
+                credentialsList.add([
+                    id: credential.id,
+                    username: credential.username,
+                    type: credential.getClass().getSimpleName(),
+                    scope: credential.getScope(),
+                    password: credential.password.plainText
+                ])
+            } else {
+                credentialsList.add([
+                    id: credential.id,
+                    type: credential.getClass().getSimpleName(),
+                    scope: credential.getScope()
+                ])
+            }
+        }
     }
-    def jsonOutput = JsonOutput.toJson(credentialsList)
-    println JsonOutput.prettyPrint(jsonOutput)
+    println groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(credentialsList))
 EOF
 )
 }
@@ -2031,8 +2042,16 @@ validateJenkinsCredentials() {
       MISSING_CREDS+=" '${i}'"
     else
       SCOPE=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").scope')
+      CRED_TYPE=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").type')
       if [ "${SCOPE}" != "GLOBAL" ]; then
         logError "121" "The scope setting for the Jenkins credentials object '${ID}' is '${SCOPE}' but it should be 'GLOBAL'."
+      fi
+      if [ "${CRED_TYPE}" == "UsernamePasswordCredentialsImpl" ]; then
+        CRED_PWD=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").password')
+        CRED_USER=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").username')
+        if [ "${CRED_PWD}" == "" ]; then
+          logError "183" "The password for the '${ID}' credential is blank but should be set to the password of the user '${CRED_USER}'."
+        fi
       fi
     fi
   done
@@ -3085,9 +3104,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"183\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"The Jenkins credentials object named in the message has a blank password value when it should be set to the password of the named user.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and update the credential to add the muissing password.\"
   },
   {
     \"id\": \"184\",
