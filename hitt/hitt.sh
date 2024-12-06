@@ -294,6 +294,10 @@ setVarsFromPlatform() {
   FTS_ELASTIC_CERTNAME="esnode"
   EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
   LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helixingress-master -o jsonpath='{.spec.rules[0].host}')
+  TMS_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress tms-ingress -o jsonpath='{.spec.rules[0].host}')
+  MINIO_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio -o jsonpath='{.spec.rules[0].host}')
+  MINIO_API_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio-api -o jsonpath='{.spec.rules[0].host}')
+  KIBANA_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress efk-elasticsearch-kibana -o jsonpath='{.spec.rules[0].host}')
   LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
   FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
   LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
@@ -306,10 +310,12 @@ setVarsFromPlatform() {
   else
     IS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
   fi
-  if [ "${LB_HOST}" == "${IS_PREFIX}.${LB_HOST#*.}" ]; then
-    logError "110" "LB_HOST value '${LB_HOST}' conflicts with the derived MidTier alias '${IS_PREFIX}.${LB_HOST#*.}'."
-    #logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
-  fi
+  for i in LB_HOST TMS_LB_HOST MINIO_LB_HOST MINIO_API_LB_HOST KIBANA_LB_HOST; do
+    if [ "${!i}" == "${IS_PREFIX}.${LB_HOST#*.}" ]; then
+      logError "110" "${i} value '${!i}' conflicts with the derived MidTier alias '${IS_PREFIX}.${LB_HOST#*.}'."
+      #logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
+    fi
+  done
 
   if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
     FTS_ELASTIC_POD_CONTAINER="-c opensearch"
@@ -2666,9 +2672,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"110\",
-    \"cause\": \"The value of the LB_HOST setting in the Helix Platform is the same as the alias that will be used for the Helix Service Management MidTier.\",
+    \"cause\": \"The value of the named infra.config setting in the Helix Platform is the same as the alias that will be used for the Helix Service Management MidTier.\",
     \"impact\": \"Installation will complete but the MidTier will not be usable due to the conflict.\",
-    \"remediation\": \"Either redeploy the Helix Platform with a different LB_HOST or change one/both of the CUSTOMER_SERVICE and ENVIRONMENT values to make the MidTier alias different to the LB_HOST.\"
+    \"remediation\": \"Either redeploy the Helix Platform with a different value or change one/both of the CUSTOMER_SERVICE and ENVIRONMENT values to make the MidTier alias different to the LB_HOST.\"
   },
   {
     \"id\": \"111\",
