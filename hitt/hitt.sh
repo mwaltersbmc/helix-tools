@@ -1150,7 +1150,7 @@ validateISDetails() {
 #      logWarning "SUPPORT_ASSISTANT_TOOL not selected - Support Assistant Tool is recommended to provide access to application logs."
 #    fi
     if [ "${IS_SIDECAR_SUPPORT_ASSISTANT_FPACK}" != "true" ]; then
-      logWarning "014 ""SIDECAR_SUPPORT_ASSISTANT_FPACK not selected - Support Assistant Tool will not be able to access application logs."
+      logWarning "014" "SIDECAR_SUPPORT_ASSISTANT_FPACK not selected - Support Assistant Tool will not be able to access application logs."
     fi
     if [ "${IS_SUPPORT_ASSISTANT_CREATE_ROLE}" != "true" ]; then
       logWarning "015" "SUPPORT_ASSISTANT_CREATE_ROLE not selected - Support Assistant Tool will not be able to access application logs unless the role/rolebinding are created manually."
