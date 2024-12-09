@@ -736,6 +736,7 @@ checkJenkinsIsRunning() {
       logError "127" "Jenkins authentication is enabled but the credentials in hitt.conf are blank or wrong.  Please set correct credentials in the HITT config file (${HITT_CONFIG_FILE})." 1
       SKIP_JENKINS=1
     fi
+    getJenkinsCrumb
 fi
 }
 
@@ -761,9 +762,9 @@ getISDetailsFromJenkins() {
   if [ "${MODE}" != "pre-is" ] || [ "${SKIP_JENKINS}" == "1" ]; then
     return
   fi
-  logMessage "Downloading jenkins-cli.jar from Jenkins..."
-  downloadJenkinsCLIJar
-  checkJenkinsCLIJavaVersion
+  #logMessage "Downloading jenkins-cli.jar from Jenkins..."
+  #downloadJenkinsCLIJar
+  #checkJenkinsCLIJavaVersion
   logMessage "Reading values from Jenkins..."
   JENKINS_JSON=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
   checkJenkinsJobResult
@@ -873,10 +874,9 @@ downloadJenkinsCLIJar() {
 }
 
 getPipelinePasswords() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE} >&1
-    import jenkins.model.*
+  SCRIPT='import jenkins.model.*
     import hudson.model.*
-    def jobName = 'HELIX_ONPREM_DEPLOYMENT'
+    def jobName = "HELIX_ONPREM_DEPLOYMENT"
     def jenkins = Jenkins.instance
     def job = jenkins.getItemByFullName(jobName)
     def lastBuild = job.getLastBuild()
@@ -891,8 +891,9 @@ getPipelinePasswords() {
         }
     }
     def jsonOutput = new groovy.json.JsonBuilder(paramMap).toPrettyString()
-    println(jsonOutput)
-EOF
+    println(jsonOutput)'
+
+  runJenkinsCurl "${SCRIPT}"
 }
 
 getPipelineValues() {
@@ -1927,8 +1928,7 @@ createPipelineNamesArray() {
 }
 
 getKubeconfigFromJenkins() {
-  ${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE} > kubeconfig.jenkins
-    import com.cloudbees.plugins.credentials.*;
+  SCRIPT='import com.cloudbees.plugins.credentials.*;
     import com.cloudbees.plugins.credentials.domains.Domain;
     import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl;
     def idName = "kubeconfig"
@@ -1941,12 +1941,13 @@ getKubeconfigFromJenkins() {
         println ""
         println s
         println ""
-      }
-EOF
+      }'
+
+  runJenkinsCurl "${SCRIPT}"
 }
 
 validateJenkinsKubeconfig() {
-  getKubeconfigFromJenkins
+  getKubeconfigFromJenkins > kubeconfig.jenkins
   if [ ! -s ./kubeconfig.jenkins ]; then
     logWarning "028" "Failed to extract kubeconfig file from Jenkins - skipping validation."
     return
@@ -1959,8 +1960,7 @@ validateJenkinsKubeconfig() {
 }
 
 getJenkinsGlobalLibs() {
-  JLIBS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE}
-    import groovy.json.JsonOutput
+  SCRIPT='import groovy.json.JsonOutput
     import jenkins.model.Jenkins
     import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
     def jenkins = Jenkins.get()
@@ -1974,13 +1974,13 @@ getJenkinsGlobalLibs() {
         ]
     }
     def jsonOutput = JsonOutput.toJson(libraryDetails)
-    println(JsonOutput.prettyPrint(jsonOutput))
-EOF
-)
+    println(JsonOutput.prettyPrint(jsonOutput))'
+
+  runJenkinsCurl "${SCRIPT}"
 }
 
 checkJenkinsGlobalLibs() {
-  getJenkinsGlobalLibs
+  JLIBS_JSON=$(getJenkinsGlobalLibs)
   JENKINS_LIBS=(pipeline-framework JENKINS-27413-workaround-library)
   MISSING_LIBS=""
   for i in "${JENKINS_LIBS[@]}" ; do
@@ -2019,12 +2019,11 @@ checkJenkinsGlobalLibs() {
 }
 
 getJenkinsCredentials() {
-  JCREDS_JSON=$(${JAVA_BIN} -jar jenkins-cli.jar -noCertificateCheck -s "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}" groovy = << EOF 2>>${HITT_DBG_FILE}
-    import jenkins.model.*
+  SCRIPT='import jenkins.model.*
     import com.cloudbees.plugins.credentials.*
     import com.cloudbees.plugins.credentials.domains.*
     def credentialsStore = Jenkins.instance.getExtensionList(
-        'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
+        "com.cloudbees.plugins.credentials.SystemCredentialsProvider"
     ).first().getStore()
     def credentialsList = []
     credentialsStore.getDomains().each {
@@ -2046,13 +2045,13 @@ getJenkinsCredentials() {
             }
         }
     }
-    println groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(credentialsList))
-EOF
-)
+    println groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(credentialsList))'
+
+  runJenkinsCurl "${SCRIPT}"
 }
 
 validateJenkinsCredentials() {
-  getJenkinsCredentials
+  JCREDS_JSON=$(getJenkinsCredentials)
   MISSING_CREDS=""
   for i in "${JENKINS_CREDS[@]}" ; do
     ID=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").id')
@@ -2217,6 +2216,15 @@ checkDERequirements() {
       fi
     fi
   fi
+}
+
+getJenkinsCrumb() {
+  JENKINS_CRUMB=$(${CURL_BIN} -c .cookies -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/crumbIssuer/api/json" | ${JQ_BIN} -r .crumb )
+}
+
+runJenkinsCurl() {
+  #1 groovy script
+  ${CURL_BIN} -b .cookies --data-urlencode "script=${1}" -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_DBG_FILE}
 }
 
 # FUNCTIONS End
