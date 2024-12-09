@@ -914,6 +914,17 @@ getPipelineValues() {
   cloneCustomerConfigsRepo
 }
 
+checkPipelinePwds() {
+  if [ "${MODE}" != "pre-is" ]; then return; fi
+  PASSWDS_JSON=$(getPipelinePasswords | ${JQ_BIN} 'to_entries')
+  for i in $(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r '.[].key'); do
+    PASSWD=$(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r ".[] | select(.key==\"${i}\").value.plainText")
+    if echo "${PASSWD}" | grep -q '\$' ; then
+      logError "191" "The value of the pipeline parameter '${i}' contains a '$' character which will cause errors."
+    fi
+done
+}
+
 getInputFileValues() {
   # Replace ' with " in input file to allow parsing
   sed -i 's/'\''/"/g' "${INPUT_CONFIG_FILE}"
@@ -2316,6 +2327,7 @@ if [ "${MODE}" != "post-hp" ]; then
   getISDetailsFromJenkins
   logStatus "Checking IS details..."
   validateISDetails
+  checkPipelinePwds
   logStatus "Checking IS registry details..."
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
@@ -3159,9 +3171,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"191\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"The Jenkins pipeline parameter named in the message includes a dollar symbol which will lead to parsing errors.\",
+    \"impact\": \"Helix Service Management deployment will fail.\",
+    \"remediation\": \"Update the value of the named parameter and remove the dollar symbol.\"
   },
   {
     \"id\": \"192\",
