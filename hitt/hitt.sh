@@ -834,6 +834,10 @@ createPipelineVarsArray() {
     FTS_ELASTICSEARCH_HOSTNAME
     FTS_ELASTICSEARCH_PORT
     FTS_ELASTICSEARCH_SECURE
+    SMARTREPORTING_DB_NAME
+    SMARTREPORTING_DB_USER
+    PLATFORM_SR_DB_JDBC_URL
+    PLATFORM_SR_DB_USER
     VC_RKM_USER_NAME
     VC_PROXY_USER_LOGIN_NAME
     DWP_CONFIG_PRIMARY_ORG_NAME
@@ -861,6 +865,8 @@ createInputFileVarsArray() {
     AR_SERVER_MIDTIER_SERVICE_PASSWORD
     BAKEDUSER_HANNAH_ADMIN_PASSWORD
     DB_ADMIN_PASSWORD
+    SMARTREPORTING_DB_PASSWORD
+    PLATFORM_SR_DB_PASSWORD
     RSSO_ADMIN_PASSWORD
     PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USER_PASSWORD
     PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USERNAME
@@ -1537,6 +1543,7 @@ fi
 checkISDBSettings() {
   if ! testNetConnection "${IS_DATABASE_HOST_NAME}" "${IS_DB_PORT}"; then
     logWarning "027" "IS DB server (${IS_DATABASE_HOST_NAME}) is not reachable on port ${IS_DB_PORT} - skipping DB checks."
+    SKIP_SR_DB_CHECKS=1
     return
   else
     logMessage "IS DB server (${IS_DATABASE_HOST_NAME}) is reachable on port ${IS_DB_PORT}."
@@ -1591,6 +1598,11 @@ checkISDBSettings() {
     logMessage "DB jar files not found - skipping checks.  Download dbjars.tgz to the HITT directory to enable them..."
   fi
 }
+
+checkSRDBSettings() {
+  echo TODO
+}
+
 
 isIPAddress() {
   if [[ "${1}" =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then
@@ -2108,7 +2120,13 @@ esac
 getPods() {
   # ns name
   logMessage "Getting pods from ${1}..."
-  ${KUBECTL_BIN} -n ${1} get pods -o wide > k8s_get_pods_${1}.log
+  ${KUBECTL_BIN} -n ${1} get pods -o wide > k8s-get-pods-${1}.log
+}
+
+getEvents() {
+  # ns name
+  logMessage "Getting events from ${1}..."
+  ${KUBECTL_BIN} -n ${1} events --sort-by='.lastTimestamp' 2>/dev/null > k8s-events-${1}.log
 }
 
 getMessageJSON() {
@@ -2299,9 +2317,11 @@ if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
 fi
 checkHPNamespace "${HP_NAMESPACE}"
 getPods ${HP_NAMESPACE}
+getEvents ${HP_NAMESPACE}
 if [ "${MODE}" != "post-hp" ]; then
   checkISNamespace "${IS_NAMESPACE}"
   getPods ${IS_NAMESPACE}
+  getEvents ${IS_NAMESPACE}
 fi
 logStatus "Getting versions..."
 getVersions
@@ -2372,7 +2392,7 @@ if [ "${MODE}" != "post-hp" ]; then
 fi
 [ -f "${HITT_LOG_FILE}" ] && cat "${HITT_LOG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hitt.txt
 [ -f "${HITT_MSG_FILE}" ] && cat "${HITT_MSG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hittmsgs.txt
-${ZIP_BIN} -q - *.log hitt*.txt > hittlogs.zip
+${ZIP_BIN} -q - *.log hitt*.txt k8s*.txt > hittlogs.zip
 }
 
 # Set vars and process command line
