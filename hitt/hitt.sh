@@ -788,6 +788,7 @@ parseJenkinsParam() {
 
 createPipelineVarsArray() {
   PIPELINE_VARS=(
+    CHECKOUT_USING_USER
     CUSTOM_BINARY_PATH
     IS_CLOUD
     ROUTE_ENABLED
@@ -1031,6 +1032,9 @@ validateISDetails() {
   if [ "${MODE}" == "pre-is" ]; then
     logMessage "ITSM pipeline version is ${IS_PLATFORM_HELM_VERSION}."
     logMessage "CUSTOMER_SIZE is ${IS_CUSTOMER_SIZE}."
+    if [ "${IS_CHECKOUT_USING_USER}" == "" ]; then
+      logError "" "CHECKOUT_USING_USER is blank but should be the Jenkins credentials ID used to access the git repository files.  Default is 'github'."
+    fi
     if [ "${IS_DEPLOYMENT_MODE}" != "FRESH" ]; then
       logWarning "030" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' and not the expected value of 'FRESH'."
     else
@@ -3317,6 +3321,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The ansible configuration file should have been updated by the Deployment Engine setup script but it is missing, or does not contain the expected settings.\",
     \"impact\": \"Helix Service Management deployment may fail.\",
     \"remediation\": \"Verify that the setup script ran as expected or contact BMC Support for further details.\"
+  },
+  {
+    \"id\": \"211\",
+    \"cause\": \"This values should be the ID of a Jenkins credentials object containing the OS user/password used by the pipeline to access the git repository files.\",
+    \"impact\": \"The HELIX_ONPREM_DEPLOYMENT pipeline will fail.\",
+    \"remediation\": \"Set the value to the correct credentials ID - usually 'github'.\"
   }
 ]"
 
