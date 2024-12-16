@@ -1212,6 +1212,10 @@ validateISDetails() {
       fi
     fi
 
+    if [ "${#IS_SMARTREPORTING_DB_PASSWORD}" -gt 28 ]; then
+      logError "212" "SMARTREPORTING_DB_PASSWORD is too long - maximum of 28 characters."
+    fi
+
     if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ] && [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
       logMessage "Case sensitive database will be restored."
     fi
@@ -3327,6 +3331,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"This values should be the ID of a Jenkins credentials object containing the OS user/password used by the pipeline to access the git repository files.\",
     \"impact\": \"The HELIX_ONPREM_DEPLOYMENT pipeline will fail.\",
     \"remediation\": \"Set the value to the correct credentials ID - usually 'github'.\"
+  },
+  {
+    \"id\": \"212\",
+    \"cause\": \"The SMARTREPORTING_DB_PASSWORD value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long, it must be 28 characters or less.\",
+    \"impact\": \"The HELIX_SMARTREPORTING_DEPLOY pipeline will fail.\",
+    \"remediation\": \"Change the SMARTREPORTING_DB_PASSWORD to one that is 28 characters or less.\"
   }
 ]"
 
