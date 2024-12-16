@@ -1973,7 +1973,7 @@ validateJenkinsKubeconfig() {
     logWarning "028" "Failed to extract kubeconfig file from Jenkins - skipping validation."
     return
   fi
-  if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>&1; then
+  if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>>${HITT_DBG_FILE}; then
     logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
   else
     logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file."
