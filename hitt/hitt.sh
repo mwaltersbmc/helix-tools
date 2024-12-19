@@ -802,6 +802,7 @@ createPipelineVarsArray() {
     DEPLOYMENT_MODE
     CUSTOMER_SIZE
     HELM_NODE
+    SOURCE_VERSION
     PLATFORM_HELM_VERSION
     HELIX_ITSM_INSIGHTS
     HELIX_BWF
@@ -1035,14 +1036,25 @@ validateISDetails() {
   if [ "${MODE}" == "pre-is" ]; then
     logMessage "ITSM pipeline version is ${IS_PLATFORM_HELM_VERSION}."
     logMessage "CUSTOMER_SIZE is ${IS_CUSTOMER_SIZE}."
+    logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
     if [ "${IS_CHECKOUT_USING_USER}" == "" ]; then
       logError "" "CHECKOUT_USING_USER is blank but should be the Jenkins credentials ID used to access the git repository files.  Default is 'github'."
     fi
-    if [ "${IS_DEPLOYMENT_MODE}" != "FRESH" ]; then
-      logWarning "030" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' and not the expected value of 'FRESH'."
-    else
-      logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
+
+    if [ "${IS_DEPLOYMENT_MODE}" == "UPGRADE" ] || [ "${IS_DEPLOYMENT_MODE}" == "UPDATE" ]; then
+      CURRENT_VER=$(echo "${IS_SOURCE_VERSION}" | tr -d .)
+      TARGET_VER=$(echo "${IS_PLATFORM_HELM_VERSION}" | tr -d .)
+      if [ "${CURRENT_VER}" -ge "${TARGET_VER}" ]; then
+        logError "213" "SOURCE_VERSION is greater than or equal to the PLATFORM_HELM_VERSION but the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
+      fi
+      if [ "${CURRENT_VER:0:5}" -eq "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPDATE" ]; then
+        logError "213" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' but should be 'UPDATE' as the source and target have the same major versions."
+      fi
+      if [ "${CURRENT_VER:0:5}" -ne "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPGRADE" ]; then
+        logError "213" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' but should be 'UPGRADE' as the source and target have different major versions."
+      fi
     fi
+
     if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
       logWarning "008" "CUSTOM_BINARY_PATH option is selected - this is not usually required and may be a mistake."
     fi
@@ -3358,6 +3370,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The SMARTREPORTING_DB_PASSWORD value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long, it must be 28 characters or less.\",
     \"impact\": \"The HELIX_SMARTREPORTING_DEPLOY pipeline will fail.\",
     \"remediation\": \"Change the SMARTREPORTING_DB_PASSWORD to one that is 28 characters or less.\"
+  },
+  {
+    \"id\": \"213\",
+    \"cause\": \"The DEPLOYMENT_MODE is UPGRADE or UPDATE but the SOURCE_VERSION or PLATFORM_HELM_VERSION are invalid for the chosen mode.\",
+    \"impact\": \"The UPGRADE/UPDATE will fail.\",
+    \"remediation\": \"Review the product documentation and verify the DEPLOYMENT_MODE, SOURCE_VERSION and PLATFORM_HELM_VERSION values.\"
   }
 ]"
 
