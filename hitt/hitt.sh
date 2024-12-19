@@ -1468,6 +1468,19 @@ checkFTSElasticSettings() {
 }
 
 checkISLicenseStatus() {
+  if ! IS_INT_ROLE=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get svc platform-int -o jsonpath='{.spec.selector.role}' 2>/dev/null); then
+    logMessage "IS platform pods not found - skipping license check."
+    return
+  fi
+  if ! IS_RESTAPI_POD_STATUS=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod "platform-${IS_INT_ROLE}-0" -o jsonpath='{.status.containerStatuses[?(@.name=="platform")].ready}'); then
+    logMessage "IS platform-${IS_INT_ROLE}-0 pod not found - skipping license check."
+    return
+  fi
+  if [ "${IS_RESTAPI_POD_STATUS}" == "false" ]; then
+    logMessage "IS platform-${IS_INT_ROLE}-0 pod not ready - skipping license check."
+    return
+  fi
+  logMessage "Checking IS license status..."
   getISAdminCreds
   if ! getISJWT; then
     logError "176" "Failed to authenticate user ${IS_ADMIN_USER} - can't check IS license status."
@@ -2372,6 +2385,7 @@ if [ "${MODE}" != "post-hp" ]; then
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
   validateCacerts
+  checkISLicenseStatus
 fi
 
 if [ "${MODE}" == "pre-is" ]; then
@@ -2389,8 +2403,6 @@ fi
 if [ "${MODE}" == "post-is" ]; then
   logStatus "Checking Helix IS platform-admin-ext service..."
   checkPlatformAdminExtSvc
-  logStatus "Checking IS license status..."
-  checkISLicenseStatus
   logStatus "Checking Support Assistant Tool..."
   checkAssistTool
 fi
