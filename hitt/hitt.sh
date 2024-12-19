@@ -1023,8 +1023,11 @@ validateISDetails() {
   fi
 
   if [ "${IS_PLATFORM_INT}" == "1" ] ; then
-    if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "false" ]; then
+    if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "false" ] && [ "${IS_VERSION}" -lt 2023303 ]; then
       logWarning "007" "platform-int pods are enabled but ENABLE_PLATFORM_INT_NORMALIZATION is not selected."
+    fi
+    if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "true" ] && [ "${IS_VERSION}" -ge 2023303 ]; then
+      logWarning "033" "ENABLE_PLATFORM_INT_NORMALIZATION is selected but will be ignored."
     fi
   fi
 
@@ -2659,6 +2662,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"When the IS_DATABASE_ALWAYS_ON option is selected you must be using an MSSQL AlwaysOn database system.\",
     \"impact\": \"If the database is not an MSSQL AlwaysOn system then deployment will fail.\",
     \"remediation\": \"Confirm the IS database is an MSSQL AlwaysOn system and that the other DB options refer to the AlwaysOn listener.\"
+  },
+  {
+    \"id\": \"033\",
+    \"cause\": \"The ENABLE_PLATFORM_INT_NORMALIZATION option is ignored from 23.3.03 onwards as there is a dedicated normalization engine pod.\",
+    \"impact\": \"The selected option has no effect.\",
+    \"remediation\": \"The selected option has no effect.\"
   },
   {
     \"id\": \"100\",
