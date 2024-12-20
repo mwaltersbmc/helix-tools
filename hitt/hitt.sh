@@ -321,14 +321,47 @@ setVarsFromPlatform() {
   if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
     FTS_ELASTIC_POD_CONTAINER="-c opensearch"
   fi
-#  case "${HP_VERSION%%.*}" in
-#    22 | 23)
-#      FTS_ELASTIC_POD=elasticsearch-logs-opendistro-es-data-0
-#      ;;
-#    *)
-#      FTS_ELASTIC_POD=opensearch-logs-data-0
-#      ;;
-#  esac
+
+  case "${HP_VERSION}" in
+    22.2.01)
+      TCTL_VER=110
+      ADE_INFRA_CLIENT_IMAGE_TAG=22201-1-v4-ade-infra-clients-1
+      ;;
+    22.4)
+      TCTL_VER=230
+      ADE_INFRA_CLIENT_IMAGE_TAG=22400-v9-ade-infra-clients-1
+      ;;
+    23.1.02)
+      TCTL_VER=255
+      ADE_INFRA_CLIENT_IMAGE_TAG=23102-v3-ade-infra-clients-1
+      ;;
+    23.2.02)
+      TCTL_VER=310
+      ADE_INFRA_CLIENT_IMAGE_TAG=23202-v1-ade-infra-clients-1
+      ;;
+    23.4.00)
+      TCTL_VER=370
+      ADE_INFRA_CLIENT_IMAGE_TAG=23400-v2-ade-infra-clients-1
+      ;;
+    24.1.00)
+      TCTL_VER=420
+      ADE_INFRA_CLIENT_IMAGE_TAG=24100-v5-ade-infra-clients-1
+      ;;
+    24.2.00)
+      TCTL_VER=472
+      ADE_INFRA_CLIENT_IMAGE_TAG=24200-v6-ade-infra-clients-alpine
+      ;;
+    24.3.00)
+      TCTL_VER=529
+      ADE_INFRA_CLIENT_IMAGE_TAG=24300-v46-ade-infra-clients-alpine
+      ;;
+    24.4.00)
+      TCTL_VER=574
+      ADE_INFRA_CLIENT_IMAGE_TAG=24400-v71-ade-infra-clients-alpine
+      ;;
+    *)
+      ;;
+  esac
 
   HP_COMPANY_NAME_LABEL="COMPANY_NAME"
   if compare "${HP_VERSION%.*} >= 24.2" ; then
@@ -349,7 +382,6 @@ setVarsFromPlatform() {
   if compare "${HP_VERSION%.*} >= 24.3" ; then
     FTS_ELASTIC_CERTNAME="esnodeopensearch2"
   fi
-
 }
 
 getRSSODetails() {
@@ -1037,6 +1069,7 @@ validateISDetails() {
     logMessage "ITSM pipeline version is ${IS_PLATFORM_HELM_VERSION}."
     logMessage "CUSTOMER_SIZE is ${IS_CUSTOMER_SIZE}."
     logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
+
     if [ "${IS_CHECKOUT_USING_USER}" == "" ]; then
       logError "" "CHECKOUT_USING_USER is blank but should be the Jenkins credentials ID used to access the git repository files.  Default is 'github'."
     fi
