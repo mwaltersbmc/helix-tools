@@ -361,7 +361,7 @@ setVarsFromPlatform() {
       ;;
     25.1.00)
       TCTL_VER=602
-      ADE_INFRA_CLIENT_IMAGE_TAG=25100-v97-ade-infra-clients-alpine 
+      ADE_INFRA_CLIENT_IMAGE_TAG=25100-v97-ade-infra-clients-alpine
       ;;
     *)
       ;;
@@ -582,9 +582,9 @@ getRealmDetails() {
 checkTenantRealms() {
   TENANT_REALM=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}" -H "X-RSSO-TENANT-IMP: ${PORTAL_HOSTNAME}")
   if ! echo "${TENANT_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
-    logError "117" "Helix IS realm (${REALM_NAME}) exists for tenant ${HP_TENANT} when it should be configured for the SAAS_TENANT."
-  else
-    logMessage "Verified Helix IS realm (${REALM_NAME}) is not configured for tenant ${HP_TENANT}."
+    logError "117" "Helix IS realm '${REALM_NAME}' exists for tenant '${HP_TENANT}' when it should be configured for the SAAS_TENANT."
+#  else
+#    logMessage "Verified Helix IS realm (${REALM_NAME}) is not configured for tenant ${HP_TENANT}."
   fi
 }
 
