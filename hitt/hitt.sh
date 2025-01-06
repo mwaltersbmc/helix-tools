@@ -1378,6 +1378,9 @@ validateCacerts() {
 
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "changeit" ]; then
     logMessage "CACERTS_SSL_TRUSTSTORE_PASSWORD is set - using non-default password for cacerts."
+    if ! ${KEYTOOL_BIN} --list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1 ; then
+      logError "214" "The value of CACERTS_SSL_TRUSTSTORE_PASSWORD is not set to the correct password for the cacerts file."
+    fi
   fi
 
   if ! ${KEYTOOL_BIN} --list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
@@ -3417,6 +3420,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The DEPLOYMENT_MODE is UPGRADE or UPDATE but the SOURCE_VERSION or PLATFORM_HELM_VERSION are invalid for the chosen mode.\",
     \"impact\": \"The UPGRADE/UPDATE will fail.\",
     \"remediation\": \"Review the product documentation and verify the DEPLOYMENT_MODE, SOURCE_VERSION and PLATFORM_HELM_VERSION values.\"
+  },
+  {
+    \"id\": \"214\",
+    \"cause\": \"The password entered for CACERTS_SSL_TRUSTSTORE_PASSWORD is not valid for the cacerts file attached to the pipeline or stored in the cacerts secret.\",
+    \"impact\": \"Platform pods will be unable to start.\",
+    \"remediation\": \"Set CACERTS_SSL_TRUSTSTORE_PASSWORD to the correct password or leave it blank to use the default.\"
   }
 ]"
 
