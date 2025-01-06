@@ -729,7 +729,6 @@ getISDetailsFromK8s() {
   IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_PLATFORM_SECRET}" | ${JQ_BIN} -r '.CACERTS_SSL_TRUSTSTORE_PASSWORD')
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "null" ]; then
     IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" | ${BASE64_BIN} -d)
-    logMessage "CACERTS_SSL_TRUSTSTORE_PASSWORD is set - using non-default password for cacerts."
   else
     IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
   fi
@@ -1371,10 +1370,14 @@ validateCacerts() {
   fi
   CACERTS_FILETYPE=$(file sealcacerts | cut -f 2- -d ' ')
   if [ "${CACERTS_FILETYPE,,}" != "java keystore" ]; then
-    logError "161" "cacerts file is of type ${CACERTS_FILETYPE} and not the expected Java keystore."
+    logError "161" "cacerts file is of type '${CACERTS_FILETYPE}' and not the expected Java keystore."
     return
   else
     logMessage "cacerts file is a valid Java keystore."
+  fi
+
+  if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "changeit" ]; then
+    logMessage "CACERTS_SSL_TRUSTSTORE_PASSWORD is set - using non-default password for cacerts."
   fi
 
   if ! ${KEYTOOL_BIN} --list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
