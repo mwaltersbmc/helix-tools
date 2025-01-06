@@ -1380,6 +1380,7 @@ validateCacerts() {
     logMessage "CACERTS_SSL_TRUSTSTORE_PASSWORD is set - using non-default password for cacerts."
     if ! ${KEYTOOL_BIN} --list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1 ; then
       logError "214" "The value of CACERTS_SSL_TRUSTSTORE_PASSWORD is not set to the correct password for the cacerts file."
+      return
     fi
   fi
 
@@ -1396,14 +1397,14 @@ validateCacerts() {
 #  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
 #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
 #  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
-  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts SSLPoke "${LB_HOST}" 443 > /dev/null 2>&1 ; then
+  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${LB_HOST}" 443 > /dev/null 2>&1 ; then
     logError "163" "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
     VALID_CACERTS=1
   fi
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
 #    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
-    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts SSLPoke "${TARGET}" 443 > /dev/null 2>&1 ; then
+    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${TARGET}" 443 > /dev/null 2>&1 ; then
       logError "164" "Certificate for ${TARGET} not found in cacerts."
       VALID_CACERTS=1
     else
