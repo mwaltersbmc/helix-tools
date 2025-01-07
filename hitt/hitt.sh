@@ -57,6 +57,7 @@ EOF
 
 logError() {
   # Print error message MSG_ID MSG / exit if value of 1 passed as third parameter
+  stopOnError "${1}"
   MSG="${BOLD}${RED}ERROR${NORMAL} (${1}) - ${2}"
   echo -e "${MSG}"
   ((FAIL++))
@@ -67,6 +68,7 @@ logError() {
 
 logWarning() {
   # Print warning message MSG_ID MSG
+  stopOnError "${1}"
   MSG="${BOLD}${YELLOW}WARNING${NORMAL} (${1}) - ${2}"
   echo -e "${MSG}"
   ((WARN++))
@@ -81,6 +83,12 @@ logMessage() {
 
 logStatus() {
   echo -e "\n${BOLD}${1}${NORMAL}"
+}
+
+stopOnError() {
+  if [ "${STOP_ON_ERROR}" == "${1}" ] || [ "${STOP_ON_ERROR}" == "0" ]; then
+    exit
+  fi
 }
 
 usage() {
@@ -3429,8 +3437,14 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "lm:f:t:" options; do
+while getopts "ce:lm:f:t:" options; do
   case "${options}" in
+    c)
+      SKIP_CLEANUP=1
+      ;;
+    e)
+      STOP_ON_ERROR="${OPTARG}"
+      ;;
     m)
       MODE=${OPTARG}
       ;;
