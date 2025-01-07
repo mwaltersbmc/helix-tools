@@ -3437,7 +3437,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "ce:lm:f:t:" options; do
+while getopts "ce:f:lm:t:" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
