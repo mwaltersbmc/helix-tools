@@ -2430,8 +2430,8 @@ logStatus "Checking FTS Elasticsearch cluster status..."
 checkFTSElasticStatus
 logStatus "Getting realm details from RSSO..."
 getRealmDetails
-checkTenantRealms
 logStatus "Checking realm..."
+checkTenantRealms
 validateRealm
 
 if [ "${MODE}" != "post-hp" ]; then
@@ -2449,6 +2449,7 @@ if [ "${MODE}" != "post-hp" ]; then
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
   validateCacerts
+  logStatus "Checking IS License..."
   checkISLicenseStatus
 fi
 
@@ -2815,7 +2816,7 @@ ALL_MSGS_JSON="[
     \"id\": \"111\",
     \"cause\": \"This version of the Helix Platform uses a new credentials service which must be installed, or the use of disabled in the TMS deployment, before the HELIX_ITSM_INTEROPS pipeline can be run.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail due to the missing/misconfigured service.\",
-    \"remediation\": \"See the steps in the 'Known and corrected issues' section of the documentation for steps set the ADE_CS_ENABLED to false and disable the use of the credentials service.\"
+    \"remediation\": \"See https://community.bmc.com/s/article/Helix-ITSM-OnPrem-HELIX-ITSM-INTEROPS-pipeline-fails-with-INTERNAL-SERVER-ERROR-when-using-Helix-Platform-24-2\"
   },
   {
     \"id\": \"112\",
