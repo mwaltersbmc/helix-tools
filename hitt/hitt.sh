@@ -212,6 +212,7 @@ checkNamespaceExists() {
       logError "106" "${NS_TYPE} namespace ${1} not found." 1
     else
       logMessage "${NS_TYPE} namespace ${1} found."
+      checkNSResourceQuotas "${1}"
     fi
   else
     logWarning "001" "Unable to run 'kubectl get ns' - skipping namespace validation."
@@ -223,7 +224,7 @@ checkHPNamespace() {
   DEPLOYMENT=rsso
   NS_TYPE="Helix Platform"
   checkNamespaceExists "${1}"
-  if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
+    if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
     logError "107" "Deployment ${DEPLOYMENT} not found in ${1} - please check the ${NS_TYPE} namespace name." 1
   else
     logMessage "${1} is a valid ${NS_TYPE} namespace."
@@ -296,6 +297,14 @@ getVersions() {
       *)
         logError "109" "Unknown Helix IS version (${IS_VERSION}) - please check https://bit.ly/gethitt for HITT updates." 1
     esac
+  fi
+}
+
+checkNSResourceQuotas() {
+  # NS name
+  if [ $(${KUBECTL_BIN} -n "${1}" get resourcequotas 2>/dev/null | wc -l) != "0" ]; then
+    logWarning "034" "Resource quotas are set in the '${1}' namespace. See k8s-get-resourcequotas-${1}.log file for details."
+    ${KUBECTL_BIN} -n "${1}" get resourcequotas -o yaml > k8s-get-resourcequotas-${1}.log
   fi
 }
 
@@ -743,7 +752,7 @@ getISDetailsFromK8s() {
 
   IS_ENABLE_PLATFORM_INT_NORMALIZATION="false"
   IS_PLATFORM_INT=0
-  if [ $(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod -l app=platform-int > /dev/null 2>&1 | wc -l) != "0" ]; then
+  if [ $(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod -l app=platform-int 2>/dev/null | wc -l) != "0" ]; then
     IS_PLATFORM_INT=1
     if ${KUBECTL_BIN} -n ${IS_NAMESPACE} get sts platform-int -o jsonpath='{.spec.template.spec.containers[?(@.name=="platform")].env[?(@.name=="ENABLE_AR_SERVICES")].value}' | grep -q normalization; then
       IS_ENABLE_PLATFORM_INT_NORMALIZATION="true"
@@ -2745,6 +2754,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The ENABLE_PLATFORM_INT_NORMALIZATION option is ignored from 23.3.03 onwards as there is a dedicated normalization engine pod.\",
     \"impact\": \"The selected option has no effect.\",
     \"remediation\": \"The selected option has no effect.\"
+  },
+  {
+    \"id\": \"034\",
+    \"cause\": \"There are Kubernetes resourcequotas defined for the named namespace.\",
+    \"impact\": \"If the quotas are too low deployments may fail.\",
+    \"remediation\": \"Review the resourcequotas and verify that they are high enough for the planned deployment.\"
   },
   {
     \"id\": \"100\",
