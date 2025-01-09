@@ -2122,7 +2122,7 @@ checkJenkinsGlobalLibs() {
     fi
   done
   if [ "${MISSING_LIBS}" != "" ]; then
-    logError "183" "One or more Jenkins global pipeline libraries not found -${MISSING_LIBS}"
+    logError "215" "One or more Jenkins global pipeline libraries not found -${MISSING_LIBS}"
   else
     logMessage "Expected global pipeline libraries found in Jenkins."
   fi
@@ -3263,7 +3263,7 @@ ALL_MSGS_JSON="[
     \"id\": \"183\",
     \"cause\": \"The Jenkins credentials object named in the message has a blank password value when it should be set to the password of the named user.\",
     \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and update the credential to add the muissing password.\"
+    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and update the credential to add the missing password.\"
   },
   {
     \"id\": \"184\",
@@ -3450,6 +3450,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The password entered for CACERTS_SSL_TRUSTSTORE_PASSWORD is not valid for the cacerts file attached to the pipeline or stored in the cacerts secret.\",
     \"impact\": \"Platform pods will be unable to start.\",
     \"remediation\": \"Set CACERTS_SSL_TRUSTSTORE_PASSWORD to the correct password or leave it blank to use the default.\"
+  },
+  {
+    \"id\": \"215\",
+    \"cause\": \"The named global pipeline libraries were not found in Jenkins.\",
+    \"impact\": \"Pipeline execution will fail.\",
+    \"remediation\": \"Review the product documentation and add the missing global pipeline library configuration.\"
   }
 ]"
 
