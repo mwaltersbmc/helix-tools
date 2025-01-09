@@ -2320,7 +2320,7 @@ checkDERequirements() {
       logError "210" "Ansible configuration file (${ANSIBLE_CFG_FILE}) not found - skipping checks."
     else
       logMessage "Checking ansible configuration file - ${ANSIBLE_CFG_FILE}."
-      ANSIBLE_CFG_VALS=(bin_ansible_callbacks=true callback_whitelist=profile_tasks stdout_callback=yaml host_key_checking=false ssh_args=-ocontrolmaster=auto retries=3 pipelining=true)
+      ANSIBLE_CFG_VALS=(bin_ansible_callbacks=true stdout_callback=yaml host_key_checking=false ssh_args=-ocontrolmaster=auto retries=3 pipelining=true)
       ANSIBLE_CFG=$(cat /etc/ansible/ansible.cfg | tr -d ' ')
       for i in "${ANSIBLE_CFG_VALS[@]}"; do
       	if ! echo "${ANSIBLE_CFG}" |  grep -qi "${i}" ; then
