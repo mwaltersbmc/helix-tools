@@ -2725,7 +2725,7 @@ ALL_MSGS_JSON="[
     \"id\": \"025\",
     \"cause\": \"The platform-admin-ext service does not have an external IP address assigned.\",
     \"impact\": \"Connectivity via the service for AR API clients such as Developer Studio will not be possible and upgrades will fail.\",
-    \"remediation\": \"Use the steps in the Performing the postinstallation configurations documentation to add an externalIP to the service.\"
+    \"remediation\": \"Use the steps in the 'Performing the post-installation configurations' documentation to add an externalIP to the service.\"
   },
   {
     \"id\": \"026\",
@@ -3479,7 +3479,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"216\",
-    \"cause\": \"The command 'ansible --verison' that is used to determine the Ansible version did not return results in the expected format.\",
+    \"cause\": \"The command 'ansible --version' that is used to determine the Ansible version did not return results in the expected format.\",
     \"impact\": \"Some checks to validate ansible will not be run.\",
     \"remediation\": \"Review the output of the 'ansible --version' command and make sure that you are using a supported version.\"
   },
