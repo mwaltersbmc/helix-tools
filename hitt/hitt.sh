@@ -879,6 +879,7 @@ createPipelineVarsArray() {
     DB_TYPE
     DB_SSL_ENABLED
     DB_PORT
+    DB_JDBC_URL
     DATABASE_RESTORE
     DATABASE_HOST_NAME
     DATABASE_ADMIN_USER
@@ -1282,6 +1283,12 @@ validateISDetails() {
         if ([ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "false" ]) || ([ "${IS_DB_TYPE}" != "postgres" ]); then
           logWarning "024" "AR_DB_CASE_SENSITIVE is selected but will be ignored as it is only relevant when the database type is Postgres and the DATABASE_RESTORE option is selected."
         fi
+      fi
+    fi
+
+    if [ -n "${IS_DB_JDBC_URL}" ]; then
+      if [ "${IS_DB_TYPE}" != "oracle" ]; then
+        logError "217" "DB_JDBC_URL is set which will cause a failure in the HELIX_SMARTAPPS_DEPLOY pipeline.  Please check with BMC Support."
       fi
     fi
 
@@ -3475,6 +3482,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The command 'ansible --verison' that is used to determine the Ansible version did not return results in the expected format.\",
     \"impact\": \"Some checks to validate ansible will not be run.\",
     \"remediation\": \"Review the output of the 'ansible --version' command and make sure that you are using a supported version.\"
+  },
+  {
+    \"id\": \"217\",
+    \"cause\": \"The DB_JDBC_URL parameter is set but there is a bug which will cause an error in the HELIX_SMARTAPPS_DEPLOY pipeline if the DB_TYPE is mssql or postgres.\",
+    \"impact\": \"The HELIX_SMARTAPPS_DEPLOY pipeline will fail at the catalog-data-upgrade stage.\",
+    \"remediation\": \"If possible remove the value from the DB_JDBC_URL parameter or contact BMC Support for advice.\"
   }
 ]"
 
