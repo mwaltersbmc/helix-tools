@@ -777,21 +777,24 @@ getValueFromPlatformSecret() {
 }
 
 checkJenkinsIsRunning() {
-  if ! "${CURL_BIN}" -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated" | grep -q WhoAmI ; then
-    logError "126" "Jenkins not found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
-    systemctl status jenkins > jenkins-status.log 2>&1
-    SKIP_JENKINS=1
-  else
-    JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
-    JENKINS_VERSION=$(echo "${JENKINS_RESPONSE}" | grep -i 'X-Jenkins:' | awk '{print $2}' | tr -d '\r')
-    JENKINS_HTTP_CODE=$(echo "${JENKINS_RESPONSE}" | grep "^HTTP" | cut -f 2 -d ' '| tr -d '\r')
-    logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
-    if [ "${JENKINS_HTTP_CODE}" != "200" ]; then
-      logError "127" "Jenkins authentication is enabled but the credentials in hitt.conf are blank or wrong.  Please set correct credentials in the HITT config file (${HITT_CONFIG_FILE})." 1
+  JENKINS_RESCODE=$(${CURL_BIN} -k -s -o /dev/null -w "%{http_code}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated")
+  case "${JENKINS_RESCODE}" in
+    200)
+      JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
+      JENKINS_VERSION=$(echo "${JENKINS_RESPONSE}" | grep -i 'X-Jenkins:' | awk '{print $2}' | tr -d '\r')
+      logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
+      getJenkinsCrumb
+      ;;
+    401)
+      logError "127" "Jenkins authentication is enabled but the credentials in hitt.conf are blank or wrong.  Please set correct credentials in the HITT config file '${HITT_CONFIG_FILE}'." 1
       SKIP_JENKINS=1
-    fi
-    getJenkinsCrumb
-fi
+      ;;
+    *)
+      logError "126" "Jenkins not found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
+      systemctl status jenkins > jenkins-status.log 2>&1
+      SKIP_JENKINS=1
+      ;;
+  esac
 }
 
 getLastBuildFromJenkins() {
@@ -978,6 +981,7 @@ getPipelineValues() {
 }
 
 checkPipelinePwds() {
+  [[ "${SKIP_JENKINS}" == "1" ]] && return
   if [ "${MODE}" != "pre-is" ]; then return; fi
   PASSWDS_JSON=$(getPipelinePasswords | ${JQ_BIN} 'to_entries')
   for i in $(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r '.[].key'); do
@@ -1807,7 +1811,7 @@ checkISDBLatency() {
       if compare "${IS_DB_LATENCY} < 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted."; fi ; return
       if compare "${IS_DB_LATENCY} > 6" ; then logMessage "Latency is ${BOLD}VERY POOR${NORMAL}. Performance will be impacted."; fi ; return
     else
-      logError "188" "Unexpected response from IS DB ping test ${PING_RESULT}."
+      logError "188" "Unexpected response from IS DB ping test: ${PING_RESULT}."
     fi
   fi
 }
@@ -2282,6 +2286,11 @@ versionFmt() {
 }
 
 checkDERequirements() {
+  if [ -z "${IS_VERSION}" ]; then
+    logMessage "IS version has not been detected - skipping checks."
+    return
+  fi
+
   IS_MAJOR_VERSION="${IS_VERSION:2:2}"
 
   # if IS <=22.x then kubectl must be <= 1.27
