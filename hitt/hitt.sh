@@ -2313,13 +2313,17 @@ checkDERequirements() {
     fi
 
     ANSIBLE_VERSION=$(ansible --version 2>/dev/null | head -1 | grep -oP '\d+.\d+')
-    if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
-      logError "208" "The installed version of ansible (${ANSIBLE_VERSION}) is not supported - required version must be no greater than ${MAX_ANSIBLE_VERSION}."
+    if [ -z "${ANSIBLE_VERSION}" ]; then
+      logError "216" "Unable to determine the version of ansible using the command 'ansible --version'."
     else
-      logMessage "Using ansible version - ${ANSIBLE_VERSION}"
-      if ! isJmespathInstalled ; then
-        ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed -n '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
-        logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible (${ANSIBLE_PYTHON_VERSION})."
+      if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
+        logError "208" "The installed version of ansible (${ANSIBLE_VERSION}) is not supported - required version must be no greater than ${MAX_ANSIBLE_VERSION}."
+      else
+        logMessage "Using ansible version - ${ANSIBLE_VERSION}"
+        if ! isJmespathInstalled ; then
+          ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed -n '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
+          logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible (${ANSIBLE_PYTHON_VERSION})."
+        fi
       fi
     fi
 
@@ -3465,6 +3469,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The named global pipeline libraries were not found in Jenkins.\",
     \"impact\": \"Pipeline execution will fail.\",
     \"remediation\": \"Review the product documentation and add the missing global pipeline library configuration.\"
+  },
+  {
+    \"id\": \"216\",
+    \"cause\": \"The command 'ansible --verison' that is used to determine the Ansible version did not return results in the expected format.\",
+    \"impact\": \"Some checks to validate ansible will not be run.\",
+    \"remediation\": \"Review the output of the 'ansible --version' command and make sure that you are using a supported version.\"
   }
 ]"
 
