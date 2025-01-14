@@ -428,6 +428,9 @@ getDomain() {
 
 checkHelixLoggingDeployed() {
   HELIX_LOGGING_DEPLOYED=0
+  if compare "${HP_VERSION%.*} >= 25.1" ; then
+    return
+  fi
   if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment efk-elasticsearch-kibana > /dev/null 2>&1 ; then
     HELIX_LOGGING_DEPLOYED=1
     logMessage "Helix Logging is installed."
