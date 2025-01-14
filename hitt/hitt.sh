@@ -3485,9 +3485,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"217\",
-    \"cause\": \"The DB_JDBC_URL parameter is set but there is a bug which will cause an error in the HELIX_SMARTAPPS_DEPLOY pipeline if the DB_TYPE is mssql or postgres.\",
+    \"cause\": \"The DB_JDBC_URL parameter is set but this is only supported when DB_TYPE is oracle.\",
     \"impact\": \"The HELIX_SMARTAPPS_DEPLOY pipeline will fail at the catalog-data-upgrade stage.\",
-    \"remediation\": \"If possible remove the value from the DB_JDBC_URL parameter or contact BMC Support for advice regarding DRSE3-14126.\"
+    \"remediation\": \"Remove the value from the DB_JDBC_URL parameter.\"
   }
 ]"
 
