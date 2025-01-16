@@ -273,7 +273,7 @@ getVersions() {
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
   logMessage "Helix Platform version - ${HP_VERSION} using DEPLOYMENT_SIZE ${HP_DEPLOYMENT_SIZE}."
   if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
-    logWarning "002" "Helix Platform DEPLOYMENT_SIZE is ${HP_DEPLOYMENT_SIZE} - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products to be installed."
+    logWarning "002" "Helix Platform DEPLOYMENT_SIZE is '${HP_DEPLOYMENT_SIZE}' - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products are/will be installed."
   fi
 
   if [ "${MODE}" == "post-is" ]; then
@@ -292,7 +292,7 @@ getVersions() {
         [[ "${IS_VERSION}" == "23.3.04" ]] && IS_DB_VERSION=203
         ;;
       25)
-        IS_DB_VERSION=202
+        IS_DB_VERSION=204
         ;;
       *)
         logError "109" "Unknown Helix IS version (${IS_VERSION}) - please check https://bit.ly/gethitt for HITT updates." 1
@@ -2008,7 +2008,7 @@ checkJenkinsCredentials() {
 }
 
 checkForNewHITT() {
-  if [  $(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' "${HITT_URL}") == "200" ]; then
+  if [  $(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' --connect-timeout 10 "${HITT_URL}") == "200" ]; then    
     REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
     LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
     if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
