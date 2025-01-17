@@ -315,7 +315,7 @@ setVarsFromPlatform() {
   TMS_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress tms-ingress -o jsonpath='{.spec.rules[0].host}')
   MINIO_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio -o jsonpath='{.spec.rules[0].host}')
   MINIO_API_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio-api -o jsonpath='{.spec.rules[0].host}')
-  KIBANA_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress efk-elasticsearch-kibana -o jsonpath='{.spec.rules[0].host}')
+  KIBANA_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress efk-elasticsearch-kibana -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
   LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
   FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
   LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
@@ -625,7 +625,7 @@ validateRealm() {
   fi
   REALM_TENANT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .tenantDomain)
   if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
-    logWarning "004" "Unexpected TENANT in realm - recommended value is ${HP_TENANT} but found ${REALM_TENANT}."
+    logWarning "004" "Unexpected TENANT value in realm - recommended value is '${HP_TENANT}' but found '${REALM_TENANT}'."
   else
     logMessage "Tenant ${REALM_TENANT} is the expected value."
   fi
@@ -1084,15 +1084,6 @@ validateISDetails() {
     logMessage "AR_SERVER_MIDTIER_SERVICE_PASSWORD length is 20 characters or less."
   fi
 
-  if [ "${IS_PLATFORM_INT}" == "1" ] ; then
-    if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "false" ] && [ "${IS_VERSION}" -lt 2023303 ]; then
-      logWarning "007" "platform-int pods are enabled but ENABLE_PLATFORM_INT_NORMALIZATION is not selected."
-    fi
-    if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "true" ] && [ "${IS_VERSION}" -ge 2023303 ]; then
-      logWarning "033" "ENABLE_PLATFORM_INT_NORMALIZATION is selected but will be ignored."
-    fi
-  fi
-
   # PRE mode only
   if [ "${MODE}" == "pre-is" ]; then
     logMessage "ITSM pipeline version is ${IS_PLATFORM_HELM_VERSION}."
@@ -1321,6 +1312,15 @@ validateISDetails() {
         logMessage "LOGS_ELASTICSEARCH_PASSWORD matches the Helix Platform KIBANA_PASSWORD."
       fi
       checkIsValidElastic "${IS_LOGS_ELASTICSEARCH_HOSTNAME}" "LOGS_ELASTICSEARCH_HOSTNAME"
+    fi
+
+    if [ "${IS_PLATFORM_INT}" == "1" ] ; then
+      if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "false" ] && [ "${IS_VERSION}" -lt 2023303 ]; then
+        logWarning "007" "platform-int pods are enabled but ENABLE_PLATFORM_INT_NORMALIZATION is not selected."
+      fi
+      if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "true" ] && [ "${IS_VERSION}" -ge 2023303 ]; then
+        logWarning "033" "ENABLE_PLATFORM_INT_NORMALIZATION is selected but will be ignored."
+      fi
     fi
 
     if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${HP_REGISTRY_PASSWORD}" ]; then
@@ -1554,26 +1554,59 @@ checkFTSElasticSettings() {
 
 }
 
-checkISLicenseStatus() {
+checkISRESTReady() {
+  IS_REST_READY=0
   if ! IS_INT_ROLE=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get svc platform-int -o jsonpath='{.spec.selector.role}' 2>/dev/null); then
-    logMessage "IS platform pods not found - skipping license check."
+    logMessage "IS platform pods not found - skipping checks."
     return
   fi
   if ! IS_RESTAPI_POD_STATUS=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod "platform-${IS_INT_ROLE}-0" -o jsonpath='{.status.containerStatuses[?(@.name=="platform")].ready}'); then
-    logMessage "IS platform-${IS_INT_ROLE}-0 pod not found - skipping license check."
+    logMessage "IS platform-${IS_INT_ROLE}-0 pod not found - skipping checks."
     return
   fi
   if [ "${IS_RESTAPI_POD_STATUS}" == "false" ]; then
-    logMessage "IS platform-${IS_INT_ROLE}-0 pod not ready - skipping license check."
+    logMessage "IS platform-${IS_INT_ROLE}-0 pod not ready - skipping checks."
+    return
+  fi
+  getISAdminCreds
+  if ! getISJWT; then
+    logError "176" "Failed to authenticate user ${IS_ADMIN_USER} - skipping checks."
+    return
+  fi
+  IS_REST_READY=1
+}
+
+checkISLicenseStatus() {
+  if [ "${IS_REST_READY}" == "0" ]; then
     return
   fi
   logMessage "Checking IS license status..."
-  getISAdminCreds
-  if ! getISJWT; then
-    logError "176" "Failed to authenticate user ${IS_ADMIN_USER} - can't check IS license status."
+  checkISLicense
+}
+
+checkISTenant() {
+  if [ "${IS_REST_READY}" == "0" ]; then
     return
   fi
-  getISLicense
+  logMessage "Checking IS Tenant..."
+  getISTenant
+  if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
+    logError "xxx" "IS tenant name is '${IS_TENANT_NAME}' and not the expected '${IS_CUSTOMER_SERVICE}'."
+  fi
+  if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
+    logError "xxx" "IS tenant domainIdentifier is '${IS_TENANT_DOMID}' and not the expected '${IS_TE}'."
+  fi
+  if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
+    logError "xxx" "IS tenant name is '${IS_TENANT_NAME}' and not the expected '${IS_CUSTOMER_SERVICE}'."
+  fi
+
+}
+
+getISTenant() {
+  IS_TENANT_JSON=$(${CURL_BIN} -s -X GET "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/datapage?dataPageType=com.bmc.arsys.rx.application.tenant.datapage.TenantDataPageQuery&pageSize=50&startIndex=0&shouldIncludeTotalSize=false&propertySelection=name%2CdomainIdentifier%2CvirtualHostname" -H "Authorization: AR-JWT ${ARJWT}")
+  IS_TENANT_NAME=$(echo "${IS_TENANT_JSON}" | ${JQ_BIN} -r '.data[].name')
+  IS_TENANT_DOMID=$(echo "${IS_TENANT_JSON}" | ${JQ_BIN} -r '.data[].domainIdentifier')
+  IS_TENANT_VHOSTNAME=$(echo "${IS_TENANT_JSON}" | ${JQ_BIN} -r '.data[].virtualHostname')
 }
 
 getISJWT() {
@@ -1585,7 +1618,7 @@ getISJWT() {
   fi
 }
 
-getISLicense() {
+checkISLicense() {
   IS_LICENSE_TYPE=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Administration%3A%20Server%20Information?q=%27configurationName%27%3D%22%25%22&fields=values(licensetype)" -H "Authorization: AR-JWT $ARJWT" | ${JQ_BIN} -r '.entries[0].values.licensetype')
   if [ "${IS_LICENSE_TYPE}" != "AR Server" ]; then
     logWarning "020" "IS Server does not have a permanent license - current license type is ${IS_LICENSE_TYPE}."
@@ -2008,7 +2041,7 @@ checkJenkinsCredentials() {
 }
 
 checkForNewHITT() {
-  if [  $(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' --connect-timeout 10 "${HITT_URL}") == "200" ]; then    
+  if [  $(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' --connect-timeout 10 "${HITT_URL}") == "200" ]; then
     REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
     LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
     if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
@@ -2481,8 +2514,10 @@ if [ "${MODE}" != "post-hp" ]; then
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
   validateCacerts
-  logStatus "Checking IS License..."
+  logStatus "Checking IS Configuration..."
+  checkISRESTReady
   checkISLicenseStatus
+  checkISTenant
 fi
 
 if [ "${MODE}" == "pre-is" ]; then
@@ -3242,8 +3277,8 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"176\",
-    \"cause\": \"An attempt to login to the Helix Service Management apps via the RESTAPI failed and so the server license could not be checked.\",
-    \"impact\": \"License validation has not been possible and some later checks will be skipped.\",
+    \"cause\": \"An attempt to login to the Helix Service Management apps via the RESTAPI failed.\",
+    \"impact\": \"Some IS configuration checks will be skipped.\",
     \"remediation\": \"Check that the hannah_admin user is enabled and that the correct password is stored in the atriumwebsvc secret.\"
   },
   {
