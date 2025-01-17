@@ -627,7 +627,7 @@ validateRealm() {
   if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
     logWarning "004" "Unexpected TENANT value in realm - recommended value is '${HP_TENANT}' but found '${REALM_TENANT}'."
   else
-    logMessage "Tenant ${REALM_TENANT} is the expected value."
+    logMessage "Tenant '${REALM_TENANT}' is the expected value."
   fi
   REALM_DOMAINS=($(echo "${RSSO_REALM}" | ${JQ_BIN} -r '.domainMapping.domain[]' | tr "\n" " "))
   BAD_DOMAINS=0
@@ -1590,20 +1590,21 @@ checkISTenant() {
   fi
   logMessage "Checking IS Tenant..."
   getISTenant
+  logMessage "IS tenant name: '${IS_TENANT_NAME}', domainIdentifier: '${IS_TENANT_DOMID}', virtualHostname: '${IS_TENANT_VHOSTNAME}'."
+  return
   if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
     logError "xxx" "IS tenant name is '${IS_TENANT_NAME}' and not the expected '${IS_CUSTOMER_SERVICE}'."
   fi
-  if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
-    logError "xxx" "IS tenant domainIdentifier is '${IS_TENANT_DOMID}' and not the expected '${IS_TE}'."
+  if [ "${IS_TENANT_DOMID}" != "${HP_TENANT}" ]; then
+    logError "xxx" "IS tenant domainIdentifier is '${IS_TENANT_DOMID}' and not the expected '${HP_TENANT}'."
   fi
-  if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
-    logError "xxx" "IS tenant name is '${IS_TENANT_NAME}' and not the expected '${IS_CUSTOMER_SERVICE}'."
+  if [ "${IS_TENANT_VHOSTNAME}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
+    logError "xxx" "IS tenant virtualHostname is '${IS_TENANT_VHOSTNAME}' and not the expected '${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}'."
   fi
-
 }
 
 getISTenant() {
-  IS_TENANT_JSON=$(${CURL_BIN} -s -X GET "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/datapage?dataPageType=com.bmc.arsys.rx.application.tenant.datapage.TenantDataPageQuery&pageSize=50&startIndex=0&shouldIncludeTotalSize=false&propertySelection=name%2CdomainIdentifier%2CvirtualHostname" -H "Authorization: AR-JWT ${ARJWT}")
+  IS_TENANT_JSON=$(${CURL_BIN} -sk -X GET "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/datapage?dataPageType=com.bmc.arsys.rx.application.tenant.datapage.TenantDataPageQuery&pageSize=50&startIndex=0&shouldIncludeTotalSize=false&propertySelection=name%2CdomainIdentifier%2CvirtualHostname" -H "Authorization: AR-JWT ${ARJWT}")
   IS_TENANT_NAME=$(echo "${IS_TENANT_JSON}" | ${JQ_BIN} -r '.data[].name')
   IS_TENANT_DOMID=$(echo "${IS_TENANT_JSON}" | ${JQ_BIN} -r '.data[].domainIdentifier')
   IS_TENANT_VHOSTNAME=$(echo "${IS_TENANT_JSON}" | ${JQ_BIN} -r '.data[].virtualHostname')
