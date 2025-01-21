@@ -1496,12 +1496,12 @@ checkIsValidElastic() {
     case "${2}" in
       FTS_ELASTICSEARCH_HOSTNAME)
         if [ "${1}" != "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
+          logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of '${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}'."
         fi
         ;;
       LOGS_ELASTICSEARCH_HOSTNAME)
         if [ "${1}" != "${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "172" "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
+          logError "172" "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of '${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}'."
         fi
         ;;
     esac
@@ -1515,6 +1515,7 @@ getSvcFromExternalIP() {
 
 checkFTSElasticSettings() {
   BAD_FTS_ELASTIC=0
+  logMessage "FTS_ELASTICSEARCH_USERNAME is '${IS_FTS_ELASTICSEARCH_USERNAME}'."
   if [ "${IS_FTS_ELASTICSEARCH_PORT}" != "9200" ]; then
     logError "173 ""FTS_ELASTICSEARCH_PORT (${IS_FTS_ELASTICSEARCH_PORT}) is not the expected value of 9200."
     BAD_FTS_ELASTIC=1
@@ -1544,7 +1545,7 @@ checkFTSElasticSettings() {
 
   #if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "bmcuser" ]; then
   if [ "${MODE}" == "pre-is" ] && [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
-    logError "175" "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of ${LOG_ELASTICSEARCH_PASSWORD}."
+    logError "175" "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of '${LOG_ELASTICSEARCH_PASSWORD}'."
     BAD_FTS_ELASTIC=1
   else
     logMessage "FTS_ELASTICSEARCH_USER_PASSWORD is the expected value."
@@ -1906,6 +1907,7 @@ dumpVARs() {
   if [ "${MODE}" == "pre-is" ]; then
     echo "CUSTOMER_SERVICE=${ISP_CUSTOMER_SERVICE}" >> "${VALUES_LOG_FILE}"
     echo "ENVIRONMENT=${ISP_ENVIRONMENT}" >> "${VALUES_LOG_FILE}"
+    echo "FTS_ELASTICSEARCH_USERNAME=${IS_FTS_ELASTICSEARCH_USERNAME}" >> "${VALUES_LOG_FILE}"
     for i in "${PIPELINE_VARS[@]}"; do
       v="IS_${i}"
       echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
