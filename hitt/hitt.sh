@@ -2778,7 +2778,7 @@ ALL_MSGS_JSON="[
     \"id\": \"027\",
     \"cause\": \"The DATABASE_HOST_NAME is not reachable from the Deployment Engine on the DB_PORT.\",
     \"impact\": \"Later checks to validate the database will not be run and deployment will fail if either of the values are wrong.\",
-    \"remediation\": \"Verify the DATABASE_HOST_NAME/DB_PORT values and enable connectivity from the Deployment Engine if possible.\"
+    \"remediation\": \"This is expected if there is no connectivity to the database server from the Deployment Engine, otherwise verify the DATABASE_HOST_NAME/DB_PORT values.\"
   },
   {
     \"id\": \"028\",
