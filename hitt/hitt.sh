@@ -2056,7 +2056,7 @@ checkForNewHITT() {
     if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
       logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -sL https://bit.ly/hitt-sh -o hitt.sh${NORMAL}"
       echo
-      read -rsn1 -p"Press any key to continue or Ctrl+C to cancel..."
+      read -r -s -n1 -t5 -p"Press any key to continue or Ctrl+C to cancel..."
       echo
     fi
   fi
@@ -2234,10 +2234,13 @@ validateJenkinsCredentials() {
         CRED_USER=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").username')
         if [ "${CRED_PWD}" == "" ]; then
           logError "183" "The password for the '${ID}' credential is blank but should be set to the password of the user '${CRED_USER}'."
+        else
+          [[ -n "${DUMP_JCREDS}" ]] && logMessage "ID=${ID} / Username=${CRED_USER} / Password=${CRED_PWD}."
         fi
       fi
     fi
   done
+
   if [ "${MISSING_CREDS}" != "" ]; then
     logError "198" "One or more Jenkins credentials not found -${MISSING_CREDS}"
   else
@@ -2373,7 +2376,7 @@ checkDERequirements() {
       else
         logMessage "Using ansible version - ${ANSIBLE_VERSION}"
         if ! isJmespathInstalled ; then
-          ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed -n '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
+          ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | se '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
           logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible (${ANSIBLE_PYTHON_VERSION})."
         fi
       fi
@@ -2436,6 +2439,12 @@ fi
 source "${HITT_CONFIG_FILE}"
 checkForNewHITT
 
+# Make Jenkins credentials URL safe
+if [ -n "${JENKINS_USERNAME}" ]; then
+  JENKINS_PASSWORD=$(printf %s "${JENKINS_PASSWORD}" | ${JQ_BIN} -sRr @uri)
+  JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
+fi
+
 # Run tctl command and then exit
 if [[ ! -z "${TCTL_CMD}" ]]; then
   logStatus "Running in tctl only mode..."
@@ -2445,6 +2454,14 @@ if [[ ! -z "${TCTL_CMD}" ]]; then
   getTCTLOutput full
   echo "${TCTL_OUTPUT}"
   deleteTCTLJob
+  exit
+fi
+
+# Print Jenkins credentials and exit
+if [[ ! -z "${DUMP_JCREDS}" ]]; then
+  logStatus "Dumping Jenkins credentials..."
+  checkJenkinsIsRunning
+  validateJenkinsCredentials
   exit
 fi
 
@@ -2458,11 +2475,6 @@ fi
 
 if [ "${MODE}" == "post-hp" ]; then
   SKIP_JENKINS=1
-else
-  if [ -n "${JENKINS_USERNAME}" ]; then
-    JENKINS_PASSWORD=$(printf %s "${JENKINS_PASSWORD}" | ${JQ_BIN} -sRr @uri)
-    JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
-  fi
 fi
 
 # Check required variables are settings
@@ -3539,7 +3551,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "ce:f:lm:pt:" options; do
+while getopts "ce:f:jlm:pt:" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
@@ -3547,11 +3559,14 @@ while getopts "ce:f:lm:pt:" options; do
     e)
       STOP_ON_ERROR="${OPTARG}"
       ;;
-    m)
-      MODE=${OPTARG}
+    j)
+      DUMP_JCREDS=1
       ;;
     l)
       CREATE_LOGS=0
+      ;;
+    m)
+      MODE=${OPTARG}
       ;;
     p)
       LOG_PASSWDS=1

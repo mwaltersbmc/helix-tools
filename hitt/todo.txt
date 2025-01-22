@@ -1,0 +1,8 @@
+SR checks
+$ in image registry username
+
+dump credentials field
+
+JWT=$(curl -s -X POST https://seal-green-itsm-is.aus-adecusranch.bmc.com/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd')
+curl -s -X GET "https://seal-green-itsm-is.aus-adecusranch.bmc.com/api/rx/application/datapage?dataPageType=com.bmc.arsys.rx.application.tenant.datapage.TenantDataPageQuery&pageSize=50&startIndex=0&shouldIncludeTotalSize=false&propertySelection=name%2CdomainIdentifier%2CvirtualHostname" -H 'accept: application/json' -H "Authorization: AR-JWT $JWT" -H 'content-type/x-www-form-urlencoded' | jq
+curl -s -X GET "https://seal-green-itsm-is.aus-adecusranch.bmc.com/api/rx/application/tenant/seal-green" -H 'accept: application/json' -H "Authorization: AR-JWT $JWT" -H 'content-type/x-www-form-urlencoded' | jq
