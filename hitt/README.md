@@ -119,6 +119,14 @@ $ bash hitt.sh -t "get tenant 1912102789 -o json"
 
 The tctl commands must be enclosed in double quotes and the output will be displayed on the console when the job completes.
 
+### Advanced CLI Options ###
+
+There are several extra command line switches which may be helpful for troubleshooting.
+
+-c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not remove temporary files used by HITT.\
+-e #&nbsp;&nbsp;&nbsp;&nbsp;Script will exit on specified error number.  Use 0 for stop on first error.\
+-p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In pre-is mode, output pipeline passwords in values.log file.
+
 ### Checks Summary ###
 
 Different groups of tests and checks are run depending on the operating mode and discovered information.  Some groups query information which is then used by other checks.
