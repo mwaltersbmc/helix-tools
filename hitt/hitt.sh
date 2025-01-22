@@ -1912,6 +1912,12 @@ dumpVARs() {
       v="IS_${i}"
       echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
     done
+    if [ "${LOG_PASSWDS}" == "1" ]; then
+      for i in "${INPUT_FILE_VARS[@]}"; do
+        v="IS_${i}"
+        echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
+      done
+    fi
   fi
   if [ "${MODE}" == "post-is" ]; then
     createPipelineVarsArray
@@ -2562,6 +2568,7 @@ FAIL=0
 WARN=0
 SKIP_JENKINS=0
 CREATE_LOGS=1
+LOG_PASSWDS=0
 HITT_LOG_FILE=hitt.log
 HITT_DBG_FILE=hittdebug.log
 HITT_MSG_FILE=hittmsgs.log
@@ -3532,7 +3539,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "ce:f:lm:t:" options; do
+while getopts "ce:f:lm:pt:" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
@@ -3545,6 +3552,9 @@ while getopts "ce:f:lm:t:" options; do
       ;;
     l)
       CREATE_LOGS=0
+      ;;
+    p)
+      LOG_PASSWDS=1
       ;;
     t)
       TCTL_CMD=${OPTARG}
