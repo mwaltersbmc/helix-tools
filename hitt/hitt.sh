@@ -1689,7 +1689,7 @@ fi
 
 checkISDBSettings() {
   if ! testNetConnection "${IS_DATABASE_HOST_NAME}" "${IS_DB_PORT}"; then
-    logWarning "027" "IS DB server (${IS_DATABASE_HOST_NAME}) is not reachable on port ${IS_DB_PORT} - skipping DB checks."
+    logWarning "027" "IS DB server (${IS_DATABASE_HOST_NAME}) is not reachable on port ${IS_DB_PORT} - this is expected if there is no connectivity from the Deployment Engine - skipping DB checks."
     SKIP_SR_DB_CHECKS=1
     return
   else
