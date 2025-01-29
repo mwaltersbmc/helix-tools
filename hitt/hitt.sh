@@ -252,11 +252,13 @@ checkISNamespace() {
 }
 
 checkPodStatus() {
-  if [ $(${KUBECTL_BIN} -n "${1}"  get pods -o custom-columns=":metadata.name,:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>" | wc -l) != "1" ]; then
-     logError "102" "One or more pods in namespace ${1} found in a non-ready state."
-     ${KUBECTL_BIN} -n "${1}" get pods -o custom-columns="POD:metadata.name,STATE:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>"
+  BAD_PODS=($(${KUBECTL_BIN} -n "${1}" get pod --field-selector=status.phase!=Succeeded -o json | ${JQ_BIN} -r '.items[] | select(.status.containerStatuses[]?.ready == false) | .metadata.name'))
+  #if [ $(${KUBECTL_BIN} -n "${1}"  get pods -o custom-columns=":metadata.name,:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>" | wc -l) != "1" ]; then
+  if [ "${#BAD_PODS[@]}" != "0" ]; then
+     logError "102" "One or more pods in the '${1}' namespace found in a non-ready state."
+     ${KUBECTL_BIN} -n "${1}" get pods "${BAD_PODS[@]}"
   else
-    logMessage "No unhealthy pods found in ${1} namespace."
+    logMessage "No unhealthy pods found in the '${1}' namespace."
   fi
 }
 
