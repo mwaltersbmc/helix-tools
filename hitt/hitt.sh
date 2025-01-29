@@ -692,6 +692,10 @@ validateDomainInDNS() {
   fi
 }
 
+logLBCertDetails() {
+  ${OPENSSL_BIN} s_client -connect  "${LB_HOST}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text > lb-cert.log
+}
+
 checkServiceDetails() {
   deleteTCTLJob
   if ! deployTCTL "get service"; then
@@ -1438,18 +1442,18 @@ validateCacerts() {
 #  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
 #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
 #  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
-  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${LB_HOST}" 443 > /dev/null 2>&1 ; then
+  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${LB_HOST}" 443 >>${HITT_DBG_FILE} 2>&1 ; then
     logError "163" "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
     VALID_CACERTS=1
   fi
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
 #    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
-    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${TARGET}" 443 > /dev/null 2>&1 ; then
-      logError "164" "Certificate for ${TARGET} not found in cacerts."
+    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${TARGET}" 443 >>${HITT_DBG_FILE} 2>&1 ; then
+      logError "164" "Certificate for '${TARGET}' not found in cacerts."
       VALID_CACERTS=1
     else
-      logMessage "  - valid certificate for ${TARGET} found in cacerts file."
+      logMessage "  - valid certificate for '${TARGET}' found in cacerts file."
     fi
   done
 
@@ -2529,6 +2533,7 @@ getRealmDetails
 logStatus "Checking realm..."
 checkTenantRealms
 validateRealm
+logLBCertDetails
 
 if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking Jenkins is accessible..."
