@@ -257,9 +257,17 @@ checkPodStatus() {
   if [ "${#BAD_PODS[@]}" != "0" ]; then
      logError "102" "One or more pods in the '${1}' namespace found in a non-ready state."
      ${KUBECTL_BIN} -n "${1}" get pods "${BAD_PODS[@]}"
+     for i in "${BAD_PODS[@]}"; do
+       logDescribePod "${1}" "${2}"
+     done
   else
     logMessage "No unhealthy pods found in the '${1}' namespace."
   fi
+}
+
+logDescribePod() {
+  # ns / pod name
+  ${KUBECTL_BIN} -n "${1}" describe pod "${2}" > "k8s-desc-pod-${1}-${2}.log" 2>>${HITT_DBG_FILE}
 }
 
 getVersions() {
