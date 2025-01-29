@@ -67,13 +67,15 @@ $ keytool -importcert -v -alias <alias name> -file <certificatefilename> -keysto
 
 Get certs from LB/Ingress
 $ openssl s_client -showcerts -connect LB_HOST:443
+$ openssl s_client -showcerts -connect HOST:443 -CAfile ./custom_cacert.pem < /dev/null 2>/dev/null | openssl x509 -noout -text
 
 Convert cacerts to pem
 $ keytool -importkeystore -srckeystore cacerts -destkeystore keystore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass changeit -deststorepass changeit
 $ openssl pkcs12 -in keystore.p12 -out keystore.pem
 
 Update Ingress controller SSL secret
-$ kubectl create secret tls my-tls-secret --cert=/path/to/cert.pem --key=/path/to/privkey.pem -n ingress-nginx
+$ kubectl delete secret SECRETNAME -n ingress-nginx
+$ kubectl create secret tls SECRETNAME --cert=/path/to/cert.pem --key=/path/to/privkey.key -n ingress-nginx
 
 Kubernetes Events
 $ kubectl get events -n NS --sort-by='.metadata.creationTimestamp' --field-selector=type!=Normal | grep -E "$(date -d '1 hour ago' --utc +%FT%T|awk -F"+" '{print $1}')|Unknown|Warning|Error"
