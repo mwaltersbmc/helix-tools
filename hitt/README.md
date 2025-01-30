@@ -104,7 +104,9 @@ HITT creates various log files in the directory that the script is run from:
 
 All of the files are added to **hittlogs.zip** which can be sent to BMC Support if needed.
 
-NOTE - password values are not logged.
+There are some additional messages which are not logged by default but can be enabled with the **-v** switch.
+
+**NOTE** - passwords are not logged unless the **-p** switch is used.
 
 ### tctl Mode ###
 
@@ -126,7 +128,8 @@ There are several extra command line switches which may be helpful for troublesh
 -c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not remove temporary files used by HITT.\
 -e #&nbsp;&nbsp;&nbsp;&nbsp;Script will exit on specified error number.  Use 0 to stop on first error.\
 -j&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
--p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In pre-is mode, output pipeline passwords in values.log file.
+-p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In pre-is mode, output pipeline passwords in values.log file.\
+-v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging,
 
 ### Checks Summary ###
 
