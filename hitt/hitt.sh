@@ -230,9 +230,9 @@ checkHPNamespace() {
   NS_TYPE="Helix Platform"
   checkNamespaceExists "${1}"
     if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
-    logError "107" "Deployment ${DEPLOYMENT} not found in ${1} - please check the ${NS_TYPE} namespace name." 1
+    logError "107" "Deployment ${DEPLOYMENT} not found in '${1}' - please check the ${NS_TYPE} namespace name." 1
   else
-    logMessage "${1} is a valid ${NS_TYPE} namespace."
+    logMessage "'${1}' is a valid ${NS_TYPE} namespace."
   fi
   checkPodStatus "${1}"
 }
@@ -249,10 +249,10 @@ checkISNamespace() {
   fi
   if [ "${MODE}" == "post-is" ]; then
     if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
-      logError "107" "Deployment ${DEPLOYMENT} not found in ${1} - please check the ${NS_TYPE} namespace name." 1
+      logError "107" "Deployment '${DEPLOYMENT}' not found in '${1}' namespace - please check the ${NS_TYPE} namespace name." 1
     fi
   fi
-  logMessage "${1} appears to be a valid ${NS_TYPE} namespace."
+  logMessage "'${1}' appears to be a valid ${NS_TYPE} namespace." 1
   checkPodStatus "${1}"
 }
 
@@ -286,14 +286,14 @@ getVersions() {
   HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json)
   HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
-  logMessage "Helix Platform version - ${HP_VERSION} using DEPLOYMENT_SIZE ${HP_DEPLOYMENT_SIZE}."
+  logMessage "Helix Platform version '${HP_VERSION}' using DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}'."
   if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
     logWarning "002" "Helix Platform DEPLOYMENT_SIZE is '${HP_DEPLOYMENT_SIZE}' - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products are/will be installed."
   fi
 
   if [ "${MODE}" == "post-is" ]; then
     IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
-    logMessage "Helix IS version - ${IS_VERSION}."
+    logMessage "Helix IS version ${IS_VERSION}."
     # Set expected currDBVersion
     case "${IS_VERSION%%.*}" in
       21)
@@ -310,7 +310,7 @@ getVersions() {
         IS_DB_VERSION=204
         ;;
       *)
-        logError "109" "Unknown Helix IS version (${IS_VERSION}) - please check https://bit.ly/gethitt for HITT updates." 1
+        logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
     esac
   fi
 }
@@ -629,19 +629,19 @@ validateRealm() {
   if [ "${REALM_ARHOST}" != "platform-user-ext.${IS_NAMESPACE}" ]; then
     logError "118" "Invalid arHost value in realm - expected platform-user-ext.${IS_NAMESPACE} but found ${REALM_ARHOST}."
   else
-    logMessage "AR host ${REALM_ARHOST} is the expected value."
+    logMessage "AR host ${REALM_ARHOST} is the expected value." 1
   fi
   REALM_ARPORT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arPort)
   if [ "${REALM_ARPORT}" != "46262" ]; then
     logError "119" "Invalid arPort in realm - expected 46262 but found ${REALM_ARPORT}."
   else
-    logMessage "AR port ${REALM_ARPORT} is the expected value."
+    logMessage "AR port ${REALM_ARPORT} is the expected value." 1
   fi
   REALM_TENANT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .tenantDomain)
   if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
     logWarning "004" "Unexpected TENANT value in realm - recommended value is '${HP_TENANT}' but found '${REALM_TENANT}'."
   else
-    logMessage "Tenant '${REALM_TENANT}' is the expected value."
+    logMessage "Tenant '${REALM_TENANT}' is the expected value." 1
   fi
   REALM_DOMAINS=($(echo "${RSSO_REALM}" | ${JQ_BIN} -r '.domainMapping.domain[]' | tr "\n" " "))
   BAD_DOMAINS=0
@@ -655,10 +655,10 @@ validateRealm() {
 buildISAliasesArray() {
   if [ "${IS_ENVIRONMENT}" == "prod" ]; then
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}"
-    logMessage "ENVIRONMENT value is 'prod' - IS hostnames prefix is '${IS_ALIAS_PREFIX}-'"
+    logMessage "ENVIRONMENT value is 'prod' - IS hostnames prefix is '${IS_ALIAS_PREFIX}-.'"
   else
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
-    logMessage "IS hostnames prefix is \"${IS_ALIAS_PREFIX}\""
+    logMessage "IS hostnames prefix is '${IS_ALIAS_PREFIX}'."
   fi
   # Midtier alias
   IS_ALIAS_ARRAY+=("${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}")
@@ -672,7 +672,7 @@ validateRealmDomains() {
   logMessage "Checking for expected hostname aliases in realm Application Domains, DNS & Helix certificate..."
   # Check for wildcard certain
   if ${OPENSSL_BIN} s_client -connect "${LB_HOST}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "*.${CLUSTER_DOMAIN}" ; then
-    logMessage "Helix certificate is a wildcard for '*.${CLUSTER_DOMAIN}'"
+    logMessage "Helix certificate is a wildcard for '*.${CLUSTER_DOMAIN}'."
     WILDCARD_CERT=1
   else
     WILDCARD_CERT=0
@@ -754,7 +754,7 @@ checkFTSElasticStatus() {
   if ! echo "${FTS_ELASTIC_STATUS}" | grep -q green ; then
     logError "125" "FTS Elasticsearch problem. Check the ${FTS_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
-    logMessage "FTS Elasticsearch (${FTS_ELASTIC_SERVICENAME}) appears healthy."
+    logMessage "FTS Elasticsearch '${FTS_ELASTIC_SERVICENAME}' appears healthy." 1
   fi
 }
 
@@ -1079,7 +1079,7 @@ cloneCustomerConfigsRepo() {
     SKIP_REPO=1
     return
   else
-    logMessage "Input config file found - ${INPUT_CONFIG_FILE}."
+    logMessage "Input config file found '${INPUT_CONFIG_FILE}'."
     getInputFileValues
   fi
 }
@@ -1092,7 +1092,7 @@ checkBlank() {
   if isBlank "${!1}"; then
     logError "131" "Value for ${1:3} is not expected to be blank."
   else
-    logMessage "Value set for ${1:3}."
+    logMessage "Value set for ${1:3}." 1
   fi
 }
 
@@ -1102,31 +1102,31 @@ validateISDetails() {
   if [ "${IS_TENANT_DOMAIN}" != "${REALM_TENANT}" ]; then
     logError "132" "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform realm Tenant (${REALM_TENANT})."
   else
-    logMessage "TENANT_DOMAIN matches the realm Tenant (${REALM_TENANT})."
+    logMessage "TENANT_DOMAIN matches the realm Tenant '${REALM_TENANT}'." 1
   fi
 
   if [ "${IS_RSSO_URL}" != "${RSSO_URL}" ]; then
     logError "133" "The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline (${IS_RSSO_URL}) does not match the Helix Platform RSSO_URL (${RSSO_URL})."
   else
-    logMessage "IS RSSO_URL is the expected value of ${RSSO_URL}."
+    logMessage "IS RSSO_URL is the expected value of '${RSSO_URL}'." 1
   fi
 
   if [ "${#IS_AR_SERVER_APP_SERVICE_PASSWORD}" -gt 19 ]; then
     logError "134" "AR_SERVER_APP_SERVICE_PASSWORD is too long - maximum of 19 characters."
   else
-    logMessage "AR_SERVER_APP_SERVICE_PASSWORD length is 19 characters or less."
+    logMessage "AR_SERVER_APP_SERVICE_PASSWORD length is 19 characters or less." 1
   fi
 
   if [ "${#IS_AR_SERVER_DSO_USER_PASSWORD}" -gt 20 ]; then
     logError "135" "AR_SERVER_DSO_USER_PASSWORD is too long - maximum of 20 characters."
   else
-    logMessage "AR_SERVER_DSO_USER_PASSWORD length is 20 characters or less."
+    logMessage "AR_SERVER_DSO_USER_PASSWORD length is 20 characters or less." 1
   fi
 
   if [ "${#IS_AR_SERVER_MIDTIER_SERVICE_PASSWORD}" -gt 20 ]; then
     logError "135" "AR_SERVER_MIDTIER_SERVICE_PASSWORD is too long - maximum of 20 characters."
   else
-    logMessage "AR_SERVER_MIDTIER_SERVICE_PASSWORD length is 20 characters or less."
+    logMessage "AR_SERVER_MIDTIER_SERVICE_PASSWORD length is 20 characters or less." 1
   fi
 
   # PRE mode only
@@ -1161,7 +1161,7 @@ validateISDetails() {
       logError "137" "CLUSTER (${IS_CLUSTER}) is not a valid context in your kubeconfig file. Available contexts are:"
       ${KUBECTL_BIN} config get-contexts
     else
-      logMessage "CLUSTER (${IS_CLUSTER}) is a valid kubeconfig context."
+      logMessage "CLUSTER '${IS_CLUSTER}' is a valid kubeconfig context." 1
     fi
 
     if [ "${IS_CLOUD}" == "true" ]; then
@@ -1175,7 +1175,7 @@ validateISDetails() {
     if [ "${IS_IS_NAMESPACE}" != "${IS_NAMESPACE}" ]; then
       logError "138" "The IS_NAMESPACE value (${IS_IS_NAMESPACE}) does not match the IS_NAMESPACE defined in the hitt.conf file (${IS_NAMESPACE})."
     else
-      logMessage "IS_NAMESPACE is the expected value (${IS_NAMESPACE})."
+      logMessage "IS_NAMESPACE is the expected value '${IS_NAMESPACE}'."
     fi
 
     if [ "${IS_VERSION}" -ge 2023303 ]; then
@@ -1186,20 +1186,20 @@ validateISDetails() {
     if [ "${#IS_IS_NAMESPACE}" -gt ${IS_NS_MAX_LEN} ]; then
       logError "139" "IS_NAMESPACE name is too long - maximum of ${IS_NS_MAX_LEN} characters."
     else
-      logMessage "IS_NAMESPACE name length is ${IS_NS_MAX_LEN} characters or less."
+      logMessage "IS_NAMESPACE name length is ${IS_NS_MAX_LEN} characters or less." 1
     fi
 
     if [ "${ISP_CUSTOMER_SERVICE}-${ISP_ENVIRONMENT}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
       logError "140" "CUSTOMER_SERVICE (${ISP_CUSTOMER_SERVICE}) and/or ENVIRONMENT (${ISP_ENVIRONMENT}) values do not match those set in the hitt.conf file - (${IS_CUSTOMER_SERVICE} and ${IS_ENVIRONMENT})."
     else
-      logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid (${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT})."
+      logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid '${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT}'." 1
     fi
 
     if checkK8sAuth get ingressclasses; then
       if isBlank "${IS_INGRESS_CLASS}" || ! ${KUBECTL_BIN} get ingressclasses "${IS_INGRESS_CLASS}" > /dev/null 2>&1 ; then
         logError "141" "INGRESS_CLASS (${IS_INGRESS_CLASS})is blank or not valid."
       else
-        logMessage "INGRESS_CLASS (${IS_INGRESS_CLASS}) appears valid."
+        logMessage "INGRESS_CLASS '${IS_INGRESS_CLASS}' appears valid." 1
       fi
     else
       logWarning "011" "Unable to list ingressclasses - skipping INGRESS_CLASS checks."
@@ -1208,13 +1208,13 @@ validateISDetails() {
     if [ "${IS_CLUSTER_DOMAIN}" != "${CLUSTER_DOMAIN}" ]; then
       logError "142" "CLUSTER_DOMAIN (${IS_CLUSTER_DOMAIN}) does not match that used for the Helix Platform (${CLUSTER_DOMAIN})."
     else
-      logMessage "CLUSTER_DOMAIN has the expected value of ${CLUSTER_DOMAIN}."
+      logMessage "CLUSTER_DOMAIN is the expected value of '${CLUSTER_DOMAIN}'." 1
     fi
 
     if [ "${IS_INPUT_CONFIG_METHOD}" != "Generate_Input_File" ]; then
       logError "143" "INPUT_CONFIG_METHOD should be Generate_Input_File."
     else
-      logMessage "INPUT_CONFIG_METHOD has the expected value of Generate_Input_File."
+      logMessage "INPUT_CONFIG_METHOD is the expected value of Generate_Input_File." 1
     fi
 
     if isBlank "${IS_HELM_NODE}" ; then
@@ -1226,7 +1226,7 @@ validateISDetails() {
         if [ "${IS_HELM_NODE}" == "${i}" ]; then NODE_MATCH=1; fi
       done
       if [ "${NODE_MATCH}" == 1"" ]; then
-        logMessage "HELM_NODE (${IS_HELM_NODE}) is a valid node in Jenkins."
+        logMessage "HELM_NODE '${IS_HELM_NODE}' is a valid node in Jenkins." 1
       else
         logError "145" "HELM_NODE (${IS_HELM_NODE}) not found as a Jenkins node.  Available nodes are:"
         printf '%s\n' "${NODE_ARRAY[@]}"
@@ -1283,19 +1283,19 @@ validateISDetails() {
     if [ "${IS_REGISTRY_TYPE}" != "DTR" ]; then
       logError "146" "REGISTRY_TYPE must be DTR."
     else
-      logMessage "REGISTRY_TYPE is the expected value of DTR."
+      logMessage "REGISTRY_TYPE is the expected value of DTR." 1
     fi
 
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${HP_REGISTRY_SERVER}" ]; then
       logError "147" "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the Helix Platform registry server (${HP_REGISTRY_SERVER})."
     else
-      logMessage "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) matches the Helix Platform registry server (${HP_REGISTRY_SERVER})."
+      logMessage "HARBOR_REGISTRY_HOST '${IS_HARBOR_REGISTRY_HOST}' matches the Helix Platform registry server '${HP_REGISTRY_SERVER}'." 1
     fi
 
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${HP_REGISTRY_USERNAME}" ]; then
       logError "148" "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the Helix Platform registry username (${HP_REGISTRY_USERNAME})."
     else
-      logMessage "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) matches the Helix Platform registry username (${HP_REGISTRY_USERNAME})."
+      logMessage "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) matches the Helix Platform registry username (${HP_REGISTRY_USERNAME})." 1
     fi
 
     if [ "${IS_DB_SSL_ENABLED}" == "true" ]; then
@@ -1349,12 +1349,12 @@ validateISDetails() {
       if [ "${IS_LOGS_ELASTICSEARCH_TLS}" != "true" ]; then
         logError "151" "LOGS_ELASTICSEARCH_TLS (${IS_LOGS_ELASTICSEARCH_TLS}) is not the expected value of true."
       else
-        logMessage "LOGS_ELASTICSEARCH_TLS is the expected value of true."
+        logMessage "LOGS_ELASTICSEARCH_TLS is the expected value of true." 1
       fi
       if [ "${IS_LOGS_ELASTICSEARCH_PASSWORD}" != "${HELIX_LOGGING_PASSWORD}" ]; then
         logError "152" "LOGS_ELASTICSEARCH_PASSWORD does not match the Helix Platform KIBANA_PASSWORD."
       else
-        logMessage "LOGS_ELASTICSEARCH_PASSWORD matches the Helix Platform KIBANA_PASSWORD."
+        logMessage "LOGS_ELASTICSEARCH_PASSWORD matches the Helix Platform KIBANA_PASSWORD." 1
       fi
       checkIsValidElastic "${IS_LOGS_ELASTICSEARCH_HOSTNAME}" "LOGS_ELASTICSEARCH_HOSTNAME"
     fi
@@ -1371,37 +1371,37 @@ validateISDetails() {
     if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${HP_REGISTRY_PASSWORD}" ]; then
       logError "153" "IMAGE_REGISTRY_PASSWORD does not match the Helix Platform registry password."
     else
-      logMessage "IMAGE_REGISTRY_PASSWORD matches the Helix Platform registry password."
+      logMessage "IMAGE_REGISTRY_PASSWORD matches the Helix Platform registry password." 1
     fi
 
     if [ "$IS_VC_RKM_USER_NAME" == "${IS_VC_PROXY_USER_LOGIN_NAME}" ] || [ -z "$IS_VC_RKM_USER_NAME" ] || [ -z "${IS_VC_PROXY_USER_LOGIN_NAME}" ]; then
       logError "154" "VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME must be different and cannot be blank."
     else
-      logMessage "VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME appear valid."
+      logMessage "VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME appear valid." 1
     fi
 
     if [ -n "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" ] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ ^\[.* ]] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ .*\]$ ]]; then
       logError "155" "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}) does not match the expected format of [x.x.x.x] - missing square brackets?"
     else
-      logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS})."
+      logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - ${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}."
     fi
 
     if [ "${IS_RSSO_ADMIN_USER,,}" != "${RSSO_USERNAME,,}" ]; then
       logError "156" "RSSO_ADMIN_USER (${IS_RSSO_ADMIN_USER}) does not match the Helix Platform RSSO_ADMIN_USER (${RSSO_USERNAME})."
     else
-      logMessage "RSSO_ADMIN_USER is the expected value of ${IS_RSSO_ADMIN_USER}."
+      logMessage "RSSO_ADMIN_USER is the expected value of ${IS_RSSO_ADMIN_USER}." 1
     fi
 
     if [ "${IS_HELIX_PLATFORM_NAMESPACE}" != "${HP_NAMESPACE}" ]; then
       logError "157" "HELIX_PLATFORM_NAMESPACE (${IS_HELIX_PLATFORM_NAMESPACE}) is not the expected value of ${HP_NAMESPACE}."
     else
-      logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of ${HP_NAMESPACE}."
+      logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of ${HP_NAMESPACE}." 1
     fi
 
     if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ]; then
       logError "158" "HELIX_PLATFORM_CUSTOMER_NAME (${IS_HELIX_PLATFORM_CUSTOMER_NAME}) is not the expected value of ${HP_COMPANY_NAME}."
     else
-      logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of ${HP_COMPANY_NAME}."
+      logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of ${HP_COMPANY_NAME}." 1
     fi
   fi
 }
@@ -1463,7 +1463,7 @@ validateCacerts() {
   if ! ${KEYTOOL_BIN} -list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
     logError "162" "cacerts file does not contain the expected ${FTS_ELASTIC_CERTNAME} certificate required for FTS Elasticsearch connection."
   else
-    logMessage "cacerts file contains the expected Elasticsearch ${FTS_ELASTIC_CERTNAME} certificate."
+    logMessage "cacerts file contains the expected Elasticsearch ${FTS_ELASTIC_CERTNAME} certificate." 1
   fi
 
   # Convert JKS to pem
@@ -1509,7 +1509,7 @@ checkISFTSElasticHost() {
           logError "167" "${1} does not appear to be the expected Elasticsearch service instance for FTS."
           echo "${ES_HEALTH}" | ${JQ_BIN} -r '.cluster_name'
         else
-          logMessage "${1} appears to be a valid Elasticsearch service instance for FTS."
+          logMessage "${1} appears to be a valid Elasticsearch service instance for FTS." 1
         fi
       fi
     fi
@@ -1517,7 +1517,7 @@ checkISFTSElasticHost() {
     if [ "${1}" != "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
       logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
     else
-      logMessage "FTS_ELASTICSEARCH_HOSTNAME appears valid (${1})."
+      logMessage "FTS_ELASTICSEARCH_HOSTNAME appears valid (${1})." 1
     fi
   fi
 }
@@ -1560,19 +1560,19 @@ getSvcFromExternalIP() {
 
 checkFTSElasticSettings() {
   BAD_FTS_ELASTIC=0
-  logMessage "FTS_ELASTICSEARCH_USERNAME is '${IS_FTS_ELASTICSEARCH_USERNAME}'."
+  logMessage "FTS_ELASTICSEARCH_USERNAME is '${IS_FTS_ELASTICSEARCH_USERNAME}'." 1
   if [ "${IS_FTS_ELASTICSEARCH_PORT}" != "9200" ]; then
     logError "173 ""FTS_ELASTICSEARCH_PORT (${IS_FTS_ELASTICSEARCH_PORT}) is not the expected value of 9200."
     BAD_FTS_ELASTIC=1
   else
-    logMessage "FTS_ELASTICSEARCH_PORT is the expected value of 9200."
+    logMessage "FTS_ELASTICSEARCH_PORT is the expected value of 9200." 1
   fi
 
   if [ "${IS_FTS_ELASTICSEARCH_SECURE}" != "true" ]; then
     logError "174" "FTS_ELASTICSEARCH_SECURE (${IS_FTS_ELASTICSEARCH_SECURE}) is not the expected value of 'true'."
     BAD_FTS_ELASTIC=1
   else
-    logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of 'true'."
+    logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of 'true'." 1
   fi
 
 # Not expected as FTS user is not a pipeline var.
@@ -1593,7 +1593,7 @@ checkFTSElasticSettings() {
     logError "175" "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of '${LOG_ELASTICSEARCH_PASSWORD}'."
     BAD_FTS_ELASTIC=1
   else
-    logMessage "FTS_ELASTICSEARCH_USER_PASSWORD is the expected value."
+    logMessage "FTS_ELASTICSEARCH_USER_PASSWORD is the expected value." 1
   fi
 
   [[ "${BAD_FTS_ELASTIC}" == "0" ]] && checkIsValidElastic "${IS_FTS_ELASTICSEARCH_HOSTNAME}" "FTS_ELASTICSEARCH_HOSTNAME" "${IS_FTS_ELASTICSEARCH_USERNAME}" "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}"
@@ -1685,17 +1685,17 @@ checkAssistTool() {
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[*].name}' | grep -q fpackager ; then
       logError "177" "fpackager sidecar containers not found - Support Assistant will not be able to access application logs."
     else
-      logMessage "fpackager sidecar containers are present."
+      logMessage "fpackager sidecar containers are present." 1
     fi
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get role assisttool-rl > /dev/null 2>&1 ; then
       logError "178" "assisttool-rl role not found - Support Assistant will not be able to access application logs."
     else
-      logMessage "assisttool-rl role present in Helix IS namespace."
+      logMessage "assisttool-rl role present in Helix IS namespace." 1
     fi
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get rolebinding assisttool-rlb > /dev/null 2>&1 ; then
       logError "178" "assisttool-rlb rolebinding not found - Support Assistant will not be able to access application logs."
     else
-      logMessage "assisttool-rlb rolebinding present in Helix IS namespace."
+      logMessage "assisttool-rlb rolebinding present in Helix IS namespace." 1
     fi
   else
     logMessage "Support Assistant Tool is not deployed."
@@ -1765,7 +1765,7 @@ checkISDBSettings() {
         if [ "${DB_VERSION}" != "${IS_DB_VERSION}" ]; then
           logError "181" "Database is not the expected version - found ${DB_VERSION} but should be ${IS_DB_VERSION}."
         else
-          logMessage "Database is the expected version - ${DB_VERSION}."
+          logMessage "Database is the expected version - ${DB_VERSION}." 1
         fi
       else
         logMessage "Database currDbVersion is ${DB_VERSION}."
@@ -1841,7 +1841,7 @@ checkKubeconfig() {
     KUBECONFIG_ERROR=1
   fi
   if [ ${KUBECONFIG_ERROR} == "0" ]; then
-    logMessage "Local KUBECONFIG file appears valid."
+    logMessage "Local KUBECONFIG file appears valid." 1
   fi
 }
 
@@ -1881,7 +1881,7 @@ getRegistryDetailsFromIS() {
 
 checkHPRegistryDetails() {
   getRegistryDetailsFromHP
-  logMessage "Helix Platform IMAGE_REGISTRY_HOST is ${HP_REGISTRY_SERVER} and IMAGE_REGISTRY_USERNAME is ${HP_REGISTRY_USERNAME}."
+  logMessage "Helix Platform IMAGE_REGISTRY_HOST is ${HP_REGISTRY_SERVER} and IMAGE_REGISTRY_USERNAME is ${HP_REGISTRY_USERNAME}." 1
 }
 
 checkISDBLatency() {
@@ -2166,7 +2166,7 @@ validateJenkinsKubeconfig() {
   if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>>${HITT_DBG_FILE}; then
     logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
   else
-    logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file."
+    logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file." 1
   fi
 }
 
@@ -2225,7 +2225,7 @@ checkJenkinsGlobalLibs() {
   if [ "${MISSING_LIBS}" != "" ]; then
     logError "215" "One or more Jenkins global pipeline libraries not found -${MISSING_LIBS}"
   else
-    logMessage "Expected global pipeline libraries found in Jenkins."
+    logMessage "Expected global pipeline libraries found in Jenkins." 1
   fi
 }
 
