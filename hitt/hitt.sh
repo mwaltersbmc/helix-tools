@@ -673,7 +673,8 @@ validateRealmDomains() {
     WILDCARD_CERT=0
   fi
 
-  ADE_ALIAS_ARRAY=("${LB_HOST}" "${TMS_LB_HOST}" "${MINIO_LB_HOST}" "${MINIO_API_LB_HOST}" "${KIBANA_LB_HOST}" "${PORTAL_HOSTNAME}")
+  ADE_ALIAS_ARRAY=("${LB_HOST}" "${TMS_LB_HOST}" "${MINIO_LB_HOST}" "${MINIO_API_LB_HOST}" "${PORTAL_HOSTNAME}")
+  [[ -n "${KIBANA_LB_HOST}" ]] && ADE_ALIAS_ARRAY+=("${KIBANA_LB_HOST}")
   for i in "${ADE_ALIAS_ARRAY[@]}"; do
     validateAliasInDNS "${i}"
     validateAliasInLBCert "${i}"
