@@ -78,7 +78,12 @@ logWarning() {
 
 logMessage() {
   # Print message
-  echo -e "\t${1}"
+  if [ -z ${2} ]; then
+    MSG_LEVEL=0
+  else
+    MSG_LEVEL=${2}
+  fi
+  [[ ${MSG_LEVEL} -le ${VERBOSITY} ]] && echo -e "\t${1}"
 }
 
 logStatus() {
@@ -618,7 +623,7 @@ checkTenantRealms() {
 }
 
 validateRealm() {
-  logMessage "Using realm - ${REALM_NAME}"
+  logMessage "Using realm '${REALM_NAME}'"
   # Parse realm data
   REALM_ARHOST=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arHost)
   if [ "${REALM_ARHOST}" != "platform-user-ext.${IS_NAMESPACE}" ]; then
@@ -650,7 +655,7 @@ validateRealm() {
 buildISAliasesArray() {
   if [ "${IS_ENVIRONMENT}" == "prod" ]; then
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}"
-    logMessage "ENVIRONMENT value is 'prod' - IS hostnames prefix is \"${IS_ALIAS_PREFIX}-\""
+    logMessage "ENVIRONMENT value is 'prod' - IS hostnames prefix is '${IS_ALIAS_PREFIX}-'"
   else
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
     logMessage "IS hostnames prefix is \"${IS_ALIAS_PREFIX}\""
@@ -687,7 +692,7 @@ validateRealmDomains() {
       logError "120" "Alias '${TARGET}' not found in Application Domains list."
       BAD_DOMAINS=1
     else
-      logMessage "  - alias '${TARGET}' found in realm Application Domains list."
+      logMessage "  - alias '${TARGET}' found in realm Application Domains list." 1
     fi
     validateAliasInDNS "${TARGET}"
     validateAliasInLBCert "${TARGET}"
@@ -703,7 +708,7 @@ validateAliasInDNS() {
   if ! ${HOST_BIN} ${1} > /dev/null 2>>${HITT_DBG_FILE}; then
     logError "122" "Entry for '${1}' not found in DNS."
   else
-    logMessage "  - alias '${1}' found in DNS."
+    logMessage "  - alias '${1}' found in DNS." 1
   fi
 }
 
@@ -714,7 +719,7 @@ validateAliasInLBCert() {
   if ! ${OPENSSL_BIN} s_client -connect "${1}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "${1}" ; then
     logError "218" "Alias '${1}' is not present as a SAN in the Helix certificate."
   else
-    logMessage "  - alias '${1}' found in the Helix certificate."
+    logMessage "  - alias '${1}' found in the Helix certificate." 1
   fi
 }
 
@@ -1444,7 +1449,7 @@ validateCacerts() {
     logError "161" "cacerts file is of type '${CACERTS_FILETYPE}' and not the expected Java keystore."
     return
   else
-    logMessage "cacerts file is a valid Java keystore."
+    logMessage "cacerts file is a valid Java keystore." 1
   fi
 
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "changeit" ]; then
@@ -1479,7 +1484,7 @@ validateCacerts() {
       logError "164" "Certificate for '${TARGET}' not found in cacerts."
       VALID_CACERTS=1
     else
-      logMessage "  - valid certificate for '${TARGET}' found in cacerts file."
+      logMessage "  - valid certificate for '${TARGET}' found in cacerts file." 1
     fi
   done
 
@@ -2635,6 +2640,7 @@ IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
 JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
 IS_ALIAS_ARRAY=()
 ADE_ALIAS_ARRAY=()
+VERBOSITY=0
 BOLD="\e[1m"
 NORMAL="\e[0m"
 RED="\e[31m"
@@ -3600,13 +3606,16 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "ce:f:jlm:pt:" options; do
+while getopts "ce:f:jlm:pt:v" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
       ;;
     e)
       STOP_ON_ERROR="${OPTARG}"
+      ;;
+    f)
+      HITT_CONFIG_FILE=${OPTARG}
       ;;
     j)
       DUMP_JCREDS=1
@@ -3626,8 +3635,8 @@ while getopts "ce:f:jlm:pt:" options; do
         logError "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
       fi
       ;;
-    f)
-      HITT_CONFIG_FILE=${OPTARG}
+    v)
+      VERBOSITY=1
       ;;
     :)
       echo -e "${BOLD}ERROR:${NORMAL} -${OPTARG} requires an argument."
