@@ -331,7 +331,6 @@ setVarsFromPlatform() {
   LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
   LOG_ELASTICSEARCH_USERNAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_USERNAME | @base64d')
   FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
-
   # Catch cases where the LB_HOST is the same as the IS CUSTOMER_SERVICE-ENVIRONMENT.CLUSTER_DOMAIN
   if [ "${IS_ENVIRONMENT}" == "prod" ]; then
     IS_PREFIX="${IS_CUSTOMER_SERVICE}"
@@ -648,9 +647,7 @@ validateRealm() {
   fi
 }
 
-validateRealmDomains() {
-  logMessage "Checking for expected hostname aliases in realm Application Domains & DNS..."
-  # Special case when IS_ENVIRONMENT is "prod"
+buildISAliasesArray() {
   if [ "${IS_ENVIRONMENT}" == "prod" ]; then
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}"
     logMessage "ENVIRONMENT value is 'prod' - IS hostnames prefix is \"${IS_ALIAS_PREFIX}-\""
@@ -658,24 +655,41 @@ validateRealmDomains() {
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
     logMessage "IS hostnames prefix is \"${IS_ALIAS_PREFIX}\""
   fi
-  # Check for midtier alias
-  if ! echo "${REALM_DOMAINS[@]}" | grep -q "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}" ; then
-    logError "120" "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} not found in the realm Application Domains list."
-    BAD_DOMAINS=1
-  else
-    logMessage "  - ${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN} found in the realm Application Domains list."
-  fi
-  validateDomainInDNS "${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}"
-  # Check for other IS aliases
+  # Midtier alias
+  IS_ALIAS_ARRAY+=("${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}")
+  # Add other IS aliases
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
-    TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
+    IS_ALIAS_ARRAY+=("${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}")
+  done
+}
+
+validateRealmDomains() {
+  logMessage "Checking for expected hostname aliases in realm Application Domains, DNS & Helix certificate..."
+  # Check for wildcard certain
+  if ${OPENSSL_BIN} s_client -connect "${LB_HOST}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "*.${CLUSTER_DOMAIN}" ; then
+    logMessage "Helix certificate is a wildcard for '*.${CLUSTER_DOMAIN}'"
+    WILDCARD_CERT=1
+  else
+    WILDCARD_CERT=0
+  fi
+
+  ADE_ALIAS_ARRAY=("${LB_HOST}" "${TMS_LB_HOST}" "${MINIO_LB_HOST}" "${MINIO_API_LB_HOST}" "${KIBANA_LB_HOST}" "${PORTAL_HOSTNAME}")
+  for i in "${ADE_ALIAS_ARRAY[@]}"; do
+    validateAliasInDNS "${i}"
+    validateAliasInLBCert "${i}"
+  done
+
+  buildISAliasesArray
+  # Check for midtier alias
+  for TARGET in "${IS_ALIAS_ARRAY[@]}"; do
     if ! echo "${REALM_DOMAINS[@]}" | grep -q "${TARGET}" ; then
-      logError "120" "${TARGET} not found in Application Domains list."
+      logError "120" "Alias '${TARGET}' not found in Application Domains list."
       BAD_DOMAINS=1
     else
-      logMessage "  - ${TARGET} found in realm Application Domains list."
+      logMessage "  - alias '${TARGET}' found in realm Application Domains list."
     fi
-    validateDomainInDNS "${TARGET}"
+    validateAliasInDNS "${TARGET}"
+    validateAliasInLBCert "${TARGET}"
   done
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}" ; then
@@ -683,12 +697,23 @@ validateRealmDomains() {
   fi
 }
 
-validateDomainInDNS() {
+validateAliasInDNS() {
   # hostname to check
   if ! ${HOST_BIN} ${1} > /dev/null 2>>${HITT_DBG_FILE}; then
-    logError "122" "Entry for ${1} not found in DNS."
+    logError "122" "Entry for '${1}' not found in DNS."
   else
-    logMessage "  - ${1} found in DNS."
+    logMessage "  - alias '${1}' found in DNS."
+  fi
+}
+
+validateAliasInLBCert() {
+  # Check that alias is valid for the cert used in LB/NGINX
+  # 1/alias
+  [[ "${WILDCARD_CERT}" == "1" ]] && return
+  if ! ${OPENSSL_BIN} s_client -connect "${1}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "${1}" ; then
+    logError "218" "Alias '${1}' is not present as a SAN in the Helix certificate."
+  else
+    logMessage "  - alias '${1}' found in the Helix certificate."
   fi
 }
 
@@ -2607,6 +2632,8 @@ CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
 JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
+IS_ALIAS_ARRAY=()
+ADE_ALIAS_ARRAY=()
 BOLD="\e[1m"
 NORMAL="\e[0m"
 RED="\e[31m"
@@ -3563,6 +3590,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The DB_JDBC_URL parameter is set but this is only supported when DB_TYPE is oracle.\",
     \"impact\": \"The HELIX_SMARTAPPS_DEPLOY pipeline will fail at the catalog-data-upgrade stage.\",
     \"remediation\": \"Remove the value from the DB_JDBC_URL parameter.\"
+  },
+  {
+    \"id\": \"218\",
+    \"cause\": \"The named hostname alias was not found in the Helix certificate returned by the load balancer.\",
+    \"impact\": \"Deployment may fail.\",
+    \"remediation\": \"Check the Helix certificate and make sure that all required Helix hostname aliases are present as SAN entries, or use a wildcard.\"
   }
 ]"
 
