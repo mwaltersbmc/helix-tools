@@ -155,7 +155,7 @@ checkToolVersion() {
       ;;
     kubectl)
       REQUIRED_VERSION=1.20
-      KUBECTL_JSON=$(${KUBECTL_BIN} version -o json 2>>${HITT_DBG_FILE})
+      KUBECTL_JSON=$(${KUBECTL_BIN} version -o json 2>>${HITT_ERR_FILE})
       INSTALLED_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.major + "." + .clientVersion.minor')
       KUBECTL_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.gitVersion')
       K8S_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.serverVersion.gitVersion')
@@ -272,7 +272,7 @@ checkPodStatus() {
 
 logDescribePod() {
   # ns / pod name
-  ${KUBECTL_BIN} -n "${1}" describe pod "${2}" > "k8s-desc-pod-${1}-${2}.log" 2>>${HITT_DBG_FILE}
+  ${KUBECTL_BIN} -n "${1}" describe pod "${2}" > "k8s-desc-pod-${1}-${2}.log" 2>>${HITT_ERR_FILE}
 }
 
 getVersions() {
@@ -705,7 +705,7 @@ validateRealmDomains() {
 
 validateAliasInDNS() {
   # hostname to check
-  if ! ${HOST_BIN} ${1} > /dev/null 2>>${HITT_DBG_FILE}; then
+  if ! ${HOST_BIN} ${1} > /dev/null 2>>${HITT_ERR_FILE}; then
     logError "122" "Entry for '${1}' not found in DNS."
   else
     logMessage "  - alias '${1}' found in DNS." 1
@@ -1473,14 +1473,14 @@ validateCacerts() {
 #  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
 #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
 #  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
-  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${LB_HOST}" 443 >>${HITT_DBG_FILE} 2>&1 ; then
+  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${LB_HOST}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
     logError "163" "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
     VALID_CACERTS=1
   fi
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
 #    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
-    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${TARGET}" 443 >>${HITT_DBG_FILE} 2>&1 ; then
+    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${TARGET}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
       logError "164" "Certificate for '${TARGET}' not found in cacerts."
       VALID_CACERTS=1
     else
@@ -2101,7 +2101,7 @@ checkForNewHITT() {
     if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
       logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -sL https://bit.ly/hitt-sh -o hitt.sh${NORMAL}"
       echo
-      read -r -s -n1 -t5 -p"Press any key to continue or Ctrl+C to cancel..."
+      read -r -s -n1 -t3 -p"Press any key to continue or Ctrl+C to cancel..."
       echo
     fi
   fi
@@ -2163,7 +2163,7 @@ validateJenkinsKubeconfig() {
     logWarning "028" "Failed to extract kubeconfig file from Jenkins - skipping validation."
     return
   fi
-  if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>>${HITT_DBG_FILE}; then
+  if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>>${HITT_ERR_FILE}; then
     logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
   else
     logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file." 1
@@ -2353,8 +2353,14 @@ printMessageDetails() {
 
 logMessageDetails() {
   # MSG_ID
+  # Suppress MSG_JSON parsing to reduce clutter
+  set +x
   getMessageJSON "${1}"
   getMessageDetails
+  # Re-enable debugging if set
+  if [ "${DEBUG}" == "1" ]; then
+    set -x
+  fi
   printMessageDetails >> "${HITT_MSG_FILE}"
 }
 
@@ -2453,7 +2459,7 @@ getJenkinsCrumb() {
 
 runJenkinsCurl() {
   #1 groovy script
-  ${CURL_BIN} -b .cookies --data-urlencode "script=${1}" -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_DBG_FILE}
+  ${CURL_BIN} -b .cookies --data-urlencode "script=${1}" -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_ERR_FILE}
 }
 
 # FUNCTIONS End
@@ -2622,6 +2628,7 @@ ${ZIP_BIN} -q - *.log hitt*.txt k8s*.txt > hittlogs.zip
 SCRIPT_VERSION=1
 HITT_CONFIG_FILE=hitt.conf
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
+DEBUG=0
 FAIL=0
 WARN=0
 SKIP_JENKINS=0
@@ -2629,11 +2636,12 @@ CREATE_LOGS=1
 LOG_PASSWDS=0
 HITT_LOG_FILE=hitt.log
 HITT_DBG_FILE=hittdebug.log
+HITT_ERR_FILE=hitterror.log
 HITT_MSG_FILE=hittmsgs.log
 VALUES_LOG_FILE=values.log
 CLEANUP_DIRS=(configsrepo)
 CLEANUP_FILES=(sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins)
-CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}")
+CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}")
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
@@ -3606,10 +3614,13 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "ce:f:jlm:pt:v" options; do
+while getopts "cde:f:jlm:pt:v" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
+      ;;
+    d)
+      DEBUG=1
       ;;
     e)
       STOP_ON_ERROR="${OPTARG}"
@@ -3650,7 +3661,10 @@ done
 
 # Call main()
 if [ ${CREATE_LOGS} -eq 1 ]; then
-  main | tee "${HITT_LOG_FILE}"
+  if [ "${DEBUG}" == "1" ]; then
+    set -x
+  fi
+  main 2>&1 | tee "${HITT_LOG_FILE}"
 else
   main
 fi
