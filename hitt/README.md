@@ -126,9 +126,10 @@ The tctl commands must be enclosed in double quotes and the output will be displ
 There are several extra command line switches which may be helpful for troubleshooting.
 
 -c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not remove temporary files used by HITT.\
--e #&nbsp;&nbsp;&nbsp;&nbsp;Script will exit on specified error number.  Use 0 to stop on first error.\
+-d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enable *set -x* debugging output.\
+-e #&nbsp;&nbsp;&nbsp;&nbsp;Script will exit on specified error number.  Use *-e 0* to stop on first error.\
 -j&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
--p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In pre-is mode, output pipeline passwords in values.log file.\
+-p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In pre-is mode, output pipeline passwords in *values.log* file.\
 -v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging,
 
 ### Checks Summary ###
