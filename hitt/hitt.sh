@@ -2322,7 +2322,7 @@ esac
 getPods() {
   # ns name
   logMessage "Getting pods from ${1}..."
-  ${KUBECTL_BIN} -n ${1} get pods -o wide > k8s-get-pods-${1}.log
+  ${KUBECTL_BIN} -n ${1} get pods -o wide 2>/dev/null > k8s-get-pods-${1}.log
 }
 
 getEvents() {
