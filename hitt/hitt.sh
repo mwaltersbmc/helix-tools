@@ -2490,7 +2490,11 @@ fi
 source "${HITT_CONFIG_FILE}"
 checkForNewHITT
 
+
 # Make Jenkins credentials URL safe
+if [ "${JENKINS_USERNAME}" == "" ] && [ "${JENKINS_PASSWORD}" != "" ]; then
+  logError "219" "JENKINS_PASSWORD is set but JENKINS_USERNAME is blank.  Please set both values in the hitt.conf file." 1
+fi
 if [ -n "${JENKINS_USERNAME}" ]; then
   JENKINS_PASSWORD=$(printf %s "${JENKINS_PASSWORD}" | ${JQ_BIN} -sRr @uri)
   JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
@@ -3611,6 +3615,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The named hostname alias was not found in the Helix certificate returned by the load balancer.\",
     \"impact\": \"Deployment may fail.\",
     \"remediation\": \"Check the Helix certificate and make sure that all required Helix hostname aliases are present as SAN entries, or use a wildcard.\"
+  },
+  {
+    \"id\": \"219\",
+    \"cause\": \"The hitt.conf file has a value set for the JENKINS_PASSWORD but the JENKINS_USERNAME value is blank.\",
+    \"impact\": \"HITT cannot continue.\",
+    \"remediation\": \"Please set, or clear, the JENKINS_PASSWORD and JENKINS_USERNAME values in the hitt.conf file.\"
   }
 ]"
 
