@@ -2541,6 +2541,10 @@ logStatus "Checking for required tools in path..."
 checkRequiredTools
 # Remove
 cleanUp start
+if [ $(whoami) == "root" ]; then
+  echo
+  logWarning "035" "The HITT script should be run as the git user, not as root."
+fi
 logStatus "Checking namespaces..."
 if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
   logError "201" "Helix Platform and Helix IS should be installed in their own namespaces." 1
@@ -2901,6 +2905,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"There are Kubernetes resourcequotas defined for the named namespace.\",
     \"impact\": \"If the quotas are too low deployments may fail.\",
     \"remediation\": \"Review the resourcequotas and verify that they are high enough for the planned deployment.\"
+  },
+  {
+    \"id\": \"035\",
+    \"cause\": \"The HITT script is being run by the root user.\",
+    \"impact\": \"Some HITT checks may fail as they are expected to be run by the git user.\",
+    \"remediation\": \"Run the HITT script as the git user.\"
   },
   {
     \"id\": \"100\",
