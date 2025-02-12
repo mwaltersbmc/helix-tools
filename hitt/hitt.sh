@@ -244,7 +244,7 @@ checkISNamespace() {
   checkNamespaceExists "${1}"
   if [ "${MODE}" == "pre-is" ]; then
     if [ $(${KUBECTL_BIN} -n "${1}" get secret --field-selector type=kubernetes.io/dockerconfigjson 2>&1 | wc -l) == "1" ]; then
-      logError "108" "Registry secret not found in ${1} namespace - HELIX_GENERATE_CONFIG pipeline must have been run before ${MODE} checks." 1
+      logError "108" "Registry secret not found in ${1} namespace - HELIX_GENERATE_CONFIG pipeline must be run to enable all ${MODE} checks."
     fi
   fi
   if [ "${MODE}" == "post-is" ]; then
@@ -894,6 +894,8 @@ createPipelineVarsArray() {
   PIPELINE_VARS=(
     CHECKOUT_USING_USER
     CUSTOM_BINARY_PATH
+    GIT_USER_HOME_DIR
+    GIT_REPO_DIR
     IS_CLOUD
     ROUTE_ENABLED
     ROUTE_TLS_ENABLED
@@ -1135,8 +1137,16 @@ validateISDetails() {
     logMessage "CUSTOMER_SIZE is ${IS_CUSTOMER_SIZE}."
     logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
 
-    if [ "${IS_CHECKOUT_USING_USER}" == "" ]; then
-      logError "" "CHECKOUT_USING_USER is blank but should be the Jenkins credentials ID used to access the git repository files.  Default is 'github'."
+    if [ "${IS_CHECKOUT_USING_USER}" != "github" ]; then
+      logError "220" "CHECKOUT_USING_USER is not set to the expected value of the Jenkins credentials ID used to access the git repository files - usually 'github'."
+    fi
+
+    if [ ! -d "${IS_GIT_USER_HOME_DIR}" ]; then
+      logError "222" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not a valid directory."
+    fi
+
+    if [[ ! "${IS_GIT_REPO_DIR}" =~ ^ssh://.* ]]; then
+      logError "221" "GIT_REPO_DIR value is blank or not in the expected format of 'ssh://<Jenkins server host name>/home/git/git_repo'."
     fi
 
     if [ "${IS_DEPLOYMENT_MODE}" == "UPGRADE" ] || [ "${IS_DEPLOYMENT_MODE}" == "UPDATE" ]; then
@@ -1857,7 +1867,7 @@ getRegistryDetailsFromSecret() {
   REGISTRY_SERVER=""
   REGISTRY_USERNAME=""
   REGISTRY_PASSWORD=""
-  IMAGESECRET_JSON=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o jsonpath='{.data.\.dockerconfigjson}' | ${BASE64_BIN} -d)
+  IMAGESECRET_JSON=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o jsonpath='{.data.\.dockerconfigjson}' 2>/dev/null | ${BASE64_BIN} -d)
   if [ "${IMAGESECRET_JSON}" = "" ]; then
     logError "187" "Failed to get registry details from ${2} secret in ${1} namespace."
     SKIP_REGISTRY=1
@@ -1947,7 +1957,8 @@ checkISDockerLogin() {
 
 dumpVARs() {
   [[ ${CREATE_LOGS} -eq 0 ]] && return
-  rm -f "${VALUES_LOG_FILE}"
+  rm -f "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}"
+  echo "${JENKINS_PARAMS}" > "${VALUES_JSON_FILE}"
   # Debug mode to print all variables
   if [ "${MODE}" == "pre-is" ]; then
     echo "CUSTOMER_SERVICE=${ISP_CUSTOMER_SERVICE}" >> "${VALUES_LOG_FILE}"
@@ -2629,7 +2640,7 @@ if [ "${MODE}" != "post-hp" ]; then
 fi
 [ -f "${HITT_LOG_FILE}" ] && cat "${HITT_LOG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hitt.txt
 [ -f "${HITT_MSG_FILE}" ] && cat "${HITT_MSG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hittmsgs.txt
-${ZIP_BIN} -q - *.log hitt*.txt k8s*.txt > hittlogs.zip
+${ZIP_BIN} -q - *.log hitt*.txt k8s*.txt *.json > hittlogs.zip
 }
 
 # Set vars and process command line
@@ -2647,9 +2658,10 @@ HITT_DBG_FILE=hittdebug.log
 HITT_ERR_FILE=hitterror.log
 HITT_MSG_FILE=hittmsgs.log
 VALUES_LOG_FILE=values.log
+VALUES_JSON_FILE=values.json
 CLEANUP_DIRS=(configsrepo)
 CLEANUP_FILES=(sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cookies)
-CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}")
+CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}")
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
@@ -2963,7 +2975,7 @@ ALL_MSGS_JSON="[
   {
     \"id\": \"108\",
     \"cause\": \"The HELIX_GENERATE_CONFIG pipeline must have been run to create the image registry secret specified in the IMAGESECRET_NAME value.\",
-    \"impact\": \"When run in this mode HITT requires that the IMAGESECRET_NAME image registry secret has been created.\",
+    \"impact\": \"Some checks will not be run and HITT results will be imcomplete.\",
     \"remediation\": \"Populate the values in the HELIX_ONPREM_DEPLOYMENT pipeline and build it with the HELIX_GENERATE_CONFIG option selected.\"
   },
   {
@@ -3631,6 +3643,24 @@ ALL_MSGS_JSON="[
     \"cause\": \"The hitt.conf file has a value set for the JENKINS_PASSWORD but the JENKINS_USERNAME value is blank.\",
     \"impact\": \"HITT cannot continue.\",
     \"remediation\": \"Please set, or clear, the JENKINS_PASSWORD and JENKINS_USERNAME values in the hitt.conf file.\"
+  },
+  {
+    \"id\": \"220\",
+    \"cause\": \"The CHECKOUT_USING_USER value must be set - the expected value is 'github'.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Set the CHECKOUT_USING_USER value to 'github'.\"
+  },
+  {
+    \"id\": \"221\",
+    \"cause\": \"The GIT_REPO_DIR value must be set using the expected format of 'ssh://<Jenkins server host name>/home/git/git_repo'.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Set the GIT_REPO_DIR to the correct value.\"
+  },
+  {
+    \"id\": \"222\",
+    \"cause\": \"The GIT_USER_HOME_DIR value is not a valid directory path.  Check the output of the command 'file <value of GIT_USER_HOME_DIR>'.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Set the GIT_USER_HOME_DIR to the correct value.\"
   }
 ]"
 
