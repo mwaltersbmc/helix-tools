@@ -97,10 +97,11 @@ HITT creates various log files in the directory that the script is run from:
 
 - **hittmsgs.log** - additional details on the cause, impact and steps to fix, warnings and errors reported by the script.
 - **hitt.log** - script output.
-- **values.log** - the pipeline input values in pre-is mode, or values read from the cluster for post-is.
+- **values.\*** - the pipeline input values in pre-is mode, or values read from the cluster for post-is.
 - **PIPELINE_NAME.log** - console output for each of the Jenkins pipelines.
 - **k8s\*.log** - output from various kubectl commands such as 'get pods'.
 - **hittdebug.log** - error messages from commands run by the script which may be useful if it does not work as expected.
+- **\*.txt** - text only versions of log files - formatting/colour codes removed.
 
 All of the files are added to **hittlogs.zip** which can be sent to BMC Support if needed.
 
