@@ -6,7 +6,8 @@ The main modes are:
 
 **post-hp**	- used after the Helix Platform has been installed and the SSO realm for Helix IS has been created.\
 **pre-is**	- used after the Jenkins HELIX_ONPREM_DEPLOYMENT and HELIX_GENERATE_CONFIG pipelines have been run with all the installation values populated.\
-**post-is**	- used after the installation of Helix IS has been completed.
+**post-is**	- used after the installation of Helix IS has been completed.\
+**jenkins**  - run Jenkins configuration checks
 
 The HITT script requires minimal manual configuration and will read the information it needs from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
 
@@ -76,11 +77,14 @@ OR
 bash hitt.sh -m pre-is   - run IS pre-installation checks
 OR
 bash hitt.sh -m post-is  - run IS post-installation checks
+OR
+bash hitt.sh -m jenkins  - run Jenkins configuration checks
 ```
 
 Use **post-hp** after installing and configuring the Helix Platform but before using Jenkins.\
 Use **pre-is** after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting the deployment of Helix IS.\
-Use **post-is** for troubleshooting after IS deployment.
+Use **post-is** for troubleshooting after IS deployment.\
+Use **jenkins** to validate the configuration of Jenkins
 
 HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages and summarised at the end.  A **hittmgs.log** file is created which contains more detailed information, including the impact and suggested fix, for each error/warning.
 
