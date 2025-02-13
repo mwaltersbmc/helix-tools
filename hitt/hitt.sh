@@ -99,7 +99,7 @@ stopOnError() {
 usage() {
     echo ""
     echo -e "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
-    echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is>${NORMAL}"
+    echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is|jenkins>${NORMAL}"
     echo ""
     echo "Examples:"
     echo "bash $0 -m post-hp   - run post HP installation only checks"
@@ -107,10 +107,13 @@ usage() {
     echo "bash $0 -m pre-is   - run pre-installation checks"
     echo "OR"
     echo "bash $0 -m post-is  - run post-installation checks"
+    echo "OR"
+    echo "bash $0 -m jenkins  - run Jenkins configuration checks"
     echo ""
     echo -e "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
     echo -e "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
     echo -e "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
+    echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
     exit 1
 }
 

@@ -69,7 +69,7 @@ HITT requires one command line option (-m) to specify the operating mode, unless
 ```
 $ bash hitt.sh
 Helix IS Triage Tool (HITT)
-Usage: bash hitt.sh -m <post-hp|pre-is|post-is>
+Usage: bash hitt.sh -m <post-hp|pre-is|post-is|jenkins>
 
 Examples:
 bash hitt.sh -m post-hp  - run post HP installation only checks
