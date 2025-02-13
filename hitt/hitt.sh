@@ -417,6 +417,13 @@ setVarsFromPlatform() {
   if compare "${HP_VERSION%.*} >= 24.3" ; then
     FTS_ELASTIC_CERTNAME="esnodeopensearch2"
   fi
+
+  if compare "${HP_VERSION%.*} = 24.4" ; then
+    ZOOKEEPER_IMG=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get sts kafka-zookeeper -o jsonpath='{.spec.template.spec.containers[?(@.name=="zookeeper")].image}')
+    if [ "${ZOOKEEPER_IMG#*:}" == "24400-v71-bitnami-zookeeper-3.9.1-alpine-jdk11" ]; then
+      logError "223" "Helix Platform 24.4 is installed but the 24.4.00.001 hotfix has not been applied - please download this update from the BMC EPD and install it."
+    fi
+  fi
 }
 
 getRSSODetails() {
@@ -1958,7 +1965,6 @@ checkISDockerLogin() {
 dumpVARs() {
   [[ ${CREATE_LOGS} -eq 0 ]] && return
   rm -f "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}"
-  echo "${JENKINS_PARAMS}" > "${VALUES_JSON_FILE}"
   # Debug mode to print all variables
   if [ "${MODE}" == "pre-is" ]; then
     echo "CUSTOMER_SERVICE=${ISP_CUSTOMER_SERVICE}" >> "${VALUES_LOG_FILE}"
@@ -1974,6 +1980,7 @@ dumpVARs() {
         echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
       done
     fi
+    echo "${JENKINS_PARAMS}" > "${VALUES_JSON_FILE}"
   fi
   if [ "${MODE}" == "post-is" ]; then
     createPipelineVarsArray
@@ -3661,6 +3668,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The GIT_USER_HOME_DIR value is not a valid directory path.  Check the output of the command 'file <value of GIT_USER_HOME_DIR>'.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Set the GIT_USER_HOME_DIR to the correct value.\"
+  },
+  {
+    \"id\": \"223\",
+    \"cause\": \"The Helix Platform 24.4.00.001 hotfix has not been installed.\",
+    \"impact\": \"Helix applications may become unavailable due to defects DRRE3-7571 & DRRE3-7638.\",
+    \"remediation\": \"Review the product documentation and download and install the hotfix.\"
   }
 ]"
 
