@@ -391,8 +391,8 @@ setVarsFromPlatform() {
       ADE_INFRA_CLIENT_IMAGE_TAG=24400-v71-ade-infra-clients-alpine
       ;;
     25.1.00)
-      TCTL_VER=602
-      ADE_INFRA_CLIENT_IMAGE_TAG=25100-v97-ade-infra-clients-alpine
+      TCTL_VER=614
+      ADE_INFRA_CLIENT_IMAGE_TAG=25100-v151-ade-infra-clients-alpine
       ;;
     *)
       ;;
@@ -418,7 +418,7 @@ setVarsFromPlatform() {
     FTS_ELASTIC_CERTNAME="esnodeopensearch2"
   fi
 
-  if compare "${HP_VERSION%.*} = 24.4" ; then
+  if compare "${HP_VERSION%.*} == 24.4" ; then
     ZOOKEEPER_IMG=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get sts kafka-zookeeper -o jsonpath='{.spec.template.spec.containers[?(@.name=="zookeeper")].image}')
     if [ "${ZOOKEEPER_IMG#*:}" == "24400-v71-bitnami-zookeeper-3.9.1-alpine-jdk11" ]; then
       logError "223" "Helix Platform 24.4 is installed but the 24.4.00.001 hotfix has not been applied - please download this update from the BMC EPD and install it."
@@ -2307,7 +2307,7 @@ validateJenkinsCredentials() {
   if [ "${MISSING_CREDS}" != "" ]; then
     logError "198" "One or more Jenkins credentials not found -${MISSING_CREDS}"
   else
-    logMessage "Expected credentials found in Jenkins."
+    logMessage "Expected credentials found in Jenkins." 1
   fi
 
   if echo "${MISSING_CREDS}" | grep -vq kubeconfig ; then
@@ -2535,6 +2535,13 @@ if [[ ! -z "${DUMP_JCREDS}" ]]; then
   logStatus "Dumping Jenkins credentials..."
   checkJenkinsIsRunning
   validateJenkinsCredentials
+  exit
+fi
+
+if [ "${MODE}" == "jenkins" ]; then
+  logStatus "Running Jenkins config checks only..."
+  checkJenkinsIsRunning
+  checkJenkinsConfig
   exit
 fi
 
