@@ -1157,6 +1157,11 @@ validateISDetails() {
 
     if [[ ! "${IS_GIT_REPO_DIR}" =~ ^ssh://.* ]]; then
       logError "221" "GIT_REPO_DIR value is blank or not in the expected format of 'ssh://<Jenkins server host name>/home/git/git_repo'."
+    else
+      REPO_PATH=$(echo ${IS_GIT_REPO_DIR} | sed -e 's#ssh://[^/]*##')
+      if [ ! -d "${REPO_PATH}" ]; then
+        logError "224" "The directory used in the GIT_REPO_DIR value '${REPO_DIR}' is not a valid directory."
+      fi
     fi
 
     if [ "${IS_DEPLOYMENT_MODE}" == "UPGRADE" ] || [ "${IS_DEPLOYMENT_MODE}" == "UPDATE" ]; then
@@ -3684,6 +3689,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The Helix Platform 24.4.00.001 hotfix has not been installed.\",
     \"impact\": \"Helix applications may become unavailable due to defects DRRE3-7571 & DRRE3-7638.\",
     \"remediation\": \"Review the product documentation and download and install the hotfix.\"
+  },
+  {
+    \"id\": \"224\",
+    \"cause\": \"The directory referenced in the GIT_REPO_DIR value is not accessible or does not exist.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Review the product documentation and set the correct value.\"
   }
 ]"
 
