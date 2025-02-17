@@ -5,9 +5,9 @@
 
   vars:
     git_user: git
-    git_user_pwd:
+    git_user_pwd: password
     jenkins_user: jenkins
-    jenkins_user_pwd:
+    jenkins_user_pwd: password
     jenkins_login_user: admin
     jenkins_login_user_pwd:
     git_repo_dir: git_repos
@@ -37,17 +37,17 @@
         ssh_key_comment: "BMC Deployment Engine from {{ git_user }}/${HOSTNAME}"
         password: "{{ git_user_pwd | password_hash('sha512') }}"
 
-    - name: Allow the git user to use ssh loopback
+    - name: Set up ssh from git to git
       authorized_key:
         user: '{{ git_user }}'
         state: present
         key: "{{ lookup('file', '~{{ git_user }}/.ssh/id_rsa.pub') }}"
 
-    - name: Add to known_hosts
+    - name: Update known_hosts
       ansible.builtin.known_hosts:
-        path: "{{ git_user }}/.ssh/known_hosts"
+        path: "~{{ git_user }}/.ssh/known_hosts"
         name: "{{ item }}"
-        key: "{{ lookup('ansible.builtin.file', '~{{ git_user }}/.ssh/id_rsa.pub'') }}"
+        key: "{{ lookup('pipe', 'ssh-keyscan {{ item }}') }}"
         state: present
       with_items:
         - "{{ ansible_fqdn }}"
@@ -83,17 +83,17 @@
         ssh_key_comment: "BMC Deployment Engine from {{ jenkins_user }}/${HOSTNAME}"
         password: "{{ jenkins_user_pwd | password_hash('sha512') }}"
 
-    - name: Allow the git user to use ssh loopback
+    - name: Set up ssh from jenkins to git
       authorized_key:
         user: '{{ git_user }}'
         state: present
         key: "{{ lookup('file', '~{{ jenkins_user }}/.ssh/id_rsa.pub') }}"
 
-    - name: Add to known_hosts
+    - name: Update known_hosts
       ansible.builtin.known_hosts:
-        path: "{{ jenkins_user }}/.ssh/known_hosts"
+        path: "~{{ jenkins_user }}/.ssh/known_hosts"
         name: "{{ item }}"
-        key: "{{ lookup('ansible.builtin.file', '~{{ git_user }}/.ssh/id_rsa.pub'') }}"
+        key: "{{ lookup('pipe', 'ssh-keyscan {{ item }}') }}"
         state: present
       with_items:
         - "{{ ansible_fqdn }}"
@@ -108,10 +108,3 @@
       with_items:
         - "{{ git_user }}"
         - "{{ jenkins_user }}"
-
-
-    - name: Unzip GIT repositories to repos directory
-      unarchive:
-        src: '{{ item }}'
-        dest: '{{ base_dir }}/git_repos'
-      with_items:
