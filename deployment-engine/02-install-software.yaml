@@ -1,0 +1,54 @@
+---
+- hosts: localhost
+  gather_facts: true
+
+  vars:
+    - add_public_repos: true
+    - helm: 1
+    - kubectl: 1
+
+  tasks:
+
+    - name: Add public repos block
+      ansible.builtin.block:
+
+        - name: Enable RedHat codeready-builder repository
+          community.general.rhsm_repository:
+            name: codeready-builder-for-rhel-9-x86_64-rpms
+
+        - name: Add EPEL repository
+          ansible.builtin.yum_repository:
+            name: epel
+            description: EPEL repo
+            baseurl: https://download.fedoraproject.org/pub/epel/$releasever/$basearch/
+
+        - name: Add Jenkins repository
+          ansible.builtin.yum_repository:
+            name: jenkins
+            description: Jenkins repo
+            baseurl: https://pkg.jenkins.io/redhat-stable
+            gpgkey: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+
+      when: add_public_repos|bool
+
+    - name: Install software
+      package:
+        name: '{{ item }}'
+        state: present
+        update_cache: false
+        disable_gpg_check: true
+      with_items:
+        - python3-pip
+        - python3-jmespath
+        - unzip
+        - git
+        - dos2unix
+        - jq
+        - unzip
+        - xmlstarlet
+        - java-17-openjdk
+        - coreutils
+        - gtk3
+        - openssl
+        - openssl-libs
+        - wget
