@@ -1,0 +1,97 @@
+# Mark_Walters@bmc.com - please note that this script is NOT supported by BMC Software and is provided as-is.
+---
+- hosts: localhost
+  gather_facts: true
+
+  vars:
+    git_user: git
+    git_user_pwd:
+    jenkins_user: jenkins
+    jenkins_user_pwd:
+    jenkins_login_user: admin
+    jenkins_login_user_pwd:
+    git_repo_dir: git_repos
+    itsm_zip:
+    base_dir: ~{{ git_user }}
+    required_dirs:
+      - "{{ git_repo_dir }}"
+      - "{{ base_dir }}"
+      - .kube
+      - ansible_xx
+    libraries_zip: LIBRARY_REPO.zip
+
+  tasks:
+
+    - name: Add the git user and create an SSH key
+      ansible.builtin.user:
+        name: '{{ git_user }}'
+        comment: Git user for Deployment Engine
+        state: present
+        create_home: true
+        skeleton: /etc/skel
+        shell: /bin/bash
+        append: true
+        generate_ssh_key: true
+        ssh_key_bits: 2048
+        ssh_key_file: .ssh/id_rsa
+        ssh_key_comment: "BMC Deployment Engine from {{ git_user }}/${HOSTNAME}"
+        password: "{{ git_user_pwd | password_hash('sha512') }}"
+
+    - name: Allow the git user to use ssh loopback
+      authorized_key:
+        user: '{{ git_user }}'
+        state: present
+        key: "{{ lookup('file', '~{{ git_user }}/.ssh/id_rsa.pub') }}"
+
+    - name: Ensure the required directories exist
+      file:
+        path: '{{ base_dir }}/{{ item }}'
+        state: directory
+      loop:
+        '{{ required_dirs }}'
+
+    - name: Create .gitconfig
+      copy:
+        dest: '{{ git_home_dir}}/.gitconfig'
+        content: |
+            [user]
+            email = user@example.com
+            name = Full Name
+
+    - name: Add the jenkins user and create an SSH key
+      ansible.builtin.user:
+        name: '{{ jenkins_user }}'
+        comment: Jenkins user for Deployment Engine
+        state: present
+        create_home: true
+        skeleton: /etc/skel
+        shell: /bin/bash
+        append: true
+        generate_ssh_key: true
+        ssh_key_bits: 2048
+        ssh_key_file: .ssh/id_rsa
+        ssh_key_comment: "BMC Deployment Engine from {{ jenkins_user }}/${HOSTNAME}"
+        password: "{{ jenkins_user_pwd | password_hash('sha512') }}"
+
+    - name: Allow the git user to use ssh loopback
+      authorized_key:
+        user: '{{ git_user }}'
+        state: present
+        key: "{{ lookup('file', '~{{ jenkins_user }}/.ssh/id_rsa.pub') }}"
+
+    - name: Set ownership of the home directories and files
+      ansible.builtin.file:
+        path: '/home/{{ item }}'
+        owner: '{{ item }}'
+        group: '{{ item }}'
+        recurse: true
+      witrh_items:
+        - "{{ git_user }}"
+        - "{{ jenkins_user }}"
+
+
+    - name: Unzip GIT repositories to repos directory
+      unarchive:
+        src: '{{ item }}'
+        dest: '{{ base_dir }}/git_repos'
+      with_items:
