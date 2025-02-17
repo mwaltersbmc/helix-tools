@@ -2,7 +2,7 @@
 - hosts: localhost
 
   vars:
-    jenkins_plugins_url: https://updates.jenkins.io/latest/
+    jenkins_plugins_url: https://updates.jenkins.io/latest
 
   tasks:
 
@@ -120,8 +120,8 @@
     - name: chown Jenkins directory and contents to jenkins user
       ansible.builtin.file:
         path: '{{ jenkins_dir }}'
-        owner: '{{ git_user }}'
-        group: '{{ git_user }}'
+        owner: '{{ jenkins_user }}'
+        group: '{{ jenkins_user }}'
         recurse: true
 
     - name: Create service override.conf
