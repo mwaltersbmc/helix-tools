@@ -1,0 +1,49 @@
+---
+- hosts: localhost
+
+  vars:
+    jenkins_dir: /var/lib/jenkins
+
+  tasks:
+
+    - name: Create {{ jenkins_dir }}
+      file:
+        name: "{{ jenkins_dir }}"
+        state: directory
+
+    - name: Copy casc config file
+      ansible.builtin.template:
+        src: casc-config.yaml.j2
+        dest: "{{ jenkins_dir }}/casc/"
+
+    - name: Copy casc security config file
+      ansible.builtin.template:
+        src: casc-security.yaml.j2
+        dest: "{{ jenkins_dir }}/casc/"
+
+    - name: Get list of k3s pipelines
+      ansible.builtin.find:
+        paths: templates/pipelines/k3s
+        pattern: '*.j2'
+      register: k3s_pipelines
+
+    - name: Create pipeline creation groovy script
+      template:
+        src: 'templates/create-pipelines.j2'
+        dest: '{{ base_dir }}/jenkins_home/casc/create_pipelines.groovy'
+
+    - name: Create empty tokens.json
+      ansible.builtin.file:
+        path: '{{ jenkins_dir }}/jenkins_home/casc/tokens.json'
+        state: touch
+
+    - name: Check for installer kubeconfig file
+      ansible.builtin.stat:
+        path: '{{ kubeconfig }}'
+      register: kubeconfig_file
+
+
+    - name: Install Jenkins
+      package:
+        name: jenkins
+        state: present

@@ -1,0 +1,102 @@
+jenkins:
+  numExecutors: 5
+  nodes:
+    - permanent:
+        labelString: "ansible-master"
+        mode: NORMAL
+        name: {{ ansible_fqdn }}
+        numExecutors: 3
+        remoteFS: "/home/{{ git_user }}/workspace"
+        launcher:
+          ssh:
+            port: 22
+            host: {{ ansible_fqdn }}
+            credentialsId: ansible_host
+            launchTimeoutSeconds: 60
+            maxNumRetries: 3
+            retryWaitTime: 30
+            sshHostKeyVerificationStrategy: "nonVerifyingKeyVerificationStrategy"
+    - permanent:
+        labelString: git-{{ ansible_fqdn }}
+        launcher:
+          ssh:
+            credentialsId: "ansible"
+            host: {{ ansible_fqdn }}
+            port: 22
+            sshHostKeyVerificationStrategy: "nonVerifyingKeyVerificationStrategy"
+        name: git-{{ ansible_fqdn }}
+        nodeDescription: "Deployment Engine"
+        numExecutors: 2
+        remoteFS: "/home/{{ git_user }}/workspace"
+        retentionStrategy: "always"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github"
+              username: {{ git_user }}
+              password: {{ git_user_pwd }}
+              description: "github id"
+          - usernamePassword:
+              scope: GLOBAL
+              id: "ansible_host"
+              username: {{ git_user }}
+              password: {{ git_user_pwd }}
+              description: "ansible_host id"
+          - usernamePassword:
+              scope: GLOBAL
+              id: "ansible"
+              username: {{ git_user }}
+              password: {{ git_user_pwd }}
+              description: "ansible id"
+          - file:
+              scope: GLOBAL
+              id: "kubeconfig"
+              fileName: "${KUBECFG_FILENAME}"
+              secretBytes: "${base64:${readFile:{{ jenkins_dir }}/casc/kubeconfig}}"
+              description: "kubeconfig id"
+          - file:
+              scope: GLOBAL
+              id: "TOKENS"
+              fileName: "tokens.json"
+              secretBytes: "${base64:${readFile:{{ jenkins_dir }}/casc/tokens.json}}"
+              description: "tokens id"
+          - string:
+              id: "password_vault_apikey"
+              scope: GLOBAL
+              secret: ""
+
+unclassified:
+  location:
+    url: "http://{{ ansible_fqdn }}:8080/"
+    adminAddress: "{{ git_user }}@{{ ansible_fqdn }}"
+
+  globalLibraries:
+    libraries:
+      - name: "pipeline-framework"
+        defaultVersion: "master"
+        retriever:
+          modernSCM:
+            scm:
+              git:
+                remote: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{ git_repo_dir }}/library-repos/pipeline-framework/pipeline-framework.git"
+      - name: "JENKINS-27413-workaround-library"
+        defaultVersion: "master"
+        implicit: true
+        retriever:
+          modernSCM:
+            scm:
+              git:
+                remote: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{ git_repo_dir }}/library-repos/jenkins-workaround/JENKINS-27413-workaround-library.git"
+
+security:
+  scriptApproval:
+    approvedSignatures:
+    - "method org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper getRawBuild"
+    - "method hudson.model.Run getLog"
+
+jobs:
+  - file: /var/jenkins_home/casc/create_pipelines.groovy

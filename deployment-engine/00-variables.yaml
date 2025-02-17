@@ -1,0 +1,40 @@
+git_user: git
+git_user_pwd: password
+jenkins_user: jenkins
+jenkins_user_pwd: password
+jenkins_login_user: admin
+jenkins_login_user_pwd: P@ssw0rd
+git_repo_dir: git_repos
+itsm_zip:
+add_public_repos: false
+install_helm: false
+helm_version: 3.12.3
+install_kubectl: false
+kubectl_version: 1.28.6
+
+libraries_zip: LIBRARY_REPO.zip
+git_user_dirs:
+  - "{{ git_repo_dir }}"
+  - .kube
+  - workspace
+ansible_cfg_file: /etc/ansible/ansible.cfg
+
+pipelines:
+  - {"name":"HELIX_CONFIGURE_ITSM", "jenkinsfile":"HELIX_CONFIGURE_ITSM"}
+  - {"name":"HELIX_GENERATE_CONFIG", "jenkinsfile":"HELIX_GENERATE_CONFIG_ONPREM"}
+  - {"name":"HELIX_ITSM_INTEROPS", "jenkinsfile":"HELIX_ITSM_INTEROPS"}
+  - {"name":"HELIX_NON_PLATFORM_DEPLOY", "jenkinsfile":"HELIX_NON_PLATFORM_DEPLOY_ONPREM"}
+  - {"name":"HELIX_ONPREM_DEPLOYMENT", "jenkinsfile":"HELIX_ONPREM_DEPLOYMENT"}
+  - {"name":"HELIX_PLATFORM_DEPLOY", "jenkinsfile":"HELIX_PLATFORM_DEPLOY_ONPREM"}
+  - {"name":"HELIX_POST_DEPLOY_CONFIG", "jenkinsfile":"HELIX_POST_DEPLOY_CONFIG"}
+  - {"name":"HELIX_SMARTAPPS_DEPLOY", "jenkinsfile":"HELIX_SMARTAPPS_DEPLOY_ONPREM"}
+  - {"name":"HELIX_SMARTREPORTING_DEPLOY", "jenkinsfile":"HELIX_SMARTREPORTING_DEPLOY"}
+  - {"name":"SUPPORT_ASSISTANT_TOOL", "jenkinsfile":"assisttool_deploy"}
+  - {"name":"HELIX_RESTART", "jenkinsfile":"HELIX_RESTART"}
+  - {"name":"HELIX_DR", "jenkinsfile":"HELIX_DR"}
+  - {"name":"HELIX_RLS_IMPLEMENTATION", "jenkinsfile":"HELIX_RLS_IMPLEMENTATION"}
+  - {"name":"HELIX_DB_REFRESH", "jenkinsfile":"helix_db_refresh", "repo":"DB_REFRESH_REPO/itsm-on-premise-db-refresh.git", "scriptpath":"jenkinsfile"}
+  - {"name":"HELIX_NON_PLATFORM_UPDATE", "jenkinsfile":"HELIX_NON_PLATFORM_UPDATE"}
+  - {"name":"HELIX_PLATFORM_UPDATE", "jenkinsfile":"HELIX_PLATFORM_UPDATE"}
+  - {"name":"HELIX_SMARTREPORTING_UPGRADE", "jenkinsfile":"HELIX_SMARTREPORTING_UPGRADE"}
+  - {"name":"HELIX_FULL_STACK_UPGRADE", "jenkinsfile":"HELIX_FULL_STACK_UPGRADE"}

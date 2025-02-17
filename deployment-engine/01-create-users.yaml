@@ -3,24 +3,11 @@
 - hosts: localhost
   gather_facts: true
 
-  vars:
-    git_user: git
-    git_user_pwd: password
-    jenkins_user: jenkins
-    jenkins_user_pwd: password
-    jenkins_login_user: admin
-    jenkins_login_user_pwd:
-    git_repo_dir: git_repos
-    itsm_zip:
-    base_dir: ~{{ git_user }}
-    required_dirs:
-      - "{{ git_repo_dir }}"
-      - "{{ base_dir }}"
-      - .kube
-      - ansible_xx
-    libraries_zip: LIBRARY_REPO.zip
-
   tasks:
+
+      # Load variables
+    - name: Load default config variables
+      include_vars: 00-variables.yaml
 
     - name: Add the git user and create an SSH key
       ansible.builtin.user:
@@ -38,7 +25,7 @@
         password: "{{ git_user_pwd | password_hash('sha512') }}"
 
     - name: Set up ssh from git to git
-      authorized_key:
+      ansible.posix.authorized_key:
         user: '{{ git_user }}'
         state: present
         key: "{{ lookup('file', '~{{ git_user }}/.ssh/id_rsa.pub') }}"
@@ -51,18 +38,18 @@
         state: present
       with_items:
         - "{{ ansible_fqdn }}"
-        - "{{ ansible_host }}"
+        - "{{ ansible_hostname }}"
 
     - name: Ensure the required directories exist
-      file:
-        path: '{{ base_dir }}/{{ item }}'
+      ansible.builtin.file:
+        path: '~{{ git_user }}/{{ item }}'
         state: directory
       loop:
-        '{{ required_dirs }}'
+        '{{ git_user_dirs }}'
 
     - name: Create .gitconfig
-      copy:
-        dest: '~{{ git_user} }/.gitconfig'
+      ansible.builtin.copy:
+        dest: '~{{ git_user }}/.gitconfig'
         content: |
             [user]
             email = user@example.com
@@ -84,7 +71,7 @@
         password: "{{ jenkins_user_pwd | password_hash('sha512') }}"
 
     - name: Set up ssh from jenkins to git
-      authorized_key:
+      ansible.posix.authorized_key:
         user: '{{ git_user }}'
         state: present
         key: "{{ lookup('file', '~{{ jenkins_user }}/.ssh/id_rsa.pub') }}"
@@ -97,7 +84,7 @@
         state: present
       with_items:
         - "{{ ansible_fqdn }}"
-        - "{{ ansible_host }}"
+        - "{{ ansible_hostname }}"
 
     - name: Set ownership of the home directories and files
       ansible.builtin.file:

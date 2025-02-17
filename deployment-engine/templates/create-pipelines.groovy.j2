@@ -1,0 +1,33 @@
+{# Template for the create-pipeines.groovy script used in Jenkins first run to add pipeline jobs #}
+{# The ITSM deployment pipelines #}
+{% for key in pipelines %}
+pipelineJob('{{ key.name }}') {
+  definition {
+    cpsScm {
+      scm {
+        git {
+          branch("{{ key.branch | default('*/master', true) }}")
+          remote {
+            url("ssh://{{ git_user }}@{{ ansible_fqdn}}/home/{{ git user }}/git_repos/{{ key.repo | default('ITSM_REPO/itsm-on-premise-installer.git', true) }}")
+            credentials('github')
+          }
+        }
+      }
+      scriptPath("{{ key.scriptpath | default('pipeline/jenkinsfile', true) }}/{{ key.jenkinsfile }}.jenkinsfile")
+    }
+  }
+}
+{% endfor %}
+
+{# Trigger first dry-run build of all ITSM pipelines #}
+pipelineJob('01 - Dry run build of all Helix deployment pipelines') {
+  definition {
+    cps {
+      script("{% for key in pipelines %}build propagate: false, job: '{{ key.name }}'\n{% endfor %}")
+    }
+  }
+}
+
+{# Create file to prevent CASC from running again if Jenkins is restarted #}
+def newFile = new File("{{ jenkins_dir }}/plugins/configuration-as-code.jpi.disabled")
+newFile.createNewFile()

@@ -3,33 +3,26 @@
   gather_facts: true
 
   vars:
-    - add_public_repos: true
-    - helm: 1
-    - kubectl: 1
+    kubectl_url: https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl
+    helm_url: https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz
 
   tasks:
 
-    - name: Add public repos block
-      ansible.builtin.block:
+      # Load variables
+    - name: Load default config variables
+      include_vars: 00-variables.yaml
 
-        - name: Enable RedHat codeready-builder repository
-          community.general.rhsm_repository:
-            name: codeready-builder-for-rhel-9-x86_64-rpms
+    - name: Add EPEL repository
+      ansible.builtin.yum:
+        name: epel-release
+        update-cache: true
 
-        - name: Add EPEL repository
-          ansible.builtin.yum_repository:
-            name: epel
-            description: EPEL repo
-            baseurl: https://download.fedoraproject.org/pub/epel/$releasever/$basearch/
-
-        - name: Add Jenkins repository
-          ansible.builtin.yum_repository:
-            name: jenkins
-            description: Jenkins repo
-            baseurl: https://pkg.jenkins.io/redhat-stable
-            gpgkey: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
-
-      when: add_public_repos|bool
+    - name: Add Jenkins repository
+      ansible.builtin.yum_repository:
+        name: jenkins
+        description: Jenkins repo
+        baseurl: https://pkg.jenkins.io/redhat-stable
+        gpgkey: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
 
     - name: Install software
       package:
@@ -52,3 +45,44 @@
         - openssl
         - openssl-libs
         - wget
+
+    - name: Update ansible.cfg [defaults]
+      ini_file:
+        path: '{{ ansible_cfg_file }}'
+        section: defaults
+        option: '{{ item.setting }}'
+        value: '{{ item.value }}'
+      with_items:
+        - {"setting":"bin_ansible_callbacks", "value":"True"}
+        - {"setting":"stdout_callback", "value":"yaml"}
+        - {"setting":"host_key_checking", "value":"False"}
+
+    - name: Update ansible.cfg [ssh_connection]
+      ini_file:
+        path: '{{ ansible_cfg_file }}'
+        section: ssh_connection
+        option: '{{ item.setting }}'
+        value: '{{ item.value }}'
+      with_items:
+        - {"setting":"ssh_args", "value":"-o ControlMaster=auto"}
+        - {"setting":"retries", "value":"3"}
+        - {"setting":"pipelining", "value":"True"}
+
+    - name: Install helm
+      unarchive:
+        src: '{{ helm_url }}'
+        dest: /usr/local/bin
+        remote_src: true
+        extra_opts:
+          - --strip=1
+          - --no-anchored
+          - helm
+        mode: "0755"
+      when: install_helm|bool
+
+    - name: Install kubectl
+      get_url:
+        url: '{{ kubectl_url }}'
+        dest: /usr/local/bin
+        mode: "0755"
+      when: install_kubectl|bool
