@@ -1,22 +1,33 @@
 ---
 - hosts: localhost
 
+  vars:
+    jenkins_plugins_url: https://updates.jenkins.io/download/plugins
+
   tasks:
 
-    - name: Create {{ jenkins_dir }}
+      # Load variables
+    - name: Load default config variables
+      include_vars: 00-variables.yaml
+
+    - name: Create Jenkins directories }}
       file:
-        name: "{{ jenkins_dir }}"
+        name: "{{ item }}"
         state: directory
+      loop:
+        - "{{ jenkins_dir }}"
+        - "{{ jenkins_dir }}/plugins"
+        - "{{ jenkins_dir }}/casc"
 
     - name: Create casc config file
       ansible.builtin.template:
         src: casc-config.yaml.j2
-        dest: "{{ jenkins_dir }}/casc/"
+        dest: "{{ jenkins_dir }}/casc/casc-config.yaml"
 
     - name: Create casc security config file
       ansible.builtin.template:
         src: casc-security.yaml.j2
-        dest: "{{ jenkins_dir }}/casc/"
+        dest: "{{ jenkins_dir }}/casc/casc-security.yaml"
       when: jenkins_login_user|length > 0
 
     - name: Create pipeline creation groovy script
@@ -26,8 +37,16 @@
 
     - name: Create empty tokens.json
       ansible.builtin.file:
-        path: '{{ jenkins_dir }}/jenkins_home/casc/tokens.json'
+        path: '{{ jenkins_dir }}/casc/tokens.json'
         state: touch
+
+    - name: Create service override.conf
+      ansible.builtin.copy:
+        dest: '/etc/systemd/system/jenkins.service.d/override.conf'
+        content: |
+          [Service]
+          Environment="JAVA_OPTS=-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"
+          Environment="CASC_JENKINS_CONFIG=/var/lib/jenkins/casc/"
 
     - name: Install Jenkins
       package:
@@ -35,8 +54,89 @@
         state: present
       when: install_jenkins|bool
 
-    - name: Start and enable Jenkiins service
+    - name: Start and enable Jenkins service
       ansible.builtin.service:
         name: jenkins
         state: started
         enabled: true
+
+    - name: Download Jenkins plugins
+      get_url:
+        url: '{{ jenkins_plugins_url }}/{{ item }}/{{ item }}.hpi'
+        dest: '{{ jenkins_dir }}/plugins'
+      loop:
+        - apache-httpcomponents-client-4-api
+        - bootstrap5-api
+        - bouncycastle-api
+        - branch-api
+        - caffeine-api
+        - checks-api
+        - cloudbees-folder
+        - commons-lang3-api
+        - commons-text-api
+        - credentials
+        - credentials-binding
+        - display-url-api
+        - durable-task
+        - echarts-api
+        - font-awesome-api
+        - git
+        - git-client
+        - instance-identity
+        - ionicons-api
+        - jackson2-api
+        - jakarta-activation-api
+        - jakarta-mail-api
+        - javax-activation-api
+        - javax-mail-api
+        - jaxb
+        - jquery3-api
+        - json-api
+        - junit
+        - mailer
+        - mask-passwords
+        - matrix-project
+        - mina-sshd-api-common
+        - mina-sshd-api-core
+        - parameter-separator
+        - pipeline-build-step
+        - pipeline-groovy-lib
+        - pipeline-input-step
+        - pipeline-milestone-step
+        - pipeline-model-api
+        - pipeline-model-definition
+        - pipeline-model-extensions
+        - pipeline-stage-step
+        - pipeline-stage-tags-metadata
+        - plain-credentials
+        - plugin-util-api
+        - rebuild
+        - resource-disposer
+        - scm-api
+        - script-security
+        - snakeyaml-api
+        - ssh-credentials
+        - ssh-slaves
+        - structs
+        - trilead-api
+        - validating-string-parameter
+        - variant
+        - workflow-aggregator
+        - workflow-api
+        - workflow-basic-steps
+        - workflow-cps
+        - workflow-durable-task-step
+        - workflow-job
+        - workflow-multibranch
+        - workflow-scm-step
+        - workflow-step-api
+        - workflow-support
+        - ws-cleanup
+        - pipeline-stage-view
+        - pipeline-rest-api
+        - pipeline-utility-steps
+
+prism-api
+json-api
+snakeyaml-api
+configuration-as-code
