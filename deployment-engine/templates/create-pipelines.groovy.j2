@@ -8,7 +8,7 @@ pipelineJob('{{ key.name }}') {
         git {
           branch("{{ key.branch | default('*/master', true) }}")
           remote {
-            url("ssh://{{ git_user }}@{{ ansible_fqdn}}/home/{{ git user }}/git_repos/{{ key.repo | default('ITSM_REPO/itsm-on-premise-installer.git', true) }}")
+            url("ssh://{{ git_user }}@{{ ansible_fqdn}}/home/{{ git_user }}/git_repos/{{ key.repo | default('ITSM_REPO/itsm-on-premise-installer.git', true) }}")
             credentials('github')
           }
         }
