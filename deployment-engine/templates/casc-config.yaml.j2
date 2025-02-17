@@ -99,4 +99,4 @@ security:
     - "method hudson.model.Run getLog"
 
 jobs:
-  - file: /var/jenkins_home/casc/create_pipelines.groovy
+  - file: {{ jenkins_dir }}/casc/create_pipelines.groovy
