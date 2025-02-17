@@ -2477,6 +2477,15 @@ checkDERequirements() {
       fi
     fi
   fi
+
+  if ! which ansible-galaxy > /dev/null 2>&1 ; then
+    logWarning "036" "'ansible-galaxy' command not found - skipping collection checks."
+  else
+    if ! ansible-galaxy collection list 2>/dev/null | grep -q community.general ; then
+      logError "225" "The community.general module for ansible is missing - please install it with the command 'ansible-galaxy collection install community.general'."
+    fi
+  fi
+
 }
 
 getJenkinsCrumb() {
@@ -2945,6 +2954,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The HITT script is being run by the root user.\",
     \"impact\": \"Some HITT checks may fail as they are expected to be run by the git user.\",
     \"remediation\": \"Run the HITT script as the git user.\"
+  },
+  {
+    \"id\": \"036\",
+    \"cause\": \"The 'ansible-galaxy' command was not found but this is required to check that the community.general collection is installed.\",
+    \"impact\": \"If the collection is not installed deployment will fail.\",
+    \"remediation\": \"Install the 'ansible-galaxy' command to enable the checks or ensure that the community.general collection is installed.\"
   },
   {
     \"id\": \"100\",
@@ -3695,7 +3710,14 @@ ALL_MSGS_JSON="[
     \"cause\": \"The directory referenced in the GIT_REPO_DIR value is not accessible or does not exist.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Review the product documentation and set the correct value.\"
+  },
+  {
+    \"id\": \"225\",
+    \"cause\": \"The 'ansible-galaxy' community.general collection is not installed.\",
+    \"impact\": \"If the collection is not installed deployment will fail.\",
+    \"remediation\": \"Install the ansible community.general collection using the command 'ansible-galaxy collection install community.general'.\"
   }
+
 ]"
 
 while getopts "cde:f:jlm:pt:v" options; do
