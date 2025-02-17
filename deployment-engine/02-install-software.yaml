@@ -15,7 +15,6 @@
     - name: Add EPEL repository
       ansible.builtin.yum:
         name: epel-release
-        update-cache: true
 
     - name: Add Jenkins repository
       ansible.builtin.yum_repository:
@@ -28,23 +27,21 @@
       package:
         name: '{{ item }}'
         state: present
-        update_cache: false
-        disable_gpg_check: true
       with_items:
-        - python3-pip
-        - python3-jmespath
-        - unzip
-        - git
         - dos2unix
-        - jq
-        - unzip
-        - xmlstarlet
-        - java-17-openjdk
         - coreutils
+        - git
         - gtk3
+        - java-17-openjdk
+        - jq
         - openssl
         - openssl-libs
+        - python3-pip
+        - python3-jmespath
+        - tar
+        - unzip
         - wget
+        - xmlstarlet
 
     - name: Update ansible.cfg [defaults]
       ini_file:

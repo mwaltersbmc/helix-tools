@@ -1,0 +1,36 @@
+---
+- hosts: localhost
+  gather_facts: true
+
+  tasks:
+
+      # Load variables
+    - name: Load default config variables
+      include_vars: 00-variables.yaml
+
+    - name: Stop and disable Jenkins service
+      ansible.builtin.service:
+        name: jenkins
+        state: stopped
+        enabled: false
+
+    - name: Remove Jenkins service
+      package:
+        name: jenkins
+        state: absent
+
+    - name: Remove the git/jenkins user
+      ansible.builtin.user:
+        name: '{{ item }}'
+        state: absent
+        remove: true
+        force: true
+      ignore_errors: yes
+      with_items:
+        - ' {{ git_user }}'
+        - ' {{ jenkins_user }}'
+
+    - name: Remove {{ jenkins_dir }}
+      ansible.builtin.file:
+        state: absent
+        path: "{{ jenkins_dir }}"

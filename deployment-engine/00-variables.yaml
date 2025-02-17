@@ -18,6 +18,7 @@ git_user_dirs:
   - .kube
   - workspace
 ansible_cfg_file: /etc/ansible/ansible.cfg
+jenkins_dir: /var/lib/jenkins
 
 pipelines:
   - {"name":"HELIX_CONFIGURE_ITSM", "jenkinsfile":"HELIX_CONFIGURE_ITSM"}

@@ -1,9 +1,6 @@
 ---
 - hosts: localhost
 
-  vars:
-    jenkins_dir: /var/lib/jenkins
-
   tasks:
 
     - name: Create {{ jenkins_dir }}
