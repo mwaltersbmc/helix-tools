@@ -43,6 +43,16 @@
         state: present
         key: "{{ lookup('file', '~{{ git_user }}/.ssh/id_rsa.pub') }}"
 
+    - name: Add to known_hosts
+      ansible.builtin.known_hosts:
+        path: "{{ git_user }}/.ssh/known_hosts"
+        name: "{{ item }}"
+        key: "{{ lookup('ansible.builtin.file', '~{{ git_user }}/.ssh/id_rsa.pub'') }}"
+        state: present
+      with_items:
+        - "{{ ansible_fqdn }}"
+        - "{{ ansible_host }}"
+
     - name: Ensure the required directories exist
       file:
         path: '{{ base_dir }}/{{ item }}'
@@ -52,7 +62,7 @@
 
     - name: Create .gitconfig
       copy:
-        dest: '{{ git_home_dir}}/.gitconfig'
+        dest: '~{{ git_user} }/.gitconfig'
         content: |
             [user]
             email = user@example.com
@@ -79,13 +89,23 @@
         state: present
         key: "{{ lookup('file', '~{{ jenkins_user }}/.ssh/id_rsa.pub') }}"
 
+    - name: Add to known_hosts
+      ansible.builtin.known_hosts:
+        path: "{{ jenkins_user }}/.ssh/known_hosts"
+        name: "{{ item }}"
+        key: "{{ lookup('ansible.builtin.file', '~{{ git_user }}/.ssh/id_rsa.pub'') }}"
+        state: present
+      with_items:
+        - "{{ ansible_fqdn }}"
+        - "{{ ansible_host }}"
+
     - name: Set ownership of the home directories and files
       ansible.builtin.file:
         path: '/home/{{ item }}'
         owner: '{{ item }}'
         group: '{{ item }}'
         recurse: true
-      witrh_items:
+      with_items:
         - "{{ git_user }}"
         - "{{ jenkins_user }}"
 
