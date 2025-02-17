@@ -8,39 +8,35 @@
         name: "{{ jenkins_dir }}"
         state: directory
 
-    - name: Copy casc config file
+    - name: Create casc config file
       ansible.builtin.template:
         src: casc-config.yaml.j2
         dest: "{{ jenkins_dir }}/casc/"
 
-    - name: Copy casc security config file
+    - name: Create casc security config file
       ansible.builtin.template:
         src: casc-security.yaml.j2
         dest: "{{ jenkins_dir }}/casc/"
-
-    - name: Get list of k3s pipelines
-      ansible.builtin.find:
-        paths: templates/pipelines/k3s
-        pattern: '*.j2'
-      register: k3s_pipelines
+      when: jenkins_login_user|length > 0
 
     - name: Create pipeline creation groovy script
       template:
-        src: 'templates/create-pipelines.j2'
-        dest: '{{ base_dir }}/jenkins_home/casc/create_pipelines.groovy'
+        src: 'templates/create-pipelines.groovy.j2'
+        dest: '{{ jenkins_dir }}/casc/create_pipelines.groovy'
 
     - name: Create empty tokens.json
       ansible.builtin.file:
         path: '{{ jenkins_dir }}/jenkins_home/casc/tokens.json'
         state: touch
 
-    - name: Check for installer kubeconfig file
-      ansible.builtin.stat:
-        path: '{{ kubeconfig }}'
-      register: kubeconfig_file
-
-
     - name: Install Jenkins
       package:
         name: jenkins
         state: present
+      when: install_jenkins|bool
+
+    - name: Start and enable Jenkiins service
+      ansible.builtin.service:
+        name: jenkins
+        state: started
+        enabled: true

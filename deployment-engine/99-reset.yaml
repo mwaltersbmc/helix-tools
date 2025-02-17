@@ -13,6 +13,7 @@
         name: jenkins
         state: stopped
         enabled: false
+      ignore_errors: true
 
     - name: Remove Jenkins service
       package:
@@ -33,4 +34,8 @@
     - name: Remove {{ jenkins_dir }}
       ansible.builtin.file:
         state: absent
-        path: "{{ jenkins_dir }}"
+        path: "{{ item }}"
+      with_items:
+        - "{{ jenkins_dir }}"
+        - "/home/{{ git_user }}"
+        - "/home/{{ jenkins_user }}"

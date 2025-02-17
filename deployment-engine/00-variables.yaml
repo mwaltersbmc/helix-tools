@@ -11,6 +11,9 @@ install_helm: false
 helm_version: 3.12.3
 install_kubectl: false
 kubectl_version: 1.28.6
+install_jenkins: true
+install_jenkins_plugins: true
+configure_jenkins: true
 
 libraries_zip: LIBRARY_REPO.zip
 git_user_dirs:
