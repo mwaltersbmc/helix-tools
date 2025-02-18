@@ -1,132 +1,228 @@
 ---
 - hosts: localhost
 
-  vars:
-    jenkins_plugins_url: https://updates.jenkins.io/latest
-
   tasks:
 
       # Load variables
     - name: Load default config variables
       include_vars: 00-variables.yaml
 
-    - name: Create casc config file
-      ansible.builtin.template:
-        src: casc-config.yaml.j2
-        dest: "{{ jenkins_dir }}/casc/casc-config.yaml"
+    - name: Plugins block
+      block:
 
-    - name: Create casc security config file
-      ansible.builtin.template:
-        src: casc-security.yaml.j2
-        dest: "{{ jenkins_dir }}/casc/casc-security.yaml"
-      when: jenkins_login_user|length > 0
+        - name: Install plugins
+          community.general.jenkins_plugin:
+           name: "{{ item }}"
+           state: present
+           url_username: "{{ jenkins_login_user }}"
+           url_password: "{{ jenkins_login_user_pwd }}"
+          with_lines: cat plugins.txt
 
-    - name: Create pipeline creation groovy script
-      template:
-        src: 'templates/create-pipelines.groovy.j2'
-        dest: '{{ jenkins_dir }}/casc/create_pipelines.groovy'
+        - name: Restart Jenkins service
+          ansible.builtin.service:
+            name: jenkins
+            state: restarted
 
-    - name: Create empty tokens.json
-      ansible.builtin.file:
-        path: '{{ jenkins_dir }}/casc/tokens.json'
-        state: touch
+        - name: Pause for 15s to allow Jenkins startup
+          ansible.builtin.pause:
+            seconds: 5
 
-    - name: Download Jenkins plugins
-      get_url:
-        url: '{{ jenkins_plugins_url }}/{{ item }}.hpi'
-        dest: '{{ jenkins_dir }}/plugins'
+      when: install_jenkins_plugins|bool
+
+    - name: Set numExecutors
+      community.general.jenkins_script:
+        script: |
+          import jenkins.model.*
+          Jenkins.instance.setNumExecutors(5)
+          instance.save()
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
+
+    - name: Create UsernamePassword credentials
+      community.general.jenkins_script:
+        script: |
+          import com.cloudbees.plugins.credentials.*
+          import com.cloudbees.plugins.credentials.domains.Domain
+          import com.cloudbees.plugins.credentials.impl.*
+          import hudson.util.Secret
+          import jenkins.model.Jenkins
+          def jenkinsKeyUsernameWithPasswordParameters = [
+            description:  '${description}',
+            id:           '${id}',
+            userName:     '${username}',
+            secret:       '${secret}',
+          ]
+          Jenkins jenkins = Jenkins.getInstance()
+          def domain = Domain.global()
+          def store = jenkins.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
+          def jenkinsKeyUsernameWithPassword = new UsernamePasswordCredentialsImpl(
+            CredentialsScope.GLOBAL,
+            jenkinsKeyUsernameWithPasswordParameters.id,
+            jenkinsKeyUsernameWithPasswordParameters.description,
+            jenkinsKeyUsernameWithPasswordParameters.userName,
+            jenkinsKeyUsernameWithPasswordParameters.secret
+          )
+          store.addCredentials(domain, jenkinsKeyUsernameWithPassword)
+          jenkins.save()
+        args:
+          description: "{{ item.description }}"
+          id: "{{ item.id }}"
+          username: "{{ item.username }}"
+          secret: "{{ item.secret }}"
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
       loop:
-        - apache-httpcomponents-client-4-api
-        - bootstrap5-api
-        - bouncycastle-api
-        - branch-api
-        - caffeine-api
-        - checks-api
-        - cloudbees-folder
-        - commons-lang3-api
-        - commons-text-api
-        - credentials
-        - credentials-binding
-        - display-url-api
-        - durable-task
-        - echarts-api
-        - font-awesome-api
-        - git
-        - git-client
-        - instance-identity
-        - ionicons-api
-        - jackson2-api
-        - jakarta-activation-api
-        - jakarta-mail-api
-        - javax-activation-api
-        - javax-mail-api
-        - jaxb
-        - jquery3-api
-        - json-api
-        - junit
-        - mailer
-        - mask-passwords
-        - matrix-project
-        - mina-sshd-api-common
-        - mina-sshd-api-core
-        - parameter-separator
-        - pipeline-build-step
-        - pipeline-groovy-lib
-        - pipeline-input-step
-        - pipeline-milestone-step
-        - pipeline-model-api
-        - pipeline-model-definition
-        - pipeline-model-extensions
-        - pipeline-stage-step
-        - pipeline-stage-tags-metadata
-        - plain-credentials
-        - plugin-util-api
-        - rebuild
-        - resource-disposer
-        - scm-api
-        - script-security
-        - snakeyaml-api
-        - ssh-credentials
-        - ssh-slaves
-        - structs
-        - trilead-api
-        - validating-string-parameter
-        - variant
-        - workflow-aggregator
-        - workflow-api
-        - workflow-basic-steps
-        - workflow-cps
-        - workflow-durable-task-step
-        - workflow-job
-        - workflow-multibranch
-        - workflow-scm-step
-        - workflow-step-api
-        - workflow-support
-        - ws-cleanup
-        - pipeline-stage-view
-        - pipeline-rest-api
-        - pipeline-utility-steps
-        - prism-api
-        - json-api
-        - snakeyaml-api
-        - configuration-as-code
-        - job-dsl
-        - pipeline-graph-view
-        - asm-api
-        - eddsa-api
-        - commons-compress-api
-        - joda-time-api
-        - prism-api
+        - { description: "github id", id: "github", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
+        - { description: "ansible_host id", id: "ansible_host", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
+        - { description: "ansible id", id: "ansible", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
+        - { description: "", id: "password_vault_apikey", username: "password_vault_apikey", secret: "" }
 
-    - name: chown Jenkins directory and contents to jenkins user
-      ansible.builtin.file:
-        path: '{{ jenkins_dir }}'
-        owner: '{{ jenkins_user }}'
-        group: '{{ jenkins_user }}'
-        recurse: true
+    - name: Create SecretText credentials
+      community.general.jenkins_script:
+        script: |
+          import jenkins.model.Jenkins
+          import com.cloudbees.plugins.credentials.domains.Domain
+          import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl
+          import com.cloudbees.plugins.credentials.CredentialsScope
+          import hudson.util.Secret
+          instance = Jenkins.instance
+          domain = Domain.global()
+          store = instance.getExtensionList(
+            "com.cloudbees.plugins.credentials.SystemCredentialsProvider")[0].getStore()
+          secretText = new StringCredentialsImpl(
+            CredentialsScope.GLOBAL,
+            "${id}",
+            "${description}",
+            Secret.fromString("")
+          )
+          store.addCredentials(domain, secretText)
+          StringCredentialsImpl
+          jenkins.save()
+        args:
+          description: "{{ item.description }}"
+          id: "{{ item.id }}"
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
+      loop:
+        - { description: "password_vault_apikey", id: "password_vault_apikey" }
 
-    - name: Start and enable Jenkins service
-      ansible.builtin.service:
-        name: jenkins
-        state: started
-        enabled: true
+    - name: Create SecretFile credentials
+      community.general.jenkins_script:
+        script: |
+          import jenkins.model.*
+          import com.cloudbees.plugins.credentials.*
+          import com.cloudbees.plugins.credentials.impl.*
+          import com.cloudbees.plugins.credentials.domains.*
+          import com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey
+          import org.jenkinsci.plugins.plaincredentials.StringCredentials
+          import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl
+          instance = Jenkins.instance
+          domain = Domain.global()
+          store = instance.getExtensionList("com.cloudbees.plugins.credentials.SystemCredentialsProvider")[0].getStore()
+          file_content = '''
+          ${filecontents}
+          '''
+          bytes = SecretBytes.fromBytes(file_content.getBytes())
+          file_secret = new FileCredentialsImpl(CredentialsScope.GLOBAL, "${id}", "", "${secretfilename}", bytes)
+          store.addCredentials(domain, file_secret)
+          jenkins.save()
+        args:
+          id: "{{ item.id }}"
+          secretfilename: "{{ item.secretfilename }}"
+          filecontents: "{{ item.filecontents }}"
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
+      loop:
+        - { id: "kubeconfig", secretfilename: "kubeconfig", filecontents: "{{ lookup('file', 'kubeconfig') }}" }
+        - { id: "TOKENS", secretfilename: "tokens.json", filecontents: "" }
+
+    - name: Create Libraries
+      community.general.jenkins_script:
+        script: |
+          import jenkins.model.*
+          import jenkins.plugins.git.GitSCMSource
+          import org.jenkinsci.plugins.workflow.libs.*
+          def libraryName = "${name}"
+          def jenkins = Jenkins.instance
+          def globalLibraries = jenkins.getDescriptorByType(GlobalLibraries.class)
+          def existingLibrary = globalLibraries.libraries.find { it.name == libraryName }
+          if (existingLibrary) {
+              println "Library already exists."
+          } else {
+              def scmSource = new GitSCMSource("${repourl}")
+              scmSource.credentialsId = ""
+              def libraryConfiguration = new LibraryConfiguration(libraryName, new SCMSourceRetriever(scmSource))
+              libraryConfiguration.setDefaultVersion("master")
+              libraryConfiguration.setImplicit(${implicit})
+              globalLibraries.libraries += libraryConfiguration
+              jenkins.save()
+          }
+        args:
+          repourl: "{{ item.repourl }}"
+          name: "{{ item.name }}"
+          implicit: "{{ item.implicit }}"
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
+      loop:
+        - { name: "pipeline-framework", repourl: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{ git_repo_dir }}/library_repos/pipeline-framework/pipeline-framework.git", implicit: "false" }
+        - { name: "JENKINS-27413-workaround-library", repourl: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{ git_repo_dir }}/library_repos/jenkins-workaround/JENKINS-27413-workaround-library.git", implicit: "true" }
+
+    - name: Approve scripts
+      community.general.jenkins_script:
+        script: |
+          import java.lang.reflect.*;
+          import jenkins.model.Jenkins;
+          import jenkins.model.*;
+          import org.jenkinsci.plugins.scriptsecurity.scripts.*;
+          import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.*;
+          scriptApproval = ScriptApproval.get()
+          alreadyApproved = new HashSet<>(Arrays.asList(scriptApproval.getApprovedSignatures()))
+          approveSignature('method org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper getRawBuild')
+          approveSignature('method hudson.model.Run getLog')
+          scriptApproval.save()
+          void approveSignature(String signature) {
+              if (!alreadyApproved.contains(signature)) {
+                 scriptApproval.approveSignature(signature)
+              }
+          }
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
+
+    - name: Add Helix jobs
+      community.general.jenkins_script:
+        script: |
+          import hudson.plugins.git.*;
+          def scm = new GitSCM("${repourl}")
+          scm.branches = [new BranchSpec("*/master")];
+          def flowDefinition = new org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition(scm, "${scriptpath}")
+          def parent = Jenkins.instance
+          def job = new org.jenkinsci.plugins.workflow.job.WorkflowJob(parent, "${name}")
+          job.definition = flowDefinition
+          parent.reload()
+        args:
+          repourl: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{git_repo_dir}}/{{ item.repo | default('ITSM_REPO/itsm-on-premise-installer.git', true) }}"
+          name: "{{ item.name }}"
+          scriptpath: "{{ item.scriptpath | default('pipeline/jenkinsfile', true) }}/{{ item.jenkinsfile }}.jenkinsfile"
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
+      loop: "{{ pipeline_jobs }}"
+
+    - name: Add Helix jobs
+      community.general.jenkins_script:
+        script: |
+          import jenkins.model.*
+          import org.jenkinsci.plugins.workflow.job.*
+          String jobName = '01 - Dry run build of all Helix deployment pipelines'
+          String pipelineScript = '''
+          pipeline {
+          ${scripttext}
+          }
+          '''
+          Jenkins jenkins = Jenkins.instance
+          WorkflowJob job = jenkins.createProject(WorkflowJob, jobName)
+          job.definition = new org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition(pipelineScript, true)
+          job.save()
+        args:
+          scripttext: "{% for key in pipelines %}build propagate: false, job: '{{ key.name }}'\n{% endfor %}"
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"

@@ -2,10 +2,10 @@ git_user: git
 git_user_pwd: password
 jenkins_user: jenkins
 jenkins_user_pwd: password
-jenkins_login_user: admin
+jenkins_login_user: jenkins
 jenkins_login_user_pwd: P@ssw0rd
 git_repo_dir: git_repos
-itsm_zip:
+itsm_zip: BMC_Remedy_Deployment_Manager_Configuration_Release_23.3.04.zip
 add_public_repos: false
 install_helm: false
 helm_version: 3.12.3
@@ -23,7 +23,7 @@ git_user_dirs:
 ansible_cfg_file: /etc/ansible/ansible.cfg
 jenkins_dir: /var/lib/jenkins
 
-pipelines:
+pipelines_jobs:
   - {"name":"HELIX_CONFIGURE_ITSM", "jenkinsfile":"HELIX_CONFIGURE_ITSM"}
   - {"name":"HELIX_GENERATE_CONFIG", "jenkinsfile":"HELIX_GENERATE_CONFIG_ONPREM"}
   - {"name":"HELIX_ITSM_INTEROPS", "jenkinsfile":"HELIX_ITSM_INTEROPS"}

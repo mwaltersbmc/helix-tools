@@ -44,3 +44,41 @@
         name: jenkins
         state: started
         enabled: true
+
+    - name: Pause for 15s to allow Jenkins to start
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Read admin pwd
+      shell: cat {{ jenkins_dir}}/secrets/initialAdminPassword
+      register: adminpwd
+
+    - name: Unlock and add admin user
+      community.general.jenkins_script:
+      script: |
+        import jenkins.model.*
+        import hudson.security.*
+        def instance = Jenkins.getInstance()
+        def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+        hudsonRealm.createAccount('${jenkins_user}', '${user_pwd}')
+        instance.setSecurityRealm(hudsonRealm)
+        def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+        strategy.setAllowAnonymousRead(false)
+        instance.setAuthorizationStrategy(strategy)
+        instance.save()
+      args:
+        jenkins_user: "{{ jenkins_login_user }}"
+        user_pwd: "{{ jenkins_login_user_pwd }}"
+      user: admin
+      password: "{{ adminpwd.stdout }}"
+
+    - name: Complete setup wizard
+      community.general.jenkins_script:
+      script: |
+        import static jenkins.model.Jenkins.instance as jenkins
+        import jenkins.install.InstallState
+        if (!jenkins.installState.isSetupComplete()) {
+          InstallState.INITIAL_SETUP_COMPLETED.initializeState()
+        }
+      user: admin
+      password: "{{ adminpwd.stdout }}"

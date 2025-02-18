@@ -27,7 +27,7 @@
       package:
         name: '{{ item }}'
         state: present
-      with_items:
+      loop:
         - dos2unix
         - coreutils
         - git
@@ -49,10 +49,10 @@
         section: defaults
         option: '{{ item.setting }}'
         value: '{{ item.value }}'
-      with_items:
-        - {"setting":"bin_ansible_callbacks", "value":"True"}
-        - {"setting":"stdout_callback", "value":"yaml"}
-        - {"setting":"host_key_checking", "value":"False"}
+      loop:
+        - { setting: "bin_ansible_callbacks", value: "True" }
+        - { setting: "stdout_callback", value: "yaml" }
+        - { setting: "host_key_checking", value: "False" }
 
     - name: Update ansible.cfg [ssh_connection]
       ini_file:
@@ -60,10 +60,10 @@
         section: ssh_connection
         option: '{{ item.setting }}'
         value: '{{ item.value }}'
-      with_items:
-        - {"setting":"ssh_args", "value":"-o ControlMaster=auto"}
-        - {"setting":"retries", "value":"3"}
-        - {"setting":"pipelining", "value":"True"}
+      loop:
+        - { setting: "ssh_args", value: "-o ControlMaster=auto" }
+        - { setting: "retries", value: "3" }
+        - { setting: "pipelining", value: "True" }
 
     - name: Install helm
       unarchive:
