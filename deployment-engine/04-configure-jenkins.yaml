@@ -199,7 +199,7 @@
           import hudson.plugins.sshslaves.verifiers.NonVerifyingKeyVerificationStrategy
           def nodeName = "${nodename}"
           def remoteFS = "${remotefs}"
-          def numExecutors = 2
+          def numExecutors = 3
           def labelString = "${label}"
           def host = "${host}"
           def sshPort = 22
@@ -224,8 +224,6 @@
           def jenkins = Jenkins.instance
           if (jenkins.getNode(nodeName) == null) {
               jenkins.addNode(node)
-          } else {
-              println "Node '${nodename}' already exists."
           }
         args:
           nodename: "{{ item.nodename }}"
@@ -236,8 +234,8 @@
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
       loop:
-        - { nodenanme: "{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible", label: "ansible-master" }
-        - { nodenanme: "git-{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible", label: "git-{{ ansible_fqdn }}" }
+        - { nodename: "{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible", label: "ansible-master" }
+        - { nodename: "git-{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible", label: "git-{{ ansible_fqdn }}" }
 
     - name: Add Helix jobs
       community.general.jenkins_script:
