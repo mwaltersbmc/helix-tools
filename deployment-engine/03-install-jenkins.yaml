@@ -1,0 +1,46 @@
+---
+- hosts: localhost
+
+  vars:
+    jenkins_plugins_url: https://updates.jenkins.io/latest
+
+  tasks:
+
+      # Load variables
+    - name: Load default config variables
+      include_vars: 00-variables.yaml
+
+    - name: Create Jenkins directories
+      file:
+        name: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ jenkins_dir }}"
+        - "{{ jenkins_dir }}/plugins"
+
+    - name: chown Jenkins directory and contents to jenkins user
+      ansible.builtin.file:
+        path: '{{ jenkins_dir }}'
+        owner: '{{ jenkins_user }}'
+        group: '{{ jenkins_user }}'
+        recurse: true
+
+    - name: Create service override.conf
+      ansible.builtin.copy:
+        dest: '/etc/systemd/system/jenkins.service.d/override.conf'
+        content: |
+          [Service]
+          Environment="JAVA_OPTS=-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"
+          Environment="CASC_JENKINS_CONFIG=/var/lib/jenkins/casc/"
+
+    - name: Install Jenkins
+      package:
+        name: jenkins
+        state: present
+      when: install_jenkins|bool
+
+    - name: Start and enable Jenkins service
+      ansible.builtin.service:
+        name: jenkins
+        state: started
+        enabled: true
