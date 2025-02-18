@@ -164,8 +164,8 @@
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
       loop:
-        - { name: "pipeline-framework", repourl: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{ git_repo_dir }}/library_repos/pipeline-framework/pipeline-framework.git", implicit: "false" }
-        - { name: "JENKINS-27413-workaround-library", repourl: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{ git_repo_dir }}/library_repos/jenkins-workaround/JENKINS-27413-workaround-library.git", implicit: "true" }
+        - { name: "pipeline-framework", repourl: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{ git_repo_dir }}/LIBRARY_REPO/pipeline-framework/pipeline-framework.git", implicit: "false" }
+        - { name: "JENKINS-27413-workaround-library", repourl: "ssh://{{ git_user }}@{{ ansible_fqdn }}/home/{{ git_user }}/{{ git_repo_dir }}/LIBRARY_REPO/jenkins-workaround/JENKINS-27413-workaround-library.git", implicit: "true" }
 
     - name: Approve scripts
       community.general.jenkins_script:
@@ -187,6 +187,57 @@
           }
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
+
+    - name: Add nodes
+      community.general.jenkins_script:
+        script: |
+          import jenkins.model.Jenkins
+          import hudson.slaves.DumbSlave
+          import hudson.slaves.SlaveComputer
+          import hudson.slaves.RetentionStrategy
+          import hudson.plugins.sshslaves.SSHLauncher
+          import hudson.plugins.sshslaves.verifiers.NonVerifyingKeyVerificationStrategy
+          def nodeName = "${nodename}"
+          def remoteFS = "${remotefs}"
+          def numExecutors = 2
+          def labelString = "${label}"
+          def host = "${host}"
+          def sshPort = 22
+          def credentialsId = "${credentials}"
+          def jvmOptions = ''
+          def javaPath = ''
+          def prefixStartSlaveCmd = ''
+          def suffixStartSlaveCmd = ''
+          def launchTimeoutSeconds = 60
+          def maxNumRetries = 3
+          def retryWaitTime = 10
+          def strategy = new NonVerifyingKeyVerificationStrategy()
+          def launcher = new SSHLauncher(
+              host, sshPort, credentialsId, jvmOptions, javaPath,
+              prefixStartSlaveCmd, suffixStartSlaveCmd, launchTimeoutSeconds,
+              maxNumRetries, retryWaitTime, strategy
+          )
+          def node = new DumbSlave(
+              nodeName, "Jenkins SSH Node", remoteFS, numExecutors.toString(),
+              Node.Mode.NORMAL, labelString, launcher, new RetentionStrategy.Always(), new LinkedList()
+          )
+          def jenkins = Jenkins.instance
+          if (jenkins.getNode(nodeName) == null) {
+              jenkins.addNode(node)
+          } else {
+              println "Node '${nodename}' already exists."
+          }
+        args:
+          nodename: "{{ item.nodename }}"
+          remotefs: "{{ item.remotefs }}"
+          host: "{{ item.host }}"
+          credentials: "{{ item.credentials }}"
+          label: "{{ item.label }}"
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
+      loop:
+        - { nodenanme: "{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible", label: "ansible-master" }
+        - { nodenanme: "git-{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible", label: "git-{{ ansible_fqdn }}" }
 
     - name: Add Helix jobs
       community.general.jenkins_script:
@@ -214,15 +265,13 @@
           import org.jenkinsci.plugins.workflow.job.*
           String jobName = '01 - Dry run build of all Helix deployment pipelines'
           String pipelineScript = '''
-          pipeline {
           ${scripttext}
-          }
           '''
           Jenkins jenkins = Jenkins.instance
           WorkflowJob job = jenkins.createProject(WorkflowJob, jobName)
           job.definition = new org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition(pipelineScript, true)
           job.save()
         args:
-          scripttext: "{% for key in pipelines %}build propagate: false, job: '{{ key.name }}'\n{% endfor %}"
+          scripttext: "{% for key in pipeline_jobs %}build propagate: false, job: '{{ key.name }}'\n{% endfor %}"
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"

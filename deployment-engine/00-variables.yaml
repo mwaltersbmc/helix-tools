@@ -22,7 +22,7 @@ git_user_dirs:
 ansible_cfg_file: /etc/ansible/ansible.cfg
 jenkins_dir: /var/lib/jenkins
 
-pipelines_jobs:
+pipeline_jobs:
   - {"name":"HELIX_CONFIGURE_ITSM", "jenkinsfile":"HELIX_CONFIGURE_ITSM"}
   - {"name":"HELIX_GENERATE_CONFIG", "jenkinsfile":"HELIX_GENERATE_CONFIG_ONPREM"}
   - {"name":"HELIX_ITSM_INTEROPS", "jenkinsfile":"HELIX_ITSM_INTEROPS"}
