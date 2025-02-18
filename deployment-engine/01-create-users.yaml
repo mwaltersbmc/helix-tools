@@ -86,6 +86,19 @@
         - "{{ ansible_fqdn }}"
         - "{{ ansible_hostname }}"
 
+    - name: Unzip GIT repositories to repos directory
+      unarchive:
+        src: '{{ item.name }}'
+        dest: '{{ item.target }}'
+      loop:
+        - { name: "{{ itsm_zip }}", target: "~{{ git_user }}/{{ git_repo_dir }}" }
+        - { name: "{{ libtary_zip }}", target: "~{{ git_user }}/{{ git_repo_dir }}/LIBRARY_REPOS" }
+
+    - name: Copy kubeconfig to git user
+      ansible.builtin.copy:
+        src: kubeconfig
+        dest: ~{{ git_user }}/.kube/config
+
     - name: Set ownership of the home directories and files
       ansible.builtin.file:
         path: '/home/{{ item }}'

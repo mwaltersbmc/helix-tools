@@ -25,7 +25,7 @@
 
         - name: Pause for 15s to allow Jenkins startup
           ansible.builtin.pause:
-            seconds: 5
+            seconds: 15
 
       when: install_jenkins_plugins|bool
 
