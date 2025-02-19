@@ -1,27 +1,37 @@
+# The OS git user username and password
 git_user: git
 git_user_pwd: password
+# The OS jenkins user username and password - using a different username may cause issues and is not tested
 jenkins_user: jenkins
 jenkins_user_pwd: password
+# The Jenkins application login name and password - do NOT use "admin" as the username
 jenkins_login_user: jenkins
 jenkins_login_user_pwd: P@ssw0rd
-git_repo_dir: git_repos
+# The namne of the zip file containing the Helix Service Management git repositories
 itsm_zip: BMC_Remedy_Deployment_Manager_Configuration_Release_23.3.04.zip
-add_public_repos: false
-install_helm: false
+# Add public package repositories to download software from - set to false if you have your own
+add_public_repos: true
+# Install helm and set the version
+install_helm: true
 helm_version: 3.12.3
-install_kubectl: false
-kubectl_version: 1.28.6
+# Install kubectl and set the version - use the same as your cluster
+install_kubectl: true
+kubectl_version: 1.30.5
+# Set to false if you have already installed Jenkins
 install_jenkins: true
+# Set to false if you will install Jenkins plugins manually
 install_jenkins_plugins: true
 
+# Values below should not need to be changed
+git_repo_dir: git_repos
 libraries_zip: LIBRARY_REPO.zip
 git_user_dirs:
   - "{{ git_repo_dir }}"
   - .kube
   - workspace
+  - "{{ git_repo_dir }}/LIBRARY_REPO"
 ansible_cfg_file: /etc/ansible/ansible.cfg
 jenkins_dir: /var/lib/jenkins
-
 pipeline_jobs:
   - {"name":"HELIX_CONFIGURE_ITSM", "jenkinsfile":"HELIX_CONFIGURE_ITSM"}
   - {"name":"HELIX_GENERATE_CONFIG", "jenkinsfile":"HELIX_GENERATE_CONFIG_ONPREM"}

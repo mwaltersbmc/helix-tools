@@ -44,4 +44,4 @@
       shell: userdel -r {{ item }}
       loop:
         - "{{ git_user }}"
-        - "{{ jenkins user }}"
+        - "{{ jenkins_user }}"
