@@ -42,3 +42,7 @@ If you encounter an error when running a playbook you should be able to correct 
 Start by editing the **00-variables.yaml** file and updating the values to match your requirements.  It is recommended that you use the defaults unless there is a good reason to change them.  
 
 If you are using a freshly installed system, run the playbooks in numerical order to create and configure the users, install software, and set up Jenkins.  Once completed you should be able to login to Jenkins using the **jenkins_login_\*** credentials set in the variables file.  All of the deployment pipelines should be present, along with a job called **01 - Dry run build of all Helix deployment pipelines**, which will dry run the Helix jobs and prepare them for use.  All of the other Jenkins configuration steps - global libraries, credential creation, etc - have been done by the playbooks.  Once the dry runs are complete you are ready to start the Helix deployments.
+
+### Jenkins Validation
+
+You can use the **HITT** script with the **-m jenkins** option to check that Jenkins is ready for use.  Review the README file in the **helix-tools/hitt** folder for more details.
