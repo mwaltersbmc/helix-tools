@@ -1,31 +1,42 @@
-This repository contains a number of ansible playbooks to set up and configure a RHEL/Rocky 9.x system as a BMC Helix Deployment Engine.  This is an alternative to the Perl set up script that is part of the Helix Service Management applications.
+This repository contains a number of ansible playbooks to set up and configure a RHEL/Rocky 9.x system as a BMC Helix Deployment Engine.  This is an alternative to the Perl script that is provided with the Helix Service Management applications.  Each playbook may be run independently if, for example, the tasks covered by a previous playbook have already been completed.
 
-Requirements
+Many of the steps, such as creating users and installing software, require elevated permissions so the playbooks are expected to be run as the root user.
+
+### Requirements
 
 You will need a RHEL/Rocky 9.x system with:
 - git and ansible-core <= 2.15
 - ansible community.general and ansible.posix collections
 - a valid kubeconfig file for your Kubernetes cluster
-- the Helix Service Management git repository and plugins.txt files
-- able to run the playbooks as the root user
+- the Helix Service Management git repository zip and plugins.txt files
+- root access
 
-Preparation
+### Preparation
 
 Start by downloading the playbook files with
 
-# git clone https://github.com/mwaltersbmc/helix-tools
+```sh
+git clone https://github.com/mwaltersbmc/helix-tools
+```
 
-Copy the following files to the helix-tools/deployment-engine directory:
-- the Helix Service Management git files - eg BMC_Remedy_Deployment_Manager_Configuration_Release_23.3.04.zip and LIBRARY_REPO.zip
-- the plugins.txt file from the Helix Service Management Deployment Engine Setup zip file
-- a valid kubeconfig file for your cluster - it must be named kubeconfig
+Change to, and copy the following files to, the **helix-tools/deployment-engine** directory:
+- the Helix Service Management git repos zip files - eg BMC_Remedy_Deployment_Manager_Configuration_Release_23.3.04.zip and LIBRARY_REPO.zip
+- the **plugins.txt** file from the Helix Service Management Deployment Engine Setup zip file
+- a valid **kubeconfig** file for your cluster - it must be named kubeconfig
 
-Edit the 00-variables.yaml file and update the variables to match your requirements.  It is recommended to use the defaults unless there is a good reason not to.  You can choose to install the required software manually by setting the relevant options to false.
+### The Playbooks
 
-The playbooks
+| File | Description |
+| --- | ----------- |
+| 00-variables.yaml | Common settings used by all the playbooks |
+| 01-create-users.yaml | Creates the git and jenkins users, sets up ssh, and prepares the deployment files |
+| 02-install-software.yaml | Installs the required OS tools |
+| 03-install-jenkins.yaml | Installs the Jenkins application |
+| 04-configure-jenkins.yaml | Configures Jenkins to act as the Helix Service Management Deployment Engine |
+| 99-reset.yaml | Uninstalls Jenkins and deletes the git and jenkins users |
 
-00-variables.yaml         common settings used by all the playbooks
-01-create-users.yaml      creates the git and jenkins users, sets up ssh, and prepares the deployment files
-02-install-software.yaml  installs the required OS tools
-03-install-jenkins.yaml   installs the Jenkins application
-04-configure-jenkins.yaml configures Jenkins to act as the Helix Service Management Deployment Engine
+If you encounter an error when running a playbook you should be able to correct the issue and rerun without having to undo any completed steps.
+
+### Usage
+
+Start by editing the **00-variables.yaml** file and updating variables to match your requirements.  It is recommended that you use the defaults unless there is a good reason not to.  You can choose to install the required software manually by setting the relevant options to false.

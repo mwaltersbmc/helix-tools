@@ -7,19 +7,17 @@ jenkins_user_pwd: password
 # The Jenkins application login name and password - do NOT use "admin" as the username
 jenkins_login_user: jenkins
 jenkins_login_user_pwd: P@ssw0rd
-# The namne of the zip file containing the Helix Service Management git repositories
+# The name of the zip file containing the Helix Service Management git repositories
 itsm_zip: BMC_Remedy_Deployment_Manager_Configuration_Release_23.3.04.zip
-# Add public package repositories to download software from - set to false if you have your own
+# Add public package repositories to download software from - set to false if you have your own already configured
 add_public_repos: true
-# Install helm and set the version
-install_helm: true
-helm_version: 3.12.3
 # Install kubectl and set the version - use the same as your cluster
 install_kubectl: true
 kubectl_version: 1.30.5
-# Set to false if you have already installed Jenkins
-install_jenkins: true
-# Set to false if you will install Jenkins plugins manually
+# Install helm and set the version
+install_helm: true
+helm_version: 3.12.3
+# Set to false if you have installed the Jenkins plugins manually
 install_jenkins_plugins: true
 
 # Values below should not need to be changed

@@ -1,9 +1,6 @@
 ---
 - hosts: localhost
 
-  vars:
-    jenkins_plugins_url: https://updates.jenkins.io/latest
-
   tasks:
 
       # Load variables
@@ -14,7 +11,6 @@
       package:
         name: jenkins
         state: present
-      when: install_jenkins|bool
 
     - name: Start and enable Jenkins service
       ansible.builtin.service:
