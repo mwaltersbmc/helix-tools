@@ -21,7 +21,7 @@ helm_version: 3.12.3
 install_jenkins_plugins: true
 
 # Values below should not need to be changed
-git_repo_dir: git_repos
+git_repo_dir: git_repo
 libraries_zip: LIBRARY_REPO.zip
 unzip_git_repos: true
 git_user_dirs:
