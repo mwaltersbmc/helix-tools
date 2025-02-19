@@ -835,7 +835,7 @@ getValueFromPlatformSecret() {
 }
 
 checkJenkinsIsRunning() {
-  JENKINS_RESCODE=$(${CURL_BIN} -k -s -o /dev/null -w "%{http_code}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/whoAmI/api/json?tree=authenticated")
+  JENKINS_RESCODE=$(${CURL_BIN} -k -s -o /dev/null -w "%{http_code}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
   case "${JENKINS_RESCODE}" in
     200)
       JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
@@ -843,7 +843,7 @@ checkJenkinsIsRunning() {
       logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
       getJenkinsCrumb
       ;;
-    401)
+    401|403)
       logError "127" "Jenkins authentication is enabled but the credentials in hitt.conf are blank or wrong.  Please set correct credentials in the HITT config file '${HITT_CONFIG_FILE}'." 1
       SKIP_JENKINS=1
       ;;
