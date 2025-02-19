@@ -93,6 +93,7 @@
       loop:
         - { name: "{{ itsm_zip }}", target: "~{{ git_user }}/{{ git_repo_dir }}" }
         - { name: "{{ libraries_zip }}", target: "~{{ git_user }}/{{ git_repo_dir }}/LIBRARY_REPO" }
+      when: unzip_git_repos|bool
 
     - name: Copy kubeconfig to git user
       ansible.builtin.copy:
