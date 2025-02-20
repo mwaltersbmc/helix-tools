@@ -19,6 +19,8 @@ install_helm: true
 helm_version: 3.12.3
 # Set to false if you have installed the Jenkins plugins manually
 install_jenkins_plugins: true
+# Start the Jenkins job to dry run the Helix deployment pipelines
+start_dry_run: false
 
 # Values below should not need to be changed
 git_repo_dir: git_repo

@@ -290,3 +290,20 @@
           scripttext: "{% for key in pipeline_jobs %}build propagate: false, job: '{{ key.name }}'\n{% endfor %}"
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
+
+    - name: Start dry run block
+      block:
+
+        - name: Install python-jenkins package
+          ansible.builtin.pip:
+            name: python-jenkins
+
+        - name: Start the dry run job
+          community.general.jenkins_build:
+            name: "01 - Dry run build of all Helix deployment pipelines"
+            state: present
+            detach: true
+            user: "{{ jenkins_login_user }}"
+            password: "{{ jenkins_login_user_pwd }}"
+
+      when: start_dry_run|bool
