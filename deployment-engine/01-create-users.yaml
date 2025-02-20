@@ -15,9 +15,7 @@
         comment: Git user for Deployment Engine
         state: present
         create_home: true
-        skeleton: /etc/skel
         shell: /bin/bash
-        append: true
         generate_ssh_key: true
         ssh_key_bits: 2048
         ssh_key_file: .ssh/id_rsa
@@ -61,9 +59,7 @@
         comment: Jenkins user for Deployment Engine
         state: present
         create_home: true
-        skeleton: /etc/skel
         shell: /bin/bash
-        append: true
         generate_ssh_key: true
         ssh_key_bits: 2048
         ssh_key_file: .ssh/id_rsa
