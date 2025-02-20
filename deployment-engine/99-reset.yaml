@@ -41,7 +41,7 @@
         - "/home/{{ jenkins_user }}"
 
     - name: Run userdel
-      shell: userdel -r {{ item }}
+      shell: userdel -rf {{ item }}
       loop:
         - "{{ git_user }}"
         - "{{ jenkins_user }}"
