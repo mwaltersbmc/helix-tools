@@ -38,6 +38,24 @@
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
 
+    - name: Set Jenkins admin config
+      community.general.jenkins_script:
+        script: |
+          import jenkins.model.Jenkins
+          import jenkins.model.JenkinsLocationConfiguration
+          def jenkinsParameters = [
+            email:  'Jenkins Admin <admin@example.com>',
+            url:    'https://${host}:8080/'
+          ]
+          def jenkinsLocationConfiguration = JenkinsLocationConfiguration.get()
+          jenkinsLocationConfiguration.setUrl(jenkinsParameters.url)
+          jenkinsLocationConfiguration.setAdminAddress(jenkinsParameters.email)
+          jenkinsLocationConfiguration.save()
+        args:
+          host: "{{ ansible_fqdn }}"
+        user: "{{ jenkins_login_user }}"
+        password: "{{ jenkins_login_user_pwd }}"
+
     - name: Create UsernamePassword credentials
       community.general.jenkins_script:
         script: |
@@ -75,7 +93,7 @@
         - { description: "github id", id: "github", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
         - { description: "ansible_host id", id: "ansible_host", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
         - { description: "ansible id", id: "ansible", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
-    
+
     - name: Create SecretText credentials
       community.general.jenkins_script:
         script: |
