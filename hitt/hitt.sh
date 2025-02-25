@@ -2453,7 +2453,7 @@ checkDERequirements() {
       else
         logMessage "Using ansible version - ${ANSIBLE_VERSION}"
         if ! isJmespathInstalled ; then
-          ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | se '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
+          ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
           logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible (${ANSIBLE_PYTHON_VERSION})."
         fi
       fi
