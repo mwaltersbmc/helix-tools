@@ -1436,11 +1436,19 @@ getCacertsFile() {
   if [ "${MODE}" == "pre-is" ]; then
     if [ -f configsrepo/customer/customCerts/cacerts ] ; then
       cp -f configsrepo/customer/customCerts/cacerts sealcacerts
-      logMessage "cacerts file found in CUSTOMER_CONFIGS repo." 1
+      logMessage "cacerts file found in CUSTOMER_CONFIGS repo."
       return
     else
-      logWarning "017" "cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
-      SKIP_CACERTS=1
+      logWarning "017" "Custom cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
+      export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
+      if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/ITSM_REPO/itsm-on-premise-installer.git itsmrepo > /dev/null 2>&1 ; then
+        logError "129" "Failed to clone ${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git"
+        SKIP_CACERTS=1
+        return
+      else
+        logMessage "Using default cacerts file from ITSM_REPO."
+        cp -f itsmrepo/pipeline/tasks/cacerts sealcacerts
+      fi
     fi
   fi
 
