@@ -474,7 +474,7 @@ checkEFKClusterHealth() {
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
     logError "113" "Helix Logging Elasticsearch problem. Check the ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
   else
-    logMessage "Helix Logging Elasticsearch (${EFK_ELASTIC_SERVICENAME}) appears healthy."
+    logMessage "Helix Logging Elasticsearch (${EFK_ELASTIC_SERVICENAME}) appears healthy." 1
   fi
 }
 
@@ -747,13 +747,13 @@ checkServiceDetails() {
   if ! echo "${TCTL_OUTPUT}" | grep -q "^ITSM "  ; then
     logError "124" "ITSM services not found in Helix Platform - please check that ARSERVICES=yes was set in your deployment.config file."
   else
-    logMessage "ITSM services found in Helix Platform."
+    logMessage "ITSM services found in Helix Platform." 1
   fi
   if ! echo "${TCTL_OUTPUT}" | grep -q "^ITSMInsight"  ; then
-    logMessage "ITSM Insights services are not installed."
+    logMessage "ITSM Insights services are not installed." 1
     ITSM_INSIGHTS=1
   else
-    logMessage "ITSM Insights services found in Helix Platform."
+    logMessage "ITSM Insights services found in Helix Platform." 1
     ITSM_INSIGHTS=0
   fi
   deleteTCTLJob
@@ -1436,7 +1436,7 @@ getCacertsFile() {
   if [ "${MODE}" == "pre-is" ]; then
     if [ -f configsrepo/customer/customCerts/cacerts ] ; then
       cp -f configsrepo/customer/customCerts/cacerts sealcacerts
-      logMessage "cacerts file found in CUSTOMER_CONFIGS repo."
+      logMessage "cacerts file found in CUSTOMER_CONFIGS repo." 1
       return
     else
       logWarning "017" "cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
@@ -1445,7 +1445,7 @@ getCacertsFile() {
   fi
 
   if [ "${MODE}" == "post-is" ]; then
-    logMessage "Extracting cacerts file from Helix IS cacerts secret..."
+    logMessage "Extracting cacerts file from Helix IS cacerts secret..." 1
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts > /dev/null 2>&1; then
       logError "159" "'cacerts' secret not found in Helix IS namespace."
       SKIP_CACERTS=1
@@ -1478,7 +1478,7 @@ validateCacerts() {
   fi
 
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "changeit" ]; then
-    logMessage "CACERTS_SSL_TRUSTSTORE_PASSWORD is set - using non-default password for cacerts."
+    logMessage "CACERTS_SSL_TRUSTSTORE_PASSWORD is set - using non-default password for cacerts." 1
     if ! ${KEYTOOL_BIN} -list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1 ; then
       logError "214" "The value of CACERTS_SSL_TRUSTSTORE_PASSWORD is not set to the correct password for the cacerts file."
       return
@@ -1514,7 +1514,7 @@ validateCacerts() {
   done
 
   if [ "${VALID_CACERTS}" == 0 ]; then
-    logMessage "cacerts file appears valid."
+    logMessage "cacerts file appears valid." 1
   fi
 }
 
@@ -1706,7 +1706,7 @@ getISAdminCreds() {
 
 checkAssistTool() {
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get deployment assisttool-dep > /dev/null 2>&1 ; then
-    logMessage "Support Assistant Tool found - checking for fpackager sidecar containers..."
+    logMessage "Support Assistant Tool found - checking for fpackager sidecar containers..." 1
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[*].name}' | grep -q fpackager ; then
       logError "177" "fpackager sidecar containers not found - Support Assistant will not be able to access application logs."
     else
@@ -1723,7 +1723,7 @@ checkAssistTool() {
       logMessage "assisttool-rlb rolebinding present in Helix IS namespace." 1
     fi
   else
-    logMessage "Support Assistant Tool is not deployed."
+    logMessage "Support Assistant Tool is not deployed." 1
   fi
 }
 
@@ -1763,7 +1763,7 @@ checkISDBSettings() {
     SKIP_SR_DB_CHECKS=1
     return
   else
-    logMessage "IS DB server (${IS_DATABASE_HOST_NAME}) is reachable on port ${IS_DB_PORT}."
+    logMessage "IS DB server (${IS_DATABASE_HOST_NAME}) is reachable on port ${IS_DB_PORT}." 1
   fi
   checkISDBLatency
   if [ -z "${IS_AR_DB_USER}" ] || [ -z "${IS_AR_DB_PASSWORD}" ]; then
@@ -1771,11 +1771,11 @@ checkISDBSettings() {
     return
   fi
   if [ -f dbjars.tgz ]; then
-    logMessage "Found dbjars.tgz - running DB checks."
-    logMessage "Unpacking dbjars.tgz..."
+    logMessage "Found dbjars.tgz - running DB checks." 1
+    logMessage "Unpacking dbjars.tgz..." 1
     ${TAR_BIN} zxf dbjars.tgz
     buildJISQLcmd
-    logMessage "Connecting to ${JISQLURL} as ${IS_AR_DB_USER}..."
+    logMessage "Connecting to ${JISQLURL} as ${IS_AR_DB_USER}..." 1
     # Note - new line is needed to avoid Java heap errors from jisql
     SQL_RESULT=$($JISQLCMD "select currDbVersion from control
     go" 2>&1)
@@ -1793,7 +1793,7 @@ checkISDBSettings() {
           logMessage "Database is the expected version - ${DB_VERSION}." 1
         fi
       else
-        logMessage "Database currDbVersion is ${DB_VERSION}."
+        logMessage "Database currDbVersion is ${DB_VERSION}." 1
       fi
     fi
 
@@ -2333,11 +2333,11 @@ case "${PLATFORM_EXT_SVC_TYPE}" in
     if [ "${PLATFORM_EXT_IP}" == "0" ]; then
       logWarning "025" "Helix IS platform-admin-ext service is of type ClusterIP but does not appear to have an externalIP assigned."
     else
-      logMessage "Helix IS platform-admin-ext service is of type ClusterIP."
+      logMessage "Helix IS platform-admin-ext service is of type ClusterIP." 1
     fi
     ;;
   NodePort)
-    logMessage "Helix IS platform-admin-ext service is of type NodePort."
+    logMessage "Helix IS platform-admin-ext service is of type NodePort." 1
     ;;
   *)
     logWarning "026" "Helix IS platform-admin-ext service is of type '${PLATFORM_EXT_SVC_TYPE}' and not the expected ClusterIP or NodePort."
