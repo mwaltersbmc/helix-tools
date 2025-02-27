@@ -176,7 +176,7 @@ checkBinary() {
   if ! which "${1}" > /dev/null 2>&1 ; then
     logError "105" "${1} command not found in path. Please set ${BINARY} variable with the full path to the file."
   else
-    logMessage "${1} command found ($(which ${1}))."
+    logMessage "${1} command found ($(which ${1}))." 1
     checkToolVersion "${2}"
   fi
 }
@@ -219,7 +219,7 @@ checkNamespaceExists() {
     if ! ${KUBECTL_BIN} get ns "${1}" > /dev/null 2>&1 ; then
       logError "106" "${NS_TYPE} namespace ${1} not found." 1
     else
-      logMessage "${NS_TYPE} namespace ${1} found."
+      logMessage "${NS_TYPE} namespace ${1} found." 1
       checkNSResourceQuotas "${1}"
     fi
   else
@@ -235,7 +235,7 @@ checkHPNamespace() {
     if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
     logError "107" "Deployment ${DEPLOYMENT} not found in '${1}' - please check the ${NS_TYPE} namespace name." 1
   else
-    logMessage "'${1}' is a valid ${NS_TYPE} namespace."
+    logMessage "'${1}' is a valid ${NS_TYPE} namespace." 1
   fi
   checkPodStatus "${1}"
 }
@@ -432,9 +432,9 @@ setVarsFromPlatform() {
 getRSSODetails() {
   RSSO_ADMIN_TAS_CM=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm rsso-admin-tas -o json)
   RSSO_URL=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.rssourl + "/rsso"')
-  logMessage "RSSO URL is ${RSSO_URL}."
+  logMessage "RSSO URL is ${RSSO_URL}." 1
   RSSO_USERNAME=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.username')
-  logMessage "RSSO username is ${RSSO_USERNAME}."
+  logMessage "RSSO username is ${RSSO_USERNAME}." 1
   RSSO_PASSWORD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret rsso-admin-tas -o jsonpath='{.data.password}' | ${BASE64_BIN} -d)
   RSSO_TOKEN_JSON=$(${CURL_BIN} -sk -X POST "${RSSO_URL}"/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"'"${RSSO_USERNAME}"'","password":"'"${RSSO_PASSWORD}"'"}')
   if [[ "${RSSO_TOKEN_JSON}" =~ "admin_token" ]]; then
@@ -619,7 +619,7 @@ getRealmDetails() {
     ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN}
     logError "116" "Realm ${REALM_NAME} not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values." 1
   else
-    logMessage "RSSO realm ${REALM_NAME} found for the SAAS_TENANT."
+    logMessage "RSSO realm ${REALM_NAME} found for the SAAS_TENANT." 1
   fi
 }
 
@@ -665,10 +665,10 @@ validateRealm() {
 buildISAliasesArray() {
   if [ "${IS_ENVIRONMENT}" == "prod" ]; then
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}"
-    logMessage "ENVIRONMENT value is 'prod' - IS hostnames prefix is '${IS_ALIAS_PREFIX}-.'"
+    logMessage "ENVIRONMENT value is 'prod' - IS hostnames prefix is '${IS_ALIAS_PREFIX}-.'" 1
   else
     IS_ALIAS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
-    logMessage "IS hostnames prefix is '${IS_ALIAS_PREFIX}'."
+    logMessage "IS hostnames prefix is '${IS_ALIAS_PREFIX}'." 1
   fi
   # Midtier alias
   IS_ALIAS_ARRAY+=("${IS_ALIAS_PREFIX}.${CLUSTER_DOMAIN}")
@@ -679,10 +679,10 @@ buildISAliasesArray() {
 }
 
 validateRealmDomains() {
-  logMessage "Checking for expected hostname aliases in realm Application Domains, DNS & Helix certificate..."
+  logMessage "Checking for expected hostname aliases in realm Application Domains, DNS & Helix certificate..." 1
   # Check for wildcard certain
   if ${OPENSSL_BIN} s_client -connect "${LB_HOST}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "*.${CLUSTER_DOMAIN}" ; then
-    logMessage "Helix certificate is a wildcard for '*.${CLUSTER_DOMAIN}'."
+    logMessage "Helix certificate is a wildcard for '*.${CLUSTER_DOMAIN}'." 1
     WILDCARD_CERT=1
   else
     WILDCARD_CERT=0
@@ -885,7 +885,7 @@ getISDetailsFromJenkins() {
   checkJenkinsJobResult
   JENKINS_ONPREM_DEPLOYMENT_LASTBUILD=$(getLastBuildFromJenkins HELIX_ONPREM_DEPLOYMENT)
   JENKINS_GENERATE_CONFIG_LASTBUILD=$(getLastBuildFromJenkins HELIX_GENERATE_CONFIG)
-  logMessage "Last pipeline build numbers are - HELIX_ONPREM_DEPLOYMENT/${JENKINS_ONPREM_DEPLOYMENT_LASTBUILD} and HELIX_GENERATE_CONFIG/${JENKINS_GENERATE_CONFIG_LASTBUILD}."
+  logMessage "Last pipeline build numbers are - HELIX_ONPREM_DEPLOYMENT/${JENKINS_ONPREM_DEPLOYMENT_LASTBUILD} and HELIX_GENERATE_CONFIG/${JENKINS_GENERATE_CONFIG_LASTBUILD}." 1
   JENKINS_PARAMS=$(echo "${JENKINS_JSON}" | ${JQ_BIN} -r '.actions[] | select(._class=="hudson.model.ParametersAction") .parameters[]')
   getPipelineValues
 }
@@ -1084,14 +1084,14 @@ cloneCustomerConfigsRepo() {
     SKIP_REPO=1
     return
   else
-    logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory."
+    logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory." 1
   fi
   if [ ! -f "${INPUT_CONFIG_FILE}" ]; then
     logError "130" "Input configuration file (${INPUT_CONFIG_FILE}) not found. Has the HELIX_GENERATE_CONFIG pipeline been run successfully?"
     SKIP_REPO=1
     return
   else
-    logMessage "Input config file found '${INPUT_CONFIG_FILE}'."
+    logMessage "Input config file found '${INPUT_CONFIG_FILE}'." 1
     getInputFileValues
   fi
 }
@@ -1200,7 +1200,7 @@ validateISDetails() {
     if [ "${IS_IS_NAMESPACE}" != "${IS_NAMESPACE}" ]; then
       logError "138" "The IS_NAMESPACE value (${IS_IS_NAMESPACE}) does not match the IS_NAMESPACE defined in the hitt.conf file (${IS_NAMESPACE})."
     else
-      logMessage "IS_NAMESPACE is the expected value '${IS_NAMESPACE}'."
+      logMessage "IS_NAMESPACE is the expected value '${IS_NAMESPACE}'." 1
     fi
 
     if [ "${IS_VERSION}" -ge 2023303 ]; then
@@ -1408,7 +1408,7 @@ validateISDetails() {
     if [ -n "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" ] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ ^\[.* ]] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ .*\]$ ]]; then
       logError "155" "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}) does not match the expected format of [x.x.x.x] - missing square brackets?"
     else
-      logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - ${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}."
+      logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - ${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}." 1
     fi
 
     if [ "${IS_RSSO_ADMIN_USER,,}" != "${RSSO_USERNAME,,}" ]; then
@@ -1964,7 +1964,7 @@ checkISDockerLogin() {
     return
   fi
   if docker login "${IS_SECRET_HARBOR_REGISTRY_HOST}" -u "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" -p "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" > /dev/null 2>&1 ; then
-    logMessage "IMAGE_REGISTRY credentials are valid - docker login to ${IS_SECRET_HARBOR_REGISTRY_HOST} was successful."
+    logMessage "IMAGE_REGISTRY credentials are valid - docker login to ${IS_SECRET_HARBOR_REGISTRY_HOST} was successful." 1
   else
     logError "192" "'docker login' to ${IS_SECRET_HARBOR_REGISTRY_HOST} failed - please check credentials."
   fi
@@ -2347,13 +2347,13 @@ esac
 
 getPods() {
   # ns name
-  logMessage "Getting pods from ${1}..."
+  logMessage "Getting pods from ${1}..." 1
   ${KUBECTL_BIN} -n ${1} get pods -o wide 2>/dev/null > k8s-get-pods-${1}.log
 }
 
 getEvents() {
   # ns name
-  logMessage "Getting events from ${1}..."
+  logMessage "Getting events from ${1}..." 1
   ${KUBECTL_BIN} -n ${1} events --sort-by='.lastTimestamp' 2>/dev/null > k8s-events-${1}.log
 }
 
@@ -2464,7 +2464,7 @@ checkDERequirements() {
     if [ ! -f "${ANSIBLE_CFG_FILE}" ]; then
       logError "210" "Ansible configuration file (${ANSIBLE_CFG_FILE}) not found - skipping checks."
     else
-      logMessage "Checking ansible configuration file - ${ANSIBLE_CFG_FILE}."
+      logMessage "Checking ansible configuration file - ${ANSIBLE_CFG_FILE}." 1
       ANSIBLE_CFG_VALS=(bin_ansible_callbacks=true stdout_callback=yaml host_key_checking=false ssh_args=-ocontrolmaster=auto retries=3 pipelining=true)
       ANSIBLE_CFG=$(cat /etc/ansible/ansible.cfg | tr -d ' ')
       for i in "${ANSIBLE_CFG_VALS[@]}"; do
