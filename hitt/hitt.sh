@@ -281,6 +281,8 @@ logDescribePod() {
 getVersions() {
   logMessage "Kubernetes version ${K8S_VERSION}."
   logMessage "kubectl version ${KUBECTL_VERSION}."
+  HELM_VERSION=$(helm version --short)
+  logMessage "Helm version ${HELM_VERSION}."
   if [ -f /etc/os-release ]; then
     OS_NAME=$(grep "^NAME=" /etc/os-release | cut -d '=' -f2)
     OS_VERSION=$(grep "^VERSION=" /etc/os-release | cut -d '=' -f2)
