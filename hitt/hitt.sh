@@ -1224,7 +1224,7 @@ validateISDetails() {
 
     if checkK8sAuth get ingressclasses; then
       if isBlank "${IS_INGRESS_CLASS}" || ! ${KUBECTL_BIN} get ingressclasses "${IS_INGRESS_CLASS}" > /dev/null 2>&1 ; then
-        logError "141" "INGRESS_CLASS (${IS_INGRESS_CLASS})is blank or not valid."
+        logError "141" "INGRESS_CLASS (${IS_INGRESS_CLASS}) is blank or not valid."
       else
         logMessage "INGRESS_CLASS '${IS_INGRESS_CLASS}' appears valid." 1
       fi
@@ -1872,7 +1872,7 @@ checkKubeconfig() {
     KUBECONFIG_ERROR=1
   fi
   if [ ! -f ~/.kube/config ]; then
-    logError "186" "Default KUBECONFIG file (~/home/.kube/config) required by Jenkins pipelines not found."
+    logError "186" "Default KUBECONFIG file (~/.kube/config) required by Jenkins pipelines not found."
     KUBECONFIG_ERROR=1
   fi
   if [ ${KUBECONFIG_ERROR} == "0" ]; then
@@ -3639,7 +3639,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"211\",
-    \"cause\": \"This values should be the ID of a Jenkins credentials object containing the OS user/password used by the pipeline to access the git repository files.\",
+    \"cause\": \"This value should be the ID of a Jenkins credentials object containing the OS user/password used by the pipeline to access the git repository files.\",
     \"impact\": \"The HELIX_ONPREM_DEPLOYMENT pipeline will fail.\",
     \"remediation\": \"Set the value to the correct credentials ID - usually 'github'.\"
   },
