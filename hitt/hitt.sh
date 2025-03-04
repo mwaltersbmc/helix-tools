@@ -281,6 +281,9 @@ logDescribePod() {
 getVersions() {
   logMessage "Kubernetes version ${K8S_VERSION}."
   logMessage "kubectl version ${KUBECTL_VERSION}."
+  if [ "${OPENSHIFT_VERSION}" != "" ]; then
+    logMessage "OpenShift version ${OPENSHIFT_VERSION}."
+  fi
   HELM_VERSION=$(helm version --short)
   logMessage "Helm version ${HELM_VERSION}."
   if [ -f /etc/os-release ]; then
@@ -2507,6 +2510,13 @@ runJenkinsCurl() {
   ${CURL_BIN} -b .cookies --data-urlencode "script=${1}" -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_ERR_FILE}
 }
 
+isOpenShift() {
+  OPENSHIFT_VERSION=""
+  if ${KUBECTL_BIN} get clusteroperators >/dev/null 2>&1; then
+    OPENSHIFT=1
+    OPENSHIFT_VERSION=$(${KUBECTL_BIN} get clusterversion -o jsonpath='{.items[].spec.desiredUpdate.version}')
+  fi
+}
 # FUNCTIONS End
 
 # MAIN Start
@@ -2610,6 +2620,7 @@ if [ "${MODE}" != "post-hp" ]; then
   getEvents ${IS_NAMESPACE}
 fi
 logStatus "Getting versions..."
+isOpenShift
 getVersions
 setVarsFromPlatform
 checkHelixLoggingDeployed
@@ -2721,6 +2732,7 @@ JQ_BIN=jq
 ERROR_ARRAY=()
 WARN_ARRAY=()
 JENKINS_CREDENTIALS=""
+OPENSHIFT=0
 SSLPOKE_PAYLOAD="
 yv66vgAAADcAbQoAFgAjCQAkACUHACYKACcAKBIAAAAsCgAtAC4KACQALwoACQAwBwAxCgAyADMK
 AAkANAcANQoADAA2CgAMADcKACAAOAoAHwA5CgAfADoKAC0AOwgAPAcAPQoAFAA+BwA/AQAGPGlu
