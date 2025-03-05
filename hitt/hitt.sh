@@ -1169,6 +1169,10 @@ validateISDetails() {
       fi
     fi
 
+    if [ "${IS_GIT_REPO_DIR: -1}" == "/" ]; then
+      logError "226" "GIT_REPO_DIR value ends with a '/' character which will cause an error - please remove it."
+    fi
+
     if [ "${IS_DEPLOYMENT_MODE}" == "UPGRADE" ] || [ "${IS_DEPLOYMENT_MODE}" == "UPDATE" ]; then
       CURRENT_VER=$(echo "${IS_SOURCE_VERSION}" | tr -d .)
       TARGET_VER=$(echo "${IS_PLATFORM_HELM_VERSION}" | tr -d .)
@@ -3738,11 +3742,16 @@ ALL_MSGS_JSON="[
     \"cause\": \"The 'ansible-galaxy' community.general collection is not installed.\",
     \"impact\": \"If the collection is not installed deployment will fail.\",
     \"remediation\": \"Install the ansible community.general collection using the command 'ansible-galaxy collection install community.general'.\"
+  },
+  {
+    \"id\": \"226\",
+    \"cause\": \"The value of the GIT_REPO_DIR parameter should not have a forward slash as the last character.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Remove the trailing forward slash '/'.\"
   }
-
 ]"
 
-while getopts "cde:f:jlm:pt:v" options; do
+while getopts "cde:f:h:e:jlm:n:ps:t:u:vw:" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
@@ -3756,6 +3765,14 @@ while getopts "cde:f:jlm:pt:v" options; do
     f)
       HITT_CONFIG_FILE=${OPTARG}
       ;;
+    h)
+      CONF_OVERRIDE=1
+      HP_NAMESPACE_OVERRIDE="${OPTARG}"
+      ;;
+    i)
+      CONF_OVERRIDE=1
+      IS_NAMESPACE_OVERRIDE="${OPTARG}"
+      ;;
     j)
       DUMP_JCREDS=1
       ;;
@@ -3765,8 +3782,16 @@ while getopts "cde:f:jlm:pt:v" options; do
     m)
       MODE=${OPTARG}
       ;;
+    n)
+      CONF_OVERRIDE=1
+      ENVIRONMENT_OVERRIDE="${OPTARG}"
+      ;;
     p)
       LOG_PASSWDS=1
+      ;;
+    s)
+      CONF_OVERRIDE=1
+      CUSTOMER_SERVICE_OVERRIDE="${OPTARG}"
       ;;
     t)
       TCTL_CMD=${OPTARG}
@@ -3774,8 +3799,16 @@ while getopts "cde:f:jlm:pt:v" options; do
         logError "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
       fi
       ;;
+    u)
+      CONF_OVERRIDE=1
+      JENKINS_USERNAME_OVERRIDE="${OPTARG}"
+      ;;
     v)
       VERBOSITY=1
+      ;;
+    w)
+      CONF_OVERRIDE=1
+      JENKINS_PASSWORD_OVERRIDE="${OPTARG}"
       ;;
     :)
       echo -e "${BOLD}ERROR:${NORMAL} -${OPTARG} requires an argument."
