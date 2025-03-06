@@ -53,6 +53,10 @@ HOST_BIN=host
 ZIP_BIN=zip
 UNZIP_BIN=unzip
 EOF
+
+if [ ! -f "${1}" ]; then
+  logError "227" "Failed to create '${1}' file - please check you have permissions to create files in the current directory." 1
+fi
 }
 
 logError() {
@@ -2542,6 +2546,9 @@ if [ ! -f "${HITT_CONFIG_FILE}" ]; then
   getConfValues
   createHITTconf "${HITT_CONFIG_FILE}"
 else
+  if [ -f .hitt.conf ] && [ ! -w .hitt.conf ]; then
+    logError "228" "The '.hitt.conf' file is not writable by the current user - please make sure all files in the current directory are owned by the user running the HITT script." 1
+  fi
   createHITTconf ".hitt.conf"
   checkHITTconf "${HITT_CONFIG_FILE}"
 fi
@@ -3746,6 +3753,18 @@ ALL_MSGS_JSON="[
     \"cause\": \"The value of the GIT_REPO_DIR parameter should not have a forward slash as the last character.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Remove the trailing forward slash '/'.\"
+  },
+  {
+    \"id\": \"227\",
+    \"cause\": \"HITT was unable to create a file in the current directory.\",
+    \"impact\": \"HITT cannot run.\",
+    \"remediation\": \"Make sure you have permissions to create files in the current directory.\"
+  },
+  {
+    \"id\": \"228\",
+    \"cause\": \"HITT attempted to update the '.hitt.conf' file but it is not writable by the current user.\",
+    \"impact\": \"HITT cannot run.\",
+    \"remediation\": \"Delete the '.hitt.conf' file.\"
   }
 ]"
 
