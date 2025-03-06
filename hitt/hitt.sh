@@ -251,8 +251,8 @@ checkISNamespace() {
     fi
   fi
   if [ "${MODE}" == "post-is" ]; then
-    if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
-      logError "107" "Deployment '${DEPLOYMENT}' not found in '${1}' namespace - please check the ${NS_TYPE} namespace name." 1
+    if ! ${KUBECTL_BIN} -n "${1}" get secret cacerts > /dev/null 2>&1 ; then
+      logError "107" "cacerts secret not found in '${1}' namespace - please check the ${NS_TYPE} namespace name." 1
     fi
   fi
   logMessage "'${1}' appears to be a valid ${NS_TYPE} namespace." 1
@@ -1837,7 +1837,6 @@ checkSRDBSettings() {
   echo TODO
 }
 
-
 isIPAddress() {
   if [[ "${1}" =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then
     echo 0
@@ -2548,7 +2547,6 @@ else
 fi
 source "${HITT_CONFIG_FILE}"
 checkForNewHITT
-
 
 # Make Jenkins credentials URL safe
 if [ "${JENKINS_USERNAME}" == "" ] && [ "${JENKINS_PASSWORD}" != "" ]; then
