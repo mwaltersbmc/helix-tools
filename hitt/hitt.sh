@@ -1682,7 +1682,7 @@ checkISTenant() {
   fi
   logMessage "Checking IS Tenant..."
   getISTenant
-  logMessage "IS tenant name: '${IS_TENANT_NAME}', domainIdentifier: '${IS_TENANT_DOMID}', virtualHostname: '${IS_TENANT_VHOSTNAME}'."
+  logMessage "IS tenant name: '${IS_TENANT_NAME}', domainIdentifier: '${IS_TENANT_DOMID}', virtualHostname: '${IS_TENANT_VHOSTNAME}'." 1
   return
   if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
     logError "xxx" "IS tenant name is '${IS_TENANT_NAME}' and not the expected '${IS_CUSTOMER_SERVICE}'."
