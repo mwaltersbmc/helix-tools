@@ -2326,7 +2326,7 @@ validateJenkinsCredentials() {
         if [ "${CRED_PWD}" == "" ]; then
           logError "183" "The password for the '${ID}' credential is blank but should be set to the password of the user '${CRED_USER}'."
         else
-          [[ -n "${DUMP_JCREDS}" ]] && logMessage "ID=${ID} / Username=${CRED_USER} / Password=${CRED_PWD}."
+          [[ -n "${DUMP_JCREDS}" ]] && logMessage "ID=${ID} / Username=${CRED_USER} / Password=${CRED_PWD}"
         fi
       fi
     fi
