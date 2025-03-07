@@ -3153,7 +3153,7 @@ ALL_MSGS_JSON="[
     \"id\": \"124\",
     \"cause\": \"The required ITSM services are not installed in the Helix Platform, likely because the ARSERVICES option in the deployment.config was not set to yes.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Rerun the Helix Platform deployment-manager.sh script with ARSERVICES=yes to install the missing services.\"
+    \"remediation\": \"Rerun the Helix Platform deployment-manager.sh script with only ARSERVICES=yes to install the missing services.\"
   },
   {
     \"id\": \"125\",
