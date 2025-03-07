@@ -2553,6 +2553,17 @@ else
   checkHITTconf "${HITT_CONFIG_FILE}"
 fi
 source "${HITT_CONFIG_FILE}"
+
+# Conf overrides
+if [ "${CONF_OVERRIDE}" == "1" ]; then
+  for opt in HP_NAMESPACE IS_NAMESPACE IS_ENVIRONMENT IS_CUSTOMER_SERVICE JENKINS_USERNAME JENKINS_PASSWORD; do
+    var="${opt}_OVERRIDE"
+    if [ "${!var}" != "" ]; then
+      eval "${opt}=${!var}"
+    fi
+  done
+fi
+
 checkForNewHITT
 
 # Make Jenkins credentials URL safe
@@ -2702,8 +2713,10 @@ fi
 [ -f "${HITT_LOG_FILE}" ] && cat "${HITT_LOG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hitt.txt
 [ -f "${HITT_MSG_FILE}" ] && cat "${HITT_MSG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hittmsgs.txt
 ${ZIP_BIN} -q - *.log hitt*.txt k8s*.txt *.json > hittlogs.zip
-}
 
+} # END of main()
+
+# START
 # Set vars and process command line
 SCRIPT_VERSION=1
 HITT_CONFIG_FILE=hitt.conf
@@ -3768,7 +3781,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "cde:f:h:e:jlm:n:ps:t:u:vw:" options; do
+while getopts "cde:f:h:i:e:jlm:n:ps:t:u:vw:" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
@@ -3801,14 +3814,14 @@ while getopts "cde:f:h:e:jlm:n:ps:t:u:vw:" options; do
       ;;
     n)
       CONF_OVERRIDE=1
-      ENVIRONMENT_OVERRIDE="${OPTARG}"
+      IS_ENVIRONMENT_OVERRIDE="${OPTARG}"
       ;;
     p)
       LOG_PASSWDS=1
       ;;
     s)
       CONF_OVERRIDE=1
-      CUSTOMER_SERVICE_OVERRIDE="${OPTARG}"
+      IS_CUSTOMER_SERVICE_OVERRIDE="${OPTARG}"
       ;;
     t)
       TCTL_CMD=${OPTARG}
