@@ -718,7 +718,11 @@ validateRealmDomains() {
   done
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}" ; then
-    logWarning "005" "${PORTAL_HOSTNAME} not found in the realm Application Domains list. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
+    logWarning "005" "Alias '${PORTAL_HOSTNAME}' not found in the realm Application Domains list. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
+  fi
+  # Should not be present in pre-is unless INTEROPS run
+  if [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
+    logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is only expected after the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
 }
 
@@ -2817,7 +2821,7 @@ ALL_MSGS_JSON="[
     \"id\": \"005\",
     \"cause\": \"The Helix Portal alias is not present in the Helix Service Management RSSO realm. This alias is added during the Jenkins HELIX_ITSM_INTEROPS pipeline run.\",
     \"impact\": \"The alias is not present until the Jenkins HELIX_ITSM_INTEROPS pipeline is run but, if it is missing after this, there will be errors when logging in.\",
-    \"remediation\": \"If the alias has been removed after the Jenkins HELIX_ITSM_INTEROPS pipeline has been run, add the full portal FQDN to the Applications Domain in the Helix Service Management SSO realm.\"
+    \"remediation\": \"If the alias has been removed after the Jenkins HELIX_ITSM_INTEROPS pipeline has been run, add the portal FQDN to the Applications Domain in the Helix Service Management SSO realm.\"
   },
   {
     \"id\": \"006\",
@@ -3004,6 +3008,11 @@ ALL_MSGS_JSON="[
     \"cause\": \"The 'ansible-galaxy' command was not found but this is required to check that the community.general collection is installed.\",
     \"impact\": \"If the collection is not installed deployment will fail.\",
     \"remediation\": \"Install the 'ansible-galaxy' command to enable the checks or ensure that the community.general collection is installed.\"
+  },
+  \"id\": \"037\",
+  \"cause\": \"The Helix Portal alias is present in the Helix Service Management RSSO realm. This alias is added during the Jenkins HELIX_ITSM_INTEROPS pipeline run.\",
+  \"impact\": \"The alias is not expected to be present until the Jenkins HELIX_ITSM_INTEROPS pipeline is run.\",
+  \"remediation\": \"If the Jenkins HELIX_ITSM_INTEROPS pipeline has not been run, remove the portal alias from the Applications Domains in the Helix Service Management SSO realm.\"
   },
   {
     \"id\": \"100\",
