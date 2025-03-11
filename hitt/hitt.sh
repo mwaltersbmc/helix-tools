@@ -3560,8 +3560,8 @@ ALL_MSGS_JSON="[
   {
     \"id\": \"192\",
     \"cause\": \"The HITT script attempted a 'docker login' to the registry server using the credentials in the IMAGESECRET_NAME secret but failed.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Verify that the IMAGESECRET_NAME secret in the Helix Service Management namespace contains valid credentials.\"
+    \"impact\": \"Helix Service Management deployment may fail if the credentials are invalid.\",
+    \"remediation\": \"Verify that the registry credentials in the IMAGESECRET_NAME secret in the Helix Service Management namepsace are correct.\"
   },
   {
     \"id\": \"193\",
