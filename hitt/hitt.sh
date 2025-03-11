@@ -702,6 +702,11 @@ validateRealmDomains() {
   for i in "${ADE_ALIAS_ARRAY[@]}"; do
     validateAliasInDNS "${i}"
     validateAliasInLBCert "${i}"
+    if [ "${i}" != "${PORTAL_HOSTNAME}" ]; then
+      if echo "${REALM_DOMAINS[@]}" | grep -q "${i}"; then
+        logError "229" "The Helix Platform alias '${i}' should not be included in the SSO realm Application Domains list."
+      fi
+    fi
   done
 
   buildISAliasesArray
@@ -716,6 +721,7 @@ validateRealmDomains() {
     validateAliasInDNS "${TARGET}"
     validateAliasInLBCert "${TARGET}"
   done
+
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
   if ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}" ; then
     logWarning "005" "Alias '${PORTAL_HOSTNAME}' not found in the realm Application Domains list. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
@@ -3787,6 +3793,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"HITT attempted to update the '.hitt.conf' file but it is not writable by the current user.\",
     \"impact\": \"HITT cannot run.\",
     \"remediation\": \"Delete the '.hitt.conf' file.\"
+  },
+  {
+    \"id\": \"229\",
+    \"cause\": \"The Helix Platform alias in message should not be present in the list of Application Domains in the SSO realm for ITSM aliases.\",
+    \"impact\": \"Invalid configuration.\",
+    \"remediation\": \"Delete the named alias from the SSO realm Application Domains.\"
   }
 ]"
 
