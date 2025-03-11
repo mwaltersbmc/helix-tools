@@ -690,7 +690,7 @@ buildISAliasesArray() {
 validateRealmDomains() {
   logMessage "Checking for expected hostname aliases in realm Application Domains, DNS & Helix certificate..." 1
   # Check for wildcard certain
-  if ${OPENSSL_BIN} s_client -connect "${LB_HOST}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "*.${CLUSTER_DOMAIN}" ; then
+  if ${OPENSSL_BIN} s_client -connect "${LB_HOST}:443" "${OPENSSL_PROXY_STRING}" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "*.${CLUSTER_DOMAIN}" ; then
     logMessage "Helix certificate is a wildcard for '*.${CLUSTER_DOMAIN}'." 1
     WILDCARD_CERT=1
   else
@@ -745,7 +745,7 @@ validateAliasInLBCert() {
   # Check that alias is valid for the cert used in LB/NGINX
   # 1/alias
   [[ "${WILDCARD_CERT}" == "1" ]] && return
-  if ! ${OPENSSL_BIN} s_client -connect "${1}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "${1}" ; then
+  if ! ${OPENSSL_BIN} s_client -connect "${1}:443" "${OPENSSL_PROXY_STRING}" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "${1}" ; then
     logError "218" "Alias '${1}' is not present as a SAN in the Helix certificate."
   else
     logMessage "  - alias '${1}' found in the Helix certificate." 1
@@ -753,7 +753,7 @@ validateAliasInLBCert() {
 }
 
 logLBCertDetails() {
-  ${OPENSSL_BIN} s_client -connect  "${LB_HOST}:443" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text > lb-cert.log
+  ${OPENSSL_BIN} s_client -connect  "${LB_HOST}:443" "${OPENSSL_PROXY_STRING}" </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text > lb-cert.log
 }
 
 checkServiceDetails() {
@@ -1529,14 +1529,14 @@ validateCacerts() {
 #  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
 #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
 #  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
-  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${LB_HOST}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
+  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" "${JAVA_PROXY_STRING}" SSLPoke "${LB_HOST}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
     logError "163" "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
     VALID_CACERTS=1
   fi
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
 #    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
-    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" SSLPoke "${TARGET}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
+    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" "${JAVA_PROXY_STRING}" SSLPoke "${TARGET}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
       logError "164" "Certificate for '${TARGET}' not found in cacerts."
       VALID_CACERTS=1
     else
@@ -2572,6 +2572,18 @@ if [ "${CONF_OVERRIDE}" == "1" ]; then
       eval "${opt}=${!var}"
     fi
   done
+fi
+
+# Proxy settings
+if [ "${https_proxy}" != "" ]; then
+  PROXY_STRING="${https_proxy#*://}"
+  PROXY_HOST="${PROXY_STRING%%:*}"
+  PROXY_PORT="${PROXY_STRING##*:}"
+  JAVA_PROXY_STRING="-Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT}"
+  OPENSSL_PROXY_STRING="-proxy ${PROXY_HOST}:${PROXY_PORT}"
+else
+  JAVA_PROXY_STRING=""
+  OPENSSL_PROXY_STRING=""
 fi
 
 checkForNewHITT
