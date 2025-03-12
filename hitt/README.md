@@ -53,6 +53,10 @@ JENKINS_PORT=8080
 
 Finally, there is a section for the command line tools that the script uses.  It is assumed that these are installed and available in directories that are included in the PATH environment variable of the user running the script.  HITT will check that these tools are present and report any that can't be found.  Missing tools must be installed, or the full path to their location set, if they are not in the PATH.
 
+### Proxy Support ###
+
+HITT supports connection to https services via a proxy.  If your system has an **https_proxy** environment variable set the script will use the value for curl, openssl and SSLPoke commands.  Proxy authentication and **no_proxy** settings are also picked up.
+
 ### Running HITT ###
 
 Run the script using bash or make it executable with chmod if preferred.
