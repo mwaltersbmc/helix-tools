@@ -2577,7 +2577,7 @@ fi
 # Proxy settings
 if [ "${https_proxy}" != "" ]; then
   PROXY_STRING="${https_proxy#*://}"
-  PROXY_HOST="${PROXY_STRING%%:*}"
+  PROXY_HOST="${PROXY_STRING%:*}"
   PROXY_PORT="${PROXY_STRING##*:}"
   JAVA_PROXY_STRING="-Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT}"
   OPENSSL_PROXY_STRING="-proxy ${PROXY_HOST}:${PROXY_PORT}"
