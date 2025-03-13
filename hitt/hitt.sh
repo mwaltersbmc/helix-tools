@@ -2319,6 +2319,7 @@ getJenkinsCredentials() {
 
 validateJenkinsCredentials() {
   JCREDS_JSON=$(getJenkinsCredentials)
+  PWD_ARRAY=()
   MISSING_CREDS=""
   for i in "${JENKINS_CREDS[@]}" ; do
     ID=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").id')
@@ -2333,6 +2334,7 @@ validateJenkinsCredentials() {
       if [ "${CRED_TYPE}" == "UsernamePasswordCredentialsImpl" ]; then
         CRED_PWD=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").password')
         CRED_USER=$(echo "${JCREDS_JSON}" | ${JQ_BIN} -r '.[] | select(.id=="'${i}'").username')
+        PWD_ARRAY+=("${CRED_PWD}")
         if [ "${CRED_PWD}" == "" ]; then
           logError "183" "The password for the '${ID}' credential is blank but should be set to the password of the user '${CRED_USER}'."
         else
@@ -2341,6 +2343,17 @@ validateJenkinsCredentials() {
       fi
     fi
   done
+
+  INIT_PWD="${PWD_ARRAY[0]}"
+  BAD_CRED_PWD=0
+  for p in "${PWD_ARRAY[@]}"; do
+    if [ "${p}" != "${INIT_PWD}" ]; then
+      BAD_CRED_PWD=1
+    fi
+  done
+  if [ "${BAD_CRED_PWD}" == "1" ]; then
+    logError "230" "The passwords for the Jenkins credentials are not all set to the same value.  Run 'bash hitt.sh -j' to display the values."
+  fi
 
   if [ "${MISSING_CREDS}" != "" ]; then
     logError "198" "One or more Jenkins credentials not found -${MISSING_CREDS}"
@@ -3876,7 +3889,14 @@ ALL_MSGS_JSON="[
     \"cause\": \"The Helix Platform alias in message should not be present in the list of Application Domains in the SSO realm for ITSM aliases.\",
     \"impact\": \"Invalid configuration.\",
     \"remediation\": \"Delete the named alias from the SSO realm Application Domains.\"
+  },
+  {
+    \"id\": \"230\",
+    \"cause\": \"One or more of the Jenkins credentials have different passwords when theyh should all be set to the password of the git user.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Run 'bash hitt.sh -j' to diplay the passwords and then, in Jenkins go to Manage Jenkins->Credentials, and update those that have the wrong value.\"
   }
+
 ]"
 
 while getopts "cde:f:h:i:e:jlm:n:ps:t:u:vw:" options; do
