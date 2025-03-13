@@ -2357,7 +2357,7 @@ validateJenkinsCredentials() {
     if ! which sshpass  > /dev/null 2>&1 ; then
       logWarning "038" "'sshpass' command not found - please install it to enable Jenkins credentials password validation."
     else
-      if ! sshpass -p "${CRED_PWD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no "${CRED_USER}"@localhost whoami >/dev/null 2>&1 ; then
+      if ! sshpass -p "${CRED_PWD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${CRED_USER}"@localhost whoami >/dev/null 2>&1 ; then
         logError "231" "The password set for the git user in the Jenkins credentials is not correct. Run 'bash hitt.sh -j' to display the values."
       fi
     fi
