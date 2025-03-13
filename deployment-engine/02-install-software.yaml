@@ -38,6 +38,7 @@
         - openssl-libs
         - python3-pip
         - python3-jmespath
+        - sshpass
         - tar
         - unzip
         - wget
