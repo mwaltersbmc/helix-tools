@@ -657,10 +657,14 @@ validateRealm() {
     logMessage "AR port ${REALM_ARPORT} is the expected value." 1
   fi
   REALM_TENANT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .tenantDomain)
-  if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
-    logWarning "004" "Unexpected TENANT value in realm - recommended value is '${HP_TENANT}' but found '${REALM_TENANT}'."
+  if [ "${REALM_TENANT}" == "" ]; then
+    logError "232" "RSSO realm Tenant is blank - recommended value is '${HP_TENANT}'."
   else
-    logMessage "Tenant '${REALM_TENANT}' is the expected value." 1
+    if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
+      logWarning "004" "Unexpected TENANT value in realm - recommended value is '${HP_TENANT}' but found '${REALM_TENANT}'."
+    else
+      logMessage "Tenant '${REALM_TENANT}' is the expected value." 1
+    fi
   fi
   REALM_DOMAINS=($(echo "${RSSO_REALM}" | ${JQ_BIN} -r '.domainMapping.domain[]' | tr "\n" " "))
   BAD_DOMAINS=0
@@ -1130,8 +1134,8 @@ checkBlank() {
 validateISDetails() {
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   # Common to pre and post
-  if [ "${IS_TENANT_DOMAIN}" != "${REALM_TENANT}" ]; then
-    logError "132" "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform realm Tenant (${REALM_TENANT})."
+  if [ "${IS_TENANT_DOMAIN}" != "${REALM_TENANT}" ] && [ "${REALM_TENANT}" != "" ] ; then
+    logError "132" "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform realm Tenant '${REALM_TENANT}'."
   else
     logMessage "TENANT_DOMAIN matches the realm Tenant '${REALM_TENANT}'." 1
   fi
@@ -3915,6 +3919,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The password set for the git user in the Jenkins credentials is not correct. Run 'bash hitt.sh -j' to display the values.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Update the password for the ansible/ansible_host/github credentials in Jenkins and set it to that of the git user.\"
+  },
+  {
+    \"id\": \"232\",
+    \"cause\": \"The Tenant value in the RSSO realm for ITSM is null when it should be set to the Helix Platform tenant name.id.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Set the RSSO realm Tenant option to the correct value.\"
   }
 ]"
 
