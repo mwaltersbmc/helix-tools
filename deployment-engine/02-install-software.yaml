@@ -15,6 +15,7 @@
     - name: Add EPEL repository
       ansible.builtin.yum:
         name: epel-release
+      ignore_errors: true
 
     - name: Add Jenkins repository
       ansible.builtin.yum_repository:
