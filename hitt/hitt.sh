@@ -2353,6 +2353,14 @@ validateJenkinsCredentials() {
   done
   if [ "${BAD_CRED_PWD}" == "1" ]; then
     logError "230" "The passwords for the Jenkins credentials are not all set to the same value.  Run 'bash hitt.sh -j' to display the values."
+  else
+    if ! which sshpass  > /dev/null 2>&1 ; then
+      logWarning "038" "'sshpass' command not found - please install it to enable Jenkins credentials password validation."
+    else
+      if ! sshpass -p "${CRED_PWD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no "${CRED_USER}"@localhost whoami >/dev/null 2>&1 ; then
+        logError "231" "The password set for the git user in the Jenkins credentials is not correct. Run 'bash hitt.sh -j' to display the values."
+      fi
+    fi
   fi
 
   if [ "${MISSING_CREDS}" != "" ]; then
@@ -3109,6 +3117,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The Helix Portal alias is present in the Helix Service Management RSSO realm. This alias is added during the Jenkins HELIX_ITSM_INTEROPS pipeline run.\",
     \"impact\": \"The alias is not expected to be present until the Jenkins HELIX_ITSM_INTEROPS pipeline is run.\",
     \"remediation\": \"If the Jenkins HELIX_ITSM_INTEROPS pipeline has not been run, remove the portal alias from the Applications Domains in the Helix Service Management SSO realm.\"
+  },
+  {
+    \"id\": \"038\",
+    \"cause\": \"The Linux 'ssphass' command was not found.\",
+    \"impact\": \"The password value set in the Jenkins credentials will not be validated.\",
+    \"remediation\": \"Please install 'sshpass' or make sure it is on the path of the user running the HITT script.\"
   },
   {
     \"id\": \"100\",
@@ -3895,8 +3909,13 @@ ALL_MSGS_JSON="[
     \"cause\": \"One or more of the Jenkins credentials have different passwords when theyh should all be set to the password of the git user.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Run 'bash hitt.sh -j' to diplay the passwords and then, in Jenkins go to Manage Jenkins->Credentials, and update those that have the wrong value.\"
+  },
+  {
+    \"id\": \"231\",
+    \"cause\": \"The password set for the git user in the Jenkins credentials is not correct. Run 'bash hitt.sh -j' to display the values.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Update the password for the ansible/ansible_host/github credentials in Jenkins and set it to that of the git user.\"
   }
-
 ]"
 
 while getopts "cde:f:h:i:e:jlm:n:ps:t:u:vw:" options; do
