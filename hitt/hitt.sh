@@ -2234,14 +2234,25 @@ getJenkinsGlobalLibs() {
   SCRIPT='import groovy.json.JsonOutput
     import jenkins.model.Jenkins
     import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
+    import org.jenkinsci.plugins.workflow.libs.SCMSourceRetriever
+    import jenkins.scm.api.SCMSource
     def jenkins = Jenkins.get()
     def globalLibraries = GlobalLibraries.get()
     def libraryDetails = globalLibraries.libraries.collect { lib ->
+        def retrieverType = lib.retriever?.class?.simpleName
+        def remoteUrl = null
+        if (lib.retriever instanceof SCMSourceRetriever) {
+            def scmSource = lib.retriever.scm
+            if (scmSource && scmSource.hasProperty("remote")) {
+                remoteUrl = scmSource.remote
+            }
+        }
         return [
-            name       : lib.name,
+            name          : lib.name,
             defaultVersion: lib.defaultVersion,
-            retrieverType : lib.retriever?.class?.simpleName,
-            implicit   : lib.implicit
+            retrieverType : retrieverType,
+            implicit      : lib.implicit,
+            remoteUrl     : remoteUrl
         ]
     }
     def jsonOutput = JsonOutput.toJson(libraryDetails)
