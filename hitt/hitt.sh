@@ -2273,11 +2273,15 @@ checkJenkinsGlobalLibs() {
       LIB_VERSION=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").defaultVersion')
       LIB_TYPE=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").retrieverType')
       LIB_IMPLICIT=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").implicit')
+      LIB_URL=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").remoteUrl')
       if [ "${LIB_VERSION}" != "master" ]; then
         logError "150" "The 'Default version' of the '${LIB_NAME}' library is not the expected value of 'master'."
       fi
       if [ "${LIB_TYPE}" != "SCMSourceRetriever" ]; then
         logError "179" "The 'Retrieval method' of the '${LIB_NAME}' library is not the expected value 'Modern SCM'."
+      fi
+      if [[ ! "${LIB_URL}" =~ ^ssh://.* ]]; then
+        logError "233" "The 'Project Repository' option of the '${LIB_NAME}' library should begin with 'ssh://'."
       fi
       case "${LIB_NAME}" in
         pipeline-framework)
@@ -3936,6 +3940,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The Tenant value in the RSSO realm for ITSM is null when it should be set to the Helix Platform tenant name.id.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
     \"remediation\": \"Set the RSSO realm Tenant option to the correct value.\"
+  },
+  {
+    \"id\": \"233\",
+    \"cause\": \"The 'Remote Repository' value for the named global pipeline library is invalid - it should begin with 'ssh://'.\",
+    \"impact\": \"Pipeline builds will fail.\",
+    \"remediation\": \"Browse to Manage Jenkins -> System and update the pipeline library definition with the correct value as per the BMC docs.\"
   }
 ]"
 
