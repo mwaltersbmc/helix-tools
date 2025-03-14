@@ -22,6 +22,19 @@
       ansible.builtin.pause:
         seconds: 15
 
+    - name: Get firewalld status
+      ansible.builtin.systemd:
+        name: firewalld
+      register: firewalld_service_status
+
+    - name: Allow Jenkins firewalld
+      ansible.posix.firewalld:
+        service: jenkins
+        state: enabled
+        permanent: true
+      immediate: true
+      when: firewalld_service_status.status.ActiveState == "active"
+
     - name: Read admin pwd
       shell: cat {{ jenkins_dir}}/secrets/initialAdminPassword
       register: adminpwd
