@@ -2041,10 +2041,10 @@ checkJenkinsConfig() {
   checkJenkinsPlugins
   logMessage "Checking nodes..."
   checkJenkinsNodes
-  logMessage "Checking global pipeline libraries..."
-  checkJenkinsGlobalLibs
   logMessage "Checking credentials..."
   validateJenkinsCredentials
+  logMessage "Checking global pipeline libraries..."
+  checkJenkinsGlobalLibs
 }
 
 checkJenkinsNodes() {
@@ -2281,7 +2281,17 @@ checkJenkinsGlobalLibs() {
         logError "179" "The 'Retrieval method' of the '${LIB_NAME}' library is not the expected value 'Modern SCM'."
       fi
       if [[ ! "${LIB_URL}" =~ ^ssh://.* ]]; then
-        logError "233" "The 'Project Repository' option of the '${LIB_NAME}' library should begin with 'ssh://'."
+        logError "233" "The 'Project Repository' value of the '${LIB_NAME}' global pipeline library is not set correctly, it should begin with 'ssh://<GIT_USER>@'."
+      else
+        LIB_PATH=$(echo "${LIB_URL#*://}")
+        if ! echo "${LIB_PATH}" | grep -q "^${CRED_USER}@" ; then
+          logError "233" "The 'Project Repository' value of the '${LIB_NAME}' global pipeline library is not set correctly, it should begin with 'ssh://<GIT_USER>@'."
+        else
+          REPO_PATH=$(echo "/${LIB_PATH#*/}")
+          if [ ! -d "${REPO_PATH}" ]; then
+            logError "234" "The .git repo directory in the 'Project Repository' value of the '${LIB_NAME}' global pipeline library does not exist.  Verify the path to the directory."
+          fi
+        fi
       fi
       case "${LIB_NAME}" in
         pipeline-framework)
@@ -3943,9 +3953,15 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"233\",
-    \"cause\": \"The 'Remote Repository' value for the named global pipeline library is invalid - it should begin with 'ssh://'.\",
+    \"cause\": \"The 'Remote Repository' value for the named global pipeline library is invalid - it should begin with 'ssh://<GIT_USER>@'.\",
     \"impact\": \"Pipeline builds will fail.\",
     \"remediation\": \"Browse to Manage Jenkins -> System and update the pipeline library definition with the correct value as per the BMC docs.\"
+  },
+  {
+    \"id\": \"234\",
+    \"cause\": \"The directory in the 'Remote Repository' value for the named global pipeline library is invalid please make sure the path is correct.\",
+    \"impact\": \"Pipeline builds will fail.\",
+    \"remediation\": \"Browse to Manage Jenkins -> System and update the pipeline library definition with the correct path to the .git directory.\"
   }
 ]"
 
