@@ -139,6 +139,7 @@ There are several extra command line switches which may be helpful for troublesh
 -e #&nbsp;&nbsp;&nbsp;&nbsp;Script will exit on specified error number.  Use *-e 0* to stop on first error.\
 -j&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
 -p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In pre-is mode, output pipeline passwords in *values.log* file.\
+-q&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\
 -v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging,
 
 ### Checks Summary ###

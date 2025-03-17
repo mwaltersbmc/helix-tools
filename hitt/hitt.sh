@@ -63,7 +63,7 @@ logError() {
   # Print error message MSG_ID MSG / exit if value of 1 passed as third parameter
   stopOnError "${1}"
   MSG="${BOLD}${RED}ERROR${NORMAL} (${1}) - ${2}"
-  echo -e "${MSG}"
+  [[ "${QUIET}" == "0" ]] && echo -e "${MSG}"
   ((FAIL++))
   ERROR_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
@@ -74,7 +74,7 @@ logWarning() {
   # Print warning message MSG_ID MSG
   stopOnError "${1}"
   MSG="${BOLD}${YELLOW}WARNING${NORMAL} (${1}) - ${2}"
-  echo -e "${MSG}"
+  [[ "${QUIET}" == "0" ]] && echo -e "${MSG}"
   ((WARN++))
   WARN_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
@@ -87,11 +87,11 @@ logMessage() {
   else
     MSG_LEVEL=${2}
   fi
-  [[ ${MSG_LEVEL} -le ${VERBOSITY} ]] && echo -e "\t${1}"
+  [[ ${MSG_LEVEL} -le ${VERBOSITY} ]] && [[ "${QUIET}" == "0" ]] && echo -e "\t${1}"
 }
 
 logStatus() {
-  echo -e "\n${BOLD}${1}${NORMAL}"
+  [[ "${QUIET}" == "0" ]] && echo -e "\n${BOLD}${1}${NORMAL}"
 }
 
 stopOnError() {
@@ -1868,8 +1868,8 @@ reportResults() {
   logStatus "HITT Summary Report"
   echo "==================="
   if [ $FAIL -gt 0 ] || [ $WARN -gt 0 ] ; then
-    echo -e "${BOLD}${FAIL} errors / ${WARN} warnings found - please review the ${HITT_MSG_FILE} file for more details and suggested fixes.${NORMAL}"
-    echo ""
+#    echo -e "${BOLD}${FAIL} errors / ${WARN} warnings found - please review the ${HITT_MSG_FILE} file for more details and suggested fixes.${NORMAL}"
+#    echo ""
     if [ "${#ERROR_ARRAY[@]}" != "0" ]; then
       echo -e "${BOLD}${RED}ERRORS:${NORMAL}"
       printf '%s\n' "${ERROR_ARRAY[@]}"
@@ -2155,6 +2155,7 @@ checkJenkinsCredentials() {
 }
 
 checkForNewHITT() {
+  [[ "${QUIET}" == "1" ]] && return
   if [  $(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' --connect-timeout 10 "${HITT_URL}") == "200" ]; then
     REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
     LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
@@ -2520,7 +2521,7 @@ checkDERequirements() {
   else
     if [ "${IS_MAJOR_VERSION}" -eq 22 ]; then
       MAX_ANSIBLE_VERSION="2.9"
-    elif [ "${IS_MAJOR_VERSION}" -eq 23 ]; then
+    elif [ "${IS_MAJOR_VERSION}" -ge 23 ]; then
       MAX_ANSIBLE_VERSION="2.15"
     fi
 
@@ -2831,6 +2832,7 @@ JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apik
 IS_ALIAS_ARRAY=()
 ADE_ALIAS_ARRAY=()
 VERBOSITY=0
+QUIET=0
 BOLD="\e[1m"
 NORMAL="\e[0m"
 RED="\e[31m"
@@ -3965,7 +3967,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "cde:f:h:i:e:jlm:n:ps:t:u:vw:" options; do
+while getopts "cde:f:h:i:e:jlm:n:pqs:t:u:vw:" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
@@ -4002,6 +4004,9 @@ while getopts "cde:f:h:i:e:jlm:n:ps:t:u:vw:" options; do
       ;;
     p)
       LOG_PASSWDS=1
+      ;;
+    q)
+      QUIET=1
       ;;
     s)
       CONF_OVERRIDE=1
