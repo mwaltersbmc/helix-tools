@@ -1045,6 +1045,29 @@ getPipelinePasswords() {
   runJenkinsCurl "${SCRIPT}"
 }
 
+checkSSHSetup() {
+  if [ ! -d ~/.ssh ]; then
+    logError "235" "SSH key not found for the current user - please create a key and configure passwordless ssh as detailed in the product docs."
+    return
+  fi
+  checkSSHknown_hosts
+  checkJenkinsSSH
+}
+
+checkJenkinsSSH() {
+  RESULT=$(runJenkinsSSH)
+  if [ "${RESULT}" != "${USER}" ]; then
+    logError "236" "Passwordless SSH test from Jenkins pipeline as the git user failed - please check that the jenkins user can run 'ssh ${USER}@${LONG_HOSTNAME} without any input."
+  fi
+}
+
+runJenkinsSSH() {
+  SCRIPT="import groovy.json.JsonOutput
+    def output=['bash', '-c', 'ssh -o StrictHostKeyChecking=accept-new ${USER}@${LONG_HOSTNAME} whoami'].execute().text.trim()
+    println output"
+  runJenkinsCurl "${SCRIPT}"
+}
+
 getPipelineValues() {
   createPipelineVarsArray
   for i in "${PIPELINE_VARS[@]}"; do
@@ -2045,6 +2068,8 @@ checkJenkinsConfig() {
   validateJenkinsCredentials
   logMessage "Checking global pipeline libraries..."
   checkJenkinsGlobalLibs
+  logMessage "Checking ssh configuration..."
+  checkSSHSetup
 }
 
 checkJenkinsNodes() {
@@ -2345,6 +2370,16 @@ getJenkinsCredentials() {
     println groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(credentialsList))'
 
   runJenkinsCurl "${SCRIPT}"
+}
+
+checkSSHknown_hosts(){
+  SHORT_HOSTNAME=$(hostname --short)
+  LONG_HOSTNAME=$(hostname --long)
+  for h in "${SHORT_HOSTNAME}" "${LONG_HOSTNAME}"; do
+    if ! ssh-keygen -F "${h}" >/dev/null 2>&1 ; then
+      logError "237" "Hostname '${h}' is not set up for passwordless ssh - please run 'ssh ${USER}@${h}' to configure this."
+    fi
+  done
 }
 
 validateJenkinsCredentials() {
@@ -3964,6 +3999,24 @@ ALL_MSGS_JSON="[
     \"cause\": \"The directory in the 'Remote Repository' value for the named global pipeline library is invalid please make sure the path is correct.\",
     \"impact\": \"Pipeline builds will fail.\",
     \"remediation\": \"Browse to Manage Jenkins -> System and update the pipeline library definition with the correct path to the .git directory.\"
+  },
+  {
+    \"id\": \"235\",
+    \"cause\": \"The ~/.ssh directory does not exist but is required for ssh connections.\",
+    \"impact\": \"Pipeline builds will fail.\",
+    \"remediation\": \"Refer to the Helix Service Management product docs for steps to set up and configure ssh for the git and jenkins users.\"
+  },
+  {
+    \"id\": \"236\",
+    \"cause\": \"An attempt to use ssh to connect as git from a Jenkins script failed.\",
+    \"impact\": \"Pipeline builds will fail.\",
+    \"remediation\": \"Make sure that the jenkins user can ssh to the git user without being prompted for a password or other inputs.\"
+  },
+  {
+    \"id\": \"237\",
+    \"cause\": \"Passwordless ssh for the git user is not set up correctly.\",
+    \"impact\": \"Pipeline builds will fail.\",
+    \"remediation\": \"Make sure that the git user can ssh to the git user without being prompted for a password or other inputs.\"
   }
 ]"
 
