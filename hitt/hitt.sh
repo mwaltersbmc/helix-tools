@@ -2068,6 +2068,8 @@ checkJenkinsConfig() {
   validateJenkinsCredentials
   logMessage "Checking global pipeline libraries..."
   checkJenkinsGlobalLibs
+  logMessage "Checking approved scripts..."
+  checkJenkinsScriptApprovals
   logMessage "Checking ssh configuration..."
   checkSSHSetup
 }
@@ -2437,6 +2439,26 @@ validateJenkinsCredentials() {
   if echo "${MISSING_CREDS}" | grep -vq kubeconfig ; then
     validateJenkinsKubeconfig
   fi
+}
+
+getJenkinsApprovedScripts() {
+  SCRIPT='import jenkins.model.*
+    import org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval
+    import groovy.json.JsonOutput
+    ScriptApproval scriptApproval = ScriptApproval.get()
+    List<String> approvedSignatures = scriptApproval.getApprovedSignatures()
+    String jsonOutput = JsonOutput.prettyPrint(JsonOutput.toJson([approvedSignatures: approvedSignatures]))
+    println jsonOutput'
+    runJenkinsCurl "${SCRIPT}"
+}
+
+checkJenkinsScriptApprovals() {
+  APPROVED_SCRIPTS=$(getJenkinsApprovedScripts)
+  for i in "getRawBuild" "getLog" ; do
+    if ! echo "${APPROVED_SCRIPTS}" | ${JQ_BIN} '.approvedSignatures' | grep -q "${i}" ; then
+      logError "238" "Missing script appoval in Jenkins - '${i}' not found in the list of approved scripts."
+    fi
+  done
 }
 
 checkPlatformAdminExtSvc() {
@@ -4017,6 +4039,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"Passwordless ssh for the git user is not set up correctly.\",
     \"impact\": \"Pipeline builds will fail.\",
     \"remediation\": \"Make sure that the git user can ssh to the git user without being prompted for a password or other inputs.\"
+  },
+  {
+    \"id\": \"238\",
+    \"cause\": \"The script named in the message has not been approved.\",
+    \"impact\": \"Pipeline builds will fail.\",
+    \"remediation\": \"Review the console output of the HELIX_ONPREM_DEPLOYMENT pipeline and look for the option to approve the missing script.\"
   }
 ]"
 
