@@ -6,7 +6,7 @@ Many of the steps, such as creating users and installing software, require eleva
 
 You will need a RHEL/Rocky 9.x system with:
 - git and ansible-core <= 2.15
-- ansible community.general and ansible.posix collections
+- ansible community.general and ansible.posix collections (use **ansible-galaxy install -r requirements.yaml** to install them)
 - a valid kubeconfig file for your Kubernetes cluster
 - the Helix Service Management git repository zip and plugins.txt files
 - root access

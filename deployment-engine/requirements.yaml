@@ -1,0 +1,5 @@
+# Install using "ansible-galaxy install -r requirements.yaml"
+---
+collections:
+  - community.docker
+  - ansible.posix
