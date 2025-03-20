@@ -67,7 +67,7 @@ logError() {
   ((FAIL++))
   ERROR_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
-  if [ -z "${IGNORE_ERRORS}" ] && [ ${3} == 1 ] ; then exit 1; fi
+  if [ -z "${IGNORE_ERRORS}" ] && [ "${3}" == "1" ] ; then exit 1; fi
 }
 
 logWarning() {
