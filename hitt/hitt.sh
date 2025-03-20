@@ -67,7 +67,7 @@ logError() {
   ((FAIL++))
   ERROR_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
-  [[ ${3} == 1 ]] && exit 1
+  if [ -z "${IGNORE_ERRORS}" ] && [ ${3} == 1 ] ; then exit 1; fi
 }
 
 logWarning() {
@@ -2456,7 +2456,7 @@ checkJenkinsScriptApprovals() {
   APPROVED_SCRIPTS=$(getJenkinsApprovedScripts)
   for i in "getRawBuild" "getLog" ; do
     if ! echo "${APPROVED_SCRIPTS}" | ${JQ_BIN} '.approvedSignatures' | grep -q "${i}" ; then
-      logError "238" "Missing script appoval in Jenkins - '${i}' not found in the list of approved scripts."
+      logError "238" "Missing script approval in Jenkins - '${i}' not found in the list of approved scripts."
     fi
   done
 }
@@ -4048,7 +4048,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "cde:f:h:i:e:jlm:n:pqs:t:u:vw:" options; do
+while getopts "cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
   case "${options}" in
     c)
       SKIP_CLEANUP=1
@@ -4061,6 +4061,9 @@ while getopts "cde:f:h:i:e:jlm:n:pqs:t:u:vw:" options; do
       ;;
     f)
       HITT_CONFIG_FILE=${OPTARG}
+      ;;
+    g)
+      IGNORE_ERRORS=1
       ;;
     h)
       CONF_OVERRIDE=1
