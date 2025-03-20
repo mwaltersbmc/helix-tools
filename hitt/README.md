@@ -18,10 +18,10 @@ There are some optional tests that will attempt to validate the Helix IS databas
 Log in as the git user, create a new directory, cd to it and download the script along with, if required, the dbjars.tgz file.
 
 ```
-$ mkdir hitt
-$ cd hitt
-$ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
-$ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz
+mkdir hitt
+cd hitt
+wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
+wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz
 ```
 
 ### Configuration ###
@@ -30,7 +30,7 @@ HITT is configured by a file called **hitt.conf** which, if not found, is create
 
 ```
 # First run to configure HITT
-$ bash hitt.sh
+bash hitt.sh
 ```
 The hitt.conf file:
 
@@ -62,16 +62,16 @@ HITT supports connection to https services via a proxy.  If your system has an *
 Run the script using bash or make it executable with chmod if preferred.
 
 ```
-$ bash hitt.sh
+bash hitt.sh
 OR
-$ chmod a+x hitt.sh
-$ ./hitt.sh
+chmod a+x hitt.sh
+./hitt.sh
 ```
 
 HITT requires one command line option (-m) to specify the operating mode, unless being used for tctl commands, and will print a usage message if this is not provided.
 
 ```
-$ bash hitt.sh
+bash hitt.sh
 Helix IS Triage Tool (HITT)
 Usage: bash hitt.sh -m <post-hp|pre-is|post-is|jenkins>
 
@@ -122,10 +122,10 @@ There are some additional messages which are not logged by default but can be en
 HITT may also be used to run simple **tctl** commands such as **get tenant** and **get service**.  This deploys the same job and pod used by the Jenkins HELIX_ITSM_INTEROPS pipeline and avoids having to download and configure the tctl client on a local system.  The command uses the **-t** switch:
 
 ```
-$ bash hitt.sh -t "tctl command"
-Examples:
-$ bash hitt.sh -t "get tenant"
-$ bash hitt.sh -t "get tenant 1912102789 -o json"
+bash hitt.sh -t "tctl command"
+# Examples:
+bash hitt.sh -t "get tenant"
+bash hitt.sh -t "get tenant 1912102789 -o json"
 ```
 
 The tctl commands must be enclosed in double quotes and the output will be displayed on the console when the job completes.
