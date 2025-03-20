@@ -2775,7 +2775,7 @@ if [ $(whoami) == "root" ]; then
 fi
 logStatus "Checking namespaces..."
 if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
-  logError "201" "Helix Platform and Helix IS should be installed in their own namespaces." 1
+  logError "201" "It is recommended to install the Helix Platform and Helix IS in their own namespaces."
 fi
 checkHPNamespace "${HP_NAMESPACE}"
 getPods ${HP_NAMESPACE}
@@ -3821,8 +3821,8 @@ ALL_MSGS_JSON="[
   {
     \"id\": \"201\",
     \"cause\": \"The Helix Platform and Helix IS namespaces are set to the same value in the hitt.conf file.\",
-    \"impact\": \"Helix Platform and Helix IS should be installed in separate namespaces.\",
-    \"remediation\": \"Update the namespaces in the hitt.conf file.\"
+    \"impact\": \"Helix Platform and Helix IS are not certified in the same namespace.\",
+    \"remediation\": \"Use separate namespaces and update the hitt.conf file.\"
   },
   {
     \"id\": \"202\",
