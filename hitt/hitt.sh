@@ -1530,6 +1530,7 @@ validateCacerts() {
   CACERTS_FILETYPE=$(file sealcacerts | cut -f 2- -d ' ')
   if [ "${CACERTS_FILETYPE,,}" != "java keystore" ]; then
     logError "161" "cacerts file is of type '${CACERTS_FILETYPE}' and not the expected Java keystore."
+    SKIP_CLEANUP=1
     return
   else
     logMessage "cacerts file is a valid Java keystore." 1
@@ -1545,6 +1546,7 @@ validateCacerts() {
 
   if ! ${KEYTOOL_BIN} -list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
     logError "162" "cacerts file does not contain the expected ${FTS_ELASTIC_CERTNAME} certificate required for FTS Elasticsearch connection."
+    SKIP_CLEANUP=1
   else
     logMessage "cacerts file contains the expected Elasticsearch ${FTS_ELASTIC_CERTNAME} certificate." 1
   fi
@@ -1573,6 +1575,8 @@ validateCacerts() {
 
   if [ "${VALID_CACERTS}" == 0 ]; then
     logMessage "cacerts file appears valid." 1
+  else
+    SKIP_CLEANUP=1
   fi
 }
 
@@ -2253,6 +2257,7 @@ validateJenkinsKubeconfig() {
   fi
   if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>>${HITT_ERR_FILE}; then
     logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
+    SKIP_CLEANUP=1
   else
     logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file." 1
   fi
