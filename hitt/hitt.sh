@@ -2456,7 +2456,7 @@ checkJenkinsScriptApprovals() {
   APPROVED_SCRIPTS=$(getJenkinsApprovedScripts)
   for i in "getRawBuild" "getLog" ; do
     if ! echo "${APPROVED_SCRIPTS}" | ${JQ_BIN} '.approvedSignatures' | grep -q "${i}" ; then
-      logError "238" "Missing script approval in Jenkins - '${i}' not found in the list of approved scripts."
+      logError "238" "Missing script approval in Jenkins - '${i}' not found in the list of approved scripts.  See https://community.bmc.com/s/article/Helix-ITSM-Onprem-How-to-add-Jenkins-in-process-script-approvals"
     fi
   done
 }
