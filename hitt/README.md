@@ -26,7 +26,7 @@ wget https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.
 
 ### Configuration ###
 
-HITT is configured by a file called **hitt.conf** which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.  If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used. There is also a section where you can enter details about your Jenkins which may be left as-is unless it requires credentials, uses https, or is running on a non-default port. Enclose the **JENKINS_USERNAME** and **JENKINS_PASSWORD** values in double quotes.  If your Jenkins is configured to use SSL change the **JENKINS_PROTOCOL** to **https** and set the **JENKINS_PORT** appropriately.
+HITT is configured by a file called **hitt.conf** which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.  If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used. There is also a section where you can enter details about your Jenkins which may be left as-is unless it requires credentials, uses https, or is running on a non-default port. Enclose the **JENKINS_USERNAME** and **JENKINS_PASSWORD** values in single quotes.  If your Jenkins is configured to use SSL change the **JENKINS_PROTOCOL** to **https** and set the **JENKINS_PORT** appropriately.
 
 ```
 # First run to configure HITT
@@ -44,8 +44,8 @@ IS_ENVIRONMENT=
 
 # OPTIONAL SETTINGS
 # Set JENKINS credentials and hostname/port if required
-JENKINS_USERNAME=""
-JENKINS_PASSWORD=""
+JENKINS_USERNAME=''
+JENKINS_PASSWORD=''
 JENKINS_HOSTNAME=localhost
 JENKINS_PROTOCOL=http
 JENKINS_PORT=8080
