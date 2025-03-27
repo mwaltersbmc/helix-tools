@@ -2561,6 +2561,19 @@ versionFmt() {
 }
 
 checkDERequirements() {
+  if [ "${MODE}" == "jenkins" ]; then
+    MISSING_BINS=()
+    for i in ansible dos2unix git jq python xmlstarlet ; do
+      if ! which "${i}" > /dev/null 2>&1; then
+        MISSING_BINS+=("${i}")
+      fi
+    done
+    if [ -n "${MISSING_BINS[*]}" ]; then
+      logError "239" "One or more of the OS tools required by the deployment pipelines were not found on the path of the git user. Please install these packages - ${MISSING_BINS[*]}"
+    fi
+    return
+  fi
+
   if [ -z "${IS_VERSION}" ]; then
     logMessage "IS version has not been detected - skipping checks."
     return
@@ -2646,6 +2659,19 @@ isOpenShift() {
     OPENSHIFT=1
     OPENSHIFT_VERSION=$(${KUBECTL_BIN} get clusterversion -o jsonpath='{.items[].spec.desiredUpdate.version}')
   fi
+}
+
+tidyUp() {
+  cleanUp stop
+  reportResults
+  # DEBUG only
+  dumpVARs
+  if [ "${MODE}" != "post-hp" ]; then
+    saveAllPipelineConsoleOutput
+  fi
+  [ -f "${HITT_LOG_FILE}" ] && cat "${HITT_LOG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hitt.txt
+  [ -f "${HITT_MSG_FILE}" ] && cat "${HITT_MSG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hittmsgs.txt
+  ${ZIP_BIN} -q - *.log hitt*.txt k8s*.txt *.json > hittlogs.zip
 }
 # FUNCTIONS End
 
@@ -2750,6 +2776,8 @@ if [ "${MODE}" == "jenkins" ]; then
   logStatus "Running Jenkins config checks only..."
   checkJenkinsIsRunning
   checkJenkinsConfig
+  checkDERequirements
+  tidyUp
   exit
 fi
 
@@ -2854,16 +2882,7 @@ if [ "${MODE}" == "post-is" ]; then
   checkAssistTool
 fi
 
-cleanUp stop
-reportResults
-# DEBUG only
-dumpVARs
-if [ "${MODE}" != "post-hp" ]; then
-  saveAllPipelineConsoleOutput
-fi
-[ -f "${HITT_LOG_FILE}" ] && cat "${HITT_LOG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hitt.txt
-[ -f "${HITT_MSG_FILE}" ] && cat "${HITT_MSG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hittmsgs.txt
-${ZIP_BIN} -q - *.log hitt*.txt k8s*.txt *.json > hittlogs.zip
+tidyUp
 
 } # END of main()
 
@@ -4050,6 +4069,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The script named in the message has not been approved.\",
     \"impact\": \"Pipeline builds will fail.\",
     \"remediation\": \"Review the console output of the HELIX_ONPREM_DEPLOYMENT pipeline and look for the option to approve the missing script.\"
+  },
+  {
+    \"id\": \"239\",
+    \"cause\": \"One of the required command line tools is not installed or found on the path of the git user.\",
+    \"impact\": \"Pipeline builds will fail.\",
+    \"remediation\": \"Install the missing packages or make sure that they are available on the path of the git user.\"
   }
 ]"
 
