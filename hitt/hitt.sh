@@ -2561,16 +2561,18 @@ versionFmt() {
 }
 
 checkDERequirements() {
-  if [ "${MODE}" == "jenkins" ]; then
-    MISSING_BINS=()
-    for i in ansible dos2unix git jq python xmlstarlet ; do
-      if ! which "${i}" > /dev/null 2>&1; then
-        MISSING_BINS+=("${i}")
-      fi
-    done
-    if [ -n "${MISSING_BINS[*]}" ]; then
-      logError "239" "One or more of the OS tools required by the deployment pipelines were not found on the path of the git user. Please install these packages - ${MISSING_BINS[*]}"
+  logMessage "Checking OS binaries..."
+  MISSING_BINS=()
+  for i in ansible dos2unix git jq python xmlstarlet ; do
+    if ! which "${i}" > /dev/null 2>&1; then
+      MISSING_BINS+=("${i}")
     fi
+  done
+  if [ -n "${MISSING_BINS[*]}" ]; then
+    logError "239" "One or more of the OS tools required by the deployment pipelines were not found on the path of the git user. Please install these packages - ${MISSING_BINS[*]}"
+  fi
+
+  if [ "${MODE}" == "jenkins" ]; then
     return
   fi
 
