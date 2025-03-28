@@ -33,9 +33,10 @@ Above will return a security exception in 23.3.03 and later as the user is not a
 
 
 cacerts contains expected esnode certificate?  If not then incorrect cacerts file attached to pipeline
-$ /opt/java/bin/keytool --list -cacerts -storepass changeit -alias esnode
+$ /opt/java/bin/keytool --list -cacerts -storepass changeit | grep esnode
 esnode, Aug 6, 2021, trustedCertEntry,
 Certificate fingerprint (SHA-256): 1D:9B:18:7B:27:9B:0D:38:21:76:5E:E0:77:89:0B:8B:48:50:24:E8:5D:76:4D:1B:4A:82:31:9C:FE:56:8A:90
+You should have esnode and/or esnodeopensearch2 certificates.
 
 SmartApps deployment checks - GUID will vary for each app and can be found in smartapps pipeline console output
 $  JWT=$(curl -k -X POST http://localhost:8008/api/jwt/login -H 'content-type/x-www-form' -d 'username=Demo&password=P@ssw0rd')
