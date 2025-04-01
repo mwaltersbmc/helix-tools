@@ -90,9 +90,10 @@
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
       loop:
-        - { description: "github id", id: "github", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
-        - { description: "ansible_host id", id: "ansible_host", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
-        - { description: "ansible id", id: "ansible", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
+        - { description: "github", id: "github", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
+        - { description: "ansible_host", id: "ansible_host", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
+        - { description: "ansible", id: "ansible", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
+        - { description: "git", id: "git", username: "{{ git_user }}", secret: "{{ git_user_pwd }}" }
 
     - name: Create SecretText credentials
       community.general.jenkins_script:
@@ -251,8 +252,8 @@
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
       loop:
-        - { nodename: "{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible", label: "ansible-master" }
-        - { nodename: "git-{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible", label: "git-{{ ansible_fqdn }}" }
+        - { nodename: "{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible_host", label: "ansible-master" }
+        - { nodename: "git-{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "git", label: "git-{{ ansible_fqdn }}" }
 
     - name: Add Helix jobs
       community.general.jenkins_script:
