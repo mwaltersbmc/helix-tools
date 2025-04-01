@@ -2175,7 +2175,7 @@ checkJenkinsPlugins() {
 
 checkJenkinsCredentials() {
   # Get list of credentials and check for expected IDs
-  EXPECTED_CREDENTIALS=(git github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
+  EXPECTED_CREDENTIALS="${JENKINS_CREDS[@]}"
   JK_CREDS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
   for i in "${EXPECTED_CREDENTIALS[@]}" ; do
     if ! echo "${JK_CREDS}" | grep -wq "${i}" ; then
@@ -2910,7 +2910,7 @@ CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "$
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
-JENKINS_CREDS=(github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
+JENKINS_CREDS=(git github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
 IS_ALIAS_ARRAY=()
 ADE_ALIAS_ARRAY=()
 VERBOSITY=0
