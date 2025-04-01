@@ -2175,8 +2175,7 @@ checkJenkinsPlugins() {
 
 checkJenkinsCredentials() {
   # Get list of credentials and check for expected IDs
-  EXPECTED_CREDENTIALS=(git github ansible_host ansible kubeconfig TOKENS)
-   #password_vault_apikey)
+  EXPECTED_CREDENTIALS=(git github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
   JK_CREDS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
   for i in "${EXPECTED_CREDENTIALS[@]}" ; do
     if ! echo "${JK_CREDS}" | grep -wq "${i}" ; then
