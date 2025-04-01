@@ -32,7 +32,7 @@
         service: jenkins
         state: enabled
         permanent: true
-      immediate: true
+        immediate: true
       when: firewalld_service_status.status.ActiveState == "active"
 
     - name: Read admin pwd
