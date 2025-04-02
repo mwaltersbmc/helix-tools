@@ -1,13 +1,13 @@
 The Helix IS Triage Tool (**HITT**) is a shell script that tests for many common configuration problems that cause issues during the installation and use of Helix IS Service Management applications.  The script should be run as the git user on the Deployment Engine system where Jenkins is installed.
 
-HITT has three main operating modes and a tctl command option, all of which require that the Helix Platform installation has been completed.
+HITT has different modes for Helix and Jenkins configuration checks, and also an option to run simple **tctl** commands. The main modes are:
 
-The main modes are:
-
-**post-hp**	- used after the Helix Platform has been installed and the SSO realm for Helix IS has been created.\
-**pre-is**	- used after the Jenkins HELIX_ONPREM_DEPLOYMENT and HELIX_GENERATE_CONFIG pipelines have been run with all the installation values populated.\
-**post-is**	- used after the installation of Helix IS has been completed.\
-**jenkins**  - run Jenkins configuration checks
+|Mode|Use|
+|-|-|
+| **post&#x2011;hp** | Checks Helix Platform and RSSO realm configuration. |
+| **pre-is**   | Checks Jenkins HELIX_ONPREM_DEPLOYMENT values after this, and the HELIX_GENERATE_CONFIG pipeline, have been run with all the installation values populated. |
+| **post-is**  | Helix Service Management post-deployment checks. |
+| **jenkins**  | Jenkins configuration checks. |
 
 The HITT script requires minimal manual configuration and will read the information it needs from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
 
@@ -83,17 +83,17 @@ OR
 bash hitt.sh -m post-is  - run IS post-installation checks
 OR
 bash hitt.sh -m jenkins  - run Jenkins configuration checks
-```
 
-Use **post-hp** after installing and configuring the Helix Platform but before using Jenkins.\
-Use **pre-is** after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting the deployment of Helix IS.\
-Use **post-is** for troubleshooting after IS deployment.\
-Use **jenkins** to validate the configuration of Jenkins
+Use post-hp after successfully installing the Helix Platform but before using Jenkins.
+Use pre-is after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS.
+Use post-is for troubleshooting after IS deployment.
+Use jenkins to validate Jenkins config - nodes, credentials, libraries etc.
+```
 
 HITT will print the results of the checks and tests as they are run.  Errors and warnings are noted with highlighted messages and summarised at the end.  A **hittmgs.log** file is created which contains more detailed information, including the impact and suggested fix, for each error/warning.
 
-<span style="color:red">ERRORS</span> indicate problems which may cause installation to fail or result in problems post-install.\
-<span style="color:yellow">WARNINGS</span> highlight potential problems or settings which may be appropriate under some conditions, but are usually recommended to be different.
+<span style="color:red">ERRORS</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- indicate problems which are likely to cause installation failures, or result in problems post-install.\
+<span style="color:yellow">WARNINGS</span>&nbsp;&nbsp;&nbsp;- highlight potential problems or settings which may be appropriate under some conditions, but are usually recommended to be different.
 
 When the test being run produces additional output, pod status for example, this is displayed after the related ERROR or WARNING.
 
@@ -103,23 +103,24 @@ All of the tests are read-only and will not make changes to the system.  However
 
 HITT creates various log files in the directory that the script is run from:
 
-- **hittmsgs.log** - additional details on the cause, impact and steps to fix, warnings and errors reported by the script.
 - **hitt.log** - script output.
+- **hittmsgs.log** - additional details on the cause, impact, and steps to fix, warnings and errors reported by the script.
 - **values.\*** - the pipeline input values in pre-is mode, or values read from the cluster for post-is.
 - **PIPELINE_NAME.log** - console output for each of the Jenkins pipelines.
 - **k8s\*.log** - output from various kubectl commands such as 'get pods'.
 - **hittdebug.log** - error messages from commands run by the script which may be useful if it does not work as expected.
-- **\*.txt** - text only versions of log files - formatting/colour codes removed.
+- **\*.txt** - text only versions of log files with formatting and colour codes removed.
 
 All of the files are added to **hittlogs.zip** which can be sent to BMC Support if needed.
 
-There are some additional messages which are not logged by default but can be enabled with the **-v** switch.
+There are some additional messages which are not logged by default but can be enabled with the **-v** switch.\
+Quiet mode **-q** only prints the summary messages.
 
 **NOTE** - passwords are not logged unless the **-p** switch is used.
 
 ### tctl Mode ###
 
-HITT may also be used to run simple **tctl** commands such as **get tenant** and **get service**.  This deploys the same job and pod used by the Jenkins HELIX_ITSM_INTEROPS pipeline and avoids having to download and configure the tctl client on a local system.  The command uses the **-t** switch:
+HITT may also be used to run simple **tctl** commands such as **get tenant** and **get service**.  This deploys the same job and pod used by the Jenkins HELIX_ITSM_INTEROPS pipeline and avoids having to download and configure the tctl client on a local system.  Use the **-t** switch along with the command to run enclosed in quotes:
 
 ```
 bash hitt.sh -t "tctl command"
@@ -128,73 +129,30 @@ bash hitt.sh -t "get tenant"
 bash hitt.sh -t "get tenant 1912102789 -o json"
 ```
 
-The tctl commands must be enclosed in double quotes and the output will be displayed on the console when the job completes.
+Output will be displayed on the console when the job completes.
 
 ### Advanced CLI Options ###
 
 There are several extra command line switches which may be helpful for troubleshooting.
 
--c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not remove temporary files used by HITT.\
--d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enable *set -x* debugging output.\
--e #&nbsp;&nbsp;&nbsp;&nbsp;Script will exit on specified error number.  Use *-e 0* to stop on first error.\
+-c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not remove temporary files used by HITT when the script finishes.\
+-d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enables **set -x** debugging output.\
+-e #&nbsp;&nbsp;&nbsp;&nbsp;Exit script on the specified error number **#**.  Use **-e 0** to stop on the first error.\
 -j&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
--p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In pre-is mode, output pipeline passwords in *values.log* file.\
+-p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output pipeline passwords in the **values.log** file when running in pre-is mode.\
 -q&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\
 -v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging,
 
 ### Checks Summary ###
 
-Different groups of tests and checks are run depending on the operating mode and discovered information.  Some groups query information which is then used by other checks.
+ HITT includes more than 150 checks, different groups of which are run depending on the operating mode and information discovered from the system. These include:
 
-Checking for required tools in path...
-	Verify that the required command line tools and versions are available.
-
-Checking KUBECONFIG file...
-  Tests that a valid kubeconfig file is present or configured via the KUBECONFIG environment variable.
-
-Checking namespaces...
-  Tests that namespaces exist, are of the expected type, and reports unhealthy pods.
-
-Getting versions...
-  Discovers versions of installed products.
-
-Getting Helix Platform registry details from bmc-dtrhub secret...
-Getting RSSO details...
-Getting domain...
-	Configuration discovery from the Helix Platform.
-
-Getting tenant details from Helix Platform...
-  Discovers tenant data and will offer a selection menu if a multi-tenant platform is found.
-
-Checking for ITSM services in Helix Platform...
-  Checks that the ARSERVICES option was enabled during Helix Platform installation.
-
-Checking FTS Elasticsearch cluster status...
-  Checks the health of the Elasticsearch instance used for FTS.
-
-Getting realm details from RSSO...
-  Reports SSO realm details.
-
-Validating realm...
-  Verifies that the SSO realm has been configured with the expected tenant, Application Domains and authentication details.
-
-Getting IS details...
-  Reads IS details from Kubernetes/Jenkins.
-
-Validating IS details...
-  Tests IS config settings.
-
-Validating IS cacerts...
-  Tests the cacerts file from Jenkins or namespace to make sure it has the required certificates.
-
-Checking IS FTS Elastic settings...
-  Validation of FTS specific settings.
-
-Checking IS DB settings...
-	Attempts to connect to the IS database and query the currDbVersion from the control table.
-
-Checking IS license status...
-  IS Server license status.
-
-Checking Support Assistant Tool...
-  If deployed, are the sidecar containers and required permissions present.
+- Verifying that the required command line tools and versions are available.
+- A valid kubeconfig file is present or configured via the KUBECONFIG environment variable.
+- Namespaces exist, are of the expected type, and lists unhealthy pods.
+- Discover versions of installed products.
+- Helix Platform and RSSO realm validation.
+- Registry credentials.
+- IS details from Kubernetes/Jenkins.
+- Validation of FTS specific settings.
+- IS Server license status.
