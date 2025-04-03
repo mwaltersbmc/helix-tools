@@ -56,15 +56,15 @@ $ curl -X POST $LB_HOST/rsso/api/v1.1/admin/login --cacert custom_cacert.pem -H 
 
 Verify PEM at https://tools.keycdn.com/ssl
 
-Recreate IS secret from good cacerts
-$ kubectl delete secret cacerts -n IS-NS
-$ kubectl create secret -n IS-NS generic cacerts --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
-
 Extract cacerts from secret
 $ kubectl get secret -n IS-NS cacerts -o jsonpath='{.data.cacerts}' | base64 -d > cacerts
 
 Import pem file to cacerts
 $ keytool -importcert -v -alias <alias name> -file <certificatefilename> -keystore cacerts
+
+Recreate IS secret from good cacerts
+$ kubectl delete secret cacerts -n IS-NS
+$ kubectl create secret -n IS-NS generic cacerts --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
 
 Get certs from LB/Ingress
 $ openssl s_client -showcerts -connect LB_HOST:443
