@@ -2379,6 +2379,10 @@ getJenkinsCredentials() {
 }
 
 checkSSHknown_hosts(){
+  if ! which ssh-keygen >/dev/null 2>&1; then
+    logWarning "039" "'ssh-keygen' command not found - skipping passwordless ssh checks."
+    return
+  fi
   SHORT_HOSTNAME=$(hostname --short)
   LONG_HOSTNAME=$(hostname --long)
   for h in "${SHORT_HOSTNAME}" "${LONG_HOSTNAME}"; do
@@ -3236,6 +3240,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The Linux 'ssphass' command was not found.\",
     \"impact\": \"The password value set in the Jenkins credentials will not be validated.\",
     \"remediation\": \"Please install 'sshpass' or make sure it is on the path of the user running the HITT script.\"
+  },
+  {
+    \"id\": \"039\",
+    \"cause\": \"The Linux 'ssh-keygen' command was not found.\",
+    \"impact\": \"Checks to test that passwordless ssh is set up correctly will not be run.\",
+    \"remediation\": \"Please install 'ssh-keygen' or make sure it is on the path of the user running the HITT script.\"
   },
   {
     \"id\": \"100\",
