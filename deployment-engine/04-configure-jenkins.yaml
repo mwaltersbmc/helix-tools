@@ -151,7 +151,7 @@
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
       loop:
-        - { id: "kubeconfig", secretfilename: "kubeconfig", filecontents: "{{ lookup('file', 'kubeconfig') }}" }
+        - { id: "kubeconfig", secretfilename: "kubeconfig", filecontents: "{{ lookup('file', '{{ installer_files_directory }}/kubeconfig') }}" }
         - { id: "TOKENS", secretfilename: "tokens.json", filecontents: "" }
 
     - name: Create Libraries
