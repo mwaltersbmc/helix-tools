@@ -16,7 +16,7 @@
            state: present
            url_username: "{{ jenkins_login_user }}"
            url_password: "{{ jenkins_login_user_pwd }}"
-          with_lines: cat plugins.txt
+          with_lines: cat {{ installer_files_directory }}/plugins.txt
 
         - name: Restart Jenkins service
           ansible.builtin.service:

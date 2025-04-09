@@ -7,6 +7,8 @@ jenkins_user_pwd: changeme
 # The Jenkins application login name and password - do NOT use "admin" as the username
 jenkins_login_user: jenkins
 jenkins_login_user_pwd: changeme
+# The path to the directory where the installer/kubeconfig etc are stored - default is current directory
+installer_files_directory: .
 # The name of the zip file containing the Helix Service Management git repositories
 itsm_zip: BMC_Remedy_Deployment_Manager_Configuration_Release_23.3.04.zip
 # Add public package repositories to download software from - set to false if you have your own already configured

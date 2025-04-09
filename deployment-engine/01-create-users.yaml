@@ -87,13 +87,13 @@
         src: '{{ item.name }}'
         dest: '{{ item.target }}'
       loop:
-        - { name: "{{ itsm_zip }}", target: "~{{ git_user }}/{{ git_repo_dir }}" }
-        - { name: "{{ libraries_zip }}", target: "~{{ git_user }}/{{ git_repo_dir }}/LIBRARY_REPO" }
+        - { name: "{{ installer_files_directory }}/{{ itsm_zip }}", target: "~{{ git_user }}/{{ git_repo_dir }}" }
+        - { name: "{{ installer_files_directory }}/{{ libraries_zip }}", target: "~{{ git_user }}/{{ git_repo_dir }}/LIBRARY_REPO" }
       when: unzip_git_repos|bool
 
     - name: Copy kubeconfig to git user
       ansible.builtin.copy:
-        src: kubeconfig
+        src: "{{ installer_files_directory }}/kubeconfig"
         dest: ~{{ git_user }}/.kube/config
 
     - name: Set ownership of the home directories and files
