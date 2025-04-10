@@ -2757,6 +2757,9 @@ if [ -n "${JENKINS_USERNAME}" ]; then
   JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
 fi
 
+# Remove old files
+cleanUp start
+
 # Run tctl command and then exit
 if [[ ! -z "${TCTL_CMD}" ]]; then
   logStatus "Running in tctl only mode..."
@@ -2805,8 +2808,6 @@ logStatus "${BOLD}Starting HITT in ${MODE} mode...${NORMAL}"
 # Check command line tools present
 logStatus "Checking for required tools in path..."
 checkRequiredTools
-# Remove
-cleanUp start
 if [ $(whoami) == "root" ]; then
   echo
   logWarning "035" "The HITT script should be run as the git user, not as root."
