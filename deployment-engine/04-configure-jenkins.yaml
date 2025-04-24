@@ -252,7 +252,7 @@
         user: "{{ jenkins_login_user }}"
         password: "{{ jenkins_login_user_pwd }}"
       loop:
-        - { nodename: "{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible_host", label: "ansible-master" }
+        - { nodename: "{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "ansible_host", label: "ansible-master,ansible-master-latest" }
         - { nodename: "git-{{ ansible_fqdn }}", remotefs: "/home/{{ git_user }}/workspace", host: "{{ ansible_fqdn }}", credentials: "git", label: "git-{{ ansible_fqdn }}" }
 
     - name: Add Helix jobs
