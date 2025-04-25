@@ -31,11 +31,12 @@ ansible-galaxy collection install -r requirements.yaml
 
 The pipelines are installed using the **create-pipelines.yaml** Ansible playbook.  There are several options that can be set by editing the playbook or passing values on the command line. The default values are:
 
+```
 jenkins_username: ""\
 jenkins_password: ""\
 jenkins_port: 8080 \
 pipelines_foldername: "SEAL-Pipelines"
-
+```
 The username and password are required if your Jenkins has authentication enabled, otherwise they can be left as "".  The **pipelines_foldername** is the name of the folder in Jenkins where the pipelines will be created and the **jenkins_port** is the port used for accessing Jenkins.
 
 Update and save the file or pass the values when running the playbook using the **-e** option, for example:
@@ -90,11 +91,13 @@ Uses the IS RESTAPI to add a server license.
 |EXPIRY_DATE | The expiry date if applying a temporary license
 
 #### IS - Build HELIX_ONPREM_DEPLOYMENT from file
-Starts the HELIX_ONPREM_DEPLOYMENT with values read from a file.\
+Starts the HELIX_ONPREM_DEPLOYMENT with values read from a file. See the **pipeline-values.sample** file for an example of the file format.
 **NOTE:** Requires the Parameterized Trigger plugin to be installed in Jenkins.
 | Parameter            |Description
 |----------------|-------------------------------
 |PIPELINE_VALUES_FILE | File containing the pipeline values in PARAMETER=value format
+
+The build of the HELIX_ONPREM_DEPLOYMENT pipeline that is started will fail as the CACERTS_FILE is not set. **THIS IS INTENTIONAL** and allows you to rebuild the failed job to verify/update values.
 
 #### IS - Create Realm in SSO
 Creates and configures the IS realm in the SSO server.  The pipeline will
