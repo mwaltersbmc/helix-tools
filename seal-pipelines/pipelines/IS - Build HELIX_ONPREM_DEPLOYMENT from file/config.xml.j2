@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><project>
+    <actions/>
+    <description/>
+    <keepDependencies>false</keepDependencies>
+    <properties>
+        <hudson.model.ParametersDefinitionProperty>
+            <parameterDefinitions>
+                <hudson.model.StringParameterDefinition>
+                    <name>pipeline_file</name>
+                    <defaultValue>/home/git/pipeline-values.properties</defaultValue>
+                    <description>Full path to pipeline properties file.</description>
+                </hudson.model.StringParameterDefinition>
+            </parameterDefinitions>
+        </hudson.model.ParametersDefinitionProperty>
+    </properties>
+    <scm class="hudson.scm.NullSCM"/>
+    <canRoam>false</canRoam>
+    <disabled>false</disabled>
+    <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+    <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+    <triggers/>
+    <concurrentBuild>false</concurrentBuild>
+    <builders>
+        <hudson.plugins.parameterizedtrigger.TriggerBuilder>
+            <configs>
+                <hudson.plugins.parameterizedtrigger.BlockableBuildTriggerConfig>
+                    <projects>HELIX_ONPREM_DEPLOYMENT</projects>
+                    <condition>ALWAYS</condition>
+                    <triggerWithNoParameters>false</triggerWithNoParameters>
+                    <configs>
+                        <hudson.plugins.parameterizedtrigger.FileBuildParameters>
+                            <propertiesFile>${pipeline_file}</propertiesFile>
+                            <failTriggerOnMissing>true</failTriggerOnMissing>
+                        </hudson.plugins.parameterizedtrigger.FileBuildParameters>
+                    </configs>
+                </hudson.plugins.parameterizedtrigger.BlockableBuildTriggerConfig>
+            </configs>
+        </hudson.plugins.parameterizedtrigger.TriggerBuilder>
+    </builders>
+    <publishers/>
+    <buildWrappers/>
+    <assignedNode>ansible-master</assignedNode>
+  </project>
