@@ -6,7 +6,7 @@
         <hudson.model.ParametersDefinitionProperty>
             <parameterDefinitions>
                 <hudson.model.StringParameterDefinition>
-                    <name>pipeline_file</name>
+                    <name>PIPELINE_VALUES_FILE</name>
                     <defaultValue>/home/git/pipeline-values.properties</defaultValue>
                     <description>Full path to pipeline properties file.</description>
                 </hudson.model.StringParameterDefinition>
@@ -29,7 +29,7 @@
                     <triggerWithNoParameters>false</triggerWithNoParameters>
                     <configs>
                         <hudson.plugins.parameterizedtrigger.FileBuildParameters>
-                            <propertiesFile>${pipeline_file}</propertiesFile>
+                            <propertiesFile>${PIPELINE_VALUES_FILE}</propertiesFile>
                             <failTriggerOnMissing>true</failTriggerOnMissing>
                         </hudson.plugins.parameterizedtrigger.FileBuildParameters>
                     </configs>

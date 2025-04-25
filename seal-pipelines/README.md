@@ -9,6 +9,7 @@ This is a collection of utility and troubleshooting pipeline jobs for the Jenkin
 |DE - Run kubectl Command | Run `kubectl` commands from the Deployment Engine
 |HP - Run tctl Command | Run `tctl` commands for the Helix Platform
 |IS - Apply IS Server License | Apply an IS server license via the RESTAPI
+|IS - Build HELIX_ONPREM_DEPLOYMENT from file | Trigger pipeline using values from a file
 |IS - Create Realm in SSO | Creates a realm for Helix IS in the Helix Platform SSO
 |IS - Generate DBID for IS Server | Generate the DB ID used for IS licensing
 |IS - Save cacerts in ITSM_REPO | Save updated cacerts file to git ITSM_REPO
@@ -88,6 +89,13 @@ Uses the IS RESTAPI to add a server license.
 |LICENSE_KEY | The IS license key
 |EXPIRY_DATE | The expiry date if applying a temporary license
 
+#### IS - Build HELIX_ONPREM_DEPLOYMENT from file
+Starts the HELIX_ONPREM_DEPLOYMENT with values read from a file.\
+**NOTE:** Requires the Parameterized Trigger plugin to be installed in Jenkins.
+| Parameter            |Description
+|----------------|-------------------------------
+|PIPELINE_VALUES_FILE | File containing the pipeline values in PARAMETER=value format
+
 #### IS - Create Realm in SSO
 Creates and configures the IS realm in the SSO server.  The pipeline will
 - discover the RSSO credentials and CLUSTER_DOMAIN
@@ -122,5 +130,5 @@ Adds an updated cacerts file to the ITSM_REPO to avoid issues if the HELIX_ONPRE
 ## NOTES
 - The pipeline jobs use ansible playbooks for most of their work and access the Deployment Engine using ssh in the same way as the BMC product pipelines.
 - The **Install K8s Clients** pipeline requires the git user to be able to use `sudo` if the target location to save files is a system directory such as `/usr/local/bin`.  
-- The **Run tctl Command** pipeline requires that the Ansible plugin is installed in Jenkins.  Install using `Manage Jenkins -> Plugins -> Available Plugins`
+- The **Run tctl Command** and **Build HELIX_ONPREM_DEPLOYMENT from file** pipelines require additional Jenkins plugins to be installed using `Manage Jenkins -> Plugins -> Available Plugins`
 - Scripts may need approval via `Manage Jenkins -> In-process Script Approval` before they can be used.
