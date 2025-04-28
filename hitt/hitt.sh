@@ -406,6 +406,10 @@ setVarsFromPlatform() {
       TCTL_VER=614
       ADE_INFRA_CLIENT_IMAGE_TAG=25100-v151-ade-infra-clients-alpine
       ;;
+    25.2.00)
+      TCTL_VER=654
+      ADE_INFRA_CLIENT_IMAGE_TAG=25200-v97-ade-infra-clients-alpine
+      ;;
     *)
       ;;
   esac
