@@ -1986,10 +1986,10 @@ checkISDBLatency() {
     if echo "${PING_RESULT}" | grep -q "^round-trip" ; then
       IS_DB_LATENCY=$(echo "${PING_RESULT}" | cut -d '/' -f 4)
       logMessage "IS DB latency from cluster is ${IS_DB_LATENCY}ms."
-      if compare "${IS_DB_LATENCY} < 1" ; then logMessage "Latency is ${BOLD}GOOD${NORMAL}."; fi ; return
-      if compare "${IS_DB_LATENCY} < 3" ; then logMessage "Latency is ${BOLD}AVERAGE${NORMAL}."; fi ; return
-      if compare "${IS_DB_LATENCY} < 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted."; fi ; return
-      if compare "${IS_DB_LATENCY} > 6" ; then logMessage "Latency is ${BOLD}VERY POOR${NORMAL}. Performance will be impacted."; fi ; return
+      if compare "${IS_DB_LATENCY} < 1" ; then logMessage "Latency is ${BOLD}GOOD${NORMAL}." ; return ; fi
+      if compare "${IS_DB_LATENCY} < 3" ; then logMessage "Latency is ${BOLD}AVERAGE${NORMAL}." ; return ; fi
+      if compare "${IS_DB_LATENCY} < 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted." ; return ; fi
+      if compare "${IS_DB_LATENCY} > 6" ; then logMessage "Latency is ${BOLD}VERY POOR${NORMAL}. Performance will be impacted." ; return ; fi
     else
       logError "188" "Unexpected response from IS DB ping test: ${PING_RESULT}."
     fi
