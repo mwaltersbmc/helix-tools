@@ -1919,15 +1919,15 @@ reportResults() {
 
 checkKubeconfig() {
   KUBECONFIG_ERROR=0
+  if [ ! -f ~/.kube/config ]; then
+    logError "186" "Default KUBECONFIG file (~/.kube/config) required by Jenkins pipelines not found."
+    KUBECONFIG_ERROR=1
+  fi
   if ! ${KUBECTL_BIN} version > /dev/null 2>&1; then
     logError "184" "'kubectl version' command returned an error - unable to continue." 1
   fi
   if [ ! -z "${KUBECONFIG}" ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
     logError "185" "KUBECONFIG environment variable is set (${KUBECONFIG}) but is not the default of ${HOME}/.kube/config required by Jenkins."
-    KUBECONFIG_ERROR=1
-  fi
-  if [ ! -f ~/.kube/config ]; then
-    logError "186" "Default KUBECONFIG file (~/.kube/config) required by Jenkins pipelines not found."
     KUBECONFIG_ERROR=1
   fi
   if [ ${KUBECONFIG_ERROR} == "0" ]; then
