@@ -1378,7 +1378,11 @@ validateISDetails() {
     fi
 
     if [ "${IS_DB_SSL_ENABLED}" == "true" ]; then
-        logError "149" "DB_SSL_ENABLED should not be selected."
+      logError "149" "DB_SSL_ENABLED should not be selected."
+    fi
+
+    if ! [[ "${IS_DB_PORT}" =~ ^[0-9]+$ ]]; then
+      logError "240" "DB_PORT value must be a number and not '${IS_DB_PORT}'."
     fi
 
     if [ "${IS_IS_DATABASE_ALWAYS_ON}" == "true" ]; then
@@ -4091,6 +4095,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"One of the required command line tools is not installed or found on the path of the git user.\",
     \"impact\": \"Pipeline builds will fail.\",
     \"remediation\": \"Install the missing packages or make sure that they are available on the path of the git user.\"
+  },
+  {
+    \"id\": \"240\",
+    \"cause\": \"The value of the DB_PORT parameter must be the port number of the database but it is not in the expected format.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Set the DB_PORT value to the correct number.\"
   }
 ]"
 
