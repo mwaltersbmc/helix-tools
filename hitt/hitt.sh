@@ -1393,6 +1393,12 @@ validateISDetails() {
       fi
     fi
 
+    if [ "${IS_DEPLOYMENT_MODE}" == "FRESH" ] && [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "false" ]; then
+      logWarning "040" "DATABASE_RESTORE is not selected - please make sure you have restored the appropriate Postgres database dump."
+    else
+      logMessage "Postgres database dump will be restored."
+    fi
+
     if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ]; then
       if [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "true" ]; then
         if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
@@ -3255,6 +3261,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The Linux 'ssh-keygen' command was not found.\",
     \"impact\": \"Checks to test that passwordless ssh is set up correctly will not be run.\",
     \"remediation\": \"Please install 'ssh-keygen' or make sure it is on the path of the user running the HITT script.\"
+  },
+  {
+    \"id\": \"040\",
+    \"cause\": \"This is a FRESH deployment using Postgres and the option to allow the pipeline to restore the databas dump is not selected.\",
+    \"impact\": \"The database dump must be restored manually before deployment if the DATABASE_RESTORE option is not selected.\",
+    \"remediation\": \"Ensure that the database dump has been restored OR select the DATABASE_RESTORE option to allow the pipeline to do it.\"
   },
   {
     \"id\": \"100\",
