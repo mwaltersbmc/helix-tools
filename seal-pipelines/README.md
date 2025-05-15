@@ -32,9 +32,9 @@ ansible-galaxy collection install -r requirements.yaml
 The pipelines are installed using the **create-pipelines.yaml** Ansible playbook.  There are several options that can be set by editing the playbook or passing values on the command line. The default values are:
 
 ```
-jenkins_username: ""\
-jenkins_password: ""\
-jenkins_port: 8080 \
+jenkins_username: ""
+jenkins_password: ""
+jenkins_port: 8080
 pipelines_foldername: "SEAL-Pipelines"
 ```
 The username and password are required if your Jenkins has authentication enabled, otherwise they can be left as "".  The **pipelines_foldername** is the name of the folder in Jenkins where the pipelines will be created and the **jenkins_port** is the port used for accessing Jenkins.
