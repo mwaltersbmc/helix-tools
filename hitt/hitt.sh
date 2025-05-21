@@ -13,7 +13,7 @@ getConfValues() {
   logStatus "Please enter your HELIX_ONPREM_DEPLOYMENT pipeline CUSTOMER_SERVICE and ENVIRONMENT values:"
   read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE
   read -p "ENVIRONMENT : " IS_ENVIRONMENT
-  logStatus "Please enter your Jenkins username and password if required, otherwise just press return:"
+  logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:"
   read -p "Username : " JENKINS_USERNAME
   read -s -p "Password : " JENKINS_PASSWORD
 }
@@ -1230,6 +1230,14 @@ validateISDetails() {
       if [ "${CURRENT_VER:0:5}" -ne "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPGRADE" ]; then
         logError "213" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' but should be 'UPGRADE' as the source and target have different major versions."
       fi
+    fi
+
+    if [ "${IS_DEPLOYMENT_MODE}" == "UPGRADE" ] && [ "${IS_HELIX_FULL_STACK}" == "false" ]; then
+      logError "241" "HELIX_FULL_STACK_UPGRADE is not selected but is required when the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
+    fi
+
+    if [ "${IS_DEPLOYMENT_MODE}" == "UPDATE" ] && [ "${IS_HELIX_FULL_STACK}" == "true" ]; then
+      logError "242" "HELIX_FULL_STACK_UPGRADE is selected but this not valid when the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
     fi
 
     if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
@@ -4113,6 +4121,18 @@ ALL_MSGS_JSON="[
     \"cause\": \"The value of the DB_PORT parameter must be the port number of the database but it is not in the expected format.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Set the DB_PORT value to the correct number.\"
+  },
+  {
+    \"id\": \"241\",
+    \"cause\": \"HELIX_FULL_STACK_UPGRADE is not selected but it is required when the DEPLOYMENT_MODE is UPGRADE.\",
+    \"impact\": \"The upgrade will fail.\",
+    \"remediation\": \"Select the HELIX_FULL_STACK_UPGRADE option if you are upgrading.\"
+  },
+  {
+    \"id\": \"242\",
+    \"cause\": \"The HELIX_FULL_STACK_UPGRADE option sbould not be selected when the DEPLOYMENT_MODE is UPDATE.\",
+    \"impact\": \"The update will fail.\",
+    \"remediation\": \"Deselect the HELIX_FULL_STACK_UPGRADE option when the DEPLOYMENT_MODE is UPDATE.\"
   }
 ]"
 
