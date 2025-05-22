@@ -1075,7 +1075,7 @@ runJenkinsSSH() {
 getPipelineValues() {
   createPipelineVarsArray
   for i in "${PIPELINE_VARS[@]}"; do
-    eval "IS_$i=$(parseJenkinsParam ${i})"
+    eval "IS_$i"='$(parseJenkinsParam ${i})'
   done
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
   ISP_ENVIRONMENT=$(parseJenkinsParam ENVIRONMENT)
@@ -1108,7 +1108,7 @@ getInputFileValues() {
   sed -i 's/'\''/"/g' "${INPUT_CONFIG_FILE}"
   createInputFileVarsArray
   for i in "${INPUT_FILE_VARS[@]}"; do
-    eval "IS_$i=$(grepInputFile $i)"
+    eval "IS_$i"='$(grepInputFile $i)'
   done
   IS_FTS_ELASTICSEARCH_USER_PASSWORD="${IS_PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USER_PASSWORD}"
   IS_FTS_ELASTICSEARCH_USERNAME="${IS_PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USERNAME}"
@@ -1368,7 +1368,7 @@ validateISDetails() {
     fi
 
     if [ "${IS_REGISTRY_TYPE}" != "DTR" ]; then
-      logError "146" "REGISTRY_TYPE must be DTR."
+      logError "146" "REGISTRY_TYPE must be DTR for onprem deployments. 'HARBOR' is only valid within BMC networks."
     else
       logMessage "REGISTRY_TYPE is the expected value of DTR." 1
     fi
@@ -1424,7 +1424,7 @@ validateISDetails() {
 
     if [ -n "${IS_DB_JDBC_URL}" ]; then
       if [ "${IS_DB_TYPE}" != "oracle" ]; then
-        logError "217" "DB_JDBC_URL is set which will cause a failure in the HELIX_SMARTAPPS_DEPLOY pipeline.  Please check with BMC Support."
+        logError "217" "DB_JDBC_URL is only valid for Oracle databases - use with MSSQL/Postgres will cause a failure in the HELIX_SMARTAPPS_DEPLOY pipeline.  Please check with BMC Support."
       fi
     fi
 
