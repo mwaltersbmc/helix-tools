@@ -460,7 +460,7 @@ getRSSODetails() {
 
 getDomain() {
   CLUSTER_DOMAIN=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="DOMAIN_NAME")].value}')
-  logMessage "Helix domain is ${CLUSTER_DOMAIN}."
+  [[ "${MODE}" =~ ^p ]] && logMessage "Helix domain is ${CLUSTER_DOMAIN}."
 }
 
 checkHelixLoggingDeployed() {
@@ -2811,6 +2811,16 @@ if [ "${MODE}" == "jenkins" ]; then
   exit
 fi
 
+if [[ ! -z "${BUNDLE_ID}" ]]; then
+  logStatus "Running IS deployment status check for bundle ID=${BUNDLE_ID}..."
+  getDomain
+  buildISAliasesArray
+  getISAdminCreds
+  getISJWT
+  ${CURL_BIN} -sk -X GET "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/bundle/deploymentstatus/${BUNDLE_ID}" -H "Authorization: AR-JWT ${ARJWT}" | ${JQ_BIN} .
+  exit
+fi
+
 # Validate action
 [[ "${MODE}" =~ ^post-hp$|^pre-is$|^post-is$ ]] || usage
 
@@ -4136,8 +4146,11 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
+while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
   case "${options}" in
+    b)
+      BUNDLE_ID="${OPTARG}"
+      ;;
     c)
       SKIP_CLEANUP=1
       ;;

@@ -1,6 +1,6 @@
 The Helix IS Triage Tool (**HITT**) is a shell script that tests for many common configuration problems that cause issues during the installation and use of Helix IS Service Management applications.  The script should be run as the git user on the Deployment Engine system where Jenkins is installed.
 
-HITT has different modes for Helix and Jenkins configuration checks, and also an option to run simple **tctl** commands. The main modes are:
+HITT has different modes for Helix and Jenkins configuration checks as well as several extra options such as running simple **tctl** commands. The main modes are:
 
 |Mode|Use|
 |-|-|
@@ -130,6 +130,47 @@ bash hitt.sh -t "get tenant 1912102789 -o json"
 ```
 
 Output will be displayed on the console when the job completes.
+
+### Get IS Bundle Deployment Status ###
+
+You can get the deployment status of IS bundles using the ID displayed in the pipeline console output.  For example, where you something like this, use the ID at the end of the URL.
+
+```
+You may use the below status URI to check deployment status under a valid logged in session.
+STATUS URI: http://platform-admin-ext:8008/api/rx/application/bundle/deploymentstatus/IDGIUNLUI5ENUASTJV8FSTJV8FT3JQ
+```
+
+Run HITT with the **-b BUNDLE-ID** option to display the status of the bundle:
+
+```sh
+$ bash hitt.sh -b IDGIUNLUI5ENUASTJV8FSTJV8FT3JQ
+
+Running IS deployment status check for bundle ID IDGIUNLUI5ENUASTJV8FSTJV8FT3JQ...
+{
+  "packageDeployStatus": "DeployedWithImportWarning",
+  "packageId": "IDGIUNLUI5ENUASTJV8FSTJV8FT3JQ",
+  "packageName": "com.bmc.dsm.shared-services-lib",
+  "packageVersion": "25.1.00-SNAPSHOT",
+  "serverDeploymentStatus": {
+    "platform-fts-0.platform-fts": "Deployed"
+  },
+  "currentServersInSync": true,
+  "newlyAddedServers": [],
+  "deploymentParsedStatus": {
+    "importingServer": "platform-fts-0.platform-fts:10.42.4.75",
+    "definitionsOverallImportStatus": "IMPORT_DEFINITIONS_SUCCESS",
+    "dataOverallImportStatus": "IMPORT_DATA_WARNING",
+    "errorMessages": [],
+    "definitionsStatusContent": [],
+    "tenantDataStatusContent": {
+      "0": [
+        "WARNING (303): Form does not exist on server; IDGAA5V0GFCOUAOMED7QOLIHTYQ6J0",
+        "WARNING (303): Form does not exist on server; IDGAA5V0GFCOUAOMED7QOLIHTYQ6J0"
+      ]
+    }
+  }
+}
+```
 
 ### Advanced CLI Options ###
 
