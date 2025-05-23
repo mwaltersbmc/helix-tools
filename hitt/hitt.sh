@@ -2207,7 +2207,7 @@ checkJenkinsCredentials() {
 }
 
 checkForNewHITT() {
-  [[ "${QUIET}" == "1" ]] && return
+  [[ "${SKIP_UPDATE_CHECK}" == "1" ]] && return
   if [  $(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' --connect-timeout 10 "${HITT_URL}") == "200" ]; then
     REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
     LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
@@ -2952,6 +2952,7 @@ IS_ALIAS_ARRAY=()
 ADE_ALIAS_ARRAY=()
 VERBOSITY=0
 QUIET=0
+SKIP_UPDATE_CHECK=0
 BOLD="\e[1m"
 NORMAL="\e[0m"
 RED="\e[31m"
@@ -4150,6 +4151,7 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
   case "${options}" in
     b)
       BUNDLE_ID="${OPTARG}"
+      SKIP_UPDATE_CHECK=1
       ;;
     c)
       SKIP_CLEANUP=1
@@ -4176,6 +4178,7 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
       ;;
     j)
       DUMP_JCREDS=1
+      SKIP_UPDATE_CHECK=1
       ;;
     l)
       CREATE_LOGS=0
@@ -4192,6 +4195,7 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
       ;;
     q)
       QUIET=1
+      SKIP_UPDATE_CHECK=1
       ;;
     s)
       CONF_OVERRIDE=1
@@ -4199,6 +4203,7 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
       ;;
     t)
       TCTL_CMD=${OPTARG}
+      SKIP_UPDATE_CHECK=1
       if [ $# -ne 2 ]; then
         logError "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
       fi
