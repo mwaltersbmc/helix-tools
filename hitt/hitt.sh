@@ -2741,7 +2741,8 @@ if [ "${CONF_OVERRIDE}" == "1" ]; then
 fi
 
 # Proxy settings
-if [ "${https_proxy}" != "" ]; then
+if [ "${https_proxy}" != "" ] && [ "${DISABLE_PROXY}" == "0" ]; then
+  logMessage "Proxy environment variables are set."
   PROXY_STRING="${https_proxy#*://}"
   # authentication required?
   if echo "${https_proxy}" | grep -q "@" ; then
@@ -2953,6 +2954,7 @@ ADE_ALIAS_ARRAY=()
 VERBOSITY=0
 QUIET=0
 SKIP_UPDATE_CHECK=0
+DISABLE_PROXY=0
 BOLD="\e[1m"
 NORMAL="\e[0m"
 RED="\e[31m"
@@ -4147,7 +4149,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
+while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
   case "${options}" in
     b)
       BUNDLE_ID="${OPTARG}"
@@ -4218,6 +4220,9 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:" options; do
     w)
       CONF_OVERRIDE=1
       JENKINS_PASSWORD_OVERRIDE="${OPTARG}"
+      ;;
+    x)
+      DISABLE_PROXY=1
       ;;
     :)
       echo -e "${BOLD}ERROR:${NORMAL} -${OPTARG} requires an argument."
