@@ -3983,7 +3983,7 @@ ALL_MSGS_JSON="[
     \"id\": \"215\",
     \"cause\": \"The named global pipeline libraries were not found in Jenkins.\",
     \"impact\": \"Pipeline execution will fail.\",
-    \"remediation\": \"Review the product documentation and add the missing global pipeline library configuration.\"
+    \"remediation\": \"Add the missing libraries and ensure they are created as 'Global Trusted Pipeline Libraries' and not 'Global Untrusted Pipeline Libraries'.\"
   },
   {
     \"id\": \"216\",
