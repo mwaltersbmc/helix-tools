@@ -2594,7 +2594,7 @@ checkDERequirements() {
     fi
   done
   if [ -n "${MISSING_BINS[*]}" ]; then
-    logError "239" "One or more of the OS tools required by the deployment pipelines were not found on the path of the git user. Please esnure these commands are available - '${MISSING_BINS[*]}'"
+    logError "239" "One or more of the OS tools required by the deployment pipelines were not found on the path of the git user. Please ensure these commands are available - '${MISSING_BINS[*]}'"
   fi
 
   if [ "${MODE}" == "jenkins" ]; then
