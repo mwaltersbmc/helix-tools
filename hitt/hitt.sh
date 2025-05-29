@@ -1374,9 +1374,13 @@ validateISDetails() {
     fi
 
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${HP_REGISTRY_SERVER}" ]; then
-      logError "147" "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the Helix Platform registry server (${HP_REGISTRY_SERVER})."
+      logError "147" "HARBOR_REGISTRY_HOST '${IS_HARBOR_REGISTRY_HOST}' does not match the Helix Platform registry server '${HP_REGISTRY_SERVER}'."
     else
       logMessage "HARBOR_REGISTRY_HOST '${IS_HARBOR_REGISTRY_HOST}' matches the Helix Platform registry server '${HP_REGISTRY_SERVER}'." 1
+    fi
+
+    if [ "${IS_IMAGESECRET_NAME}" == "" ]; then
+      logError "243" "IMAGESECRET_NAME is blank - you must provide a value for this parameter to be used as the registry credentials secret name."
     fi
 
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${HP_REGISTRY_USERNAME}" ]; then
@@ -3885,7 +3889,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"199\",
-    \"cause\": \"The command list namespaces in the cluster did not return the expected results needed to provide a list to select from.\",
+    \"cause\": \"The command to list namespaces in the cluster did not return the expected results needed to provide a list to select from.\",
     \"impact\": \"HITT cannot run until the hitt.conf file is updated.\",
     \"remediation\": \"Update the hitt.conf file and set the namespace names.\"
   },
@@ -4146,6 +4150,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The HELIX_FULL_STACK_UPGRADE option sbould not be selected when the DEPLOYMENT_MODE is UPDATE.\",
     \"impact\": \"The update will fail.\",
     \"remediation\": \"Deselect the HELIX_FULL_STACK_UPGRADE option when the DEPLOYMENT_MODE is UPDATE.\"
+  },
+  {
+    \"id\": \"243\",
+    \"cause\": \"The IMAGESECRET_NAME pipeline parameter must be set.\",
+    \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
+    \"remediation\": \"Enter a value for the IMAGESECRET_NAME which will be used as the name of the registry credentials secret in the Helix Service Management namespace.\"
   }
 ]"
 
