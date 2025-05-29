@@ -182,7 +182,8 @@ There are several extra command line switches which may be helpful for troublesh
 -j&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
 -p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output pipeline passwords in the **values.log** file when running in pre-is mode.\
 -q&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\
--v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging,
+-v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging.\
+-x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ignore proxy environment variables.
 
 ### Checks Summary ###
 
