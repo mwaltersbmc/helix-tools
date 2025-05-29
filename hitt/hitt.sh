@@ -2104,6 +2104,11 @@ checkJenkinsConfig() {
   checkSSHSetup
 }
 
+getPipelineParameterDefault(){
+  PARAM_VALUE=$(getPipelineDefaults ${1} | ${JQ_BIN} -r .${2})
+  echo "${PARAM_VALUE}"
+}
+
 checkJenkinsNodes() {
   NODE_STATUS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/manage/computer/api/json?depth=1")
   OFFLINE_NODES=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[]| select(.offline=='true').displayName')
@@ -2113,8 +2118,14 @@ checkJenkinsNodes() {
   fi
 
   NODE_LABELS=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[].assignedLabels[].name')
-  if ! echo "${NODE_LABELS}" | grep -q 'ansible-master' ; then
-    logError "194" "No Jenkins nodes found with the 'ansible-master' label."
+  UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
+  if [ ${UBER_VERSION::5} -ge 20252 ]; then
+    HELM_NODE_LABEL="ansible-master-latest"
+  else
+    HELM_NODE_LABEL="ansible-master"
+  fi
+  if ! echo "${NODE_LABELS}" | grep -Fxq "${HELM_NODE_LABEL}" ; then
+    logError "194" "No Jenkins nodes found with the label '${HELM_NODE_LABEL}'."
   fi
 }
 
@@ -2370,6 +2381,33 @@ checkJenkinsGlobalLibs() {
   else
     logMessage "Expected global pipeline libraries found in Jenkins." 1
   fi
+}
+
+getPipelineDefaults() {
+  SCRIPT="import groovy.json.JsonOutput
+    def jobName = '${1}'
+    def job = Jenkins.instance.getItemByFullName(jobName)
+    def parameterDefs = job.getProperty(ParametersDefinitionProperty)?.parameterDefinitions
+    def result = [:]
+    parameterDefs.each { param ->
+        def value = null
+        if (param.class.simpleName == 'ChoiceParameterDefinition') {
+            def choices = param.choices
+            if (choices && choices[0].toString().trim()) {
+                value = choices[0].toString().trim()
+            }
+        } else if (param.metaClass.hasProperty(param, 'defaultValue')) {
+            def defVal = param.defaultValue
+            if (defVal != null && defVal.toString().trim()) {
+                value = defVal.toString().trim()
+            }
+        }
+        if (value) {
+            result[param.name] = value
+        }
+    }
+    println JsonOutput.prettyPrint(JsonOutput.toJson(result))"
+  runJenkinsCurl "${SCRIPT}"
 }
 
 getJenkinsCredentials() {
@@ -3859,7 +3897,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"194\",
-    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT process requires a Jenkins node with the label 'ansible-master' to perform the product installation but one was not found.\",
+    \"cause\": \"There are no Jenkins nodes with the label named in the error message but one is required by the deployment pipelines.\",
     \"impact\": \"Helix Service Management deployment will fail.\",
     \"remediation\": \"In Jenkins go to Manage Jenkins -> Nodes and ensure that there is a node with this label. This is usually the node named after the Deployment Engine hostname. See the product documentation for full details.\"
   },
