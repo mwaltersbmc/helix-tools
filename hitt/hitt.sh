@@ -514,9 +514,9 @@ getTenantDetails() {
   else
     logWarning "041" "Tenant has not been activated - please check for activiation email."
   fi
-  logMessage "Helix Portal hostname is ${PORTAL_HOSTNAME}."
+  logMessage "Helix Portal hostname is '${PORTAL_HOSTNAME}'."
   HP_COMPANY_NAME=$(echo "${HP_TENANT%%.*}")
-  logMessage "Helix Platform ${HP_COMPANY_NAME_LABEL} is ${HP_COMPANY_NAME}."
+  logMessage "Helix Platform ${HP_COMPANY_NAME_LABEL} is '${HP_COMPANY_NAME}'."
 }
 
 isTenantActivated() {
@@ -642,7 +642,7 @@ getRealmDetails() {
   RSSO_REALM=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}")
   if echo "${RSSO_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     echo "Realms found in RSSO are:"
-    ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN}
+    ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} -r '" - " + .realms[].id'
     logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values." 1
   else
     logMessage "SSO realm '${REALM_NAME}' found for the SAAS_TENANT." 1
