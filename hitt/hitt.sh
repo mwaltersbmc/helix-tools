@@ -506,11 +506,24 @@ getTenantDetails() {
   else
     HP_TENANT="${TENANT_ARRAY[0]}"
   fi
+
   logMessage "Helix Platform tenant is ${HP_TENANT}."
   PORTAL_HOSTNAME=$(echo "${TENANT_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${HP_TENANT}'").host')
+  if isTenantActivated ; then
+    logMessage "Tenant has been activated."
+  else
+    logWarning "041" "Tenant has not been activated - please check for activiation email."
+  fi
   logMessage "Helix Portal hostname is ${PORTAL_HOSTNAME}."
   HP_COMPANY_NAME=$(echo "${HP_TENANT%%.*}")
   logMessage "Helix Platform ${HP_COMPANY_NAME_LABEL} is ${HP_COMPANY_NAME}."
+}
+
+isTenantActivated() {
+  # HP_TENANT
+  PG_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "data=postgres,apps.kubernetes.io/pod-index=0")
+  TENANT_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "select status from localuser where realm='${HP_TENANT}'" 2>/dev/null)
+  echo "${TENANT_STATUS}" | grep -q "REG_COMPLETED"
 }
 
 selectFromArray () {
@@ -630,9 +643,9 @@ getRealmDetails() {
   if echo "${RSSO_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     echo "Realms found in RSSO are:"
     ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN}
-    logError "116" "Realm ${REALM_NAME} not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values." 1
+    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values." 1
   else
-    logMessage "RSSO realm ${REALM_NAME} found for the SAAS_TENANT." 1
+    logMessage "SSO realm '${REALM_NAME}' found for the SAAS_TENANT." 1
   fi
 }
 
@@ -2742,6 +2755,11 @@ tidyUp() {
   [ -f "${HITT_MSG_FILE}" ] && cat "${HITT_MSG_FILE}" | sed -e 's/\x1b\[[0-9;]*m//g' > hittmsgs.txt
   ${ZIP_BIN} -q - *.log hitt*.txt k8s*.txt *.json > hittlogs.zip
 }
+
+getPodNameByLabel() {
+  # namespace label-filter
+  ${KUBECTL_BIN} -n "${1}" get pod -l "${2}" -o custom-columns=:metadata.name --no-headers
+}
 # FUNCTIONS End
 
 # MAIN Start
@@ -3330,6 +3348,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"This is a FRESH deployment using Postgres and the option to allow the pipeline to restore the databas dump is not selected.\",
     \"impact\": \"The database dump must be restored manually before deployment if the DATABASE_RESTORE option is not selected.\",
     \"remediation\": \"Ensure that the database dump has been restored OR select the DATABASE_RESTORE option to allow the pipeline to do it.\"
+  },
+  {
+    \"id\": \"041\",
+    \"cause\": \"The named Helix Platform tenant has not been activated using the link in the activation email.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline may encounter issues.\",
+    \"remediation\": \"Use the link in the activation email to set the first user password and activate the tenant.\"
   },
   {
     \"id\": \"100\",
