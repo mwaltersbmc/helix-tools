@@ -319,7 +319,8 @@ getVersions() {
         [[ "${IS_VERSION}" == "23.3.04" ]] && IS_DB_VERSION=203
         ;;
       25)
-        IS_DB_VERSION=204
+        [[ "${IS_VERSION}" == "25.1.01" ]] && IS_DB_VERSION=204
+        [[ "${IS_VERSION}" == "25.2.01" ]] && IS_DB_VERSION=215
         ;;
       *)
         logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
@@ -512,7 +513,7 @@ getTenantDetails() {
   if isTenantActivated ; then
     logMessage "Tenant has been activated."
   else
-    logWarning "041" "Tenant has not been activated - please check for activiation email."
+    logWarning "041" "Tenant has not been activated - please check for activation email."
   fi
   logMessage "Helix Portal hostname is '${PORTAL_HOSTNAME}'."
   HP_COMPANY_NAME=$(echo "${HP_TENANT%%.*}")
@@ -2660,10 +2661,10 @@ checkDERequirements() {
     return
   fi
 
-  IS_MAJOR_VERSION="${IS_VERSION:2:2}"
+  IS_MAJOR_VERSION="${IS_VERSION:2:3}"
 
   # if IS <=22.x then kubectl must be <= 1.27
-  if [ "${IS_MAJOR_VERSION}" -lt 23 ]; then
+  if [ "${IS_MAJOR_VERSION}" -lt 233 ]; then
     MAX_KUBECTL_VERSION="1.27"
     INSTALLED_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.clientVersion.major + "." + .clientVersion.minor')
     if compare "${INSTALLED_VERSION} > ${MAX_KUBECTL_VERSION}"; then
@@ -2675,10 +2676,14 @@ checkDERequirements() {
   if ! which ansible > /dev/null 2>&1 ; then
     logWarning "029" "'ansible' command not found - skipping checks."
   else
-    if [ "${IS_MAJOR_VERSION}" -eq 22 ]; then
+    if [ "${IS_MAJOR_VERSION}" -ge 221 ] && [ "${IS_MAJOR_VERSION}" -lt 233 ]; then
       MAX_ANSIBLE_VERSION="2.9"
-    elif [ "${IS_MAJOR_VERSION}" -ge 23 ]; then
+    fi
+    if [ "${IS_MAJOR_VERSION}" -ge 233 ] && [ "${IS_MAJOR_VERSION}" -lt 252 ]; then
       MAX_ANSIBLE_VERSION="2.15"
+    fi
+    if [ "${IS_MAJOR_VERSION}" -ge 252 ]; then
+      MAX_ANSIBLE_VERSION="2.18"
     fi
 
     ANSIBLE_VERSION=$(ansible --version 2>/dev/null | head -1 | grep -oP '\d+.\d+')
