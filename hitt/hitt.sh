@@ -643,7 +643,7 @@ getRealmDetails() {
   if echo "${RSSO_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     echo "Realms found in RSSO are:"
     ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} -r '" - " + .realms[].id'
-    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values." 1
+    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values in hitt.conf." 1
   else
     logMessage "SSO realm '${REALM_NAME}' found for the SAAS_TENANT." 1
   fi
@@ -663,9 +663,9 @@ validateRealm() {
   # Parse realm data
   REALM_ARHOST=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arHost)
   if [ "${REALM_ARHOST}" != "platform-user-ext.${IS_NAMESPACE}" ]; then
-    logError "118" "Invalid arHost value in realm - expected platform-user-ext.${IS_NAMESPACE} but found ${REALM_ARHOST}."
+    logError "118" "Invalid arHost value in realm - expected 'platform-user-ext.${IS_NAMESPACE}' but found '${REALM_ARHOST}'."
   else
-    logMessage "AR host ${REALM_ARHOST} is the expected value." 1
+    logMessage "AR host '${REALM_ARHOST}' is the expected value." 1
   fi
   REALM_ARPORT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .authChain.idpAr[0].arPort)
   if [ "${REALM_ARPORT}" != "46262" ]; then
@@ -813,7 +813,6 @@ getISDetailsFromK8s() {
   logMessage "Getting data from IS namespace..."
   IS_PLATFORM_STS=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[?(@.name=="platform")]}')
   IS_PLATFORM_SECRET=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret platform-fts -o jsonpath='{.data}')
-
   IS_TENANT_DOMAIN=$(getValueFromPlatformSTS "TENANT_ID")
   IS_RSSO_URL=$(getValueFromPlatformSTS "RSSO_EXTERNAL_URL")
   IS_FTS_ELASTICSEARCH_HOSTNAME=$(getValueFromPlatformSTS "FTS_ELASTIC_HOST")
@@ -825,7 +824,6 @@ getISDetailsFromK8s() {
   IS_AR_SERVER_APP_SERVICE_PASSWORD=$(getValueFromPlatformSTS "AR_SERVER_APP_SERVICE_PASSWORD")
   IS_AR_SERVER_DSO_USER_PASSWORD=$(getValueFromPlatformSTS "AR_SERVER_DSO_USER_PASSWORD")
   IS_AR_SERVER_MIDTIER_SERVICE_PASSWORD=$(getValueFromPlatformSTS "AR_SERVER_MIDTIER_SERVICE_PASSWORD")
-
   IS_AR_DB_NAME=$(getValueFromPlatformSecret "AR_DB_NAME")
   IS_AR_DB_PASSWORD=$(getValueFromPlatformSecret "AR_SERVER_DB_USER_PASSWORD")
   IS_AR_DB_USER=$(getValueFromPlatformSecret "AR_SERVER_DB_USERNAME")
@@ -856,9 +854,7 @@ getISDetailsFromK8s() {
       IS_ENABLE_PLATFORM_INT_NORMALIZATION="true"
     fi
   fi
-
   IS_IMAGESECRET_NAME=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.imagePullSecrets[0].name}')
-
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[?(@.name=="fluent-bit")].name}' | grep -q fluent-bit; then
     IS_SIDECAR_FLUENTBIT=1
   else
@@ -1216,6 +1212,9 @@ validateISDetails() {
 
     if [ ! -d "${IS_GIT_USER_HOME_DIR}" ]; then
       logError "222" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not a valid directory."
+    fi
+    if [[ ! "${IS_GIT_REPO_DIR}" =~ ^/.* ]]; then
+      logError "244" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid - it must be an absolute path beginning with '/' - eg: '/home/git'."
     fi
 
     if [[ ! "${IS_GIT_REPO_DIR}" =~ ^ssh://.* ]]; then
@@ -4218,7 +4217,14 @@ ALL_MSGS_JSON="[
     \"cause\": \"The IMAGESECRET_NAME pipeline parameter must be set.\",
     \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
     \"remediation\": \"Enter a value for the IMAGESECRET_NAME which will be used as the name of the registry credentials secret in the Helix Service Management namespace.\"
+  },
+  {
+    \"id\": \"244\",
+    \"cause\": \"The GIT_USER_HOME_DIR value must be a path name beginning with a forward slash.\",
+    \"impact\": \"The HELIX_ONPREM_DEPLOYMENT pipeline will fail.\",
+    \"remediation\": \"Change the GIT_USER_HOME_DIR value to an absolute path - for example '/home/git'.\"
   }
+
 ]"
 
 while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
