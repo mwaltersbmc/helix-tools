@@ -1,0 +1,40 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    helix_platform_namespace: "{{ lookup('env', 'HELIX_PLATFORM_NAMESPACE') }}"
+
+  tasks:
+
+    - name: Get postgres pod
+      kubernetes.core.k8s_info:
+        kind:  pod
+        namespace: "{{ helix_platform_namespace }}"
+        label_selectors:
+          - "data=postgres"
+          - "apps.kubernetes.io/pod-index=0"
+      register: k8s_result
+
+    - set_fact:
+        pg_pod_name: "{{ k8s_result.resources[0].metadata.name }}"
+
+    - name: Check for hannah_admin creation
+      kubernetes.core.k8s_exec:
+        namespace: "{{ helix_platform_namespace }}"
+        pod: "{{ pg_pod_name }}"
+        command: psql -d ade_rsso -U postgres -c "select id from localuser where login = 'hannah_admin'"
+      register: rows
+      until: "'1 row' in rows.stdout"
+
+    - name: Set hannah_admin password
+      kubernetes.core.k8s_exec:
+        namespace: "{{ helix_platform_namespace }}"
+        pod: "{{ pg_pod_name }}"
+        command: psql -d ade_rsso -U postgres -c "update localuser set password = '\x020a7e17c23b9cb42174e31d1d39085f305bdbab57544b163e1c2be70c7523b43eb1f1e8b092ed5b13f05aff838d32141181892e14bbfdbd75ab235640adfc30731f9c7f72d24f2a2ecba2fa22d2dd50ca85020d15213956c22f09e87f76fa4398' where login = 'hannah_admin'"
+
+    - name: Set hannah_admin active
+      kubernetes.core.k8s_exec:
+        namespace: "{{ helix_platform_namespace }}"
+        pod: "{{ pg_pod_name }}"
+        command: psql -d ade_rsso -U postgres -c "update localuser set status = 'REG_COMPLETED' where login = 'hannah_admin'"

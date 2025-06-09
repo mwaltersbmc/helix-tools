@@ -1222,7 +1222,7 @@ validateISDetails() {
     else
       REPO_PATH=$(echo ${IS_GIT_REPO_DIR} | sed -e 's#ssh://[^/]*##')
       if [ ! -d "${REPO_PATH}" ]; then
-        logError "224" "The directory used in the GIT_REPO_DIR value '${REPO_DIR}' is not a valid directory."
+        logError "224" "The directory used in the GIT_REPO_DIR value '${IS_GIT_REPO_DIR}' is not valid."
       fi
     fi
 

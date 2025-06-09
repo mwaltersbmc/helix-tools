@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${SEALUTIL}
+  namespace: ${HP_NAMESPACE}
+spec:
+  containers:
+  - args:
+    - /opt/bmc/redis_application_monitor.sh
+    command:
+    - /opt/bmc/bmc-log-shipper
+    env:
+    image: harbor2.seal.bmc.com/bmc/lp0lz:24400001-v103-ade-infra-clients-alpine
+    imagePullPolicy: IfNotPresent
+    name: ${SEALUTIL}
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      runAsNonRoot: true
+      restartPolicy: Never
+      seccompProfile:
+        type: RuntimeDefault
+  imagePullSecrets:
+  - name: bmc-dtrhub
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sealutil
+  namespace: helix-platform
+spec:
+  containers:
+  - command: ["curl", "-k", "-X", "POST", "https://helix-platform.seal-k3s.bmc.com/rsso//api/v1.1/admin/login", "-H", "Content-Type: application/json", "-d", '{"username":"admin","password":"RSSO#Admin#"}']
+    image: harbor2.seal.bmc.com/bmc/lp0lz:24400001-v103-ade-infra-clients-alpine
+    imagePullPolicy: IfNotPresent
+    name: sealutil
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      runAsNonRoot: true
+      restartPolicy: Never
+      seccompProfile:
+        type: RuntimeDefault
+  imagePullSecrets:
+  - name: bmc-dtrhub
+
+
+
+SEAL_APP=sealutil
+SEAL_NAMESPACE="${IS_NAMESPACE}"
+IMAGE_SECRET="${IS_IMAGESECRET_NAME}"
+SEAL_IMAGE="${ADE_INFRA_CLIENT_IMAGE_TAG}"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: ${SEAL_APP}
+  name: ${SEAL_APP}
+  namespace: ${SEAL_NAMESPACE}
+spec:
+  backoffLimit: 1
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: ${SEAL_APP}
+    spec:
+      containers:
+      - name: ${SEAL_APP}
+        image: ${SEAL_IMAGE}
+        imagePullPolicy: IfNotPresent
+        command: ["curl", "-k", "-X", "POST", "https://helix-platform.seal-k3s.bmc.com/rsso//api/v1.1/admin/login", "-H", "Content-Type: application/json", "-d", '{"username":"admin","password":"RSSO#Admin#"}']
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          limits:
+            cpu: 512m
+            memory: 512Mi
+          requests:
+            cpu: 256m
+            memory: 256Mi
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ${IMAGE_SECRET}
+EOF

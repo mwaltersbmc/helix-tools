@@ -23,6 +23,9 @@ helm_version: 3.12.3
 install_jenkins_plugins: true
 # Start the Jenkins job to dry run the Helix deployment pipelines
 start_dry_run: false
+# HP vars
+hp_installer: 
+
 
 # Values below should not need to be changed
 git_repo_dir: git_repo
