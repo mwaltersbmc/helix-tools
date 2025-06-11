@@ -2304,7 +2304,7 @@ validateJenkinsKubeconfig() {
     logWarning "028" "Failed to extract kubeconfig file from Jenkins - skipping validation."
     return
   fi
-  if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} cluster-info > /dev/null 2>>${HITT_ERR_FILE}; then
+  if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} -n "${HP_NAMESPACE}" cluster-info > /dev/null 2>>${HITT_ERR_FILE}; then
     logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
     SKIP_CLEANUP=1
   else
@@ -2460,8 +2460,6 @@ checkSSHknown_hosts(){
     logWarning "039" "'ssh-keygen' command not found - skipping passwordless ssh checks."
     return
   fi
-  SHORT_HOSTNAME=$(hostname --short)
-  LONG_HOSTNAME=$(hostname --long)
   for h in "${SHORT_HOSTNAME}" "${LONG_HOSTNAME}"; do
     if ! ssh-keygen -F "${h}" >/dev/null 2>&1 ; then
       logError "237" "Hostname '${h}' is not set up for passwordless ssh - please run 'ssh ${USER}@${h}' to configure this."
@@ -2509,7 +2507,7 @@ validateJenkinsCredentials() {
     if ! which sshpass  > /dev/null 2>&1 ; then
       logWarning "038" "'sshpass' command not found - please install it to enable Jenkins credentials password validation."
     else
-      if ! sshpass -p "${CRED_PWD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${CRED_USER}"@localhost whoami >/dev/null 2>&1 ; then
+      if ! sshpass -p "${CRED_PWD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${CRED_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
         logError "231" "The password set for the git user in the Jenkins credentials is not correct. Run 'bash hitt.sh -j' to display the values."
       fi
     fi
@@ -2994,6 +2992,8 @@ tidyUp
 SCRIPT_VERSION=1
 HITT_CONFIG_FILE=hitt.conf
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
+SHORT_HOSTNAME=$(hostname --short)
+LONG_HOSTNAME=$(hostname --long)
 DEBUG=0
 FAIL=0
 WARN=0
