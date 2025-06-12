@@ -2305,10 +2305,10 @@ validateJenkinsKubeconfig() {
     return
   fi
   if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} -n "${HP_NAMESPACE}" cluster-info > /dev/null 2>>${HITT_ERR_FILE}; then
-    logError "197" "Jenkins KUBECONFIG credential does not appear contain a valid kubeconfig file."
+    logError "197" "Unable to verify kubeconfig file from Jenkins KUBECONFIG credential."
     SKIP_CLEANUP=1
   else
-    logMessage "Jenkins KUBECONFIG credential contains a valid kubeconfig file." 1
+    logMessage "Verified Jenkins KUBECONFIG credential contains a valid kubeconfig file." 1
   fi
 }
 
@@ -3943,7 +3943,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"197\",
-    \"cause\": \"A command to validate the KUBECONFIG credential in Jenkins failed. The credentials item is expected to contain a valid kubeconfig file but it is missing or is not valid for the cluster.\",
+    \"cause\": \"Unable to verify the file in the Jenkins KUBECONFIG credential. It is expected to contain a valid kubeconfig file but it is missing or is not valid for the cluster.\",
     \"impact\": \"Helix Service Management deployment will fail.\",
     \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and update the KUBECONFIG credential with a valid file. See the product documentation for full details.\"
   },
