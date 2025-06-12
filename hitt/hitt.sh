@@ -1214,7 +1214,7 @@ validateISDetails() {
     if [ ! -d "${IS_GIT_USER_HOME_DIR}" ]; then
       logError "222" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not a valid directory."
     fi
-    if [[ ! "${IS_GIT_REPO_DIR}" =~ ^/.* ]]; then
+    if [[ ! "${IS_GIT_USER_HOME_DIR}" =~ ^/.* ]]; then
       logError "244" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid - it must be an absolute path beginning with '/' - eg: '/home/git'."
     fi
 
