@@ -4135,13 +4135,13 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"229\",
-    \"cause\": \"The Helix Platform alias in message should not be present in the list of Application Domains in the SSO realm for ITSM aliases.\",
+    \"cause\": \"The Helix Platform alias named in the message should not be present in the list of Application Domains of the SSO realm for ITSM aliases.\",
     \"impact\": \"Invalid configuration.\",
     \"remediation\": \"Delete the named alias from the SSO realm Application Domains.\"
   },
   {
     \"id\": \"230\",
-    \"cause\": \"One or more of the Jenkins credentials have different passwords when theyh should all be set to the password of the git user.\",
+    \"cause\": \"One or more of the Jenkins credentials have different passwords when they should all be set to the password of the git user.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Run 'bash hitt.sh -j' to diplay the passwords and then, in Jenkins go to Manage Jenkins->Credentials, and update those that have the wrong value.\"
   },
@@ -4213,13 +4213,13 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"242\",
-    \"cause\": \"The HELIX_FULL_STACK_UPGRADE option sbould not be selected when the DEPLOYMENT_MODE is UPDATE.\",
+    \"cause\": \"The HELIX_FULL_STACK_UPGRADE option should not be selected when the DEPLOYMENT_MODE is UPDATE.\",
     \"impact\": \"The update will fail.\",
     \"remediation\": \"Deselect the HELIX_FULL_STACK_UPGRADE option when the DEPLOYMENT_MODE is UPDATE.\"
   },
   {
     \"id\": \"243\",
-    \"cause\": \"The IMAGESECRET_NAME pipeline parameter must be set.\",
+    \"cause\": \"The IMAGESECRET_NAME pipeline parameter cannot be blank.\",
     \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
     \"remediation\": \"Enter a value for the IMAGESECRET_NAME which will be used as the name of the registry credentials secret in the Helix Service Management namespace.\"
   },
