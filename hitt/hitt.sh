@@ -1120,6 +1120,7 @@ getInputFileValues() {
   for i in "${INPUT_FILE_VARS[@]}"; do
     eval "IS_$i"='$(grepInputFile $i)'
   done
+  IS_DATABASE_ADMIN_PASSWORD="${IS_DB_ADMIN_PASSWORD}"
   IS_FTS_ELASTICSEARCH_USER_PASSWORD="${IS_PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USER_PASSWORD}"
   IS_FTS_ELASTICSEARCH_USERNAME="${IS_PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USERNAME}"
   IS_CACERTS_SSL_TRUSTSTORE_PASSWORD="${IS_PLATFORM_COMMON_CACERTS_SSL_TRUSTSTORE_PASSWORD}"
@@ -1802,7 +1803,11 @@ checkISLicense() {
 
 getISAdminCreds() {
   IS_ADMIN_USER=hannah_admin
-  IS_ADMIN_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret atriumwebsvc -o jsonpath='{.data.UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
+  if [ "${IS_VERSION}" -ge 2025201 ]; then
+    IS_ADMIN_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data.ATWS_UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
+  else
+    IS_ADMIN_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret atriumwebsvc -o jsonpath='{.data.UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
+  fi
 }
 
 checkAssistTool() {
@@ -1847,7 +1852,7 @@ buildJISQLcmd() {
       JISQLDRIVER=postgresql
       ;;
   esac
-  JISQLCMD="${JAVA_BIN} -cp ./jisql.jar:./${JISQLJAR} com.xigole.util.sql.Jisql -user ${IS_AR_DB_USER} -password ${IS_AR_DB_PASSWORD} -driver ${JISQLDRIVER} -cstring ${JISQLURL} -noheader -query"
+  JISQLCMD="${JAVA_BIN} -cp ./jisql.jar:./${JISQLJAR} com.xigole.util.sql.Jisql -user ${JISQL_USERNAME} -password ${JISQL_PASSWORD} -driver ${JISQLDRIVER} -cstring ${JISQLURL} -noheader -query"
 }
 
 testNetConnection () {
@@ -1868,9 +1873,20 @@ checkISDBSettings() {
   fi
   checkISDBLatency
   if [ -z "${IS_AR_DB_USER}" ] || [ -z "${IS_AR_DB_PASSWORD}" ]; then
-    logWarning "021" "One or more DB settings are blank - skipping checks."
-    return
+    logError "246" "AR_DB_USER and/or AR_DB_PASSWORD are blank - skipping checks."
+    SKIP_AR_DB_CHECKS=1
   fi
+  JISQL_USERNAME="${IS_AR_DB_USER}"
+  JISQL_PASSWORD="${IS_AR_DB_PASSWORD}"
+  if [ "${IS_DATABASE_RESTORE}" == "true" ]; then
+    if [ -z "${IS_DATABASE_ADMIN_USER}" ] || [ -z "${IS_DATABASE_ADMIN_PASSWORD}" ]; then
+      logError "246" "DATABASE_ADMIN_USER and/or DATABASE_ADMIN_PASSWORD are blank - skipping checks."
+      SKIP_AR_DB_CHECKS=1
+    fi
+    JISQL_USERNAME="${IS_DATABASE_ADMIN_USER}"
+    JISQL_PASSWORD="${IS_DATABASE_ADMIN_PASSWORD}"
+  fi
+  [[ -n "${SKIP_AR_DB_CHECKS}" ]] && return
   if [ -f dbjars.tgz ]; then
     logMessage "Found dbjars.tgz - running DB checks." 1
     logMessage "Unpacking dbjars.tgz..." 1
@@ -2014,7 +2030,7 @@ checkISDBLatency() {
     logMessage "DATABASE_HOST_NAME not set - can't test IS DB latency."
     return
   fi
-  logMessage "Testing latency between cluster and IS DB server ${IS_DATABASE_HOST_NAME}."
+  logMessage "Attempting to test latency between cluster and IS DB server ${IS_DATABASE_HOST_NAME}..."
   PING_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pod --no-headers -l app=rsso -o custom-columns=:metadata.name --field-selector status.phase=Running | head -1)
   if [ ! -z "${PING_POD}" ]; then
     PING_RESULT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PING_POD}" -- ping "${IS_DATABASE_HOST_NAME}" -c 3 -q | tail -1)
@@ -2026,7 +2042,7 @@ checkISDBLatency() {
       if compare "${IS_DB_LATENCY} < 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted." ; return ; fi
       if compare "${IS_DB_LATENCY} > 6" ; then logMessage "Latency is ${BOLD}VERY POOR${NORMAL}. Performance will be impacted." ; return ; fi
     else
-      logError "188" "Unexpected response from IS DB ping test: ${PING_RESULT}."
+      logError "188" "Unexpected response from IS DB ping test."
     fi
   fi
 }
@@ -4228,8 +4244,13 @@ ALL_MSGS_JSON="[
     \"cause\": \"The GIT_USER_HOME_DIR value must be a path name beginning with a forward slash.\",
     \"impact\": \"The HELIX_ONPREM_DEPLOYMENT pipeline will fail.\",
     \"remediation\": \"Change the GIT_USER_HOME_DIR value to an absolute path - for example '/home/git'.\"
+  },
+  {
+    \"id\": \"245\",
+    \"cause\": \"Either or both of the named pipeline parameters are blank.\",
+    \"impact\": \"Deployment will fail and some HITT checks have been skipped.\",
+    \"remediation\": \"Set the missing values in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
   }
-
 ]"
 
 while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
