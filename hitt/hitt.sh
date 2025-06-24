@@ -817,7 +817,17 @@ getISDetailsFromK8s() {
   [[ "${MODE}" != "post-is" ]] && return
   logMessage "Getting data from IS namespace..."
   IS_PLATFORM_STS=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[?(@.name=="platform")]}')
-  IS_PLATFORM_SECRET=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret platform-fts -o jsonpath='{.data}')
+  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret > /dev/null 2>&1; then
+    IS_PLATFORM_SECRET=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data}')
+    IS_AR_DB_USER=$(getValueFromPlatformSecret "AR_DB_USERNAME")
+    IS_AR_DB_PASSWORD=$(getValueFromPlatformSecret "AR_DB_PASSWORD")
+    IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_PLATFORM_SECRET}" | ${JQ_BIN} -r '.CACERTS_PASSWORD')
+  else
+    IS_PLATFORM_SECRET=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret platform-fts -o jsonpath='{.data}')
+    IS_AR_DB_USER=$(getValueFromPlatformSecret "AR_SERVER_DB_USERNAME")
+    IS_AR_DB_PASSWORD=$(getValueFromPlatformSecret "AR_SERVER_DB_USER_PASSWORD")
+    IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_PLATFORM_SECRET}" | ${JQ_BIN} -r '.CACERTS_SSL_TRUSTSTORE_PASSWORD')
+  fi
   IS_TENANT_DOMAIN=$(getValueFromPlatformSTS "TENANT_ID")
   IS_RSSO_URL=$(getValueFromPlatformSTS "RSSO_EXTERNAL_URL")
   IS_FTS_ELASTICSEARCH_HOSTNAME=$(getValueFromPlatformSTS "FTS_ELASTIC_HOST")
@@ -830,8 +840,6 @@ getISDetailsFromK8s() {
   IS_AR_SERVER_DSO_USER_PASSWORD=$(getValueFromPlatformSTS "AR_SERVER_DSO_USER_PASSWORD")
   IS_AR_SERVER_MIDTIER_SERVICE_PASSWORD=$(getValueFromPlatformSTS "AR_SERVER_MIDTIER_SERVICE_PASSWORD")
   IS_AR_DB_NAME=$(getValueFromPlatformSecret "AR_DB_NAME")
-  IS_AR_DB_PASSWORD=$(getValueFromPlatformSecret "AR_SERVER_DB_USER_PASSWORD")
-  IS_AR_DB_USER=$(getValueFromPlatformSecret "AR_SERVER_DB_USERNAME")
   IS_ORACLE_SERVICE_NAME=$(getValueFromPlatformSecret "AR_DB_INSTANCE")
 
   # 23.3.03+ update for new FTS ES creds
@@ -844,7 +852,6 @@ getISDetailsFromK8s() {
     IS_FTS_ELASTICSEARCH_USER_PASSWORD=$(getValueFromPlatformSecret "FTS_ELASTIC_SEARCH_USER_PASSWORD")
   fi
 
-  IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_PLATFORM_SECRET}" | ${JQ_BIN} -r '.CACERTS_SSL_TRUSTSTORE_PASSWORD')
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "null" ]; then
     IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=$(echo "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" | ${BASE64_BIN} -d)
   else
@@ -1809,7 +1816,7 @@ checkISLicense() {
 
 getISAdminCreds() {
   IS_ADMIN_USER=hannah_admin
-  if [ "${IS_VERSION}" -ge 2025201 ]; then
+  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret > /dev/null 2>&1; then
     IS_ADMIN_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data.ATWS_UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
   else
     IS_ADMIN_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret atriumwebsvc -o jsonpath='{.data.UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
