@@ -306,26 +306,30 @@ getVersions() {
   if [ "${MODE}" == "post-is" ]; then
     IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
     logMessage "Helix IS version ${IS_VERSION}."
-    # Set expected currDBVersion
-    case "${IS_VERSION%%.*}" in
-      21)
-        IS_DB_VERSION=199
-        ;;
-      22)
-        IS_DB_VERSION=200
-        ;;
-      23)
-        [[ "${IS_VERSION}" == "23.3.03" ]] && IS_DB_VERSION=201
-        [[ "${IS_VERSION}" == "23.3.04" ]] && IS_DB_VERSION=203
-        ;;
-      25)
-        [[ "${IS_VERSION}" == "25.1.01" ]] && IS_DB_VERSION=204
-        [[ "${IS_VERSION}" == "25.2.01" ]] && IS_DB_VERSION=215
-        ;;
-      *)
-        logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
-    esac
+    setISDBVersion "${IS_VERSION}"
   fi
+}
+
+setISDBVersion() {
+  # Set expected currDBVersion
+  case "${1%%.*}" in
+    21)
+      IS_DB_VERSION=199
+      ;;
+    22)
+      IS_DB_VERSION=200
+      ;;
+    23)
+      [[ "${1}" == "23.3.03" ]] && IS_DB_VERSION=201
+      [[ "${1}" == "23.3.04" ]] && IS_DB_VERSION=203
+      ;;
+    25)
+      [[ "${1}" == "25.1.01" ]] && IS_DB_VERSION=204
+      [[ "${1}" == "25.2.01" ]] && IS_DB_VERSION=215
+      ;;
+    *)
+      logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
+  esac
 }
 
 checkNSResourceQuotas() {
@@ -1098,6 +1102,8 @@ getPipelineValues() {
   IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
   IS_PIPELINE_VERSION="${IS_PLATFORM_HELM_VERSION:2:2}.${IS_PLATFORM_HELM_VERSION:4:1}.${IS_PLATFORM_HELM_VERSION:5:2}"
   IS_VERSION="${IS_PLATFORM_HELM_VERSION:0:7}"
+  echo "XXX ${IS_PIPELINE_VERSION}"
+  setISDBVersion "${IS_PIPELINE_VERSION}"
   cloneCustomerConfigsRepo
 }
 
@@ -1894,8 +1900,13 @@ checkISDBSettings() {
     buildJISQLcmd
     logMessage "Connecting to ${JISQLURL} as ${IS_AR_DB_USER}..." 1
     # Note - new line is needed to avoid Java heap errors from jisql
-    SQL_RESULT=$($JISQLCMD "select currDbVersion from control
+    if [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "true" ]; then
+      SQL_RESULT=$($JISQLCMD "select 1
     go" 2>&1)
+    else
+      SQL_RESULT=$($JISQLCMD "select currDbVersion from control
+    go" 2>&1)
+    fi
 
     if echo "${SQL_RESULT}" | grep -q ErrorCode ; then
      logError "180" "Problem connecting to database - please review the following message."
