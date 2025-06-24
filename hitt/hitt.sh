@@ -311,7 +311,7 @@ getVersions() {
 }
 
 setISDBVersion() {
-  # Set expected currDBVersion
+  # Set expected currDbVersion
   case "${1%%.*}" in
     21)
       IS_DB_VERSION=199
@@ -324,7 +324,7 @@ setISDBVersion() {
       [[ "${1}" == "23.3.04" ]] && IS_DB_VERSION=203
       ;;
     25)
-      [[ "${1}" == "25.1.01" ]] && IS_DB_VERSION=204
+      [[ "${1}" == "25.1.01" ]] && IS_DB_VERSION=203
       [[ "${1}" == "25.2.01" ]] && IS_DB_VERSION=215
       ;;
     *)
@@ -1854,7 +1854,7 @@ buildJISQLcmd() {
       ;;
     postgres)
       JISQLJAR=postgresql-42.2.8.jar
-      JISQLURL=jdbc:postgresql://${IS_DATABASE_HOST_NAME}:${IS_DB_PORT}/${IS_AR_DB_NAME}
+      JISQLURL=jdbc:postgresql://${IS_DATABASE_HOST_NAME}:${IS_DB_PORT}/${JISQL_DB_NAME}
       JISQLDRIVER=postgresql
       ;;
   esac
@@ -1884,6 +1884,7 @@ checkISDBSettings() {
   fi
   JISQL_USERNAME="${IS_AR_DB_USER}"
   JISQL_PASSWORD="${IS_AR_DB_PASSWORD}"
+  JISQL_DB_NAME="${IS_AR_DB_NAME}"
   if [ "${IS_DATABASE_RESTORE}" == "true" ]; then
     if [ -z "${IS_DATABASE_ADMIN_USER}" ] || [ -z "${IS_DATABASE_ADMIN_PASSWORD}" ]; then
       logError "246" "DATABASE_ADMIN_USER and/or DATABASE_ADMIN_PASSWORD are blank - skipping checks."
@@ -1891,6 +1892,7 @@ checkISDBSettings() {
     fi
     JISQL_USERNAME="${IS_DATABASE_ADMIN_USER}"
     JISQL_PASSWORD="${IS_DATABASE_ADMIN_PASSWORD}"
+    JISQL_DB_NAME="postgres"
   fi
   [[ -n "${SKIP_AR_DB_CHECKS}" ]] && return
   if [ -f dbjars.tgz ]; then
@@ -1898,7 +1900,7 @@ checkISDBSettings() {
     logMessage "Unpacking dbjars.tgz..." 1
     ${TAR_BIN} zxf dbjars.tgz
     buildJISQLcmd
-    logMessage "Connecting to ${JISQLURL} as ${IS_AR_DB_USER}..." 1
+    logMessage "Connecting to ${JISQLURL} as ${JISQL_USERNAME}..." 1
     # Note - new line is needed to avoid Java heap errors from jisql
     if [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "true" ]; then
       SQL_RESULT=$($JISQLCMD "select 1
@@ -1915,10 +1917,14 @@ checkISDBSettings() {
     else
       DB_VERSION=$(echo "${SQL_RESULT}" | awk '{print $1}')
       if [ ! -z "${IS_DB_VERSION}" ]; then
-        if [ "${DB_VERSION}" != "${IS_DB_VERSION}" ]; then
-          logError "181" "Database is not the expected version - found ${DB_VERSION} but should be ${IS_DB_VERSION}."
+        if [ "${DB_VERSION}" != "${IS_DB_VERSION}" ] && [ "${DB_VERSION}" != "1" ]; then
+          logError "181" "Database is not the expected version - found '${DB_VERSION}' but expected '${IS_DB_VERSION}'."
         else
-          logMessage "Database is the expected version - ${DB_VERSION}." 1
+          if [ "${DB_VERSION}" != "1" ]; then
+            logMessage "Database is the expected version - ${DB_VERSION}." 1
+          else
+            logMessage "DATABASE_RESTORE selected so skipping currDbVersion check." 1
+          fi
         fi
       else
         logMessage "Database currDbVersion is ${DB_VERSION}." 1
@@ -3874,7 +3880,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"181\",
-    \"cause\": \"Different versions of the Helix Service Management database are identified using the currDBVersion value in the control table. The discovered value is not the expected one for this version of Helix Service Management.\",
+    \"cause\": \"Different versions of the Helix Service Management database are identified using the currDbVersion value in the control table. The discovered value is not the expected one for this version of Helix Service Management.\",
     \"impact\": \"Helix Service Management deployment will fail or the server will not start.\",
     \"remediation\": \"If this is a fresh install verify that the correct database dump was restored. If this is an upgrade issue please contact BMC Support.\"
   },
