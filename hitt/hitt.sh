@@ -288,7 +288,7 @@ getVersions() {
   if [ "${OPENSHIFT_VERSION}" != "" ]; then
     logMessage "OpenShift version ${OPENSHIFT_VERSION}."
   fi
-  HELM_VERSION=$(helm version --short)
+  HELM_VERSION=$(helm version --short 2>/dev/null)
   logMessage "Helm version ${HELM_VERSION}."
   if [ -f /etc/os-release ]; then
     OS_NAME=$(grep "^NAME=" /etc/os-release | cut -d '=' -f2)
