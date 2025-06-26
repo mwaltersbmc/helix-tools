@@ -1161,7 +1161,7 @@ cloneCustomerConfigsRepo() {
     logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory." 1
   fi
   if [ ! -f "${INPUT_CONFIG_FILE}" ]; then
-    logError "130" "Input configuration file (${INPUT_CONFIG_FILE}) not found. Has the HELIX_GENERATE_CONFIG pipeline been run successfully?"
+    logError "130" "Input configuration file '${INPUT_CONFIG_FILE}' not found. Has the HELIX_GENERATE_CONFIG pipeline been run successfully?"
     SKIP_REPO=1
     return
   else
@@ -1395,9 +1395,9 @@ validateISDetails() {
     fi
 
     if [ "${IS_REGISTRY_TYPE}" != "DTR" ]; then
-      logError "146" "REGISTRY_TYPE must be DTR for onprem deployments. 'HARBOR' is only valid within BMC networks."
+      logError "146" "REGISTRY_TYPE must be 'DTR' for onprem deployments. 'HARBOR' is only valid within BMC networks."
     else
-      logMessage "REGISTRY_TYPE is the expected value of DTR." 1
+      logMessage "REGISTRY_TYPE is the expected value of 'DTR'." 1
     fi
 
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${HP_REGISTRY_SERVER}" ]; then
@@ -1411,9 +1411,9 @@ validateISDetails() {
     fi
 
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${HP_REGISTRY_USERNAME}" ]; then
-      logError "148" "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the Helix Platform registry username (${HP_REGISTRY_USERNAME})."
+      logError "148" "IMAGE_REGISTRY_USERNAME '${IS_IMAGE_REGISTRY_USERNAME}' does not match the Helix Platform registry username '${HP_REGISTRY_USERNAME}'."
     else
-      logMessage "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) matches the Helix Platform registry username (${HP_REGISTRY_USERNAME})." 1
+      logMessage "IMAGE_REGISTRY_USERNAME '${IS_IMAGE_REGISTRY_USERNAME}' matches the Helix Platform registry username '${HP_REGISTRY_USERNAME}'." 1
     fi
 
     if [ "${IS_DB_SSL_ENABLED}" == "true" ]; then
@@ -1551,6 +1551,7 @@ getCacertsFile() {
       else
         logMessage "Using default cacerts file from ITSM_REPO."
         cp -f itsmrepo/pipeline/tasks/cacerts sealcacerts
+        IS_CACERTS_SSL_TRUSTSTORE_PASSWORD="changeit"
       fi
     fi
   fi
