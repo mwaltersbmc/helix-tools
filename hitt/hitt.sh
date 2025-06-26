@@ -490,9 +490,9 @@ checkEFKClusterHealth() {
   EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c 'curl -sk -u elastic:"'"${HELIX_LOGGING_PASSWORD}"'" -X GET https://"'"${EFK_ELASTIC_SERVICENAME}"'":9200/_cluster/health')
   EFK_ELASTIC_STATUS=$(echo "${EFK_ELASTIC_JSON}" | ${JQ_BIN} -r '.status')
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
-    logError "113" "Helix Logging Elasticsearch problem. Check the ${EFK_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
+    logError "113" "Helix Logging Elasticsearch problem. Check the '${EFK_ELASTIC_SERVICENAME}' pods in Helix Platform namespace."
   else
-    logMessage "Helix Logging Elasticsearch (${EFK_ELASTIC_SERVICENAME}) appears healthy." 1
+    logMessage "Helix Logging Elasticsearch '${EFK_ELASTIC_SERVICENAME}' appears healthy." 1
   fi
 }
 
@@ -659,7 +659,7 @@ checkTenantRealms() {
   if ! echo "${TENANT_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     logError "117" "Helix IS realm '${REALM_NAME}' exists for tenant '${HP_TENANT}' when it should be configured for the SAAS_TENANT."
 #  else
-#    logMessage "Verified Helix IS realm (${REALM_NAME}) is not configured for tenant ${HP_TENANT}."
+#    logMessage "Verified Helix IS realm '${REALM_NAME}' is not configured for tenant ${HP_TENANT}."
   fi
 }
 
@@ -1186,13 +1186,13 @@ validateISDetails() {
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   # Common to pre and post
   if [ "${IS_TENANT_DOMAIN}" != "${REALM_TENANT}" ] && [ "${REALM_TENANT}" != "" ] ; then
-    logError "132" "TENANT_DOMAIN (${IS_TENANT_DOMAIN}) does not match the Helix Platform realm Tenant '${REALM_TENANT}'."
+    logError "132" "TENANT_DOMAIN '${IS_TENANT_DOMAIN}' does not match the Helix Platform realm Tenant '${REALM_TENANT}'."
   else
     logMessage "TENANT_DOMAIN matches the realm Tenant '${REALM_TENANT}'." 1
   fi
 
   if [ "${IS_RSSO_URL}" != "${RSSO_URL}" ]; then
-    logError "133" "The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline (${IS_RSSO_URL}) does not match the Helix Platform RSSO_URL (${RSSO_URL})."
+    logError "133" "The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline '${IS_RSSO_URL}' does not match the Helix Platform RSSO_URL '${RSSO_URL}'."
   else
     logMessage "IS RSSO_URL is the expected value of '${RSSO_URL}'." 1
   fi
@@ -1272,8 +1272,8 @@ validateISDetails() {
     fi
 
     if ! ${KUBECTL_BIN} config get-contexts "${IS_CLUSTER}" > /dev/null 2>&1; then
-      logError "137" "CLUSTER (${IS_CLUSTER}) is not a valid context in your kubeconfig file. Available contexts are:"
-      ${KUBECTL_BIN} config get-contexts
+      logError "137" "CLUSTER '${IS_CLUSTER}' is not a valid context in your kubeconfig file. Available contexts are:"
+      ${KUBECTL_BIN} config get-contexts 2>/dev/null
     else
       logMessage "CLUSTER '${IS_CLUSTER}' is a valid kubeconfig context." 1
     fi
@@ -1287,7 +1287,7 @@ validateISDetails() {
     fi
 
     if [ "${IS_IS_NAMESPACE}" != "${IS_NAMESPACE}" ]; then
-      logError "138" "The IS_NAMESPACE value (${IS_IS_NAMESPACE}) does not match the IS_NAMESPACE defined in the hitt.conf file (${IS_NAMESPACE})."
+      logError "138" "The IS_NAMESPACE value '${IS_IS_NAMESPACE}' does not match the IS_NAMESPACE defined in the hitt.conf file '${IS_NAMESPACE}'."
     else
       logMessage "IS_NAMESPACE is the expected value '${IS_NAMESPACE}'." 1
     fi
@@ -1304,14 +1304,14 @@ validateISDetails() {
     fi
 
     if [ "${ISP_CUSTOMER_SERVICE}-${ISP_ENVIRONMENT}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
-      logError "140" "CUSTOMER_SERVICE (${ISP_CUSTOMER_SERVICE}) and/or ENVIRONMENT (${ISP_ENVIRONMENT}) values do not match those set in the hitt.conf file - (${IS_CUSTOMER_SERVICE} and ${IS_ENVIRONMENT})."
+      logError "140" "CUSTOMER_SERVICE '${ISP_CUSTOMER_SERVICE}' and/or ENVIRONMENT '${ISP_ENVIRONMENT}' values do not match those set in the hitt.conf file - '${IS_CUSTOMER_SERVICE}' and '${IS_ENVIRONMENT}'."
     else
       logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid '${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT}'." 1
     fi
 
     if checkK8sAuth get ingressclasses; then
       if isBlank "${IS_INGRESS_CLASS}" || ! ${KUBECTL_BIN} get ingressclasses "${IS_INGRESS_CLASS}" > /dev/null 2>&1 ; then
-        logError "141" "INGRESS_CLASS (${IS_INGRESS_CLASS}) is blank or not valid."
+        logError "141" "INGRESS_CLASS '${IS_INGRESS_CLASS}' is blank or not valid."
       else
         logMessage "INGRESS_CLASS '${IS_INGRESS_CLASS}' appears valid." 1
       fi
@@ -1320,7 +1320,7 @@ validateISDetails() {
     fi
 
     if [ "${IS_CLUSTER_DOMAIN}" != "${CLUSTER_DOMAIN}" ]; then
-      logError "142" "CLUSTER_DOMAIN (${IS_CLUSTER_DOMAIN}) does not match that used for the Helix Platform (${CLUSTER_DOMAIN})."
+      logError "142" "CLUSTER_DOMAIN '${IS_CLUSTER_DOMAIN}' does not match that used for the Helix Platform '${CLUSTER_DOMAIN}'."
     else
       logMessage "CLUSTER_DOMAIN is the expected value of '${CLUSTER_DOMAIN}'." 1
     fi
@@ -1342,7 +1342,7 @@ validateISDetails() {
       if [ "${NODE_MATCH}" == 1"" ]; then
         logMessage "HELM_NODE '${IS_HELM_NODE}' is a valid node in Jenkins." 1
       else
-        logError "145" "HELM_NODE (${IS_HELM_NODE}) not found as a Jenkins node.  Available nodes are:"
+        logError "145" "HELM_NODE '${IS_HELM_NODE}' not found as a Jenkins node.  Available nodes are:"
         printf '%s\n' "${NODE_ARRAY[@]}"
       fi
     fi
@@ -1475,7 +1475,7 @@ validateISDetails() {
 
     if [ "$HELIX_LOGGING_DEPLOYED" == 1 ]; then
       if [ "${IS_LOGS_ELASTICSEARCH_TLS}" != "true" ]; then
-        logError "151" "LOGS_ELASTICSEARCH_TLS (${IS_LOGS_ELASTICSEARCH_TLS}) is not the expected value of true."
+        logError "151" "LOGS_ELASTICSEARCH_TLS '${IS_LOGS_ELASTICSEARCH_TLS}' is not the expected value of true."
       else
         logMessage "LOGS_ELASTICSEARCH_TLS is the expected value of true." 1
       fi
@@ -1509,27 +1509,27 @@ validateISDetails() {
     fi
 
     if [ -n "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" ] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ ^\[.* ]] && [[ ! "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ .*\]$ ]]; then
-      logError "155" "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS (${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}) does not match the expected format of [x.x.x.x] - missing square brackets?"
+      logError "155" "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS '${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}' does not match the expected format of [x.x.x.x] - missing square brackets?"
     else
-      logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - ${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}." 1
+      logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - '${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}'." 1
     fi
 
     if [ "${IS_RSSO_ADMIN_USER,,}" != "${RSSO_USERNAME,,}" ]; then
-      logError "156" "RSSO_ADMIN_USER (${IS_RSSO_ADMIN_USER}) does not match the Helix Platform RSSO_ADMIN_USER (${RSSO_USERNAME})."
+      logError "156" "RSSO_ADMIN_USER '${IS_RSSO_ADMIN_USER}' does not match the Helix Platform RSSO_ADMIN_USER '${RSSO_USERNAME}'."
     else
-      logMessage "RSSO_ADMIN_USER is the expected value of ${IS_RSSO_ADMIN_USER}." 1
+      logMessage "RSSO_ADMIN_USER is the expected value of '${IS_RSSO_ADMIN_USER}'." 1
     fi
 
     if [ "${IS_HELIX_PLATFORM_NAMESPACE}" != "${HP_NAMESPACE}" ]; then
-      logError "157" "HELIX_PLATFORM_NAMESPACE (${IS_HELIX_PLATFORM_NAMESPACE}) is not the expected value of ${HP_NAMESPACE}."
+      logError "157" "HELIX_PLATFORM_NAMESPACE '${IS_HELIX_PLATFORM_NAMESPACE}' is not the expected value of '${HP_NAMESPACE}'."
     else
-      logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of ${HP_NAMESPACE}." 1
+      logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of '${HP_NAMESPACE}'." 1
     fi
 
     if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ]; then
-      logError "158" "HELIX_PLATFORM_CUSTOMER_NAME (${IS_HELIX_PLATFORM_CUSTOMER_NAME}) is not the expected value of ${HP_COMPANY_NAME}."
+      logError "158" "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' is not the expected value of '${HP_COMPANY_NAME}'."
     else
-      logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of ${HP_COMPANY_NAME}." 1
+      logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of '${HP_COMPANY_NAME}'." 1
     fi
   fi
 }
@@ -1599,10 +1599,10 @@ validateCacerts() {
   fi
 
   if ! ${KEYTOOL_BIN} -list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
-    logError "162" "cacerts file does not contain the expected ${FTS_ELASTIC_CERTNAME} certificate required for FTS Elasticsearch connection."
+    logError "162" "cacerts file does not contain the expected '${FTS_ELASTIC_CERTNAME}' certificate required for FTS Elasticsearch connection."
     SKIP_CLEANUP=1
   else
-    logMessage "cacerts file contains the expected Elasticsearch ${FTS_ELASTIC_CERTNAME} certificate." 1
+    logMessage "cacerts file contains the expected Elasticsearch '${FTS_ELASTIC_CERTNAME}' certificate." 1
   fi
 
   # Convert JKS to pem
@@ -1638,7 +1638,7 @@ checkISFTSElasticHost() {
   # IP/service.ns pipeline_param_name
   if [ $(isIPAddress "${1}") == "0" ]; then
     if [ $(getSvcFromExternalIP "${1}") == "1" ]; then
-      logError "165" "FTS_ELASTICSEARCH_HOSTNAME IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
+      logError "165" "FTS_ELASTICSEARCH_HOSTNAME IP address '${1}' not found as an externalIP for any exposed service in the Helix Platform namespace."
     else
       logWarning "018" "Recommend using 'servicename.namespace' format instead of an exposed IP address for FTS_ELASTICSEARCH_HOSTNAME."
       # Try and confirm IP is a valid ES
@@ -1647,18 +1647,18 @@ checkISFTSElasticHost() {
         logError "166" "${1} does not appear to be a valid Elasticsearch server IP address."
       else
         if ! echo "${ES_HEALTH}" | ${JQ_BIN} -r '.cluster_name' | grep -q 'logs$' ; then
-          logError "167" "${1} does not appear to be the expected Elasticsearch service instance for FTS."
+          logError "167" "'${1}' does not appear to be the expected Elasticsearch service instance for FTS."
           echo "${ES_HEALTH}" | ${JQ_BIN} -r '.cluster_name'
         else
-          logMessage "${1} appears to be a valid Elasticsearch service instance for FTS." 1
+          logMessage "'${1}' appears to be a valid Elasticsearch service instance for FTS." 1
         fi
       fi
     fi
   else
     if [ "${1}" != "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-      logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of ${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}."
+      logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name '${1}' is not the expected value of '${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}'."
     else
-      logMessage "FTS_ELASTICSEARCH_HOSTNAME appears valid (${1})." 1
+      logMessage "FTS_ELASTICSEARCH_HOSTNAME appears valid '${1}'." 1
     fi
   fi
 }
@@ -1667,14 +1667,14 @@ checkIsValidElastic() {
   BAD_ELASTIC=0
   if [ $(isIPAddress "${1}") == "0" ]; then
     if [ $(getSvcFromExternalIP "${1}") == "1" ]; then
-      logError "169" "${2} IP address (${1}) not found as an externalIP for any exposed service in the Helix Platform namespace."
+      logError "169" "${2} IP address '${1}' not found as an externalIP for any exposed service in the Helix Platform namespace."
       return
     else
       logWarning "019" "Recommend using 'servicename.namespace' format instead of an exposed IP address for ${2}."
       # Try and confirm IP is a valid ES
       ES_HEALTH=$(${CURL_BIN} -sk -u "${3}:${4}" -X GET https://"${1}":9200/_cluster/health)
       if [ -z "${ES_HEALTH}" ]; then
-        logError "170" "${1} does not appear to be a valid Elasticsearch server IP address."
+        logError "170" "'${1}' does not appear to be a valid Elasticsearch server IP address."
         return
       fi
     fi
@@ -1682,12 +1682,12 @@ checkIsValidElastic() {
     case "${2}" in
       FTS_ELASTICSEARCH_HOSTNAME)
         if [ "${1}" != "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of '${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}'."
+          logError "168" "FTS_ELASTICSEARCH_HOSTNAME service name '${1}' is not the expected value of '${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}'."
         fi
         ;;
       LOGS_ELASTICSEARCH_HOSTNAME)
         if [ "${1}" != "${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "172" "LOGS_ELASTICSEARCH_HOSTNAME service name (${1}) is not the expected value of '${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}'."
+          logError "172" "LOGS_ELASTICSEARCH_HOSTNAME service name '${1}' is not the expected value of '${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}'."
         fi
         ;;
     esac
@@ -1703,14 +1703,14 @@ checkFTSElasticSettings() {
   BAD_FTS_ELASTIC=0
   logMessage "FTS_ELASTICSEARCH_USERNAME is '${IS_FTS_ELASTICSEARCH_USERNAME}'." 1
   if [ "${IS_FTS_ELASTICSEARCH_PORT}" != "9200" ]; then
-    logError "173 ""FTS_ELASTICSEARCH_PORT (${IS_FTS_ELASTICSEARCH_PORT}) is not the expected value of 9200."
+    logError "173 ""FTS_ELASTICSEARCH_PORT '${IS_FTS_ELASTICSEARCH_PORT}' is not the expected value of 9200."
     BAD_FTS_ELASTIC=1
   else
-    logMessage "FTS_ELASTICSEARCH_PORT is the expected value of 9200." 1
+    logMessage "FTS_ELASTICSEARCH_PORT is the expected value of '9200'." 1
   fi
 
   if [ "${IS_FTS_ELASTICSEARCH_SECURE}" != "true" ]; then
-    logError "174" "FTS_ELASTICSEARCH_SECURE (${IS_FTS_ELASTICSEARCH_SECURE}) is not the expected value of 'true'."
+    logError "174" "FTS_ELASTICSEARCH_SECURE '${IS_FTS_ELASTICSEARCH_SECURE}' is not the expected value of 'true'."
     BAD_FTS_ELASTIC=1
   else
     logMessage "FTS_ELASTICSEARCH_SECURE is the expected value of 'true'." 1
@@ -1879,11 +1879,11 @@ fi
 
 checkISDBSettings() {
   if ! testNetConnection "${IS_DATABASE_HOST_NAME}" "${IS_DB_PORT}"; then
-    logWarning "027" "IS DB server (${IS_DATABASE_HOST_NAME}) is not reachable on port ${IS_DB_PORT} - this is expected if there is no connectivity from the Deployment Engine - skipping DB checks."
+    logWarning "027" "IS DB server '${IS_DATABASE_HOST_NAME}' is not reachable on port '${IS_DB_PORT}' - this is expected if there is no connectivity from the Deployment Engine - skipping DB checks."
     SKIP_SR_DB_CHECKS=1
     return
   else
-    logMessage "IS DB server (${IS_DATABASE_HOST_NAME}) is reachable on port ${IS_DB_PORT}." 1
+    logMessage "IS DB server '${IS_DATABASE_HOST_NAME}' is reachable on port '${IS_DB_PORT}'." 1
   fi
   checkISDBLatency
   if [ -z "${IS_AR_DB_USER}" ] || [ -z "${IS_AR_DB_PASSWORD}" ]; then
@@ -1996,14 +1996,14 @@ reportResults() {
 checkKubeconfig() {
   KUBECONFIG_ERROR=0
   if [ ! -f ~/.kube/config ]; then
-    logError "186" "Default KUBECONFIG file (~/.kube/config) required by Jenkins pipelines not found."
+    logError "186" "Default KUBECONFIG file '~/.kube/config' required by Jenkins pipelines not found."
     KUBECONFIG_ERROR=1
   fi
   if ! ${KUBECTL_BIN} version > /dev/null 2>&1; then
     logError "184" "'kubectl version' command returned an error - unable to continue." 1
   fi
   if [ ! -z "${KUBECONFIG}" ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
-    logError "185" "KUBECONFIG environment variable is set (${KUBECONFIG}) but is not the default of ${HOME}/.kube/config required by Jenkins."
+    logError "185" "KUBECONFIG environment variable is set '${KUBECONFIG}' but is not the default of '${HOME}/.kube/config' required by Jenkins."
     KUBECONFIG_ERROR=1
   fi
   if [ ${KUBECONFIG_ERROR} == "0" ]; then
@@ -2025,7 +2025,7 @@ getRegistryDetailsFromSecret() {
   REGISTRY_PASSWORD=""
   IMAGESECRET_JSON=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o jsonpath='{.data.\.dockerconfigjson}' 2>/dev/null | ${BASE64_BIN} -d)
   if [ "${IMAGESECRET_JSON}" = "" ]; then
-    logError "187" "Failed to get registry details from ${2} secret in ${1} namespace."
+    logError "187" "Failed to get registry details from '${2}' secret in '${1}' namespace."
     SKIP_REGISTRY=1
     return
   fi
@@ -2082,11 +2082,11 @@ checkISDockerLogin() {
 
   if [ "${MODE}" == "pre-is" ]; then
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${IS_SECRET_HARBOR_REGISTRY_HOST}" ]; then
-      logError "190" "HARBOR_REGISTRY_HOST (${IS_HARBOR_REGISTRY_HOST}) does not match the value in the registry secret (${IS_SECRET_HARBOR_REGISTRY_HOST})."
+      logError "190" "HARBOR_REGISTRY_HOST '${IS_HARBOR_REGISTRY_HOST}' does not match the value in the registry secret '${IS_SECRET_HARBOR_REGISTRY_HOST}'."
       return
     fi
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" ]; then
-      logError "190" "IMAGE_REGISTRY_USERNAME (${IS_IMAGE_REGISTRY_USERNAME}) does not match the value in the registry secret (${IS_SECRET_IMAGE_REGISTRY_USERNAME})."
+      logError "190" "IMAGE_REGISTRY_USERNAME '${IS_IMAGE_REGISTRY_USERNAME}' does not match the value in the registry secret '${IS_SECRET_IMAGE_REGISTRY_USERNAME}'."
       return
     fi
 #    if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" ]; then
@@ -2301,7 +2301,7 @@ checkHITTconf() {
       CONF_UPDATED=1
     fi
   done < <(grep '.=' .hitt.conf)
-  [[ $CONF_UPDATED == 1 ]] && logStatus "${GREEN}HITT config file (${1}) has been updated with a new parameter.${NORMAL}"
+  [[ $CONF_UPDATED == 1 ]] && logStatus "${GREEN}HITT config file '${1}' has been updated with a new parameter.${NORMAL}"
 }
 
 createPipelineNamesArray() {
@@ -2730,12 +2730,12 @@ checkDERequirements() {
       logError "216" "Unable to determine the version of ansible using the command 'ansible --version'."
     else
       if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
-        logError "208" "The installed version of ansible (${ANSIBLE_VERSION}) is not supported - required version must be no greater than ${MAX_ANSIBLE_VERSION}."
+        logError "208" "The installed version of ansible '${ANSIBLE_VERSION}' is not supported - required version must be no greater than '${MAX_ANSIBLE_VERSION}'."
       else
         logMessage "Using ansible version - ${ANSIBLE_VERSION}"
         if ! isJmespathInstalled ; then
           ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
-          logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible (${ANSIBLE_PYTHON_VERSION})."
+          logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible '${ANSIBLE_PYTHON_VERSION}'."
         fi
       fi
     fi
@@ -2743,7 +2743,7 @@ checkDERequirements() {
     ANSIBLE_CFG_FILE=/etc/ansible/ansible.cfg
     ANSIBLE_CFG_MISSING=""
     if [ ! -f "${ANSIBLE_CFG_FILE}" ]; then
-      logError "210" "Ansible configuration file (${ANSIBLE_CFG_FILE}) not found - skipping checks."
+      logError "210" "Ansible configuration file '${ANSIBLE_CFG_FILE}' not found - skipping checks."
     else
       logMessage "Checking ansible configuration file - ${ANSIBLE_CFG_FILE}." 1
       ANSIBLE_CFG_VALS=(bin_ansible_callbacks=true stdout_callback=yaml host_key_checking=false ssh_args=-ocontrolmaster=auto retries=3 pipelining=true)
@@ -2817,10 +2817,10 @@ checkKubeconfig
 if [ ! -f "${HITT_CONFIG_FILE}" ]; then
   if ! ${KUBECTL_BIN} get ns > /dev/null 2>&1 ; then
     createHITTconf "${HITT_CONFIG_FILE}"
-    logError "199" "'kubectl get namespaces' command returned unexpected results - please update the HITT config file (${HITT_CONFIG_FILE}) manually." 1
+    logError "199" "'kubectl get namespaces' command returned unexpected results - please update the HITT config file '${HITT_CONFIG_FILE}' manually." 1
   fi
   NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
-  logStatus "HITT config file (${HITT_CONFIG_FILE}) not found - creating..."
+  logStatus "HITT config file '${HITT_CONFIG_FILE}' not found - creating..."
   logStatus "Please use the following steps to configure the HITT and create your config file..."
   getConfValues
   createHITTconf "${HITT_CONFIG_FILE}"
