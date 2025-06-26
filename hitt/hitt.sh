@@ -512,7 +512,7 @@ getTenantDetails() {
     HP_TENANT="${TENANT_ARRAY[0]}"
   fi
 
-  logMessage "Helix Platform tenant is ${HP_TENANT}."
+  logMessage "Helix Platform tenant is '${HP_TENANT}'."
   PORTAL_HOSTNAME=$(echo "${TENANT_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${HP_TENANT}'").host')
   if isTenantActivated ; then
     logMessage "Tenant has been activated."
@@ -2413,6 +2413,10 @@ checkJenkinsGlobalLibs() {
           REPO_PATH=$(echo "/${LIB_PATH#*/}")
           if [ ! -d "${REPO_PATH}" ]; then
             logError "234" "The .git repo directory in the 'Project Repository' value of the '${LIB_NAME}' global pipeline library does not exist.  Verify the path to the directory."
+          else
+            if [ "${REPO_PATH##*/}" != "${i}.git" ]; then
+              logError "246" "'${REPO_PATH##*/}' is not the expected git repository for this global library - expected '${i}.git'."
+            fi
           fi
         fi
       fi
@@ -4275,6 +4279,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"Either or both of the named pipeline parameters are blank.\",
     \"impact\": \"Deployment will fail and some HITT checks have been skipped.\",
     \"remediation\": \"Set the missing values in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+  },
+  {
+    \"id\": \"246\",
+    \"cause\": \"The 'Project Repository' value for the named Global Pipeline Library does not reference the expected .git directory.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Set the correct 'Project Repository' value for the named Global Pipeline Library.\"
   }
 ]"
 
