@@ -1550,7 +1550,6 @@ getCacertsFile() {
       else
         logMessage "Using default cacerts file from ITSM_REPO."
         cp -f itsmrepo/pipeline/tasks/cacerts sealcacerts
-        IS_CACERTS_SSL_TRUSTSTORE_PASSWORD="changeit"
       fi
     fi
   fi
@@ -1587,6 +1586,10 @@ validateCacerts() {
     return
   else
     logMessage "cacerts file is a valid Java keystore." 1
+  fi
+
+  if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" == "" ]; then
+    IS_CACERTS_SSL_TRUSTSTORE_PASSWORD="changeit"
   fi
 
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "changeit" ]; then
