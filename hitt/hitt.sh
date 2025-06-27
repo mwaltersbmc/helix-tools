@@ -221,9 +221,9 @@ checkNamespaceExists() {
   if checkK8sAuth get ns; then
   # namespace_name - exit if not found
     if ! ${KUBECTL_BIN} get ns "${1}" > /dev/null 2>&1 ; then
-      logError "106" "${NS_TYPE} namespace ${1} not found." 1
+      logError "106" "${NS_TYPE} namespace '${1}' not found." 1
     else
-      logMessage "${NS_TYPE} namespace ${1} found." 1
+      logMessage "${NS_TYPE} namespace '${1}' found." 1
       checkNSResourceQuotas "${1}"
     fi
   else
@@ -283,13 +283,13 @@ logDescribePod() {
 }
 
 getVersions() {
-  logMessage "Kubernetes version ${K8S_VERSION}."
-  logMessage "kubectl version ${KUBECTL_VERSION}."
+  logMessage "Kubernetes version '${K8S_VERSION}'."
+  logMessage "kubectl version '${KUBECTL_VERSION}'."
   if [ "${OPENSHIFT_VERSION}" != "" ]; then
-    logMessage "OpenShift version ${OPENSHIFT_VERSION}."
+    logMessage "OpenShift version '${OPENSHIFT_VERSION}'."
   fi
   HELM_VERSION=$(helm version --short 2>/dev/null)
-  logMessage "Helm version ${HELM_VERSION}."
+  logMessage "Helm version '${HELM_VERSION}'."
   if [ -f /etc/os-release ]; then
     OS_NAME=$(grep "^NAME=" /etc/os-release | cut -d '=' -f2)
     OS_VERSION=$(grep "^VERSION=" /etc/os-release | cut -d '=' -f2)
@@ -305,7 +305,7 @@ getVersions() {
 
   if [ "${MODE}" == "post-is" ]; then
     IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
-    logMessage "Helix IS version ${IS_VERSION}."
+    logMessage "Helix IS version '${IS_VERSION}'."
     setISDBVersion "${IS_VERSION}"
   fi
 }
@@ -450,9 +450,9 @@ setVarsFromPlatform() {
 getRSSODetails() {
   RSSO_ADMIN_TAS_CM=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm rsso-admin-tas -o json)
   RSSO_URL=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.rssourl + "/rsso"')
-  logMessage "RSSO URL is ${RSSO_URL}." 1
+  logMessage "RSSO URL is '${RSSO_URL}'." 1
   RSSO_USERNAME=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.username')
-  logMessage "RSSO username is ${RSSO_USERNAME}." 1
+  logMessage "RSSO username is '${RSSO_USERNAME}'." 1
   RSSO_PASSWORD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret rsso-admin-tas -o jsonpath='{.data.password}' | ${BASE64_BIN} -d)
   RSSO_TOKEN_JSON=$(${CURL_BIN} -sk -X POST "${RSSO_URL}"/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"'"${RSSO_USERNAME}"'","password":"'"${RSSO_PASSWORD}"'"}')
   if [[ "${RSSO_TOKEN_JSON}" =~ "admin_token" ]]; then
@@ -465,7 +465,7 @@ getRSSODetails() {
 
 getDomain() {
   CLUSTER_DOMAIN=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="DOMAIN_NAME")].value}')
-  [[ "${MODE}" =~ ^p ]] && logMessage "Helix domain is ${CLUSTER_DOMAIN}."
+  [[ "${MODE}" =~ ^p ]] && logMessage "Helix domain is '${CLUSTER_DOMAIN}'."
 }
 
 checkHelixLoggingDeployed() {
@@ -676,7 +676,7 @@ validateRealm() {
   if [ "${REALM_ARPORT}" != "46262" ]; then
     logError "119" "Invalid arPort in realm - expected 46262 but found ${REALM_ARPORT}."
   else
-    logMessage "AR port ${REALM_ARPORT} is the expected value." 1
+    logMessage "AR port '${REALM_ARPORT}' is the expected value." 1
   fi
   REALM_TENANT=$(echo "${RSSO_REALM}" | ${JQ_BIN} -r .tenantDomain)
   if [ "${REALM_TENANT}" == "" ]; then
@@ -692,7 +692,7 @@ validateRealm() {
   BAD_DOMAINS=0
   validateRealmDomains
   if [ "${BAD_DOMAINS}" == "1" ]; then
-    logMessage "Application Domains found in SSO Realm ${REALM_NAME} are:"
+    logMessage "Application Domains found in SSO Realm '${REALM_NAME}' are:"
     printf '  %s\n' "${REALM_DOMAINS[@]}"
   fi
 }
@@ -1175,9 +1175,9 @@ isBlank() {
 
 checkBlank() {
   if isBlank "${!1}"; then
-    logError "131" "Value for ${1:3} is not expected to be blank."
+    logError "131" "Value for '${1:3}' is not expected to be blank."
   else
-    logMessage "Value set for ${1:3}." 1
+    logMessage "Value set for '${1:3}'." 1
   fi
 }
 
@@ -1216,9 +1216,9 @@ validateISDetails() {
 
   # PRE mode only
   if [ "${MODE}" == "pre-is" ]; then
-    logMessage "ITSM pipeline version is ${IS_PLATFORM_HELM_VERSION}."
-    logMessage "CUSTOMER_SIZE is ${IS_CUSTOMER_SIZE}."
-    logMessage "DEPLOYMENT_MODE is ${IS_DEPLOYMENT_MODE}."
+    logMessage "ITSM pipeline version is '${IS_PLATFORM_HELM_VERSION}'."
+    logMessage "CUSTOMER_SIZE is '${IS_CUSTOMER_SIZE}'."
+    logMessage "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
 
     if [ "${IS_CHECKOUT_USING_USER}" != "github" ]; then
       logError "220" "CHECKOUT_USING_USER is not set to the expected value of the Jenkins credentials ID used to access the git repository files - usually 'github'."
@@ -1327,7 +1327,7 @@ validateISDetails() {
     if [ "${IS_INPUT_CONFIG_METHOD}" != "Generate_Input_File" ]; then
       logError "143" "INPUT_CONFIG_METHOD should be Generate_Input_File."
     else
-      logMessage "INPUT_CONFIG_METHOD is the expected value of Generate_Input_File." 1
+      logMessage "INPUT_CONFIG_METHOD is the expected value of 'Generate_Input_File'." 1
     fi
 
     if isBlank "${IS_HELM_NODE}" ; then
@@ -1910,7 +1910,7 @@ checkISDBSettings() {
     logMessage "Unpacking dbjars.tgz..." 1
     ${TAR_BIN} zxf dbjars.tgz
     buildJISQLcmd
-    logMessage "Connecting to ${JISQLURL} as ${JISQL_USERNAME}..." 1
+    logMessage "Connecting to '${JISQLURL}' as '${JISQL_USERNAME}'..." 1
     # Note - new line is needed to avoid Java heap errors from jisql
     if [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "true" ]; then
       SQL_RESULT=$($JISQLCMD "select 1
@@ -1931,13 +1931,13 @@ checkISDBSettings() {
           logError "181" "Database is not the expected version - found '${DB_VERSION}' but expected '${IS_DB_VERSION}'."
         else
           if [ "${DB_VERSION}" != "1" ]; then
-            logMessage "Database is the expected version - ${DB_VERSION}." 1
+            logMessage "Database is the expected version - '${DB_VERSION}'." 1
           else
             logMessage "DATABASE_RESTORE selected so skipping currDbVersion check." 1
           fi
         fi
       else
-        logMessage "Database currDbVersion is ${DB_VERSION}." 1
+        logMessage "Database currDbVersion is '${DB_VERSION}'." 1
       fi
     fi
 
@@ -2049,7 +2049,7 @@ getRegistryDetailsFromIS() {
 
 checkHPRegistryDetails() {
   getRegistryDetailsFromHP
-  logMessage "Helix Platform IMAGE_REGISTRY_HOST is ${HP_REGISTRY_SERVER} and IMAGE_REGISTRY_USERNAME is ${HP_REGISTRY_USERNAME}." 1
+  logMessage "Helix Platform IMAGE_REGISTRY_HOST is '${HP_REGISTRY_SERVER}' and IMAGE_REGISTRY_USERNAME is '${HP_REGISTRY_USERNAME}'." 1
 }
 
 checkISDBLatency() {
@@ -2057,7 +2057,7 @@ checkISDBLatency() {
     logMessage "DATABASE_HOST_NAME not set - can't test IS DB latency."
     return
   fi
-  logMessage "Attempting to test latency between cluster and IS DB server ${IS_DATABASE_HOST_NAME}..."
+  logMessage "Attempting to test latency between cluster and IS DB server '${IS_DATABASE_HOST_NAME}'..."
   PING_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pod --no-headers -l app=rsso -o custom-columns=:metadata.name --field-selector status.phase=Running | head -1)
   if [ ! -z "${PING_POD}" ]; then
     PING_RESULT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PING_POD}" -- ping "${IS_DATABASE_HOST_NAME}" -c 3 -q | tail -1)
@@ -2107,9 +2107,9 @@ checkISDockerLogin() {
     return
   fi
   if docker login "${IS_SECRET_HARBOR_REGISTRY_HOST}" -u "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" -p "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" > /dev/null 2>&1 ; then
-    logMessage "IMAGE_REGISTRY credentials are valid - docker login to ${IS_SECRET_HARBOR_REGISTRY_HOST} was successful." 1
+    logMessage "IMAGE_REGISTRY credentials are valid - docker login to '${IS_SECRET_HARBOR_REGISTRY_HOST}' was successful." 1
   else
-    logError "192" "'docker login' to ${IS_SECRET_HARBOR_REGISTRY_HOST} failed - please check credentials."
+    logError "192" "'docker login' to '${IS_SECRET_HARBOR_REGISTRY_HOST}' failed - please check credentials."
   fi
 }
 
@@ -2615,13 +2615,13 @@ esac
 
 getPods() {
   # ns name
-  logMessage "Getting pods from ${1}..." 1
+  logMessage "Getting pods from '${1}'..." 1
   ${KUBECTL_BIN} -n ${1} get pods -o wide 2>/dev/null > k8s-get-pods-${1}.log
 }
 
 getEvents() {
   # ns name
-  logMessage "Getting events from ${1}..." 1
+  logMessage "Getting events from '${1}'..." 1
   ${KUBECTL_BIN} -n ${1} events --sort-by='.lastTimestamp' 2>/dev/null > k8s-events-${1}.log
 }
 
@@ -2738,7 +2738,7 @@ checkDERequirements() {
       if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
         logError "208" "The installed version of ansible '${ANSIBLE_VERSION}' is not supported - required version must be no greater than '${MAX_ANSIBLE_VERSION}'."
       else
-        logMessage "Using ansible version - ${ANSIBLE_VERSION}"
+        logMessage "Using ansible version - '${ANSIBLE_VERSION}'"
         if ! isJmespathInstalled ; then
           ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
           logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible '${ANSIBLE_PYTHON_VERSION}'."
@@ -2751,7 +2751,7 @@ checkDERequirements() {
     if [ ! -f "${ANSIBLE_CFG_FILE}" ]; then
       logError "210" "Ansible configuration file '${ANSIBLE_CFG_FILE}' not found - skipping checks."
     else
-      logMessage "Checking ansible configuration file - ${ANSIBLE_CFG_FILE}." 1
+      logMessage "Checking ansible configuration file - '${ANSIBLE_CFG_FILE}'." 1
       ANSIBLE_CFG_VALS=(bin_ansible_callbacks=true stdout_callback=yaml host_key_checking=false ssh_args=-ocontrolmaster=auto retries=3 pipelining=true)
       ANSIBLE_CFG=$(cat /etc/ansible/ansible.cfg | tr -d ' ')
       for i in "${ANSIBLE_CFG_VALS[@]}"; do
