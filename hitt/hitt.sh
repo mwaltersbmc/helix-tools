@@ -106,7 +106,7 @@ usage() {
     echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is|jenkins>${NORMAL}"
     echo ""
     echo "Examples:"
-    echo "bash $0 -m post-hp   - run post HP installation only checks"
+    echo "bash $0 -m post-hp  - run post HP installation only checks"
     echo "OR"
     echo "bash $0 -m pre-is   - run pre-installation checks"
     echo "OR"

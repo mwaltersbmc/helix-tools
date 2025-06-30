@@ -34,7 +34,7 @@ There are some optional tests that will attempt to validate the Helix IS databas
 
 HITT is configured by a file called `hitt.conf` which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.  If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used. There is also a section where you can enter details about your Jenkins which may be left as-is unless it requires credentials, uses https, or is running on a non-default port. Enclose the `JENKINS_USERNAME` and `JENKINS_PASSWORD` values in single quotes.  If your Jenkins is configured to use SSL change the `JENKINS_PROTOCOL` to `https` and set the `JENKINS_PORT` appropriately.
 
-The hitt.conf file:
+The `hitt.conf` file:
 
 ```
 # REQUIRED SETTINGS
@@ -70,7 +70,7 @@ chmod a+x hitt.sh
 ./hitt.sh
 ```
 
-HITT requires one command line option (-m) to specify the operating mode, unless being used for tctl commands, and will print a usage message if this is not provided.
+HITT requires one command line option (`-m`) to specify the operating mode, unless being used for tctl commands, and will print a usage message if this is not provided.
 
 ```bash
 bash hitt.sh
