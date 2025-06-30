@@ -3849,19 +3849,19 @@ ALL_MSGS_JSON="[
   {
     \"id\": \"173\",
     \"cause\": \"The FTS_ELASTICSEARCH_PORT must be 9200.\",
-    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be accessible.\",
+    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be inaccessible.\",
     \"remediation\": \"Set the value to 9200.\"
   },
   {
     \"id\": \"174\",
     \"cause\": \"The FTS_ELASTICSEARCH_SECURE option must be selected.\",
-    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be accessible.\",
+    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be inaccessible.\",
     \"remediation\": \"Select the value.\"
   },
   {
     \"id\": \"175\",
     \"cause\": \"The FTS_ELASTICSEARCH_USER_PASSWORD value does not match the value set in the Helix Platform.\",
-    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be accessible.\",
+    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be inaccessible.\",
     \"remediation\": \"Set the value to the correct password.\"
   },
   {
