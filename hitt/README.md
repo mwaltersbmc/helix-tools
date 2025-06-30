@@ -9,8 +9,7 @@ The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic c
 Run the following commands as the `git` user:
 
 ```bash
-mkdir hitt && cd hitt
-curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
+mkdir hitt && cd hitt && curl -sO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz   # Optional, enables DB validation
 ```
 
@@ -181,8 +180,8 @@ There are several extra command line switches which may be helpful for troublesh
 
 `-c`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not delete temporary files after execution.\
 `-d`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enables `set -x` debugging output.\
-`-e #`&nbsp;&nbsp;&nbsp;&nbsp;Exit script on the specified error number `#`.  Use `-e 0` to stop on the first error.\
-`-j`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
+`-e #`&nbsp;&nbsp;&nbsp;Exit script on the specified error number `#`.  Use `-e 0` to stop on the first error.\
+`-j`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
 `-p`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output pipeline passwords in the `values.log` file when running in pre-is mode.\
 `-q`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\
 `-v`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging.\
