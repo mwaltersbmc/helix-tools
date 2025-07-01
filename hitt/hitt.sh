@@ -1066,7 +1066,6 @@ getPipelinePasswords() {
     }
     def jsonOutput = new groovy.json.JsonBuilder(paramMap).toPrettyString()
     println(jsonOutput)'
-
   runJenkinsCurl "${SCRIPT}"
 }
 
@@ -1092,6 +1091,17 @@ runJenkinsSSH() {
     println output"
   runJenkinsCurl "${SCRIPT}"
 }
+
+setVarsFromPipelineJSON() {
+  # Parse and export variables
+for key in $(echo "$json" | jq -r 'keys[]'); do
+    value=$(echo "$json" | jq -r --arg key "$key" '.[$key]')
+    varname="IS_$key"
+    export "$varname=$value"
+    echo "$varname=$value"
+done
+}
+
 
 getPipelineValues() {
   createPipelineVarsArray
@@ -2443,6 +2453,23 @@ checkJenkinsGlobalLibs() {
   fi
 }
 
+getPipelineValuesJSON() {
+  SCRIPT='import groovy.json.JsonOutput
+    import hudson.model.ParametersAction
+    def jobName = "HELIX_ONPREM_DEPLOYMENT"
+    def job = Jenkins.instance.getItemByFullName(jobName)
+    def lastBuild = job.getLastCompletedBuild()
+    def paramsAction = lastBuild.getAction(ParametersAction)
+    def paramMap = [:]
+    paramsAction.getParameters().each { param ->
+        paramMap[param.getName()] = param.getValue().toString()
+    }
+    def json = JsonOutput.prettyPrint(JsonOutput.toJson(paramMap))
+    println json'
+  runJenkinsCurl "${SCRIPT}"
+}
+
+
 getPipelineDefaults() {
   SCRIPT="import groovy.json.JsonOutput
     def jobName = '${1}'
@@ -2498,7 +2525,6 @@ getJenkinsCredentials() {
         }
     }
     println groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(credentialsList))'
-
   runJenkinsCurl "${SCRIPT}"
 }
 
@@ -2624,7 +2650,7 @@ getPods() {
 getEvents() {
   # ns name
   logMessage "Getting events from '${1}'..." 1
-  ${KUBECTL_BIN} -n ${1} events --sort-by='.lastTimestamp' 2>/dev/null > k8s-events-${1}.log
+  ${KUBECTL_BIN} -n ${1} events 2>/dev/null > k8s-events-${1}.log
 }
 
 getMessageJSON() {
@@ -2641,7 +2667,7 @@ getMessageDetails() {
 
 printMessageDetails() {
   printf "\n"
-  printf "${BOLD}Message:${NORMAL} ${MSG}\n"
+  [[ -n "${MSG}" ]] && printf "${BOLD}Message:${NORMAL} ${MSG}\n"
   printf "${BOLD}${YELLOW}Cause:${NORMAL} ${cause}\n"
   printf "${BOLD}${RED}Impact:${NORMAL} ${impact}\n"
   printf "${BOLD}${GREEN}Remediation:${NORMAL} ${remediation}\n"
@@ -4214,7 +4240,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"234\",
-    \"cause\": \"The directory in the 'Remote Repository' value for the named global pipeline library is invalid please make sure the path is correct.\",
+    \"cause\": \"The directory in the 'Remote Repository' value for the named global pipeline library is invalid. Please make sure the path is correct.\",
     \"impact\": \"Pipeline builds will fail.\",
     \"remediation\": \"Browse to Manage Jenkins -> System and update the pipeline library definition with the correct path to the .git directory.\"
   },
@@ -4306,6 +4332,12 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
       ;;
     e)
       STOP_ON_ERROR="${OPTARG}"
+      if [ $# -eq 2 ]; then
+        getMessageJSON "${2}"
+        getMessageDetails
+        printMessageDetails | tail -n +1
+        exit
+      fi
       ;;
     f)
       HITT_CONFIG_FILE=${OPTARG}
