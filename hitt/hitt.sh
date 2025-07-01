@@ -2293,7 +2293,7 @@ checkForNewHITT() {
     REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
     LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
     if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
-      logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -sL https://bit.ly/hitt-sh -o hitt.sh${NORMAL}"
+      logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -sO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh${NORMAL}"
       echo
       read -r -s -n1 -t3 -p"Press any key to continue or Ctrl+C to cancel..."
       echo
