@@ -1584,6 +1584,7 @@ getCacertsFile() {
 }
 
 validateCacerts() {
+  VALID_CACERTS=0
   getCacertsFile
   if [ "${SKIP_CACERTS}" == "1" ]; then
     logMessage "cacerts file not found - skipping checks."
@@ -1612,7 +1613,7 @@ validateCacerts() {
 
   if ! ${KEYTOOL_BIN} -list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
     logError "162" "cacerts file does not contain the expected '${FTS_ELASTIC_CERTNAME}' certificate required for FTS Elasticsearch connection."
-    SKIP_CLEANUP=1
+    VALID_CACERTS=1
   else
     logMessage "cacerts file contains the expected Elasticsearch '${FTS_ELASTIC_CERTNAME}' certificate." 1
   fi
@@ -1620,8 +1621,7 @@ validateCacerts() {
   # Convert JKS to pem
   logMessage "Processing cacerts..."
   unpackSSLPoke
-  VALID_CACERTS=0
-#  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
+  #  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
 #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
 #  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
   if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" ${JAVA_PROXY_STRING} SSLPoke "${LB_HOST}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
@@ -2293,7 +2293,7 @@ checkForNewHITT() {
     REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
     LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
     if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
-      logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -sO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh${NORMAL}"
+      logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -sO ${HITT_URL}${NORMAL}"
       echo
       read -r -s -n1 -t3 -p"Press any key to continue or Ctrl+C to cancel..."
       echo
