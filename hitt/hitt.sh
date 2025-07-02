@@ -1588,11 +1588,13 @@ validateCacerts() {
   getCacertsFile
   if [ "${SKIP_CACERTS}" == "1" ]; then
     logMessage "cacerts file not found - skipping checks."
+    VALID_CACERTS=1
     return
   fi
   CACERTS_FILETYPE=$(file sealcacerts | cut -f 2- -d ' ')
   if [ "${CACERTS_FILETYPE,,}" != "java keystore" ]; then
     logError "161" "cacerts file is of type '${CACERTS_FILETYPE}' and not the expected Java keystore."
+    VALID_CACERTS=1
     SKIP_CLEANUP=1
     return
   else
@@ -2103,13 +2105,13 @@ EOF
     )
     if [ "${PING_RESULT}" != "FAILED" ]; then
       IS_DB_LATENCY="${PING_RESULT}"
-      logMessage "IS DB latency from cluster is ${IS_DB_LATENCY}ms."
+      logMessage "IS DB latency from ${PING_NAMESPACE}/${PING_POD} is ${IS_DB_LATENCY}ms."
       if compare "${IS_DB_LATENCY} <= 1" ; then logMessage "Latency is ${BOLD}GOOD${NORMAL}." ; return ; fi
       if compare "${IS_DB_LATENCY} <= 3" ; then logMessage "Latency is ${BOLD}AVERAGE${NORMAL}." ; return ; fi
       if compare "${IS_DB_LATENCY} <= 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted." ; return ; fi
       if compare "${IS_DB_LATENCY} > 6" ; then logMessage "Latency is ${BOLD}VERY POOR${NORMAL}. Performance will be impacted." ; return ; fi
     else
-      logError "188" "Unexpected response from IS DB latency test.  Is the DATABASE_HOST_NAME '${IS_DATABASE_HOST_NAME}' accessible from the '${PING_POD}' pod?"
+      logError "188" "Unexpected response from IS DB latency test.  Is the DATABASE_HOST_NAME '${IS_DATABASE_HOST_NAME}' accessible from the '${PING_NAMESPACE}/${PING_POD}' pod?"
     fi
   fi
 }
@@ -2867,6 +2869,25 @@ getPodNameByLabel() {
   # namespace label-filter
   ${KUBECTL_BIN} -n "${1}" get pod -l "${2}" -o custom-columns=:metadata.name --no-headers
 }
+
+updateISCacerts() {
+  if [ ! -f "${NEWCACERTS}" ]; then
+    logError "999" "New cacerts file '${NEWCACERTS}' not found." 1
+  fi
+  cp "${NEWCACERTS}" sealcacerts
+  validateCacerts
+  if [ "${VALID_CACERTS}" == "0" ]; then
+    replaceISCacertsSecret
+    logStatus "cacerts secret is '${IS_NAMESPACE}' namespace replaced with '${NEWCACERTS}'."
+  fi
+  exit
+}
+
+replaceISCacertsSecret() {
+ ${KUBECTL_BIN} -n "${IS_NAMESPACE}" delete secret cacerts >/dev/null 2>&1
+ ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts=sealcacerts --dry-run=client -o yaml | ${KUBECTL_BIN} apply -f - >/dev/null 2>&1
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -2987,6 +3008,30 @@ if [[ ! -z "${BUNDLE_ID}" ]]; then
   getISJWT
   ${CURL_BIN} -sk -X GET "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/bundle/deploymentstatus/${BUNDLE_ID}" -H "Authorization: AR-JWT ${ARJWT}" | ${JQ_BIN} .
   exit
+fi
+
+if [ "${MODE}" == "fix" ]; then
+  logStatus "Running HITT in fix mode..."
+  # Parse FIXOPTS to array
+  read -ra FIXARGS <<< "${FIXOPTS}"
+  NUMFIXOPTS="${#FIXARGS[@]}"
+  case "${FIXARGS[0]}" in
+    cacerts)
+      if [ "${NUMFIXOPTS}" != "2" ]; then
+        logError "999" "Usage: bash hitt.sh -f \"cacerts /path/to/new/cacerts-file\"";
+      fi
+      NEWCACERTS="${FIXARGS[1]/#\~/$HOME}" # convert ~ to path if used
+      checkToolVersion kubectl
+      getVersions
+      setVarsFromPlatform
+      getDomain
+      buildISAliasesArray
+      updateISCacerts
+      ;;
+  *)
+    logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
+    ;;
+  esac
 fi
 
 # Validate action
@@ -4371,7 +4416,11 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
       fi
       ;;
     f)
-      HITT_CONFIG_FILE=${OPTARG}
+      MODE=fix
+      FIXOPTS="${OPTARG}"
+      if [ $# -ne 2 ]; then
+        logError "247" "fix mode options must be enclosed in double quotes - eg bash hitt.sh -f \"cacerts /path/to/new-file\"" 1
+      fi
       ;;
     g)
       IGNORE_ERRORS=1
@@ -4392,7 +4441,7 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
       CREATE_LOGS=0
       ;;
     m)
-      MODE=${OPTARG}
+      MODE="${OPTARG}"
       ;;
     n)
       CONF_OVERRIDE=1
@@ -4410,7 +4459,7 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
       IS_CUSTOMER_SERVICE_OVERRIDE="${OPTARG}"
       ;;
     t)
-      TCTL_CMD=${OPTARG}
+      TCTL_CMD="${OPTARG}"
       SKIP_UPDATE_CHECK=1
       if [ $# -ne 2 ]; then
         logError "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
