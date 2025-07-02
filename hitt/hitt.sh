@@ -1892,12 +1892,11 @@ fi
 checkISDBSettings() {
   if ! testNetConnection "${IS_DATABASE_HOST_NAME}" "${IS_DB_PORT}"; then
     logWarning "027" "IS DB server '${IS_DATABASE_HOST_NAME}' is not reachable on port '${IS_DB_PORT}' - this is expected if there is no connectivity from the Deployment Engine - skipping DB checks."
-    SKIP_SR_DB_CHECKS=1
+    SKIP_DB_CHECKS=1
     return
   else
     logMessage "IS DB server '${IS_DATABASE_HOST_NAME}' is reachable on port '${IS_DB_PORT}'." 1
   fi
-  checkISDBLatency
   if [ -z "${IS_AR_DB_USER}" ] || [ -z "${IS_AR_DB_PASSWORD}" ]; then
     logError "246" "AR_DB_USER and/or AR_DB_PASSWORD are blank - skipping checks."
     SKIP_AR_DB_CHECKS=1
@@ -2068,18 +2067,49 @@ checkISDBLatency() {
     return
   fi
   logMessage "Attempting to test latency between cluster and IS DB server '${IS_DATABASE_HOST_NAME}'..."
-  PING_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pod --no-headers -l app=rsso -o custom-columns=:metadata.name --field-selector status.phase=Running | head -1)
+  PING_NAMESPACE="${HP_NAMESPACE}"
+  PING_APP=rsso
+  PING_CONTAINER=rsso
+  if [ "${MODE}" == "post-is" ]; then
+    PING_NAMESPACE="${IS_NAMESPACE}"
+    PING_APP=platform-fts
+    PING_CONTAINER=platform
+  fi
+  PING_POD=$(${KUBECTL_BIN} -n "${PING_NAMESPACE}" get pod --no-headers -l app="${PING_APP}" -o custom-columns=:metadata.name --field-selector status.phase=Running | head -1)
   if [ ! -z "${PING_POD}" ]; then
-    PING_RESULT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PING_POD}" -- ping "${IS_DATABASE_HOST_NAME}" -c 3 -q | tail -1)
-    if echo "${PING_RESULT}" | grep -q "^round-trip" ; then
-      IS_DB_LATENCY=$(echo "${PING_RESULT}" | cut -d '/' -f 4)
+    PING_RESULT=$(${KUBECTL_BIN} -n "${PING_NAMESPACE}" exec -i "${PING_POD}" -c "${PING_CONTAINER}" -- env IS_DATABASE_HOST_NAME="${IS_DATABASE_HOST_NAME}" IS_DB_PORT="${IS_DB_PORT}"  bash -s <<'EOF'
+      total_ms=0
+      if bash -c "</dev/tcp/${IS_DATABASE_HOST_NAME}/${IS_DB_PORT}" 2>/dev/null; then
+        overhead_sec=$( (time bash -c exit) 2>&1 | grep real | sed -E 's/real[[:space:]]+0m([0-9]+\.[0-9]+)s/\1/')
+        over_int=${overhead_sec%.*}
+        over_frac=${overhead_sec#*.}
+        over_frac=$(printf "%-3s" "$over_frac" | tr ' ' '0')
+        overhead_ms=$((over_int * 1000 + 10#$over_frac))
+        for i in {1..3}; do
+          sec=$( (time bash -c "</dev/tcp/${IS_DATABASE_HOST_NAME}/${IS_DB_PORT}") 2>&1 | grep real | sed -E 's/real[[:space:]]+0m([0-9]+\.[0-9]+)s/\1/')
+          int=${sec%.*}
+          frac=${sec#*.}
+          frac=$(printf "%-3s" "$frac" | tr ' ' '0')
+          ms=$((int * 1000 + 10#$frac))
+          adj_ms=$(( ms > overhead_ms ? ms - overhead_ms : 0 ))
+          total_ms=$((total_ms + adj_ms))
+        done
+        avg_ms=$((total_ms / 3))
+        echo "${avg_ms}"
+      else
+        echo "FAILED"
+      fi
+EOF
+    )
+    if [ "${PING_RESULT}" != "FAILED" ]; then
+      IS_DB_LATENCY="${PING_RESULT}"
       logMessage "IS DB latency from cluster is ${IS_DB_LATENCY}ms."
-      if compare "${IS_DB_LATENCY} < 1" ; then logMessage "Latency is ${BOLD}GOOD${NORMAL}." ; return ; fi
-      if compare "${IS_DB_LATENCY} < 3" ; then logMessage "Latency is ${BOLD}AVERAGE${NORMAL}." ; return ; fi
-      if compare "${IS_DB_LATENCY} < 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted." ; return ; fi
+      if compare "${IS_DB_LATENCY} <= 1" ; then logMessage "Latency is ${BOLD}GOOD${NORMAL}." ; return ; fi
+      if compare "${IS_DB_LATENCY} <= 3" ; then logMessage "Latency is ${BOLD}AVERAGE${NORMAL}." ; return ; fi
+      if compare "${IS_DB_LATENCY} <= 6" ; then logMessage "Latency is ${BOLD}POOR${NORMAL}. Performance may be impacted." ; return ; fi
       if compare "${IS_DB_LATENCY} > 6" ; then logMessage "Latency is ${BOLD}VERY POOR${NORMAL}. Performance will be impacted." ; return ; fi
     else
-      logError "188" "Unexpected response from IS DB ping test."
+      logError "188" "Unexpected response from IS DB latency test.  Is the DATABASE_HOST_NAME '${IS_DATABASE_HOST_NAME}' accessible from the '${PING_POD}' pod?"
     fi
   fi
 }
@@ -3049,6 +3079,7 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
   checkFTSElasticSettings
   logStatus "Checking IS DB settings..."
   checkISDBSettings
+  checkISDBLatency
 fi
 
 if [ "${MODE}" == "post-is" ]; then
