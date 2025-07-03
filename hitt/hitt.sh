@@ -2975,7 +2975,35 @@ fixSSORealm() {
   getRSSODetails
   getDomain
   getTenantDetails
+  HP_TENANT_ID="${HP_TENANT#*.}"
+  deleteTCTLJob
+  deployTCTL "get tenant ${HP_TENANT_ID} -o json"
+  getTCTLOutput full
+  echo "${TCTL_OUTPUT}"
+  deleteTCTLJob
+  # Get JSON from tctl pod output
+  TMP_JSON=$(awk  '
+    /Response: *{/ {
+      json_started=1
+      depth=1
+      line = substr($0, index($0, "{"))
+      print line
+      next
+    }
+    json_started {
+      print
+      depth += gsub(/{/, "{")
+      depth -= gsub(/}/, "}")
+      if (depth == 0) exit
+    }
+  ' <<< "${TCTL_OUTPUT}")
+
   buildRealmJSON
+
+  REALM_AUTH_TYPE=$(echo "${TMP_JSON}" | jq -r '.auth_context.type')
+  if [ "${REALM_AUTH_TYPE}" == "OIDC" ]; then # INTEROPS has been run so portal alias should be in Application Domains
+    REALM_JSON=$(echo "${REALM_JSON}" | ${JQ_BIN} --ard ND "${PORTAL_HOSTNAME}" '.domainMapping.domain += [$ND]')
+  fi
 
   if ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     CURL_ACTION=POST
@@ -2991,7 +3019,7 @@ fixSSORealm() {
     -H "Content-Type: application/json" \
     -H "Authorization: RSSO ${RSSO_TOKEN}" \
     -d "${REALM_JSON}" >"${HITT_ERR_FILE}"
-  }
+}
 
 # FUNCTIONS End
 
@@ -4522,11 +4550,10 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
       fi
       ;;
     f)
-      logError "999" "FIX mode is not ready for use." 1
       MODE=fix
       FIXOPTS="${OPTARG}"
       if [ $# -ne 2 ]; then
-        logError "247" "fix mode options must be enclosed in double quotes - eg bash hitt.sh -f \"cacerts /path/to/new-file\"" 1
+        logError "247" "fix mode commands with options must be enclosed in double quotes - eg bash hitt.sh -f \"cacerts /path/to/new-file\"" 1
       fi
       ;;
     g)
