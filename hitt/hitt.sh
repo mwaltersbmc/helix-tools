@@ -2899,6 +2899,100 @@ fixSATRole(){
   logStatus "Support Assistant Tool 'assisttool-rl' role and 'assisttool-rlb' rolebinding created in the '${IS_NAMESPACE}' namespace."
 }
 
+buildRealmJSON() {
+  REALM_JSON=$(cat <<EOF
+    {
+    "domainMapping": {
+       "domain": [
+         "${IS_PREFIX}.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-smartit.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-sr.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-is.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-restapi.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-atws.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-dwp.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-dwpcatalog.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-vchat.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-chat.${CLUSTER_DOMAIN}",
+         "${IS_PREFIX}-int.${CLUSTER_DOMAIN}"
+       ]
+     },
+     "tenantDomain": "${HP_TENANT}",
+     "authChain": {
+       "idpSaml": [],
+       "idpAr": [
+         {
+           "cspDomains": {
+             "domain": [
+               ""
+             ]
+           },
+           "id": "ar",
+           "order": 1,
+           "arHost": "platform-user-ext.${IS_NAMESPACE}",
+           "arQueue": 0,
+           "arPort": 46262,
+           "transformationStrategy": "None",
+           "customExpression": ""
+         }
+       ],
+       "idpLdap": [],
+       "idpCert": [],
+       "idpKerberos": [],
+       "idpPreauth": [],
+       "idpOidc": [],
+       "idpLocalUser": []
+     },
+     "bypassAllowed": false,
+     "tenantLogoutURL": "",
+     "sessionQuota": 0,
+     "forceLogoutOnReachQuota": true,
+     "singleLogOut": false,
+     "useCaptcha": false,
+     "onAuthWebhook": "",
+     "tenantName": "${IS_PREFIX}"
+    }
+EOF
+  )
+}
+
+fixCacerts() {
+  NEWCACERTS="${FIXARGS[1]/#\~/$HOME}" # convert ~ to path if used
+  checkToolVersion kubectl
+  getVersions
+  setVarsFromPlatform
+  getDomain
+  buildISAliasesArray
+  updateISCacerts
+
+}
+
+fixSSORealm() {
+  REALM_NAME="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
+  checkToolVersion kubectl
+  getVersions
+  setVarsFromPlatform
+  getRSSODetails
+  getDomain
+  getTenantDetails
+  buildRealmJSON
+
+  if ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
+    CURL_ACTION=POST
+    URL_SUFFIX=""
+    logMessage "Creating new realm '${REALM_NAME}'."
+  else
+    CURL_ACTION=PUT
+    URL_SUFFIX="/${REALM_NAME}"
+    logMessage "Updating existing realm '${REALM_NAME}'."
+  fi
+
+  ${CURL_BIN} -sk -X "${CURL_ACTION}" "${RSSO_URL}/api/v1.1/realms${URL_SUFFIX}" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: RSSO ${RSSO_TOKEN}" \
+    -d "${REALM_JSON}" >"${HITT_ERR_FILE}"
+  }
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -3029,18 +3123,15 @@ if [ "${MODE}" == "fix" ]; then
   case "${FIXARGS[0]}" in
     cacerts)
       if [ "${NUMFIXOPTS}" != "2" ]; then
-        logError "999" "Usage: bash hitt.sh -f \"cacerts /path/to/new/cacerts-file\"";
+        logError "999" "Usage: bash hitt.sh -f \"cacerts /path/to/new/cacerts-file\"" 1
       fi
-      NEWCACERTS="${FIXARGS[1]/#\~/$HOME}" # convert ~ to path if used
-      checkToolVersion kubectl
-      getVersions
-      setVarsFromPlatform
-      getDomain
-      buildISAliasesArray
-      updateISCacerts
+      fixCacerts
       ;;
     sat)
       fixSATRole
+      ;;
+    realm)
+      fixSSORealm
       ;;
     *)
     logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
@@ -4431,6 +4522,7 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
       fi
       ;;
     f)
+      logError "999" "FIX mode is not ready for use." 1
       MODE=fix
       FIXOPTS="${OPTARG}"
       if [ $# -ne 2 ]; then
