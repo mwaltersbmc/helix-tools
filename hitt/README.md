@@ -13,6 +13,15 @@ mkdir hitt && cd hitt && curl -sO https://raw.githubusercontent.com/mwaltersbmc/
 curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz   # Optional, enables DB validation
 ```
 
+- [Features & Modes](#features--modes)
+- [Configuration](#configuration)
+- [Proxy Support](#proxy-support)
+- [Running HITT](#running-hitt)
+- [Log Files](#log-files)
+- [tctl Mode](#tctl-mode)
+- [Bundle Deployment Status](#get-is-bundle-deployment-status)
+- [Advanced CLI Options](#advanced-cli-options)
+
 ## Features & Modes
 
 HITT supports different modes for Helix and Jenkins validation:
