@@ -2878,13 +2878,18 @@ updateISCacerts() {
   validateCacerts
   if [ "${VALID_CACERTS}" == "0" ]; then
     replaceISCacertsSecret
-    logStatus "cacerts secret is '${IS_NAMESPACE}' namespace replaced with '${NEWCACERTS}'."
+    logStatus "cacerts secret in '${IS_NAMESPACE}' namespace replaced with '${NEWCACERTS}'."
   fi
 }
 
 replaceISCacertsSecret() {
- ${KUBECTL_BIN} -n "${IS_NAMESPACE}" delete secret cacerts >/dev/null 2>&1
- ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts=sealcacerts --dry-run=client -o yaml | ${KUBECTL_BIN} apply -f - >/dev/null 2>&1
+  NOW=$(date +"%Y%m%d%H%M%S")
+  BACKUP_FILE="cacerts_backup_${NOW}.yaml"
+  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o yaml > "${BACKUP_FILE}" 2>/dev/null; then
+    logMessage "Current cacerts secret saved as ${BACKUP_FILE}."
+  fi
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" delete secret cacerts >/dev/null 2>&1
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts=sealcacerts --dry-run=client -o yaml | ${KUBECTL_BIN} apply -f - >/dev/null 2>&1
 }
 
 fixSATRole(){
@@ -2964,7 +2969,6 @@ fixCacerts() {
   getDomain
   buildISAliasesArray
   updateISCacerts
-
 }
 
 fixSSORealm() {
@@ -2979,7 +2983,6 @@ fixSSORealm() {
   deleteTCTLJob
   deployTCTL "get tenant ${HP_TENANT_ID} -o json"
   getTCTLOutput full
-  echo "${TCTL_OUTPUT}"
   deleteTCTLJob
   # Get JSON from tctl pod output
   TMP_JSON=$(awk  '
@@ -3018,7 +3021,83 @@ fixSSORealm() {
   ${CURL_BIN} -sk -X "${CURL_ACTION}" "${RSSO_URL}/api/v1.1/realms${URL_SUFFIX}" \
     -H "Content-Type: application/json" \
     -H "Authorization: RSSO ${RSSO_TOKEN}" \
-    -d "${REALM_JSON}" >"${HITT_ERR_FILE}"
+    -d "${REALM_JSON}" >"${HITT_ERR_FILE}" 2>&1
+}
+
+updateJenkinsKubeconfig() {
+  SCRIPT="import com.cloudbees.plugins.credentials.*
+    import com.cloudbees.plugins.credentials.domains.*
+    import jenkins.model.*
+    import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl
+    import hudson.util.Secret
+    import com.cloudbees.plugins.credentials.SecretBytes
+    def kubeconfigContentBase64 = '''${KUBECONFIG_B64}'''
+    def secretBytes = SecretBytes.fromBytes(kubeconfigContentBase64.decodeBase64())
+    def store = Jenkins.instance
+        .getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0]
+        .getStore()
+    def existing = CredentialsProvider.lookupCredentials(
+        FileCredentialsImpl.class,
+        Jenkins.instance,
+        null,
+        null
+    ).find { it.id == 'kubeconfig' }
+    if (existing) {
+        store.removeCredentials(Domain.global(), existing)
+    }
+    def fileCredential = new FileCredentialsImpl(
+        CredentialsScope.GLOBAL,
+        'kubeconfig',                   // ID
+        'Kubeconfig file from script',  // Description
+        'kubeconfig',                   // File name
+        secretBytes                     // SecretBytes content
+    )
+    store.addCredentials(Domain.global(), fileCredential)"
+  runJenkinsCurl "${SCRIPT}" >/dev/null
+}
+
+checkValidKubeconfig() {
+  if [ ! -f "${1}" ]; then
+    logError "999" "kubeconfig file '${1}' not found." 1
+  fi
+  if ! KUBECONFIG="${1}" ${KUBECTL_BIN} version > /dev/null 2>&1; then
+    logError "999" "'kubectl version' command returned an error - is '${1}' a valid kubeconfig file?" 1
+  fi
+}
+
+fixJenkinsKubeconfig() {
+  case "${#FIXARGS[@]}" in
+    2)
+      KUBECONFIG_FILE="${HOME}/.kube/config"
+      ;;
+    3)
+      KUBECONFIG_FILE="${FIXARGS[2]/#\~/$HOME}" # convert ~ to path if used
+      ;;
+    *)
+      logError "999" "Usage: bash hitt.sh -f \"jenkins kubeconfig\" (uses ~/.kube/config) OR \"jenkins kubeconfig /path/to/kubeconfig\"" 1
+      ;;
+  esac
+  checkValidKubeconfig "${KUBECONFIG_FILE}"
+  encodeKubeconfig "${KUBECONFIG_FILE}"
+  updateJenkinsKubeconfig
+  logMessage "Jenkins kubeconfig credential updated with '${KUBECONFIG_FILE}'."
+}
+
+encodeKubeconfig() {
+  KUBECONFIG_B64=$(${BASE64_BIN} -w 0 "${1}")
+}
+
+fixJenkins() {
+  checkJenkinsIsRunning
+  getJenkinsCrumb
+  case "${FIXARGS[1]}" in
+    kubeconfig)
+      fixJenkinsKubeconfig
+      ;;
+    *)
+      logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
+      ;;
+  esac
 }
 
 # FUNCTIONS End
@@ -3144,15 +3223,11 @@ if [[ ! -z "${BUNDLE_ID}" ]]; then
 fi
 
 if [ "${MODE}" == "fix" ]; then
-  logStatus "Running HITT in fix mode..."
   # Parse FIXOPTS to array
   read -ra FIXARGS <<< "${FIXOPTS}"
-  NUMFIXOPTS="${#FIXARGS[@]}"
+  logStatus "Running HITT in fix mode '${FIXARGS[0]}'..."
   case "${FIXARGS[0]}" in
     cacerts)
-      if [ "${NUMFIXOPTS}" != "2" ]; then
-        logError "999" "Usage: bash hitt.sh -f \"cacerts /path/to/new/cacerts-file\"" 1
-      fi
       fixCacerts
       ;;
     sat)
@@ -3160,6 +3235,9 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     realm)
       fixSSORealm
+      ;;
+    jenkins)
+      fixJenkins
       ;;
     *)
     logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
@@ -4550,11 +4628,11 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
       fi
       ;;
     f)
+      if [ $# -ne 2 ]; then
+        logError "999" "When using FIX mode commands with options you must use double quotes - eg: bash hitt.sh -f \"cacerts /path/to/new/cacerts-file\"" 1
+      fi
       MODE=fix
       FIXOPTS="${OPTARG}"
-      if [ $# -ne 2 ]; then
-        logError "247" "fix mode commands with options must be enclosed in double quotes - eg bash hitt.sh -f \"cacerts /path/to/new-file\"" 1
-      fi
       ;;
     g)
       IGNORE_ERRORS=1
