@@ -3087,12 +3087,35 @@ encodeKubeconfig() {
   KUBECONFIG_B64=$(${BASE64_BIN} -w 0 "${1}")
 }
 
+fixJenkinsScriptApproval () {
+  SCRIPT='import java.lang.reflect.*;
+    import jenkins.model.Jenkins;
+    import jenkins.model.*;
+    import org.jenkinsci.plugins.scriptsecurity.scripts.*;
+    import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.*;
+    scriptApproval = ScriptApproval.get()
+    alreadyApproved = new HashSet<>(Arrays.asList(scriptApproval.getApprovedSignatures()))
+    approveSignature("method org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper getRawBuild")
+    approveSignature("method hudson.model.Run getLog")
+    scriptApproval.save()
+    void approveSignature(String signature) {
+        if (!alreadyApproved.contains(signature)) {
+           scriptApproval.approveSignature(signature)
+        }
+    }'
+  runJenkinsCurl "${SCRIPT}"
+  logMessage "Updated Jenkins to approve scripts required by deployment pipelines."
+}
+
 fixJenkins() {
   checkJenkinsIsRunning
   getJenkinsCrumb
   case "${FIXARGS[1]}" in
     kubeconfig)
       fixJenkinsKubeconfig
+      ;;
+    scriptapproval)
+      fixJenkinsScriptApproval
       ;;
     *)
       logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
