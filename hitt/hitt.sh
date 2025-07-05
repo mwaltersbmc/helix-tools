@@ -2609,13 +2609,13 @@ validateJenkinsCredentials() {
     fi
   done
   if [ "${BAD_CRED_PWD}" == "1" ]; then
-    logError "230" "The passwords for the Jenkins credentials are not all set to the same value.  Run 'bash hitt.sh -j' to display the values."
+    logError "230" "The passwords for the Jenkins credentials are not all set to the same value.  Run 'bash $0 -j' to display the values."
   else
     if ! which sshpass  > /dev/null 2>&1 ; then
       logWarning "038" "'sshpass' command not found - please install it to enable Jenkins credentials password validation."
     else
       if ! sshpass -p "${CRED_PWD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${CRED_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
-        logError "231" "The password set for the git user in the Jenkins credentials is not correct. Run 'bash hitt.sh -j' to display the values."
+        logError "231" "The password set for the git user in the Jenkins credentials is not correct. Run 'bash $0 -j' to display the values."
       fi
     fi
   fi
@@ -2832,7 +2832,6 @@ checkDERequirements() {
       logError "225" "The community.general module for ansible is missing - please install it with the command 'ansible-galaxy collection install community.general'."
     fi
   fi
-
 }
 
 getJenkinsCrumb() {
@@ -2962,6 +2961,9 @@ EOF
 }
 
 fixCacerts() {
+  if [ ${#FIXARGS[@]} -ne 2 ]; then
+    logError "999" "Usage: bash $0 -f \"cacerts /path/to/new/cacerts-file\"" 1
+  fi
   NEWCACERTS="${FIXARGS[1]/#\~/$HOME}" # convert ~ to path if used
   checkToolVersion kubectl
   getVersions
@@ -3005,7 +3007,7 @@ fixSSORealm() {
 
   REALM_AUTH_TYPE=$(echo "${TMP_JSON}" | jq -r '.auth_context.type')
   if [ "${REALM_AUTH_TYPE}" == "OIDC" ]; then # INTEROPS has been run so portal alias should be in Application Domains
-    REALM_JSON=$(echo "${REALM_JSON}" | ${JQ_BIN} --ard ND "${PORTAL_HOSTNAME}" '.domainMapping.domain += [$ND]')
+    REALM_JSON=$(echo "${REALM_JSON}" | ${JQ_BIN} --arg ND "${PORTAL_HOSTNAME}" '.domainMapping.domain += [$ND]')
   fi
 
   if ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
@@ -3074,7 +3076,7 @@ fixJenkinsKubeconfig() {
       KUBECONFIG_FILE="${FIXARGS[2]/#\~/$HOME}" # convert ~ to path if used
       ;;
     *)
-      logError "999" "Usage: bash hitt.sh -f \"jenkins kubeconfig\" (uses ~/.kube/config) OR \"jenkins kubeconfig /path/to/kubeconfig\"" 1
+      logError "999" "Usage: bash $0 -f \"jenkins kubeconfig\" (uses ~/.kube/config) OR \"jenkins kubeconfig /path/to/kubeconfig\"" 1
       ;;
   esac
   checkValidKubeconfig "${KUBECONFIG_FILE}"
@@ -3107,6 +3109,71 @@ fixJenkinsScriptApproval () {
   logMessage "Updated Jenkins to approve scripts required by deployment pipelines."
 }
 
+fixJenkinsPipelineLibs() {
+  declare -A PIPELINE_LIBS
+  PIPELINE_LIBS["pipeline-framework"]="pipeline-framework"
+  PIPELINE_LIBS["JENKINS-27413-workaround-library"]="jenkins-workaround"
+  declare -A PIPELINE_LIBS_PATHS
+
+  if [ ${#FIXARGS[@]} -eq 2 ]; then
+    for pl in "${!PIPELINE_LIBS[@]}"; do
+      LIB_GIT=($(find ~ -type d -name "${pl}.git"))
+      if [ ${#LIB_GIT[@]} -eq 0 ]; then
+        logError "999" "Unable to find the pipeline libraries git directories - please use bash $0 -f \"jenkins pipelinelibs /path/to/LIBRARY_REPO/dir\"". 1
+      else
+        logStatus "Select the '${pl}' git directory:"
+        while [ "${PIPELINE_LIBS_PATHS[${pl}]}" == "" ]; do
+            PIPELINE_LIBS_PATHS["${pl}"]=$(selectFromArray LIB_GIT)
+        done
+      fi
+    done
+  fi
+
+  if [ ${#FIXARGS[@]} -eq 3 ]; then
+    PIPELINE_LIBS_DIR="${FIXARGS[2]/#\~/$HOME}"
+    for pl in "${!PIPELINE_LIBS[@]}"; do
+      PIPELINE_LIBS_PATHS["${pl}"]="${PIPELINE_LIBS_DIR}/${PIPELINE_LIBS[${pl}]}/${pl}.git"
+      if [ -d "${PIPELINE_LIBS_PATHS[${pl}]}" ]; then
+        logMessage "'${pl}' pipeline library git directory found at '${PIPELINE_LIBS_PATHS[${pl}]}'." 1
+      else
+        logError "999" "'${pl}' git directory not found at '${PIPELINE_LIBS_PATHS[${pl}]}'." 1
+      fi
+    done
+  fi
+
+  for pl in "${!PIPELINE_LIBS_PATHS[@]}"
+  do
+    updateJenkinsPipelineLibrary "${pl}" "ssh://${USER}@${LONG_HOSTNAME}${PIPELINE_LIBS_PATHS[${pl}]}"
+    logMessage "Jenkins '${pl}' pipeline library updated." 1
+  done
+}
+
+updateJenkinsPipelineLibrary() {
+  SCRIPT="import jenkins.model.*
+    import jenkins.plugins.git.GitSCMSource
+    import org.jenkinsci.plugins.workflow.libs.*
+    def libraryName = '${1}'
+    def repoUrl = '${2}'
+    def defaultVersion = 'master'
+    def credentialsId = ''
+    def implicit = true
+    def jenkins = Jenkins.instance
+    def globalLibraries = jenkins.getDescriptorByType(GlobalLibraries.class)
+    def scmSource = new GitSCMSource(repoUrl)
+    scmSource.credentialsId = credentialsId
+    def retriever = new SCMSourceRetriever(scmSource)
+    def existingLibrary = globalLibraries.libraries.find { it.name == libraryName }
+    if (existingLibrary) {
+      globalLibraries.libraries.remove(existingLibrary)
+    }
+    def newLibrary = new LibraryConfiguration(libraryName, retriever)
+    newLibrary.setDefaultVersion(defaultVersion)
+    newLibrary.setImplicit(implicit)
+    globalLibraries.libraries += newLibrary
+    jenkins.save()"
+  runJenkinsCurl "${SCRIPT}"
+}
+
 fixJenkins() {
   checkJenkinsIsRunning
   getJenkinsCrumb
@@ -3116,6 +3183,9 @@ fixJenkins() {
       ;;
     scriptapproval)
       fixJenkinsScriptApproval
+      ;;
+    pipelinelibs)
+      fixJenkinsPipelineLibs
       ;;
     *)
       logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
@@ -3260,6 +3330,9 @@ if [ "${MODE}" == "fix" ]; then
       fixSSORealm
       ;;
     jenkins)
+      if [ ${#FIXARGS[@]} -eq 1 ]; then
+        logError "999" "Usage: bash $0 -f \"jenkins fixtype <fixoptions>\"" 1
+      fi
       fixJenkins
       ;;
     *)
@@ -4651,8 +4724,9 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
       fi
       ;;
     f)
+      SKIP_UPDATE_CHECK=1
       if [ $# -ne 2 ]; then
-        logError "999" "When using FIX mode commands with options you must use double quotes - eg: bash hitt.sh -f \"cacerts /path/to/new/cacerts-file\"" 1
+        logError "999" "When using FIX mode commands with options you must use double quotes - eg: bash $0 -f \"cacerts /path/to/new/cacerts-file\"" 1
       fi
       MODE=fix
       FIXOPTS="${OPTARG}"
