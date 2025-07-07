@@ -3217,7 +3217,95 @@ updateJenkinsUserCredentials() {
           credentialsStore.addCredentials(domain, newCred)
       }"
     runJenkinsCurl "${SCRIPT}" >/dev/null
+    logMessage "Updated Jenkins "${cred}" credentials."
   done
+}
+
+updateJenkinsSecretTextCredentials() {
+  SCRIPT="import jenkins.model.Jenkins
+  import com.cloudbees.plugins.credentials.domains.Domain
+  import com.cloudbees.plugins.credentials.CredentialsScope
+  import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl
+  import com.cloudbees.plugins.credentials.CredentialsProvider
+  import hudson.util.Secret
+  def credentialsId = 'password_vault_apikey'
+  def secretValue = ''
+  def description = 'password_vault_apikey'
+  def instance = Jenkins.instance
+  def domain = Domain.global()
+  def store = instance.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
+  def existing = CredentialsProvider.lookupCredentials(
+      StringCredentialsImpl.class,
+      instance,
+      null,
+      null
+  ).find { it.id == credentialsId }
+  if (existing) {
+      def updated = new StringCredentialsImpl(
+          CredentialsScope.GLOBAL,
+          credentialsId,
+          description,
+          Secret.fromString(secretValue)
+      )
+      store.updateCredentials(domain, existing, updated)
+  } else {
+      def secretText = new StringCredentialsImpl(
+          CredentialsScope.GLOBAL,
+          credentialsId,
+          description,
+          Secret.fromString(secretValue)
+      )
+      store.addCredentials(domain, secretText)
+  }
+  instance.save()"
+  runJenkinsCurl "${SCRIPT}" >/dev/null
+  logMessage "Updated Jenkins password_vault_apikey credentials."
+}
+
+updateJenkinsSecretFileCredentials() {
+  SCRIPT="import jenkins.model.*
+    import com.cloudbees.plugins.credentials.*
+    import com.cloudbees.plugins.credentials.domains.*
+    import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl
+    import hudson.util.Secret
+    import com.cloudbees.plugins.credentials.SecretBytes
+    import com.cloudbees.plugins.credentials.CredentialsProvider
+    def credentialsId = 'TOKENS'
+    def description = 'tokens.json'
+    def fileName = 'tokens.json'
+    def fileContent = ''
+    def fileBytes = SecretBytes.fromBytes(fileContent.getBytes('UTF-8'))
+    def instance = Jenkins.instance
+    def domain = Domain.global()
+    def store = instance.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
+    def existing = CredentialsProvider.lookupCredentials(
+        FileCredentialsImpl.class,
+        instance,
+        null,
+        null
+    ).find { it.id == credentialsId }
+    if (existing) {
+        def updated = new FileCredentialsImpl(
+            CredentialsScope.GLOBAL,
+            credentialsId,
+            description,
+            fileName,
+            fileBytes
+        )
+        store.updateCredentials(domain, existing, updated)
+    } else {
+        def fileSecret = new FileCredentialsImpl(
+            CredentialsScope.GLOBAL,
+            credentialsId,
+            description,
+            fileName,
+            fileBytes
+        )
+      store.addCredentials(domain, fileSecret)
+    }
+    instance.save()"
+  runJenkinsCurl "${SCRIPT}" >/dev/null
+  logMessage "Updated Jenkins TOKENS credentials."
 }
 
 fixJenkinsCredentials() {
@@ -3228,7 +3316,10 @@ fixJenkinsCredentials() {
   if ! sshpass -p "${GIT_USER_PASSWORD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${GIT_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
     logError "999" "The GIT user password is incorrect." 1
   fi
+  echo ""
   updateJenkinsUserCredentials
+  updateJenkinsSecretTextCredentials
+  updateJenkinsSecretFileCredentials
 }
 
 fixJenkins() {
