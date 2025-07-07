@@ -3110,41 +3110,43 @@ fixJenkinsScriptApproval () {
 }
 
 fixJenkinsPipelineLibs() {
-  declare -A PIPELINE_LIBS
-  PIPELINE_LIBS["pipeline-framework"]="pipeline-framework"
-  PIPELINE_LIBS["JENKINS-27413-workaround-library"]="jenkins-workaround"
-  declare -A PIPELINE_LIBS_PATHS
+  PIPELINE_LIBS=(
+    "JENKINS-27413-workaround-library,jenkins-workaround,JENKINS-27413-workaround-library.git,true"
+    "pipeline-framework,pipeline-framework,pipeline-framework.git,false"
+  )
 
-  if [ ${#FIXARGS[@]} -eq 2 ]; then
-    for pl in "${!PIPELINE_LIBS[@]}"; do
-      LIB_GIT=($(find ~ -type d -name "${pl}.git"))
-      if [ ${#LIB_GIT[@]} -eq 0 ]; then
+  for pl in "${PIPELINE_LIBS[@]}"; do
+    PLNAME=$(echo "${pl}" | awk -F',' '{ print $1 }')
+    PLDIR=$(echo "${pl}" | awk -F',' '{ print $2 }')
+    PLGIT=$(echo "${pl}" | awk -F',' '{ print $3 }')
+    PLIMPLICIT=$(echo "${pl}" | awk -F',' '{ print $4 }')
+
+    if [ ${#FIXARGS[@]} -eq 2 ]; then
+      PLPATHS_ARRAY=($(find ~ -type d -name "${PLGIT}"))
+      PATH_TO_PL=""
+      if [ ${#PLPATHS_ARRAY[@]} -eq 0 ]; then
         logError "999" "Unable to find the pipeline libraries git directories - please use bash $0 -f \"jenkins pipelinelibs /path/to/LIBRARY_REPO/dir\"". 1
       else
-        logStatus "Select the '${pl}' git directory:"
-        while [ "${PIPELINE_LIBS_PATHS[${pl}]}" == "" ]; do
-            PIPELINE_LIBS_PATHS["${pl}"]=$(selectFromArray LIB_GIT)
+        logStatus "Select the '${PLNAME}' git directory:"
+        while [ "${PATH_TO_PL}" == "" ]; do
+            PATH_TO_PL=$(selectFromArray PLPATHS_ARRAY)
         done
       fi
-    done
-  fi
+    fi
 
-  if [ ${#FIXARGS[@]} -eq 3 ]; then
-    PIPELINE_LIBS_DIR="${FIXARGS[2]/#\~/$HOME}"
-    for pl in "${!PIPELINE_LIBS[@]}"; do
-      PIPELINE_LIBS_PATHS["${pl}"]="${PIPELINE_LIBS_DIR}/${PIPELINE_LIBS[${pl}]}/${pl}.git"
-      if [ -d "${PIPELINE_LIBS_PATHS[${pl}]}" ]; then
-        logMessage "'${pl}' pipeline library git directory found at '${PIPELINE_LIBS_PATHS[${pl}]}'." 1
+    if [ ${#FIXARGS[@]} -eq 3 ]; then
+      PL_BASE_DIR="${FIXARGS[2]/#\~/$HOME}"
+      PATH_TO_PL="${PL_BASE_DIR}/${PLDIR}/${PLGIT}"
+      if [ -d "${PATH_TO_PL}" ]; then
+        logMessage "'${PLNAME}' pipeline library git directory found at '${PATH_TO_PL}'." 1
       else
-        logError "999" "'${pl}' git directory not found at '${PIPELINE_LIBS_PATHS[${pl}]}'." 1
+        logError "999" "'${PLNAME}' git directory not found at '${PATH_TO_PL}'." 1
       fi
-    done
-  fi
+    fi
 
-  for pl in "${!PIPELINE_LIBS_PATHS[@]}"
-  do
-    updateJenkinsPipelineLibrary "${pl}" "ssh://${USER}@${LONG_HOSTNAME}${PIPELINE_LIBS_PATHS[${pl}]}"
-    logMessage "Jenkins '${pl}' pipeline library updated." 1
+    updateJenkinsPipelineLibrary "${PLNAME}" "ssh://${USER}@${LONG_HOSTNAME}${PATH_TO_PL}" "${PLIMPLICIT}"
+    logMessage "Jenkins '${PLNAME}' pipeline library updated."
+
   done
 }
 
@@ -3156,7 +3158,7 @@ updateJenkinsPipelineLibrary() {
     def repoUrl = '${2}'
     def defaultVersion = 'master'
     def credentialsId = ''
-    def implicit = true
+    def implicit = ${3}
     def jenkins = Jenkins.instance
     def globalLibraries = jenkins.getDescriptorByType(GlobalLibraries.class)
     def scmSource = new GitSCMSource(repoUrl)
