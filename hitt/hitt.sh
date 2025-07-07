@@ -3176,6 +3176,61 @@ updateJenkinsPipelineLibrary() {
   runJenkinsCurl "${SCRIPT}"
 }
 
+updateJenkinsUserCredentials() {
+  JENKINS_USER_CREDS=("github" "ansible_host" "ansible" "git")
+  for cred in "${JENKINS_USER_CREDS[@]}"; do
+    SCRIPT="import com.cloudbees.plugins.credentials.*
+      import com.cloudbees.plugins.credentials.domains.*
+      import com.cloudbees.plugins.credentials.impl.*
+      import com.cloudbees.plugins.credentials.common.*
+      import hudson.util.Secret
+      import jenkins.model.Jenkins
+      def credentialsId = '${cred}'
+      def newUsername = '${GIT_USER}'
+      def newPassword = '${GIT_USER_PASSWORD}'
+      def newDescription = '${cred}'
+      def credentialsStore = Jenkins.instance.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
+      def domain = Domain.global()
+      def existing = CredentialsProvider.lookupCredentials(
+          StandardUsernamePasswordCredentials.class,
+          Jenkins.instance,
+          null,
+          null
+      ).find { it.id == credentialsId }
+            if (existing) {
+          def updated = new UsernamePasswordCredentialsImpl(
+              CredentialsScope.GLOBAL,
+              credentialsId,
+              newDescription,
+              newUsername,
+              newPassword
+          )
+          credentialsStore.updateCredentials(domain, existing, updated)
+      } else {
+          def newCred = new UsernamePasswordCredentialsImpl(
+              CredentialsScope.GLOBAL,
+              credentialsId,
+              newDescription,
+              newUsername,
+              newPassword
+          )
+          credentialsStore.addCredentials(domain, newCred)
+      }"
+    runJenkinsCurl "${SCRIPT}" >/dev/null
+  done
+}
+
+fixJenkinsCredentials() {
+  # description,id,username,password
+  GIT_USER="${USER}"
+  logStatus "Please enter your GIT user password:"
+  read -s -p "GIT user password : " GIT_USER_PASSWORD
+  if ! sshpass -p "${GIT_USER_PASSWORD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${GIT_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
+    logError "999" "The GIT user password is incorrect." 1
+  fi
+  updateJenkinsUserCredentials
+}
+
 fixJenkins() {
   checkJenkinsIsRunning
   getJenkinsCrumb
@@ -3188,6 +3243,9 @@ fixJenkins() {
       ;;
     pipelinelibs)
       fixJenkinsPipelineLibs
+      ;;
+    credentials)
+      fixJenkinsCredentials
       ;;
     *)
       logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
