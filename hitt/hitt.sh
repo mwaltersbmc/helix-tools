@@ -3125,7 +3125,7 @@ fixJenkinsPipelineLibs() {
       PLPATHS_ARRAY=($(find ~ -type d -name "${PLGIT}"))
       PATH_TO_PL=""
       if [ ${#PLPATHS_ARRAY[@]} -eq 0 ]; then
-        logError "999" "Unable to find the pipeline libraries git directories - please use bash $0 -f \"jenkins pipelinelibs /path/to/LIBRARY_REPO/dir\"". 1
+        logError "999" "Unable to find the pipeline libraries git directory - please use 'bash $0 -f \"jenkins pipelinelibs /path/to/LIBRARY_REPO\"'". 1
       else
         logStatus "Select the '${PLNAME}' git directory:"
         while [ "${PATH_TO_PL}" == "" ]; do
@@ -3309,8 +3309,9 @@ updateJenkinsSecretFileCredentials() {
 }
 
 fixJenkinsCredentials() {
-  # description,id,username,password
-  GIT_USER="${USER}"
+  if ! which sshpass  > /dev/null 2>&1 ; then
+    logError "999" "The 'sshpass' command was not found but is required to enable Jenkins credentials password validation." 1
+  fi
   logStatus "Please enter your GIT user password:"
   read -s -p "GIT user password : " GIT_USER_PASSWORD
   if ! sshpass -p "${GIT_USER_PASSWORD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${GIT_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
@@ -3320,6 +3321,38 @@ fixJenkinsCredentials() {
   updateJenkinsUserCredentials
   updateJenkinsSecretTextCredentials
   updateJenkinsSecretFileCredentials
+}
+
+testSSH() {
+    if ssh -o BatchMode=yes -o StrictHostKeyChecking=no "${GIT_USER}@${1}" "echo success" 2>/dev/null | grep -q success; then
+        logMessage "Passwordless 'ssh ${GIT_USER}@${1}' succeeded."
+    else
+        logError "999" "Passwordless 'ssh ${GIT_USER}@${1}' failed."
+    fi
+}
+
+fixSSH() {
+  HOME_DIR=$(getent passwd ${1} | cut -d: -f6)
+  GIT_HOME_DIR=$(getent passwd ${GIT_USER} | cut -d: -f6)
+  SSH_DIR="${HOME_DIR}/.ssh"
+  KEY_FILE="${SSH_DIR}/id_rsa"
+  AUTHORIZED_KEYS="${GIT_HOME_DIR}/.ssh/authorized_keys"
+  mkdir -p "${SSH_DIR}"
+  chmod 700 "${SSH_DIR}"
+  # Generate SSH key if it doesn't exist
+  if [ ! -f "${KEY_FILE}" ]; then
+      ssh-keygen -t rsa -b 4096 -f "${KEY_FILE}" -N "" -q
+  fi
+  PUB_KEY=$(cat "${KEY_FILE}.pub")
+  # Ensure authorized_keys file exists
+  touch "${AUTHORIZED_KEYS}"
+  chmod 600 "${AUTHORIZED_KEYS}"
+  # Add key if not already in authorized_keys
+  if ! grep -qF "{$PUB_KEY}" "${AUTHORIZED_KEYS}"; then
+      echo "${PUB_KEY}" >> "${AUTHORIZED_KEYS}"
+  fi
+  testSSH "${SHORT_HOSTNAME}"
+  testSSH "${LONG_HOSTNAME}"
 }
 
 fixJenkins() {
@@ -3486,6 +3519,9 @@ if [ "${MODE}" == "fix" ]; then
       fi
       fixJenkins
       ;;
+    ssh)
+      fixSSH "${GIT_USER}"
+      ;;
     *)
     logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
     ;;
@@ -3604,6 +3640,7 @@ HITT_CONFIG_FILE=hitt.conf
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short)
 LONG_HOSTNAME=$(hostname --long)
+GIT_USER=$(whoami)
 DEBUG=0
 FAIL=0
 WARN=0
@@ -4877,7 +4914,7 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
     f)
       SKIP_UPDATE_CHECK=1
       if [ $# -ne 2 ]; then
-        logError "999" "When using FIX mode commands with options you must use double quotes - eg: bash $0 -f \"cacerts /path/to/new/cacerts-file\"" 1
+        logError "999" "When using FIX mode commands with options you must enclose them in double quotes - eg: bash $0 -f \"cacerts /path/to/new/cacerts-file\"" 1
       fi
       MODE=fix
       FIXOPTS="${OPTARG}"
