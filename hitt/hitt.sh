@@ -1094,8 +1094,8 @@ runJenkinsSSH() {
 
 setVarsFromPipelineJSON() {
   # Parse and export variables
-for key in $(echo "$json" | jq -r 'keys[]'); do
-    value=$(echo "$json" | jq -r --arg key "$key" '.[$key]')
+for key in $(echo "$json" | ${JQ_BIN} -r 'keys[]'); do
+    value=$(echo "$json" | ${JQ_BIN} -r --arg key "$key" '.[$key]')
     varname="IS_$key"
     export "$varname=$value"
     echo "$varname=$value"
@@ -2000,7 +2000,7 @@ reportResults() {
     fi
     echo "==================="
     echo -e "${BOLD}Please review the ${GREEN}${HITT_MSG_FILE}${NORMAL}${BOLD} file for explanations and suggested fixes for the messages above.${NORMAL}"
-    echo -e "${BOLD}Attach the ${YELLOW}hittlogs.zip${NORMAL}${BOLD} file to your case if working with BMC Support.${NORMAL}"
+    echo -e "${BOLD}Attach the ${YELLOW}hittlogs.zip${NORMAL}${BOLD} file to your case if requested by BMC Support.${NORMAL}"
   else
     echo -e "${BOLD}Tests complete - no errors or warnings found.${NORMAL}"
   fi
@@ -2334,7 +2334,7 @@ checkForNewHITT() {
 }
 
 unpackSSLPoke() {
-  echo "${SSLPOKE_PAYLOAD}" | tr -d ' ' | base64 -d > SSLPoke.class
+  echo "${SSLPOKE_PAYLOAD}" | tr -d ' ' | ${BASE64_BIN} -d > SSLPoke.class
 }
 
 checkHITTconf() {
@@ -2798,7 +2798,7 @@ checkDERequirements() {
       if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
         logError "208" "The installed version of ansible '${ANSIBLE_VERSION}' is not supported - required version must be no greater than '${MAX_ANSIBLE_VERSION}'."
       else
-        logMessage "Using ansible version - '${ANSIBLE_VERSION}'"
+        logMessage "Using ansible version '${ANSIBLE_VERSION}'"
         if ! isJmespathInstalled ; then
           ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
           logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible '${ANSIBLE_PYTHON_VERSION}'."
@@ -2811,7 +2811,7 @@ checkDERequirements() {
     if [ ! -f "${ANSIBLE_CFG_FILE}" ]; then
       logError "210" "Ansible configuration file '${ANSIBLE_CFG_FILE}' not found - skipping checks."
     else
-      logMessage "Checking ansible configuration file - '${ANSIBLE_CFG_FILE}'." 1
+      logMessage "Checking ansible configuration file '${ANSIBLE_CFG_FILE}'." 1
       ANSIBLE_CFG_VALS=(bin_ansible_callbacks=true stdout_callback=yaml host_key_checking=false ssh_args=-ocontrolmaster=auto retries=3 pipelining=true)
       ANSIBLE_CFG=$(cat /etc/ansible/ansible.cfg | tr -d ' ')
       for i in "${ANSIBLE_CFG_VALS[@]}"; do
@@ -3005,7 +3005,7 @@ fixSSORealm() {
 
   buildRealmJSON
 
-  REALM_AUTH_TYPE=$(echo "${TMP_JSON}" | jq -r '.auth_context.type')
+  REALM_AUTH_TYPE=$(echo "${TMP_JSON}" | ${JQ_BIN} -r '.auth_context.type')
   if [ "${REALM_AUTH_TYPE}" == "OIDC" ]; then # INTEROPS has been run so portal alias should be in Application Domains
     REALM_JSON=$(echo "${REALM_JSON}" | ${JQ_BIN} --arg ND "${PORTAL_HOSTNAME}" '.domainMapping.domain += [$ND]')
   fi
@@ -3400,7 +3400,7 @@ if [ ! -f "${HITT_CONFIG_FILE}" ]; then
   createHITTconf "${HITT_CONFIG_FILE}"
 else
   if [ -f .hitt.conf ] && [ ! -w .hitt.conf ]; then
-    logError "228" "The '.hitt.conf' file is not writable by the current user - please make sure all files in the current directory are owned by the user running the HITT script." 1
+    logError "228" "The '.hitt.conf' file is not writable by the current user - please make sure all files in the hitt directory are owned by the user running the HITT script." 1
   fi
   createHITTconf ".hitt.conf"
   checkHITTconf "${HITT_CONFIG_FILE}"
