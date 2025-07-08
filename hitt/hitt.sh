@@ -3394,7 +3394,7 @@ triggerHelixDryRun() {
     }
     return"
   runJenkinsCurl "${SCRIPT}"
-  logMessage "Helix deployment pipelines dry runs started..."
+  logMessage "Starting dry runs of Helix deployment pipelines..."
 }
 
 fixJenkins() {
