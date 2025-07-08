@@ -17,8 +17,8 @@
 |------------|-----------------------------------------------------------------------------|
 | `scriptapproval`  | Approves the scripts required by the deployment pipelines.                     |
 | `pipelinelibs`  | Create/update the Global Trusted Pipeline Library definitions.              |
-| `credentials`  | Create/update the kubeconfig credential with a new kubeconfig file.              |
-| `kubeconfig`   | Create/update all the required credentials, except kubeconfig - see the 'kubeconfig' option. |
+| `credentials`  | Create/update all the required credentials, except kubeconfig - see the 'kubeconfig' option. |
+| `kubeconfig`   | Create/update the kubeconfig credential with a new kubeconfig file. |
 | `dryrun`   | Trigger a dry run of all the HELIX pipelines. |
 ## Usage ##
 
