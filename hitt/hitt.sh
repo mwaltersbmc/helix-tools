@@ -2707,6 +2707,7 @@ printMessageDetails() {
 
 logMessageDetails() {
   # MSG_ID
+  [[ "${1}" == "999" ]] && return # Don't log 999 messages
   # Suppress MSG_JSON parsing to reduce clutter
   set +x
   getMessageJSON "${1}"
@@ -3310,7 +3311,7 @@ updateJenkinsSecretFileCredentials() {
 
 fixJenkinsCredentials() {
   if ! which sshpass  > /dev/null 2>&1 ; then
-    logError "999" "The 'sshpass' command was not found but is required to enable Jenkins credentials password validation." 1
+    logError "999" "The 'sshpass' command was not found but is required to enable Jenkins credentials password validation. Please install 'sshpass'." 1
   fi
   logStatus "Please enter your GIT user password:"
   read -s -p "GIT user password : " GIT_USER_PASSWORD
@@ -3355,6 +3356,47 @@ fixSSH() {
   testSSH "${LONG_HOSTNAME}"
 }
 
+triggerHelixDryRun() {
+  SCRIPT="import jenkins.model.*
+    import hudson.model.*
+    import org.jenkinsci.plugins.workflow.job.WorkflowJob
+    Thread.start {
+        def jobList = [
+            'HELIX_CONFIGURE_ITSM',
+            'HELIX_GENERATE_CONFIG',
+            'HELIX_ITSM_INTEROPS',
+            'HELIX_NON_PLATFORM_DEPLOY',
+            'HELIX_ONPREM_DEPLOYMENT',
+            'HELIX_PLATFORM_DEPLOY',
+            'HELIX_POST_DEPLOY_CONFIG',
+            'HELIX_SMARTAPPS_DEPLOY',
+            'HELIX_SMARTREPORTING',
+            'HELIX_SMARTREPORTING_DEPLOY',
+            'SUPPORT_ASSISTANT_TOOL',
+            'HELIX_RESTART',
+            'HELIX_DR',
+            'HELIX_RLS_IMPLEMENTATION',
+            'HELIX_DB_REFRESH',
+            'HELIX_NON_PLATFORM_UPDATE',
+            'HELIX_PLATFORM_UPDATE',
+            'HELIX_SMARTREPORTING_UPGRADE',
+            'HELIX_FULL_STACK_UPGRADE'
+        ]
+        def jenkins = Jenkins.instance
+        jobList.each { jobName ->
+            def job = jenkins.getItemByFullName(jobName)
+            if (job == null) { return }
+            if (!(job instanceof WorkflowJob)) { return }
+            def causeAction = new CauseAction(new Cause.UserIdCause())
+            def future = job.scheduleBuild2(0, causeAction)
+            def build = future.get()
+        }
+    }
+    return"
+  runJenkinsCurl "${SCRIPT}"
+  logMessage "Helix deployment pipelines dry runs started..."
+}
+
 fixJenkins() {
   checkJenkinsIsRunning
   getJenkinsCrumb
@@ -3370,6 +3412,9 @@ fixJenkins() {
       ;;
     credentials)
       fixJenkinsCredentials
+      ;;
+    dryrun)
+      triggerHelixDryRun
       ;;
     *)
       logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
