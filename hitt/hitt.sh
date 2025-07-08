@@ -1102,7 +1102,6 @@ for key in $(echo "$json" | ${JQ_BIN} -r 'keys[]'); do
 done
 }
 
-
 getPipelineValues() {
   createPipelineVarsArray
   for i in "${PIPELINE_VARS[@]}"; do
@@ -2500,7 +2499,6 @@ getPipelineValuesJSON() {
     println json'
   runJenkinsCurl "${SCRIPT}"
 }
-
 
 getPipelineDefaults() {
   SCRIPT="import groovy.json.JsonOutput
