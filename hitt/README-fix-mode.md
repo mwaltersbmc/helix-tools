@@ -10,6 +10,8 @@
 | `realm`  | Create/update the Helix Service Management realm in SSO. |
 | `cacerts`  | Update the cacerts secret in the Helix IS namespace with a new file. |
 | `sat`   | Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool in the Helix IS namespace. |
+| `arlicense`   | Apply an Innovation Suite/AR server license to the system. |
+| `getdbid`   | Displays the database ID (DBID) for the system - used for licensing. |
 | `jenkins`  | Jenkins specific fixes - see below. |
 
 ### Jenkins Fixes ###
@@ -55,6 +57,21 @@ bash hitt.sh -f sat
 ```
 Creates the default role and rolebinding required by the Support Assistant Tool.  Used when SAT was deployed but the **SUPPORT_ASSISTANT_CREATE_ROLE** option was not selected.
 
+#### `"arlicense key <expiry-date>"` - applies a server license to the system
+```bash
+bash hitt.sh -f "arlicense BRD-128754"
+or
+bash hitt.sh -f "arlicense LTD-761066 28-Apr-27"
+```
+Applies a permanent or temporary server license to the system.
+
+#### `getdbid` - add the role and rolebinding needed by the Support Assistant Tool
+```bash
+bash hitt.sh -f getdbid
+```
+Displays the DB ID of the system that is required to generate a server license via the BMC web site.
+
+### Jenkins Fixes ###
 #### `"jenkins scriptapproval"` - approves Jenkins scripts
 ```bash
 bash hitt.sh -f "jenkins scriptapproval"
