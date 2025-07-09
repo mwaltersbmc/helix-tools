@@ -1819,8 +1819,12 @@ getISJWT() {
   fi
 }
 
-checkISLicense() {
+getISLicenseType() {
   IS_LICENSE_TYPE=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Administration%3A%20Server%20Information?q=%27configurationName%27%3D%22%25%22&fields=values(licensetype)" -H "Authorization: AR-JWT $ARJWT" | ${JQ_BIN} -r '.entries[0].values.licensetype')
+}
+
+checkISLicense() {
+  getISLicenseType
   if [ "${IS_LICENSE_TYPE}" != "AR Server" ]; then
     logWarning "020" "IS Server does not have a permanent license - current license type is ${IS_LICENSE_TYPE}."
   else
@@ -3420,6 +3424,10 @@ fixJenkins() {
   esac
 }
 
+getISDbID() {
+  IS_DBID=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Administration%3A%20Server%20Information?q=%27configurationName%27%3D%22%25%22&fields=values(dbId)" -H "Authorization: AR-JWT $ARJWT" | ${JQ_BIN} -r '.entries[0].values.dbId')
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -3564,6 +3572,9 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     ssh)
       fixSSH "${GIT_USER}"
+      ;;
+    arlicense)
+      applyARLicense
       ;;
     *)
     logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
