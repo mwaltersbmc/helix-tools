@@ -1259,20 +1259,24 @@ validateISDetails() {
       if [ "${CURRENT_VER}" -ge "${TARGET_VER}" ]; then
         logError "213" "SOURCE_VERSION is greater than or equal to the PLATFORM_HELM_VERSION but the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
       fi
-      if [ "${CURRENT_VER:0:5}" -eq "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPDATE" ]; then
-        logError "213" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' but should be 'UPDATE' as the source and target have the same major versions."
-      fi
-      if [ "${CURRENT_VER:0:5}" -ne "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPGRADE" ]; then
-        logError "213" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' but should be 'UPGRADE' as the source and target have different major versions."
-      fi
-    fi
 
-    if [ "${IS_DEPLOYMENT_MODE}" == "UPGRADE" ] && [ "${IS_HELIX_FULL_STACK}" == "false" ]; then
-      logError "241" "HELIX_FULL_STACK_UPGRADE is not selected but is required when the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
-    fi
+      # removed until I can figure out combos
+      #+ CURRENT_VER=202330410400
+      #+ TARGET_VER=202510110000
+#      if [ "${CURRENT_VER:0:5}" -eq "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPDATE" ]; then
+#        logError "213" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' but should be 'UPDATE' as the source and target have the same major versions."
+#      fi
+#      if [ "${CURRENT_VER:0:5}" -ne "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPGRADE" ]; then
+#        logError "213" "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}' but should be 'UPGRADE' as the source and target have different major versions."
+#      fi
+#    fi
 
-    if [ "${IS_DEPLOYMENT_MODE}" == "UPDATE" ] && [ "${IS_HELIX_FULL_STACK}" == "true" ]; then
-      logError "242" "HELIX_FULL_STACK_UPGRADE is selected but this not valid when the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
+#    if [ "${IS_DEPLOYMENT_MODE}" == "UPGRADE" ] && [ "${IS_HELIX_FULL_STACK}" == "false" ]; then
+#      logError "241" "HELIX_FULL_STACK_UPGRADE is not selected but is required when the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
+#    fi
+
+#    if [ "${IS_DEPLOYMENT_MODE}" == "UPDATE" ] && [ "${IS_HELIX_FULL_STACK}" == "true" ]; then
+#      logError "242" "HELIX_FULL_STACK_UPGRADE is selected but this not valid when the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
     fi
 
     if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
