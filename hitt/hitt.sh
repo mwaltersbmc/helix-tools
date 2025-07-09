@@ -3425,7 +3425,52 @@ fixJenkins() {
 }
 
 getISDbID() {
+  getDomain
+  buildISAliasesArray
+  getISAdminCreds
+  if ! getISJWT; then
+    logError "999" "Failed to authenticate user '${IS_ADMIN_USER}' - can't get DB ID." 1
+  fi
   IS_DBID=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Administration%3A%20Server%20Information?q=%27configurationName%27%3D%22%25%22&fields=values(dbId)" -H "Authorization: AR-JWT $ARJWT" | ${JQ_BIN} -r '.entries[0].values.dbId')
+  logMessage "DB ID for this system is '${IS_DBID}'."
+}
+
+applyARLicense() {
+  IS_LICENSE_KEY="${FIXARGS[1]^^}"
+  IS_LICENSE_EXPIRY=""
+  # Validate inputs
+  if [[ ! "${IS_LICENSE_KEY}" =~ ^[A-Z]{3}-[0-9]{6}$ ]]; then
+    logError "999" "Invalid license key format '${FIXARGS[1]}'. Expected format is 'XXX-nnnnnn' where X is a letter and n is a number - eg BRD-256197."
+    INVALID_IS_LICENSE=1
+  else
+    IS_LICENSE_JSON="{\"values\":{\"License Type\":\"AR Server\",\"Number of Licenses\":1,\"Key\":\"${IS_LICENSE_KEY}\"}}"
+  fi
+  if [ -n "${FIXARGS[2]}" ]; then
+    IS_LICENSE_EXPIRY="${FIXARGS[2]}"
+    if [[ ! "${FIXARGS[2]}" =~ ^(0[1-9]|[12][0-9]|3[01])-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-[0-9]{2}$ ]]; then
+      logError "999" "Invalid license expiry date format '${FIXARGS[2]}'. Expected format is 'DD-Mon-YY' - eg 01-Feb-27."
+      INVALID_IS_LICENSE=1
+    else
+      IS_LICENSE_JSON="{\"values\":{\"License Type\":\"AR Server\",\"Number of Licenses\":1,\"Key\":\"${IS_LICENSE_KEY}\",\"Expiration Date\":\"${IS_LICENSE_EXPIRY}\"}}"
+    fi
+  fi
+  [[ ! -z "${INVALID_IS_LICENSE+x}" ]] && exit
+  getDomain
+  buildISAliasesArray
+  getISAdminCreds
+  if ! getISJWT; then
+    logError "999" "Failed to authenticate user '${IS_ADMIN_USER}' - can't apply license." 1
+  fi
+  getISLicenseType
+  logMessage "Current server license type is '${IS_LICENSE_TYPE}'."
+  # is license already present?
+  NUM_LICS=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses?q=%27Key%27%3D%22${IS_LICENSE_KEY}%22&fields=values(Key)" -H "Authorization: AR-JWT $ARJWT" | ${JQ_BIN} -r '.entries |length')
+  if [[ $NUM_LICS -ne 0 ]]; then
+    logError "999" "License with key '${IS_LICENSE_KEY}' is already present." 1
+  fi
+  echo "${IS_LICENSE_JSON}"
+  ${CURL_BIN} -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT $ARJWT" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}"
+  logMessage "License applied."
 }
 
 # FUNCTIONS End
@@ -3573,7 +3618,13 @@ if [ "${MODE}" == "fix" ]; then
     ssh)
       fixSSH "${GIT_USER}"
       ;;
+    getdbid)
+      getISDbID
+      ;;
     arlicense)
+      if [ ${#FIXARGS[@]} -eq 1 ]; then
+        logError "999" "Usage: bash $0 -f \"arlicense key <expiry>\"" 1
+      fi
       applyARLicense
       ;;
     *)
