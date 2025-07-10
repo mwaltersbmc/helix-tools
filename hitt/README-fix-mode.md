@@ -49,7 +49,7 @@ Creates or updates the SSO realm required by the Helix Service management applic
 ```bash
 bash hitt.sh -f "cacerts /path/to/newcacerts"
 ```
-Updates the `cacerts` secret in the Helix IS namespace with a new cacerts file.  Used when the `HELIX_ONPREM_DEPLOYMENT` pipeline was run but the cacerts file was not attached or the existing secret needs to be updated with one containing a new third party certificate.
+Updates the `cacerts` secret in the Helix IS namespace with a new cacerts file.  Used when the `HELIX_ONPREM_DEPLOYMENT` pipeline was run but the cacerts file was not attached or the existing secret needs to be updated with one containing a new third party certificate.  If the new cacerts file is valid you will be prompted to confirm the update.
 
 #### `sat` - add the role and rolebinding needed by the Support Assistant Tool
 ```bash
@@ -99,7 +99,7 @@ bash hitt.sh -f "jenkins kubeconfig"
 or
 bash hitt.sh -f "jenkins kubeconfig /path/to/kubeconfig"
 ```
-Creates or updates the Jenkins `kubeconfig` credential with the current `~/.kube/config` file or the file specified in the command.  The file is tested to make sure it is valid for the current cluster.
+Creates or updates the Jenkins `kubeconfig` credential with the current `~/.kube/config` file or the file specified in the command.  The file is tested to make sure it is valid for the current cluster. If the new kubeconfig file is valid you will be prompted to confirm the update.
 
 #### `"jenkins dryrun"` - starts a dry run of all Helix deployment pipelines
 ```bash
