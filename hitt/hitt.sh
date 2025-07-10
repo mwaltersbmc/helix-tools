@@ -31,7 +31,7 @@ IS_ENVIRONMENT=${IS_ENVIRONMENT}
 
 # OPTIONAL SETTINGS
 # Set JENKINS credentials and hostname/port if required
-# Use double quotes to avoid issues with special characters
+# Enclose username/password in single quotes to avoid issues with special characters
 JENKINS_USERNAME='${JENKINS_USERNAME}'
 JENKINS_PASSWORD='${JENKINS_PASSWORD}'
 JENKINS_HOSTNAME=localhost
