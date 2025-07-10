@@ -1260,6 +1260,24 @@ validateISDetails() {
         logError "213" "SOURCE_VERSION is greater than or equal to the PLATFORM_HELM_VERSION but the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
       fi
 
+      # UPDATE is always valid for applying a HF
+      # eg 202330410000 / 202330410400 / 202330410400
+      if [ "${CURRENT_VER:0:9}" -eq "${TARGET_VER:0:9}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPDATE" ]; then
+        logError "213" "DEPLOYMENT_MODE should be 'UPDATE' when applying a hotfix but is set to '${IS_DEPLOYMENT_MODE}'."
+      fi
+
+      # UPDATE should be used for any 2330x updates with same major release
+      # eg 20233 0410000 / 20233 0410400 / 20233 0410400
+      if [ "${CURRENT_VER:0:5}" -eq "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPDATE" ]; then
+        logError "213" "DEPLOYMENT_MODE should be 'UPDATE' when upgrading to a new version of the same major release but is set to '${IS_DEPLOYMENT_MODE}'."
+      fi
+
+      # When first 5 digits of source are less than target then should be UPGRADE
+      if [ "${CURRENT_VER:0:5}" -lt "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPGRADE" ]; then
+        logError "213" "DEPLOYMENT_MODE should be 'UPGRADE' but is set to '${IS_DEPLOYMENT_MODE}'."
+      fi
+
+
       # removed until I can figure out combos
       #+ CURRENT_VER=202330410400
       #+ TARGET_VER=202510110000
@@ -2798,17 +2816,21 @@ checkDERequirements() {
       MAX_ANSIBLE_VERSION="2.18"
     fi
 
-    ANSIBLE_VERSION=$(ansible --version 2>/dev/null | head -1 | grep -oP '\d+.\d+')
+#    ANSIBLE_VERSION=$(ansible --version 2>/dev/null | head -1 | grep -oP '\d+.\d+')
+    ANSIBLE_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible localhost -m ansible.builtin.debug -a "msg={{ ansible_version.full }}" 2>/dev/null | jq -r '.plays[0].tasks[0].hosts.localhost.msg' | grep -oP '\d+.\d+')
     if [ -z "${ANSIBLE_VERSION}" ]; then
-      logError "216" "Unable to determine the version of ansible using the command 'ansible --version'."
+      logError "216" "Unable to determine the version of ansible."
     else
       if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
         logError "208" "The installed version of ansible '${ANSIBLE_VERSION}' is not supported - required version must be no greater than '${MAX_ANSIBLE_VERSION}'."
       else
-        logMessage "Using ansible version '${ANSIBLE_VERSION}'"
+        logMessage "Using ansible version '${ANSIBLE_VERSION}'."
         if ! isJmespathInstalled ; then
-          ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
-          logError "209" "Unable to verify that 'jmespath' is installed for the python instance used by ansible '${ANSIBLE_PYTHON_VERSION}'."
+          ANSIBLE_FACTS_JSON=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>>${HITT_ERR_FILE})
+          ANSIBLE_PYTHON_VERSION=$(echo "${ANSIBLE_FACTS_JSON}" | ${JQ_BIN} -r '.plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python_version')
+          ANSIBLE_PYTHON_EXECUTABLE=$(echo "${ANSIBLE_FACTS_JSON}" | ${JQ_BIN} -r '.plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable')
+#          ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
+          logError "209" "Unable to verify that 'jmespath' is installed for python version '${ANSIBLE_PYTHON_VERSION}' used by ansible - '${ANSIBLE_PYTHON_EXECUTABLE}'."
         fi
       fi
     fi
