@@ -779,7 +779,8 @@ validateAliasInLBCert() {
 }
 
 logLBCertDetails() {
-  ${OPENSSL_BIN} s_client -connect  "${LB_HOST}:443" ${OPENSSL_PROXY_STRING} </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text > lb-cert.log
+  ${OPENSSL_BIN} s_client -connect  "${LB_HOST}:443" ${OPENSSL_PROXY_STRING} </dev/null 2>/dev/null > cert-lb-host.log
+  ${OPENSSL_BIN} s_client -connect  "${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}:443" ${OPENSSL_PROXY_STRING} </dev/null 2>/dev/null > cert-restapi.log
 }
 
 checkServiceDetails() {
@@ -2905,8 +2906,12 @@ updateISCacerts() {
   cp "${NEWCACERTS}" sealcacerts
   validateCacerts
   if [ "${VALID_CACERTS}" == "0" ]; then
-    replaceISCacertsSecret
-    logStatus "cacerts secret in '${IS_NAMESPACE}' namespace replaced with '${NEWCACERTS}'."
+    if askYesNo "New cacerts file is valid - do you want to replace the cacerts secret?"; then
+      replaceISCacertsSecret
+      logMessage "cacerts secret in '${IS_NAMESPACE}' namespace replaced with '${NEWCACERTS}'."
+    else
+      logMessage "No changes made to the cacerts secret in the '${IS_NAMESPACE}' namespace."
+    fi
   fi
 }
 
@@ -3110,8 +3115,12 @@ fixJenkinsKubeconfig() {
   esac
   checkValidKubeconfig "${KUBECONFIG_FILE}"
   encodeKubeconfig "${KUBECONFIG_FILE}"
-  updateJenkinsKubeconfig
-  logMessage "Jenkins kubeconfig credential updated with '${KUBECONFIG_FILE}'."
+  if askYesNo "Do you want to update the Jenkins kubeconfig credential?"; then
+    updateJenkinsKubeconfig
+    logMessage "Jenkins kubeconfig credential updated with '${KUBECONFIG_FILE}'."
+  else
+    logMessage "No changes made to the Jenkins kubeconfig credential."
+  fi
 }
 
 encodeKubeconfig() {
@@ -3499,6 +3508,20 @@ applyARLicense() {
   logMessage "License applied."
 }
 
+askYesNo() {
+  local prompt="$1"
+  local response
+
+  while true; do
+    read -rp "${prompt} [y/n]: " response
+    case "${response}" in
+      y|Y) return 0 ;;  # Yes: return success
+      n|N) return 1 ;;  # No: return failure
+      *) echo "Please enter 'y' or 'n'." ;;
+    esac
+  done
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -3717,7 +3740,6 @@ getRealmDetails
 logStatus "Checking realm..."
 checkTenantRealms
 validateRealm
-logLBCertDetails
 
 if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking Jenkins is accessible..."
@@ -3739,6 +3761,8 @@ if [ "${MODE}" != "post-hp" ]; then
   checkISLicenseStatus
   checkISTenant
 fi
+
+logLBCertDetails
 
 if [ "${MODE}" == "pre-is" ]; then
   logStatus "Checking Deployment Engine setup..."
