@@ -2332,6 +2332,10 @@ checkJenkinsPlugins() {
       logError "195" "Jenkins plugin '${i}' is missing."
     fi
   done
+  # Test for permissive script plugin
+  if [[ "${JK_PLUGINS[@]}" =~ "permissive-script-security" ]]; then
+    SKIP_JENKINS_SCRIPTAPPROVAL_CHECK=1
+  fi
 }
 
 checkJenkinsCredentials() {
@@ -2668,6 +2672,10 @@ getJenkinsApprovedScripts() {
 }
 
 checkJenkinsScriptApprovals() {
+  if [[ -n "${SKIP_JENKINS_SCRIPTAPPROVAL_CHECK+x}" ]]; then
+    logMessage "Jenkins 'permissive-script-security' plugin found - skipping script approval checks..." 1
+    return
+  fi
   APPROVED_SCRIPTS=$(getJenkinsApprovedScripts)
   for i in "getRawBuild" "getLog" ; do
     if ! echo "${APPROVED_SCRIPTS}" | ${JQ_BIN} '.approvedSignatures' | grep -q "${i}" ; then
