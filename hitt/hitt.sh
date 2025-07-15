@@ -570,7 +570,11 @@ deployTCTL() {
     logError "202" "Unable to find job with TCTL image details."
     return 1
   fi
-  TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o jsonpath='{.spec.template.spec.containers[0].image}')
+  TCTL_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o json)
+  #  TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o jsonpath='{.spec.template.spec.containers[0].image}')
+  TCTL_IMAGE=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].image')
+  TCTL_RUNASUSER=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].securityContext.runAsUser')
+  TCTL_RUNASGROUP=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].securityContext.runAsGroup')
   if [ -z "${TCTL_IMAGE}" ]; then
     logError "203" "Unable to get TCTL image name from job ${TCTL_JOB_NAME}."
     return 1
@@ -619,6 +623,8 @@ spec:
           capabilities:
             drop: ["ALL"]
           runAsNonRoot: true
+          runAsUser: ${TCTL_RUNASUSER}
+          runAsGroup: ${TCTL_RUNASGROUP}
           seccompProfile:
             type: RuntimeDefault
         resources:
