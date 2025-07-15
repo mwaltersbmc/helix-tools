@@ -3129,7 +3129,7 @@ fixJenkinsKubeconfig() {
   esac
   checkValidKubeconfig "${KUBECONFIG_FILE}"
   encodeKubeconfig "${KUBECONFIG_FILE}"
-  if askYesNo "Do you want to update the Jenkins kubeconfig credential?"; then
+  if askYesNo "Do you want to update the Jenkins kubeconfig credential with '${KUBECONFIG_FILE}'?"; then
     updateJenkinsKubeconfig
     logMessage "Jenkins kubeconfig credential updated with '${KUBECONFIG_FILE}'."
   else
@@ -3466,6 +3466,12 @@ fixJenkins() {
       ;;
     dryrun)
       triggerHelixDryRun
+      ;;
+    all)
+      fixJenkinsCredentials
+      fixJenkinsPipelineLibs
+      fixJenkinsScriptApproval
+      fixJenkinsKubeconfig
       ;;
     *)
       logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
