@@ -2234,7 +2234,7 @@ checkJenkinsConfig() {
   checkSSHSetup
 }
 
-getPipelineParameterDefault(){
+getPipelineParameterDefault() {
   PARAM_VALUE=$(getPipelineDefaults ${1} | ${JQ_BIN} -r .${2})
   echo "${PARAM_VALUE}"
 }
@@ -2595,7 +2595,7 @@ getJenkinsCredentials() {
   runJenkinsCurl "${SCRIPT}"
 }
 
-checkSSHknown_hosts(){
+checkSSHknown_hosts() {
   if ! which ssh-keygen >/dev/null 2>&1; then
     logWarning "039" "'ssh-keygen' command not found - skipping passwordless ssh checks."
     return
@@ -2939,7 +2939,7 @@ replaceISCacertsSecret() {
   ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts=sealcacerts --dry-run=client -o yaml | ${KUBECTL_BIN} apply -f - >/dev/null 2>&1
 }
 
-fixSATRole(){
+fixSATRole() {
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get role assisttool-rl >/dev/null 2>&1; then
     logError "999" "'assisttool-rl' role is already present in the '${IS_NAMESPACE}' namespace."  1
   fi
@@ -3542,6 +3542,37 @@ askYesNo() {
   done
 }
 
+activateHP() {
+  checkToolVersion kubectl
+  getVersions
+  setVarsFromPlatform
+  getRSSODetails
+  getDomain
+  getTenantDetails
+  HP_TENANT_ID="${HP_TENANT#*.}"
+  if ! isTenantActivated ; then
+    ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "update localuser set password = '\x020a7e17c23b9cb42174e31d1d39085f305bdbab57544b163e1c2be70c7523b43eb1f1e8b092ed5b13f05aff838d32141181892e14bbfdbd75ab235640adfc30731f9c7f72d24f2a2ecba2fa22d2dd50ca85020d15213956c22f09e87f76fa4398' where login = 'hannah_admin' and realm='${HP_TENANT}' and status = 'REG_PENDING'" > /dev/null 2>&1
+    ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "update localuser set status = 'REG_COMPLETED' where login = 'hannah_admin' and realm='${HP_TENANT}' and status = 'REG_PENDING'" > /dev/null 2>&1
+    logMessage "Tenant '${HP_TENANT}' activated."
+    exit
+  fi
+}
+
+resetSSOPasswd() {
+  PG_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "data=postgres,apps.kubernetes.io/pod-index=0")
+  SSO_ADMIN_TID=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "select tid from AdminUsers where loginid = 'Admin' and tid = '00000000-0000-0000-0000-000000000000';" 2>/dev/null )
+  if echo "${SSO_ADMIN_TID}" | grep -q "00000000-0000-0000-0000-000000000000" ; then
+    if askYesNo "Do you want to reset the SSO admin password?"; then
+      ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "update adminusers set Password = '3a544f348f1ed1ec7bdfbfb41cb3f752', blocked=0  where LoginId = 'Admin' and tid = '00000000-0000-0000-0000-000000000000';" >/dev/null 2>&1
+      logMessage "SSO admin user password has been reset to the default value."
+    else
+      logMessage "SSO admin user password has not been changed."
+    fi
+  else
+    logError "999" "SSO admin user not found - no changes made."
+  fi
+}
+
 # FUNCTIONS End
 
 # MAIN Start
@@ -3695,6 +3726,12 @@ if [ "${MODE}" == "fix" ]; then
         logError "999" "Usage: bash $0 -f \"arlicense key <expiry>\"" 1
       fi
       applyARLicense
+      ;;
+    activatehp)
+      activateHP
+      ;;
+    resetssopwd)
+      resetSSOPasswd
       ;;
     *)
     logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
