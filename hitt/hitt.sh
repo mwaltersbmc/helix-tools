@@ -1077,10 +1077,7 @@ getPipelinePasswords() {
 }
 
 checkSSHSetup() {
-  if [ ! -d ~/.ssh ]; then
-    logError "235" "SSH key not found for the current user - please create a key and configure passwordless ssh as detailed in the product docs."
-    return
-  fi
+  validateSSHPermissions
   checkSSHknown_hosts
   checkJenkinsSSH
 }
@@ -3389,11 +3386,17 @@ fixSSH() {
   SSH_DIR="${HOME_DIR}/.ssh"
   KEY_FILE="${SSH_DIR}/id_rsa"
   AUTHORIZED_KEYS="${GIT_HOME_DIR}/.ssh/authorized_keys"
-  mkdir -p "${SSH_DIR}"
-  chmod 700 "${SSH_DIR}"
-  # Generate SSH key if it doesn't exist
-  if [ ! -f "${KEY_FILE}" ]; then
-      ssh-keygen -t rsa -b 4096 -f "${KEY_FILE}" -N "" -q
+  # Set correct perms or create ~/.ssh and key files
+  if [ -d "${SSH_DIR}" ]; then
+    chmod 700 "${SSH_DIR}"
+  else
+    mkdir -p -m 700 "${SSH_DIR}"
+  fi
+  if [ -f "${KEY_FILE}" ]; then
+    chmod 600 "${KEY_FILE}"
+    chmod 644 "${KEY_FILE}.pub"
+  else
+    ssh-keygen -t rsa -b 4096 -f "${KEY_FILE}" -N "" -q
   fi
   PUB_KEY=$(cat "${KEY_FILE}.pub")
   # Ensure authorized_keys file exists
@@ -3572,6 +3575,67 @@ resetSSOPasswd() {
     logError "999" "SSO admin user not found - no changes made."
   fi
 }
+
+validateSSHPermissions() {
+  SSH_DIR="$HOME/.ssh"
+  SSH_ERROR=0
+  logMessage "Validating SSH directory and file permissions..."
+
+  if [ ! -d "$SSH_DIR" ]; then
+    logError "235" "SSH directory '$SSH_DIR' does not exist. Please see the product documentation for the steps to set up ssh for the git user."
+    return
+  fi
+
+  if [ "$(stat -c "%a" "$SSH_DIR")" != "700" ]; then
+    logWarning "042" "Permissions on '$SSH_DIR' should be 700, found $(stat -c "%a" "$SSH_DIR")."
+    SSH_ERROR=1
+  fi
+
+  if [ "$(stat -c "%U" "$SSH_DIR")" != "${GIT_USER}" ]; then
+    logWarning "042" "Owner of '$SSH_DIR' is not '${GIT_USER}'."
+    SSH_ERROR=1
+  fi
+
+  # Check authorized_keys
+  SSH_AUTH_KEYS="$SSH_DIR/authorized_keys"
+  if [ -f "${SSH_AUTH_KEYS}" ]; then
+    if [ "$(stat -c "%a" "${SSH_AUTH_KEYS}")" != "600" ]; then
+      logWarning "042" "Permissions on '${SSH_AUTH_KEYS}' should be 600."
+      SSH_ERROR=1
+    fi
+    if [ "$(stat -c "%U" "${SSH_AUTH_KEYS}")" != "${GIT_USER}" ]; then
+      logWarning "042" "Owner of '${SSH_AUTH_KEYS}' is not '${GIT_USER}'."
+      SSH_ERROR=1
+    fi
+  fi
+
+  # Check private keys
+  for key in "$SSH_DIR"/id_*; do
+    [ -f "$key" ] || continue
+    [[ "$key" == *.pub ]] && continue
+    if [ "$(stat -c "%a" "$key")" != "600" ]; then
+      logWarning "042" "Private key '$key' should have 600 permissions."
+      SSH_ERROR=1
+    fi
+  done
+
+  # Check public keys
+  for pubkey in "$SSH_DIR"/*.pub; do
+    [ -f "$pubkey" ] || continue
+    if [ "$(stat -c "%a" "$pubkey")" != "644" ]; then
+      logWarning "042" "Public key '$pubkey' should have 644 permissions."
+      SSH_ERROR=1
+    fi
+  done
+
+  if [ "${SSH_ERROR}" -eq 0 ]; then
+    logMessage "SSH permissions and ownership are valid." 1
+  else
+    logError "247" "One or more SSH permission issues detected. Fix with: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub"
+  fi
+}
+
+
 
 # FUNCTIONS End
 
@@ -4217,6 +4281,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The named Helix Platform tenant has not been activated using the link in the activation email.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline may encounter issues.\",
     \"remediation\": \"Use the link in the activation email to set the first user password and activate the tenant.\"
+  },
+  {
+    \"id\": \"042\",
+    \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
+    \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
+    \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
   },
   {
     \"id\": \"100\",
@@ -5099,6 +5169,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The 'Project Repository' value for the named Global Pipeline Library does not reference the expected .git directory.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Set the correct 'Project Repository' value for the named Global Pipeline Library.\"
+  },
+  {
+    \"id\": \"247\",
+    \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
+    \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
+    \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
   }
 ]"
 
