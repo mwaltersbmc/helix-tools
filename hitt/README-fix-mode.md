@@ -12,6 +12,7 @@
 | `sat`   | Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool in the Helix IS namespace. |
 | `arlicense`   | Apply an Innovation Suite/AR server license to the system. |
 | `getdbid`   | Displays the database ID (DBID) for the system - used for licensing. |
+| `resetssopwd`   | Resets the Helix SSO admin user password to the BMC default value. |
 | `jenkins`  | Jenkins specific fixes - see below. |
 
 ### Jenkins Fixes ###
@@ -21,6 +22,7 @@
 | `pipelinelibs`  | Create/update the Global Trusted Pipeline Library definitions.              |
 | `credentials`  | Create/update all the required credentials, except kubeconfig - see the 'kubeconfig' option. |
 | `kubeconfig`   | Create/update the kubeconfig credential with a new kubeconfig file. |
+| `all`   | Runs all of the Jenkins fixes except for 'dryrun'. |
 | `dryrun`   | Trigger a dry run of all the HELIX pipelines. |
 ## Usage ##
 
@@ -71,6 +73,12 @@ bash hitt.sh -f getdbid
 ```
 Displays the DB ID of the system that is required to generate a server license via the BMC web site.
 
+#### `resetssopwd` - resets the Helix SSO admin user password to the BMC default value
+```bash
+bash hitt.sh -f resetssopwd
+```
+Checks that the SSO 'Admin' user exists and prompts for confirmation before resetting the password to the default value.
+
 ### Jenkins Fixes ###
 #### `"jenkins scriptapproval"` - approves Jenkins scripts
 ```bash
@@ -100,6 +108,12 @@ or
 bash hitt.sh -f "jenkins kubeconfig /path/to/kubeconfig"
 ```
 Creates or updates the Jenkins `kubeconfig` credential with the current `~/.kube/config` file or the file specified in the command.  The file is tested to make sure it is valid for the current cluster. If the new kubeconfig file is valid you will be prompted to confirm the update.
+
+#### `"jenkins all"` - run all Jenkins fixes
+```bash
+bash hitt.sh -f "jenkins all"
+```
+Runs all of the HITT Jenkins fixes, except for 'dryrun'. Useful for configuring a new installation of Jenkins.
 
 #### `"jenkins dryrun"` - starts a dry run of all Helix deployment pipelines
 ```bash
