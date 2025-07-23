@@ -2881,7 +2881,7 @@ getJenkinsCrumb() {
 
 runJenkinsCurl() {
   #1 groovy script
-  ${CURL_BIN} -b .cookies --data-urlencode "script=${1}" -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_ERR_FILE}
+  ${CURL_BIN} --max-time 3 -b .cookies --data-urlencode "script=${1}" -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_ERR_FILE}
 }
 
 isOpenShift() {
@@ -3414,41 +3414,38 @@ triggerHelixDryRun() {
   SCRIPT="import jenkins.model.*
     import hudson.model.*
     import org.jenkinsci.plugins.workflow.job.WorkflowJob
-    Thread.start {
-        def jobList = [
-            'HELIX_CONFIGURE_ITSM',
-            'HELIX_GENERATE_CONFIG',
-            'HELIX_ITSM_INTEROPS',
-            'HELIX_NON_PLATFORM_DEPLOY',
-            'HELIX_ONPREM_DEPLOYMENT',
-            'HELIX_PLATFORM_DEPLOY',
-            'HELIX_POST_DEPLOY_CONFIG',
-            'HELIX_SMARTAPPS_DEPLOY',
-            'HELIX_SMARTREPORTING',
-            'HELIX_SMARTREPORTING_DEPLOY',
-            'SUPPORT_ASSISTANT_TOOL',
-            'HELIX_RESTART',
-            'HELIX_DR',
-            'HELIX_RLS_IMPLEMENTATION',
-            'HELIX_DB_REFRESH',
-            'HELIX_NON_PLATFORM_UPDATE',
-            'HELIX_PLATFORM_UPDATE',
-            'HELIX_SMARTREPORTING_UPGRADE',
-            'HELIX_FULL_STACK_UPGRADE'
-        ]
-        def jenkins = Jenkins.instance
-        jobList.each { jobName ->
-            def job = jenkins.getItemByFullName(jobName)
-            if (job == null) { return }
-            if (!(job instanceof WorkflowJob)) { return }
-            def causeAction = new CauseAction(new Cause.UserIdCause())
-            def future = job.scheduleBuild2(0, causeAction)
-            def build = future.get()
-        }
-    }
+    def jobList = [
+      'HELIX_CONFIGURE_ITSM',
+      'HELIX_GENERATE_CONFIG',
+      'HELIX_ITSM_INTEROPS',
+      'HELIX_NON_PLATFORM_DEPLOY',
+      'HELIX_ONPREM_DEPLOYMENT',
+      'HELIX_PLATFORM_DEPLOY',
+      'HELIX_POST_DEPLOY_CONFIG',
+      'HELIX_SMARTAPPS_DEPLOY',
+      'SUPPORT_ASSISTANT_TOOL',
+      'HELIX_RESTART',
+      'HELIX_DR',
+      'HELIX_RLS_IMPLEMENTATION',
+      'HELIX_DB_REFRESH',
+      'HELIX_NON_PLATFORM_UPDATE',
+      'HELIX_PLATFORM_UPDATE',
+      'HELIX_FULL_STACK_UPGRADE',
+      'HELIX_PLATFORM_UPGRADE',
+      'HELIX_NON_PLATFORM_UPGRADE'
+      ]
+    def jenkins = Jenkins.instance
+    jobList.each { jobName ->
+      def job = jenkins.getItemByFullName(jobName)
+      if (job == null) { return }
+      if (!(job instanceof WorkflowJob)) { return }
+      def causeAction = new CauseAction(new Cause.UserIdCause())
+      def future = job.scheduleBuild2(0, causeAction)
+      def build = future.get()
+      }
     return"
+  logMessage "Started dry runs of Helix deployment pipelines..."
   runJenkinsCurl "${SCRIPT}"
-  logMessage "Starting dry runs of Helix deployment pipelines..."
 }
 
 fixJenkins() {
