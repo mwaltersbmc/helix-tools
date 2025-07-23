@@ -1085,7 +1085,7 @@ checkSSHSetup() {
 checkJenkinsSSH() {
   RESULT=$(runJenkinsSSH)
   if [ "${RESULT}" != "${USER}" ]; then
-    logError "236" "Passwordless SSH test from Jenkins pipeline as the git user failed - please check that the jenkins user can run 'ssh ${USER}@${LONG_HOSTNAME} without any input."
+    logError "236" "Passwordless SSH test from Jenkins pipeline as the git user failed - please check that the jenkins user can run 'ssh ${USER}@${LONG_HOSTNAME}' without any input."
   fi
 }
 
