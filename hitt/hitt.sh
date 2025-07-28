@@ -2828,19 +2828,30 @@ checkDERequirements() {
       MAX_ANSIBLE_VERSION="2.18"
     fi
 
+    ANSIBLE_VERS=$(ansible-playbook /dev/stdin << EOF 2>/dev/null | grep 'msg:' | xargs
+      - hosts: localhost
+        gather_facts: true
+        tasks:
+        - debug:
+            msg: "{{ ansible_version.full }}={{ ansible_python_version }}={{ ansible_python.executable }}"
+EOF
+    )
+    ANSIBLE_VERS_CLEAN="${ANSIBLE_VERS#msg: }"
+    IFS='=' read -r ANSIBLE_VERSION ANSIBLE_PYTHON_VERSION ANSIBLE_PYTHON_EXECUTABLE <<< "${ANSIBLE_VERS_CLEAN}"
 #    ANSIBLE_VERSION=$(ansible --version 2>/dev/null | head -1 | grep -oP '\d+.\d+')
-    ANSIBLE_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible localhost -m ansible.builtin.debug -a "msg={{ ansible_version.full }}" 2>/dev/null | jq -r '.plays[0].tasks[0].hosts.localhost.msg' | grep -oP '\d+.\d+')
+#    ANSIBLE_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible localhost -m ansible.builtin.debug -a "msg={{ ansible_version.full }}" 2>/dev/null | jq -r '.plays[0].tasks[0].hosts.localhost.msg' | grep -oP '\d+.\d+')
     if [ -z "${ANSIBLE_VERSION}" ]; then
       logError "216" "Unable to determine the version of ansible."
     else
+      ANSIBLE_VERSION=$(echo "${ANSIBLE_VERSION}" | grep -oP '\d+.\d+')
       if [ $(versionFmt "${ANSIBLE_VERSION}") -gt $(versionFmt "${MAX_ANSIBLE_VERSION}") ]; then
         logError "208" "The installed version of ansible '${ANSIBLE_VERSION}' is not supported - required version must be no greater than '${MAX_ANSIBLE_VERSION}'."
       else
         logMessage "Using ansible version '${ANSIBLE_VERSION}'."
         if ! isJmespathInstalled ; then
-          ANSIBLE_FACTS_JSON=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>>${HITT_ERR_FILE})
-          ANSIBLE_PYTHON_VERSION=$(echo "${ANSIBLE_FACTS_JSON}" | ${JQ_BIN} -r '.plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python_version')
-          ANSIBLE_PYTHON_EXECUTABLE=$(echo "${ANSIBLE_FACTS_JSON}" | ${JQ_BIN} -r '.plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable')
+#          ANSIBLE_FACTS_JSON=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>>${HITT_ERR_FILE})
+#          ANSIBLE_PYTHON_VERSION=$(echo "${ANSIBLE_FACTS_JSON}" | ${JQ_BIN} -r '.plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python_version')
+#          ANSIBLE_PYTHON_EXECUTABLE=$(echo "${ANSIBLE_FACTS_JSON}" | ${JQ_BIN} -r '.plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable')
 #          ANSIBLE_PYTHON_VERSION=$(ANSIBLE_STDOUT_CALLBACK=json ansible -m setup localhost 2>/dev/null | sed '/^{/,/^}/p' | ${JQ_BIN} -r .plays[0].tasks[0].hosts.localhost.ansible_facts.ansible_python.executable)
           logError "209" "Unable to verify that 'jmespath' is installed for python version '${ANSIBLE_PYTHON_VERSION}' used by ansible - '${ANSIBLE_PYTHON_EXECUTABLE}'."
         fi
