@@ -3643,9 +3643,11 @@ validateSSHPermissions() {
   fi
 }
 
+getPipelineConsoleOutput() {
+  ${CURL_BIN} -skf "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1^^}/lastBuild/consoleText"
+}
 
-
-# FUNCTIONS End
+#End functions
 
 # MAIN Start
 main() {
@@ -3809,6 +3811,12 @@ if [ "${MODE}" == "fix" ]; then
     logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
     ;;
   esac
+  exit
+fi
+
+if [ -n "${PIPELINE_NAME}" ]; then
+  checkJenkinsIsRunning
+  getPipelineConsoleOutput "${PIPELINE_NAME}"
   exit
 fi
 
@@ -5186,7 +5194,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
+while getopts "b:cde:f:gh:i:e:jlm:n:o:pqs:t:u:vw:x" options; do
   case "${options}" in
     b)
       BUNDLE_ID="${OPTARG}"
@@ -5239,6 +5247,12 @@ while getopts "b:cde:f:gh:i:e:jlm:n:pqs:t:u:vw:x" options; do
     n)
       CONF_OVERRIDE=1
       IS_ENVIRONMENT_OVERRIDE="${OPTARG}"
+      ;;
+    o)
+      if [ $# -ne 2 ]; then
+        logError "999" "Usage: bash $0 -o PIPELINE_NAME" 1
+      fi
+      PIPELINE_NAME="${OPTARG}"
       ;;
     p)
       LOG_PASSWDS=1
