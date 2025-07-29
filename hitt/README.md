@@ -183,6 +183,36 @@ Running IS deployment status check for bundle ID IDGIUNLUI5ENUASTJV8FSTJV8FT3JQ.
 }
 ```
 
+### Display Jenkins Pipeline Console Output ###
+
+Use the `-o PIPELINE_NAME` option to display the console output from the latest build of the named Jenkins pipeline:
+
+```bash
+$ bash hitt.sh -o helix_onprem_deployment
+
+Welcome to the Helix IS Triage Tool - Tue Jul 29 04:00:35 AM CDT 2025.
+
+Checking KUBECONFIG file...
+
+        Jenkins version 2.504.2 found on http://localhost:8080
+
+Started by user jenkins
+Checking out git ssh://git@bcx-aus-ae931ed.bmc.com/home/git/git_repos/ITSM_REPO/itsm-on-premise-installer.git into /var/lib/jenkins/workspace/HELIX_ONPREM_DEPLOYMENT@script/f800e028f92c79b5b7545feb0b85328f01f45790e00dfe4a3ef1e757ca639e59 to read pipeline/jenkinsfile/HELIX_ONPREM_DEPLOYMENT.jenkinsfile
+The recommended git tool is: NONE
+No credentials specified
+ > git rev-parse --resolve-git-dir /var/lib/jenkins/workspace/HELIX_ONPREM_DEPLOYMENT@script/f800e028f92c79b5b7545feb0b85328f01f45790e00dfe4a3ef1e757ca639e59/.git # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url ssh://git@bcx-aus-ae931ed.bmc.com/home/git/git_repos/ITSM_REPO/itsm-on-premise-installer.git # timeout=10
+Fetching upstream changes from ssh://git@bcx-aus-ae931ed.bmc.com/home/git/git_repos/ITSM_REPO/itsm-on-premise-installer.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.47.1'
+ > git fetch --tags --force --progress -- ssh://git@bcx-aus-ae931ed.bmc.com/home/git/git_repos/ITSM_REPO/itsm-on-premise-installer.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/master^{commit} # timeout=10
+Checking out Revision cc2013d91e7f786c9a744527dfc61a29c00e7338 (refs/remotes/origin/master)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f cc2013d91e7f786c9a744527dfc61a29c00e7338 # timeout=10
+```
+
 ### Advanced CLI Options ###
 
 There are several extra command line switches which may be helpful for troubleshooting.
