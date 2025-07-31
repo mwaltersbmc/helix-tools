@@ -1135,7 +1135,7 @@ checkPipelinePwds() {
     if echo "${PASSWD}" | grep -q '\$' ; then
       logError "191" "The value of the pipeline parameter '${i}' contains a '$' character which will cause errors."
     fi
-done
+  done
 }
 
 getInputFileValues() {
@@ -2197,13 +2197,11 @@ dumpVARs() {
       echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
     done
     if [ "${LOG_PASSWDS}" == "1" ]; then
-      for i in "${INPUT_FILE_VARS[@]}"; do
-        v="IS_${i}"
-        echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
-      done
+      echo "${PASSWDS_JSON}" | ${JQ_BIN} -r '.[] | select(.value.plainText != "") | "\(.key)=\(.value.plainText)"' >> "${VALUES_LOG_FILE}"
     fi
     echo "${JENKINS_PARAMS}" > "${VALUES_JSON_FILE}"
   fi
+
   if [ "${MODE}" == "post-is" ]; then
     createPipelineVarsArray
     for i in "${PIPELINE_VARS[@]}"; do
