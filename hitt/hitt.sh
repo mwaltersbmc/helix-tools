@@ -2334,7 +2334,7 @@ checkJenkinsPlugins() {
     fi
   done
   # Test for permissive script plugin
-  if [[ "${JK_PLUGINS[@]}" =~ "permissive-script-security" ]]; then
+  if [[ "${JK_PLUGINS[*]}" =~ "permissive-script-security" ]]; then
     SKIP_JENKINS_SCRIPTAPPROVAL_CHECK=1
   fi
 }
