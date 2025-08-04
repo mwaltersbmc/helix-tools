@@ -752,6 +752,7 @@ validateRealmDomains() {
     fi
     validateAliasInDNS "${TARGET}"
     validateAliasInLBCert "${TARGET}"
+    validateAliasAccessibleFromDE "${TARGET}"
   done
 
   # Check for portal alias - will not be present if INTEROPS pipeline has not been run
@@ -762,6 +763,18 @@ validateRealmDomains() {
   if [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
     logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is only expected after the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
+}
+
+validateAliasAccessibleFromDE(){
+  HTTP_CODE=$(${CURL_BIN} -ks -o /dev/null -w "%{http_code}" --max-time 3 "https://${1}")
+  case "${HTTP_CODE}" in
+    200|201|202|204|404|409|302)
+      logMessage "  - url 'https://${1}' is accessible from the Deployment Engine system." 1
+      ;;
+    *)
+      logWarning "043" "URL 'https://${1}' is not accessible from the Deployment Engine system."
+      ;;
+  esac
 }
 
 validateAliasInDNS() {
@@ -2339,6 +2352,7 @@ checkJenkinsPlugins() {
   fi
 }
 
+# NOT USED
 checkJenkinsCredentials() {
   # Get list of credentials and check for expected IDs
   EXPECTED_CREDENTIALS="${JENKINS_CREDS[@]}"
@@ -4306,6 +4320,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
     \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
     \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
+  },
+  {
+    \"id\": \"043\",
+    \"cause\": \"The named alias is accessible from the Deployment Engine system using a curl command.\",
+    \"impact\": \"Deployment may fail as some aliases, RESTAPI for example, are used by the pipeline scripts.\",
+    \"remediation\": \"Make sure the aliases are correctly set up and accessible - check firewall settings etc.\"
   },
   {
     \"id\": \"100\",
