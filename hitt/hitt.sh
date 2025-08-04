@@ -2485,7 +2485,12 @@ checkJenkinsGlobalLibs() {
         if ! echo "${LIB_PATH}" | grep -q "^${CRED_USER}@" ; then
           logError "233" "The 'Project Repository' value of the '${LIB_NAME}' global pipeline library is not set correctly, it should begin with 'ssh://<GIT_USER>@'."
         else
-          REPO_PATH=$(echo "/${LIB_PATH#*/}")
+          REPO_PATH=$(echo "${LIB_PATH#*/}")
+          if [[ "${REPO_PATH}" =~ ^~ ]] ; then
+            REPO_PATH=$(eval echo "${REPO_PATH}")
+          else
+            REPO_PATH="/${REPO_PATH}"
+          fi
           if [ ! -d "${REPO_PATH}" ]; then
             logError "234" "The .git repo directory in the 'Project Repository' value of the '${LIB_NAME}' global pipeline library does not exist.  Verify the path to the directory."
           else
