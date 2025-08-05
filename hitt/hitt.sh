@@ -326,6 +326,7 @@ setISDBVersion() {
     25)
       [[ "${1}" == "25.1.01" ]] && IS_DB_VERSION=203
       [[ "${1}" == "25.2.01" ]] && IS_DB_VERSION=215
+      [[ "${1}" == "25.3.01" ]] && IS_DB_VERSION=215
       ;;
     *)
       logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
@@ -414,6 +415,10 @@ setVarsFromPlatform() {
     25.2.00)
       TCTL_VER=654
       ADE_INFRA_CLIENT_IMAGE_TAG=25200-v97-ade-infra-clients-alpine
+      ;;
+    25.3.00)
+      TCTL_VER=685
+      ADE_INFRA_CLIENT_IMAGE_TAG=25300-v232-ade-infra-clients-alpine
       ;;
     *)
       ;;
@@ -3715,7 +3720,6 @@ if [ "${https_proxy}" != "" ] && [ "${DISABLE_PROXY}" == "0" ]; then
     PROXY_PWD="${PROXY_CREDS#*:}"
     PROXY_STRING="${PROXY_STRING#*@}"
     PROXY_HOST="${PROXY_STRING%%:*}"
-
     JAVA_PROXY_CREDS="-Dhttps.proxyUser=${PROXY_USER} -Dhttps.proxyPassword=${PROXY_PWD}"
     OPENSSL_PROXY_CREDS="-proxy_user ${PROXY_USER} -proxy_pass pass:${PROXY_PWD}"
   else
