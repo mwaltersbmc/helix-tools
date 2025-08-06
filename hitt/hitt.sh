@@ -531,7 +531,7 @@ getTenantDetails() {
 
 isTenantActivated() {
   # HP_TENANT
-  PG_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "data=postgres,apps.kubernetes.io/pod-index=0")
+  PG_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "application=patroni,data=pool")
   TENANT_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "select status from localuser where realm='${HP_TENANT}'" 2>/dev/null)
   echo "${TENANT_STATUS}" | grep -q "REG_COMPLETED"
 }
@@ -2940,7 +2940,7 @@ tidyUp() {
 
 getPodNameByLabel() {
   # namespace label-filter
-  ${KUBECTL_BIN} -n "${1}" get pod -l "${2}" -o custom-columns=:metadata.name --no-headers
+  ${KUBECTL_BIN} -n "${1}" get pod -l "${2}" -o custom-columns=:metadata.name --no-headers | head -1
 }
 
 updateISCacerts() {
@@ -3617,7 +3617,7 @@ activateHP() {
 }
 
 resetSSOPasswd() {
-  PG_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "data=postgres,apps.kubernetes.io/pod-index=0")
+  PG_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "application=patroni,data=pool")
   SSO_ADMIN_TID=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "select tid from AdminUsers where loginid = 'Admin' and tid = '00000000-0000-0000-0000-000000000000';" 2>/dev/null )
   if echo "${SSO_ADMIN_TID}" | grep -q "00000000-0000-0000-0000-000000000000" ; then
     if askYesNo "Do you want to reset the SSO admin password?"; then
