@@ -3500,6 +3500,9 @@ fixJenkins() {
     dryrun)
       triggerHelixDryRun
       ;;
+    nodes)
+      fixJenkinsNodes
+      ;;
     all)
       fixJenkinsCredentials
       fixJenkinsPipelineLibs
@@ -3510,6 +3513,28 @@ fixJenkins() {
       logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
       ;;
   esac
+}
+
+fixJenkinsNodes() {
+  addJenkinsNodeLabel
+}
+
+addJenkinsNodeLabel() {
+  SCRIPT="import jenkins.model.*
+    import hudson.model.*
+    def targetLabel = 'ansible-master'
+    def newLabel = 'ansible-master-latest'
+    Jenkins.instance.nodes.each { node ->
+        if (node.getAssignedLabels().any { it.name == targetLabel }) {
+            def currentLabels = node.getLabelString().tokenize(' ').toSet()
+            if (!currentLabels.contains(newLabel)) {
+                currentLabels << newLabel
+                node.setLabelString(currentLabels.join(' '))
+            }
+        }
+    }"
+  logMessage "Adding missing node label..."
+  runJenkinsCurl "${SCRIPT}" >/dev/null
 }
 
 getISDbID() {
