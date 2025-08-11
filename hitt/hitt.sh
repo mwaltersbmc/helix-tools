@@ -2944,9 +2944,6 @@ getPodNameByLabel() {
 }
 
 updateISCacerts() {
-  if [ ! -f "${NEWCACERTS}" ]; then
-    logError "999" "New cacerts file '${NEWCACERTS}' not found." 1
-  fi
   cp "${NEWCACERTS}" sealcacerts
   validateCacerts
   if [ "${VALID_CACERTS}" == "0" ]; then
@@ -3043,6 +3040,9 @@ fixCacerts() {
     logError "999" "Usage: bash $0 -f \"cacerts /path/to/new/cacerts-file\"" 1
   fi
   NEWCACERTS="${FIXARGS[1]/#\~/$HOME}" # convert ~ to path if used
+  if [ ! -f "${NEWCACERTS}" ]; then
+    logError "999" "New cacerts file '${NEWCACERTS}' not found." 1
+  fi
   checkToolVersion kubectl
   getVersions
   setVarsFromPlatform
