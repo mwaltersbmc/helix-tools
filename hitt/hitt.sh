@@ -270,7 +270,7 @@ checkPodStatus() {
      logError "102" "One or more pods in the '${1}' namespace found in a non-ready state."
      ${KUBECTL_BIN} -n "${1}" get pods "${BAD_PODS[@]}"
      for i in "${BAD_PODS[@]}"; do
-       logDescribePod "${1}" "${2}"
+       logDescribePod "${1}" "${i}"
      done
   else
     logMessage "No unhealthy pods found in the '${1}' namespace." 1
