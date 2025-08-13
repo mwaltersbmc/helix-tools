@@ -2069,7 +2069,7 @@ reportResults() {
       printf '%s\n' "${WARN_ARRAY[@]}"
     fi
     echo "==================="
-    echo -e "${BOLD}Please review the ${GREEN}${HITT_MSG_FILE}${NORMAL}${BOLD} file for explanations and suggested fixes for the messages above.${NORMAL}"
+    echo -e "${BOLD}Please review the ${GREEN}${HITT_MSG_FILE}${NORMAL}${BOLD} file or run 'bash $0 -e MSG_NUM' for explanations and suggested fixes for the messages above.${NORMAL}"
     echo -e "${BOLD}Attach the ${YELLOW}hittlogs.zip${NORMAL}${BOLD} file to your case if requested by BMC Support.${NORMAL}"
   else
     echo -e "${BOLD}Tests complete - no errors or warnings found.${NORMAL}"
