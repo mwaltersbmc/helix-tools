@@ -750,7 +750,11 @@ validateRealmDomains() {
   # Check for midtier alias
   for TARGET in "${IS_ALIAS_ARRAY[@]}"; do
     if ! echo "${REALM_DOMAINS[@]}" | grep -q "${TARGET}" ; then
-      logError "120" "Alias '${TARGET}' not found in Application Domains list."
+      if echo "${TARGET}" | grep -q reporting ; then
+        MSG_SUFFIX="Note: only required for ITSM 25.3.01 and later."
+      fi
+      logError "120" "Alias '${TARGET}' not found in Application Domains list. ${MSG_SUFFIX}"
+      MSG_SUFFIX=""
       BAD_DOMAINS=1
     else
       logMessage "  - alias '${TARGET}' found in realm Application Domains list." 1
@@ -777,7 +781,11 @@ validateAliasAccessibleFromDE(){
       logMessage "  - url 'https://${1}' is accessible from the Deployment Engine system." 1
       ;;
     *)
-      logWarning "043" "URL 'https://${1}' is not accessible from the Deployment Engine system."
+      if echo "${1}" | grep -q reporting ; then
+        MSG_SUFFIX="Note: alias only applies to ITSM 25.3.01 and later."
+      fi
+      logWarning "043" "URL 'https://${1}' is not accessible from the Deployment Engine system. ${MSG_SUFFIX}"
+      MSG_SUFFIX=""
       ;;
   esac
 }
@@ -785,7 +793,11 @@ validateAliasAccessibleFromDE(){
 validateAliasInDNS() {
   # hostname to check
   if ! ${HOST_BIN} ${1} > /dev/null 2>>${HITT_ERR_FILE}; then
-    logError "122" "Entry for '${1}' not found in DNS."
+    if echo "${1}" | grep -q reporting ; then
+      MSG_SUFFIX="Note: only required for ITSM 25.3.01 and later."
+    fi
+    logError "122" "Entry for '${1}' not found in DNS. ${MSG_SUFFIX}"
+    MSG_SUFFIX=""
   else
     logMessage "  - alias '${1}' found in DNS." 1
   fi
@@ -796,7 +808,11 @@ validateAliasInLBCert() {
   # 1/alias
   [[ "${WILDCARD_CERT}" == "1" ]] && return
   if ! ${OPENSSL_BIN} s_client -connect "${1}:443" ${OPENSSL_PROXY_STRING} </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "${1}" ; then
-    logError "218" "Alias '${1}' is not present as a SAN in the Helix certificate."
+    if echo "${1}" | grep -q reporting ; then
+      MSG_SUFFIX="Note: only required for ITSM 25.3.01 and later."
+    fi
+    logError "218" "Alias '${1}' is not present as a SAN in the Helix certificate. ${MSG_SUFFIX}"
+    MSG_SUFFIX=""
   else
     logMessage "  - alias '${1}' found in the Helix certificate." 1
   fi
@@ -1700,7 +1716,11 @@ validateCacerts() {
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
 #    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
     if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" ${JAVA_PROXY_STRING} SSLPoke "${TARGET}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
-      logError "164" "Certificate for '${TARGET}' not found in cacerts."
+      if echo "${TARGET}" | grep -q reporting ; then
+        MSG_SUFFIX="Note: only required for ITSM 25.3.01 and later."
+      fi
+      logError "164" "Certificate for '${TARGET}' not found in cacerts. ${MSG_SUFFIX}"
+      MSG_SUFFIX=""
       VALID_CACERTS=1
     else
       logMessage "  - valid certificate for '${TARGET}' found in cacerts file." 1
@@ -3016,7 +3036,8 @@ buildRealmJSON() {
          "${IS_PREFIX}-dwpcatalog.${CLUSTER_DOMAIN}",
          "${IS_PREFIX}-vchat.${CLUSTER_DOMAIN}",
          "${IS_PREFIX}-chat.${CLUSTER_DOMAIN}",
-         "${IS_PREFIX}-int.${CLUSTER_DOMAIN}"
+         "${IS_PREFIX}-int.${CLUSTER_DOMAIN}".
+         "${IS_PREFIX}-reporting.${CLUSTER_DOMAIN}"
        ]
      },
      "tenantDomain": "${HP_TENANT}",
@@ -4019,7 +4040,7 @@ CLEANUP_FILES=(sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cooki
 CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}")
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
-IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int)
+IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int reporting)
 JENKINS_CREDS=(git github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
 IS_ALIAS_ARRAY=()
 ADE_ALIAS_ARRAY=()
