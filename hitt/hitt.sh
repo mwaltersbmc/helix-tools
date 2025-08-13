@@ -1135,23 +1135,23 @@ getPipelineValues() {
   done
   IS_PIPELINE_VERSION="${IS_PLATFORM_HELM_VERSION:2:2}.${IS_PLATFORM_HELM_VERSION:4:1}.${IS_PLATFORM_HELM_VERSION:5:2}"
   IS_VERSION="${IS_PLATFORM_HELM_VERSION:0:7}"
-
   # 25.3.01 renamed parameters
   if [ "${IS_VERSION}" -ge 2025301 ]; then
-    IS_CLUSTER="${CLUSTER_CONTEXT}"
+    IS_CLUSTER="${IS_CLUSTER_CONTEXT}"
     IS_CLUSTER_LABEL="CLUSTER_CONTEXT"
-    IS_CLUSTER_DOMAIN="${APPLICATION_PARENT_DOMAIN}"
+    IS_CLUSTER_DOMAIN="${IS_APPLICATION_PARENT_DOMAIN}"
     IS_CLUSTER_DOMAIN_LABEL="APPLICATION_PARENT_DOMAIN"
-    IS_CUSTOMER_SIZE="${ENVIRONMENT_SIZE}"
+    IS_CUSTOMER_SIZE="${IS_ENVIRONMENT_SIZE}"
     IS_CUSTOMER_SIZE_LABEL="ENVIRONMENT_SIZE"
+    IS_PIPELINE_MODE="${IS_DEPLOYMENT_TYPE}"
+    IS_PIPELINE_MODE_LABEL="DEPLOYMENT_TYPE"
   else
     IS_CLUSTER_LABEL="CLUSTER"
     IS_CLUSTER_DOMAIN_LABEL="CLUSTER_DOMAIN"
     IS_CUSTOMER_SIZE_LABEL="CUSTOMER_SIZE"
+    IS_PIPELINE_MODE="${IS_DEPLOYMENT_MODE}"
+    IS_PIPELINE_MODE_LABEL="DEPLOYMENT_MODE"
   fi
-
-  #DEPLOYMENT_MODE=DEPLOYMENT_TYPE
-
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
   ISP_ENVIRONMENT=$(parseJenkinsParam ENVIRONMENT)
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
@@ -1161,7 +1161,6 @@ getPipelineValues() {
     IS_PLATFORM_INT=1
   fi
   IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
-
   setISDBVersion "${IS_PIPELINE_VERSION}"
   cloneCustomerConfigsRepo
 }
@@ -1271,8 +1270,10 @@ validateISDetails() {
   if [ "${MODE}" == "pre-is" ]; then
     logMessage "ITSM pipeline version is '${IS_PLATFORM_HELM_VERSION}'."
     logMessage "${IS_CUSTOMER_SIZE_LABEL} is '${IS_CUSTOMER_SIZE}'."
-    logMessage "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
-
+    logMessage "${IS_PIPELINE_MODE_LABEL} is '${IS_PIPELINE_MODE}'."
+    if [ "${IS_VERSION}" -ge 2025301 ]; then
+      logMessage "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
+    fi
     if [ "${IS_CHECKOUT_USING_USER}" != "github" ]; then
       logError "220" "CHECKOUT_USING_USER is not set to the expected value of the Jenkins credentials ID used to access the git repository files - usually 'github'."
     fi
@@ -1297,28 +1298,28 @@ validateISDetails() {
       logError "226" "GIT_REPO_DIR value ends with a '/' character which will cause an error - please remove it."
     fi
 
-    if [ "${IS_DEPLOYMENT_MODE}" == "UPGRADE" ] || [ "${IS_DEPLOYMENT_MODE}" == "UPDATE" ]; then
+    if [ "${IS_PIPELINE_MODE}" == "UPGRADE" ] || [ "${IS_PIPELINE_MODE}" == "UPDATE" ]; then
       CURRENT_VER=$(echo "${IS_SOURCE_VERSION}" | tr -d .)
       TARGET_VER=$(echo "${IS_PLATFORM_HELM_VERSION}" | tr -d .)
       if [ "${CURRENT_VER}" -ge "${TARGET_VER}" ]; then
-        logError "213" "SOURCE_VERSION is greater than or equal to the PLATFORM_HELM_VERSION but the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
+        logError "213" "SOURCE_VERSION is greater than or equal to the PLATFORM_HELM_VERSION but ${IS_PIPELINE_MODE_LABEL} is '${IS_PIPELINE_MODE}'."
       fi
 
       # UPDATE is always valid for applying a HF
       # eg 202330410000 / 202330410400 / 202330410400
-      if [ "${CURRENT_VER:0:9}" -eq "${TARGET_VER:0:9}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPDATE" ]; then
-        logError "213" "DEPLOYMENT_MODE should be 'UPDATE' when applying a hotfix but is set to '${IS_DEPLOYMENT_MODE}'."
+      if [ "${CURRENT_VER:0:9}" -eq "${TARGET_VER:0:9}" ] && [ "${IS_PIPELINE_MODE}" != "UPDATE" ]; then
+        logError "213" "${IS_PIPELINE_MODE_LABEL} should be 'UPDATE' when applying a hotfix but is set to '${IS_PIPELINE_MODE}'."
       fi
 
       # UPDATE should be used for any 2330x updates with same major release
       # eg 20233 0410000 / 20233 0410400 / 20233 0410400
-      if [ "${CURRENT_VER:0:5}" -eq "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPDATE" ]; then
-        logError "213" "DEPLOYMENT_MODE should be 'UPDATE' when upgrading to a new version of the same major release but is set to '${IS_DEPLOYMENT_MODE}'."
+      if [ "${CURRENT_VER:0:5}" -eq "${TARGET_VER:0:5}" ] && [ "${IS_PIPELINE_MODE}" != "UPDATE" ]; then
+        logError "213" "${IS_PIPELINE_MODE_LABEL} should be 'UPDATE' when upgrading to a new version of the same major release but is set to '${IS_PIPELINE_MODE}'."
       fi
 
       # When first 5 digits of source are less than target then should be UPGRADE
-      if [ "${CURRENT_VER:0:5}" -lt "${TARGET_VER:0:5}" ] && [ "${IS_DEPLOYMENT_MODE}" != "UPGRADE" ]; then
-        logError "213" "DEPLOYMENT_MODE should be 'UPGRADE' but is set to '${IS_DEPLOYMENT_MODE}'."
+      if [ "${CURRENT_VER:0:5}" -lt "${TARGET_VER:0:5}" ] && [ "${IS_PIPELINE_MODE}" != "UPGRADE" ]; then
+        logError "213" "${IS_PIPELINE_MODE_LABEL} should be 'UPGRADE' but is set to '${IS_PIPELINE_MODE}'."
       fi
 
 
@@ -1506,7 +1507,7 @@ validateISDetails() {
       fi
     fi
 
-    if [ "${IS_DEPLOYMENT_MODE}" == "FRESH" ] && [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "false" ]; then
+    if [ "${IS_PIPELINE_MODE}" == "FRESH" ] && [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "false" ]; then
       logWarning "040" "DATABASE_RESTORE is not selected - please make sure you have restored the appropriate Postgres database dump."
     else
       logMessage "Postgres database dump will be restored."
