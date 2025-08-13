@@ -983,13 +983,17 @@ createPipelineVarsArray() {
     ROUTE_ENABLED
     ROUTE_TLS_ENABLED
     CLUSTER
+    CLUSTER_CONTEXT
     IS_NAMESPACE
 #    CUSTOMER_NAME - removed as may have spaces
     INGRESS_CLASS
     CLUSTER_DOMAIN
+    APPLICATION_PARENT_DOMAIN
     INPUT_CONFIG_METHOD
     DEPLOYMENT_MODE
+    DEPLOYMENT_TYPE
     CUSTOMER_SIZE
+    ENVIRONMENT_SIZE
     HELM_NODE
     SOURCE_VERSION
     PLATFORM_HELM_VERSION
@@ -1129,6 +1133,25 @@ getPipelineValues() {
   for i in "${PIPELINE_VARS[@]}"; do
     eval "IS_$i"='$(parseJenkinsParam ${i})'
   done
+  IS_PIPELINE_VERSION="${IS_PLATFORM_HELM_VERSION:2:2}.${IS_PLATFORM_HELM_VERSION:4:1}.${IS_PLATFORM_HELM_VERSION:5:2}"
+  IS_VERSION="${IS_PLATFORM_HELM_VERSION:0:7}"
+
+  # 25.3.01 renamed parameters
+  if [ "${IS_VERSION}" -ge 2025301 ]; then
+    IS_CLUSTER="${CLUSTER_CONTEXT}"
+    IS_CLUSTER_LABEL="CLUSTER_CONTEXT"
+    IS_CLUSTER_DOMAIN="${APPLICATION_PARENT_DOMAIN}"
+    IS_CLUSTER_DOMAIN_LABEL="APPLICATION_PARENT_DOMAIN"
+    IS_CUSTOMER_SIZE="${ENVIRONMENT_SIZE}"
+    IS_CUSTOMER_SIZE_LABEL="ENVIRONMENT_SIZE"
+  else
+    IS_CLUSTER_LABEL="CLUSTER"
+    IS_CLUSTER_DOMAIN_LABEL="CLUSTER_DOMAIN"
+    IS_CUSTOMER_SIZE_LABEL="CUSTOMER_SIZE"
+  fi
+
+  #DEPLOYMENT_MODE=DEPLOYMENT_TYPE
+
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
   ISP_ENVIRONMENT=$(parseJenkinsParam ENVIRONMENT)
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
@@ -1138,8 +1161,7 @@ getPipelineValues() {
     IS_PLATFORM_INT=1
   fi
   IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
-  IS_PIPELINE_VERSION="${IS_PLATFORM_HELM_VERSION:2:2}.${IS_PLATFORM_HELM_VERSION:4:1}.${IS_PLATFORM_HELM_VERSION:5:2}"
-  IS_VERSION="${IS_PLATFORM_HELM_VERSION:0:7}"
+
   setISDBVersion "${IS_PIPELINE_VERSION}"
   cloneCustomerConfigsRepo
 }
@@ -1324,10 +1346,10 @@ validateISDetails() {
     fi
 
     if ! ${KUBECTL_BIN} config get-contexts "${IS_CLUSTER}" > /dev/null 2>&1; then
-      logError "137" "CLUSTER '${IS_CLUSTER}' is not a valid context in your kubeconfig file. Available contexts are:"
+      logError "137" "The ${IS_CLUSTER_LABEL} value '${IS_CLUSTER}' is not a valid context in your kubeconfig file. Available contexts are:"
       ${KUBECTL_BIN} config get-contexts 2>/dev/null
     else
-      logMessage "CLUSTER '${IS_CLUSTER}' is a valid kubeconfig context." 1
+      logMessage "${IS_CLUSTER_LABEL} '${IS_CLUSTER}' is a valid kubeconfig context." 1
     fi
 
     if [ "${IS_CLOUD}" == "true" ]; then
@@ -4580,9 +4602,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"137\",
-    \"cause\": \"The CLUSTER value in the HELIX_ONPREM_DEPLOYMENT pipeline is not found as a context in the kubeconfig file.\",
+    \"cause\": \"The value of the named parameter in the HELIX_ONPREM_DEPLOYMENT pipeline is not a context in the kubeconfig file.\",
     \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Update the CLUSTER value in the HELIX_ONPREM_DEPLOYMENT pipeline to the correct context from your kubeconfig file. Use 'kubectl config get-contexts' to list valid options.\"
+    \"remediation\": \"Update the value to the correct context. Use 'kubectl config get-contexts' to list valid options.\"
   },
   {
     \"id\": \"138\",
