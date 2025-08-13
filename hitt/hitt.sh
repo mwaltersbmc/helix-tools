@@ -1270,7 +1270,7 @@ validateISDetails() {
   # PRE mode only
   if [ "${MODE}" == "pre-is" ]; then
     logMessage "ITSM pipeline version is '${IS_PLATFORM_HELM_VERSION}'."
-    logMessage "CUSTOMER_SIZE is '${IS_CUSTOMER_SIZE}'."
+    logMessage "${IS_CUSTOMER_SIZE_LABEL} is '${IS_CUSTOMER_SIZE}'."
     logMessage "DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
 
     if [ "${IS_CHECKOUT_USING_USER}" != "github" ]; then
