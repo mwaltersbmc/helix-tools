@@ -1394,9 +1394,9 @@ validateISDetails() {
     fi
 
     if [ "${IS_CLUSTER_DOMAIN}" != "${CLUSTER_DOMAIN}" ]; then
-      logError "142" "CLUSTER_DOMAIN '${IS_CLUSTER_DOMAIN}' does not match that used for the Helix Platform '${CLUSTER_DOMAIN}'."
+      logError "142" "The ${CLUSTER_DOMAIN_LABEL} value '${IS_CLUSTER_DOMAIN}' does not match that used for the Helix Platform '${CLUSTER_DOMAIN}'."
     else
-      logMessage "CLUSTER_DOMAIN is the expected value of '${CLUSTER_DOMAIN}'." 1
+      logMessage "${CLUSTER_DOMAIN_LABEL} is the expected value of '${CLUSTER_DOMAIN}'." 1
     fi
 
     if [ "${IS_INPUT_CONFIG_METHOD}" != "Generate_Input_File" ]; then
@@ -4632,9 +4632,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"142\",
-    \"cause\": \"The CLUSTER_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT pipeline is different to the DOMAIN used for the Helix Platform.\",
+    \"cause\": \"The value of the named parameter in the HELIX_ONPREM_DEPLOYMENT pipeline is different to the DOMAIN used for the Helix Platform.\",
     \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"The Helix Service Management and Helix Platform are expected to use the same domain. Verify and correct the CLUSTER_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+    \"remediation\": \"Helix Service Management and Helix Platform are expected to use the same domain. Correct the value in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
   },
   {
     \"id\": \"143\",
