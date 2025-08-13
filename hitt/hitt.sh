@@ -2830,13 +2830,13 @@ versionFmt() {
 checkDERequirements() {
   logMessage "Checking OS binaries..."
   MISSING_BINS=()
-  for i in ansible dos2unix git jq python xmlstarlet ; do
+  for i in ansible dos2unix git jq python xmlstarlet yq; do
     if ! which "${i}" > /dev/null 2>&1; then
       MISSING_BINS+=("${i}")
     fi
   done
   if [ -n "${MISSING_BINS[*]}" ]; then
-    logError "239" "One or more of the OS tools required by the deployment pipelines were not found on the path of the git user. Please ensure these commands are available - '${MISSING_BINS[*]}'"
+    logError "239" "One or more of the required OS tools were not found. Please ensure these commands are available - '${MISSING_BINS[*]}' - note 'yq' is only required for ITSM 25.3.01 and later."
   fi
 
   if [ "${MODE}" == "jenkins" ]; then
