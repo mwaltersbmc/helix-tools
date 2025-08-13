@@ -1837,7 +1837,7 @@ checkISRESTReady() {
   fi
   getISAdminCreds
   if ! getISJWT; then
-    logError "176" "Failed to authenticate user ${IS_ADMIN_USER} - skipping checks."
+    logError "176" "Failed to authenticate user' ${IS_ADMIN_USER}' - skipping checks."
     return
   fi
   IS_REST_READY=1
@@ -4297,9 +4297,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"030\",
-    \"cause\": \"HITT 'pre-is' mode is used to validate the environment and HELIX_ONPREM_DEPLOYMENT pipeline values before deployment but the DEPLOYMENT_MODE is not the expected value of 'FRESH'.\",
+    \"cause\": \"HITT 'pre-is' mode is used to validate the environment and HELIX_ONPREM_DEPLOYMENT pipeline values before deployment but the pipeline operation is not the expected value of 'FRESH'.\",
     \"impact\": \"HITT checks may return incorrect results.\",
-    \"remediation\": \"Confirm the DEPLOYMENT_MODE is correct and review any warnings/errors carefully as the results may be unreliable.\"
+    \"remediation\": \"Confirm the pipeline operation is correct and review any warnings/errors carefully as the results may be unreliable.\"
   },
   {
     \"id\": \"031\",
@@ -5059,9 +5059,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"213\",
-    \"cause\": \"The DEPLOYMENT_MODE is UPGRADE or UPDATE but the SOURCE_VERSION or PLATFORM_HELM_VERSION are invalid for the chosen mode.\",
+    \"cause\": \"The pipeine is running an UPGRADE or UPDATE but the SOURCE_VERSION or PLATFORM_HELM_VERSION are invalid for the chosen mode.\",
     \"impact\": \"The UPGRADE/UPDATE will fail.\",
-    \"remediation\": \"Review the product documentation and verify the DEPLOYMENT_MODE, SOURCE_VERSION and PLATFORM_HELM_VERSION values.\"
+    \"remediation\": \"Review the product documentation and verify the SOURCE_VERSION and PLATFORM_HELM_VERSION values.\"
   },
   {
     \"id\": \"214\",
@@ -5227,15 +5227,15 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"241\",
-    \"cause\": \"HELIX_FULL_STACK_UPGRADE is not selected but it is required when the DEPLOYMENT_MODE is UPGRADE.\",
+    \"cause\": \"HELIX_FULL_STACK_UPGRADE is not selected but it is required when the pipeline operation is UPGRADE.\",
     \"impact\": \"The upgrade will fail.\",
     \"remediation\": \"Select the HELIX_FULL_STACK_UPGRADE option if you are upgrading.\"
   },
   {
     \"id\": \"242\",
-    \"cause\": \"The HELIX_FULL_STACK_UPGRADE option should not be selected when the DEPLOYMENT_MODE is UPDATE.\",
+    \"cause\": \"The HELIX_FULL_STACK_UPGRADE option should not be selected when the pipeline operation is UPDATE.\",
     \"impact\": \"The update will fail.\",
-    \"remediation\": \"Deselect the HELIX_FULL_STACK_UPGRADE option when the DEPLOYMENT_MODE is UPDATE.\"
+    \"remediation\": \"Deselect the HELIX_FULL_STACK_UPGRADE option when the pipeline operation is UPDATE.\"
   },
   {
     \"id\": \"243\",
