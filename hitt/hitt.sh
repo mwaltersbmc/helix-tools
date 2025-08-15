@@ -475,13 +475,10 @@ getDomain() {
 
 checkHelixLoggingDeployed() {
   HELIX_LOGGING_DEPLOYED=0
-  if compare "${HP_VERSION%.*} >= 25.1" ; then
-    return
-  fi
-  if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment efk-elasticsearch-kibana > /dev/null 2>&1 ; then
+  if HELIX_LOGGING_NAMESPACE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment -A | grep efk-elasticsearch-kibana | awk '{print $1}' 2>/dev/null) ; then
     HELIX_LOGGING_DEPLOYED=1
-    logMessage "Helix Logging is installed."
-    HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret efk-elasticsearch-kibana -o jsonpath='{.data.kibana-password}' | ${BASE64_BIN} -d)
+    logMessage "Helix Logging is installed in the ${HELIX_LOGGING_NAMESPACE} namespace."
+    HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get secret efk-elasticsearch-kibana -o json  | ${JQ_BIN} -r '.data["kibana-password"] | @base64d | @uri')
     checkEFKClusterHealth
   else
     logMessage "Helix Logging is not installed."
@@ -492,12 +489,12 @@ checkHelixLoggingDeployed() {
 }
 
 checkEFKClusterHealth() {
-  EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c 'curl -sk -u elastic:"'"${HELIX_LOGGING_PASSWORD}"'" -X GET https://"'"${EFK_ELASTIC_SERVICENAME}"'":9200/_cluster/health')
+  EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c "curl -sk -X GET https://elastic:${HELIX_LOGGING_PASSWORD}@${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}:9200/_cluster/health")
   EFK_ELASTIC_STATUS=$(echo "${EFK_ELASTIC_JSON}" | ${JQ_BIN} -r '.status')
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
-    logError "113" "Helix Logging Elasticsearch problem. Check the '${EFK_ELASTIC_SERVICENAME}' pods in Helix Platform namespace."
+    logError "113" "Helix Logging Elasticsearch problem. Check the '${EFK_ELASTIC_SERVICENAME}' pods in the '${HELIX_LOGGING_NAMESPACE}' namespace."
   else
-    logMessage "Helix Logging Elasticsearch '${EFK_ELASTIC_SERVICENAME}' appears healthy." 1
+    logMessage "Helix Logging Elasticsearch '${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}' appears healthy." 1
   fi
 }
 
