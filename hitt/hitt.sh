@@ -770,7 +770,7 @@ validateRealmDomains() {
   fi
   # Should not be present in pre-is unless INTEROPS run
   if [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
-    logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is only expected after the HELIX_ITSM_INTEROPS pipeline has completed."
+    logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is expected after the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
 }
 
