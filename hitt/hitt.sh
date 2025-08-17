@@ -1563,7 +1563,7 @@ validateISDetails() {
 
     if [ "$HELIX_LOGGING_DEPLOYED" == 1 ]; then
       if [ "${IS_LOGS_ELASTICSEARCH_TLS}" != "true" ]; then
-        logError "151" "LOGS_ELASTICSEARCH_TLS '${IS_LOGS_ELASTICSEARCH_TLS}' is not the expected value of true."
+        logError "151" "LOGS_ELASTICSEARCH_TLS '${IS_LOGS_ELASTICSEARCH_TLS}' is not the expected value of 'true'."
       else
         logMessage "LOGS_ELASTICSEARCH_TLS is the expected value of true." 1
       fi
@@ -1783,8 +1783,8 @@ checkIsValidElastic() {
         fi
         ;;
       LOGS_ELASTICSEARCH_HOSTNAME)
-        if [ "${1}" != "${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}" ]; then
-          logError "172" "LOGS_ELASTICSEARCH_HOSTNAME service name '${1}' is not the expected value of '${EFK_ELASTIC_SERVICENAME}.${HP_NAMESPACE}'."
+        if [ "${1}" != "${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}" ]; then
+          logError "172" "LOGS_ELASTICSEARCH_HOSTNAME service name '${1}' is not the expected value of '${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}'."
         fi
         ;;
     esac
