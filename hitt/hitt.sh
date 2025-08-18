@@ -1170,7 +1170,7 @@ getPipelineValues() {
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
     logError "128" "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all required values in the HELIX_ONPREM_DEPLOYMENT pipeline." 1
   fi
-  if [[ "${IS_CUSTOMER_SIZE}" =~ M$ ]] || [[ "${IS_CUSTOMER_SIZE}" =~ L$ ]]; then
+  if [[ "${IS_CUSTOMER_SIZE}" =~ M ]] || [[ "${IS_CUSTOMER_SIZE}" =~ L ]]; then
     IS_PLATFORM_INT=1
   fi
   IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
