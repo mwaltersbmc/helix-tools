@@ -477,7 +477,7 @@ checkHelixLoggingDeployed() {
   HELIX_LOGGING_DEPLOYED=0
   if HELIX_LOGGING_NAMESPACE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment -A | grep efk-elasticsearch-kibana | awk '{print $1}' 2>/dev/null) ; then
     HELIX_LOGGING_DEPLOYED=1
-    logMessage "Helix Logging is installed in the ${HELIX_LOGGING_NAMESPACE} namespace."
+    logMessage "Helix Logging is installed in the '${HELIX_LOGGING_NAMESPACE}' namespace."
     HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get secret efk-elasticsearch-kibana -o json  | ${JQ_BIN} -r '.data["kibana-password"] | @base64d | @uri')
     checkEFKClusterHealth
   else
