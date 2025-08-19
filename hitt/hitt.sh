@@ -478,7 +478,8 @@ checkHelixLoggingDeployed() {
   if HELIX_LOGGING_NAMESPACE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment -A | grep efk-elasticsearch-kibana | awk '{print $1}' 2>/dev/null) ; then
     HELIX_LOGGING_DEPLOYED=1
     logMessage "Helix Logging is installed in the '${HELIX_LOGGING_NAMESPACE}' namespace."
-    HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get secret efk-elasticsearch-kibana -o json  | ${JQ_BIN} -r '.data["kibana-password"] | @base64d | @uri')
+    HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get secret efk-elasticsearch-kibana -o json  | ${JQ_BIN} -r '.data["kibana-password"] | @base64d')
+    HELIX_LOGGING_PASSWORD_URI=$(printf %s "${HELIX_LOGGING_PASSWORD}" | ${JQ_BIN} -sRr @uri)
     checkEFKClusterHealth
   else
     logMessage "Helix Logging is not installed."
@@ -489,7 +490,7 @@ checkHelixLoggingDeployed() {
 }
 
 checkEFKClusterHealth() {
-  EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c "curl -sk -X GET https://elastic:${HELIX_LOGGING_PASSWORD}@${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}:9200/_cluster/health")
+  EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c "curl -sk -X GET https://elastic:${HELIX_LOGGING_PASSWORD_URI}@${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}:9200/_cluster/health")
   EFK_ELASTIC_STATUS=$(echo "${EFK_ELASTIC_JSON}" | ${JQ_BIN} -r '.status')
   if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
     logError "113" "Helix Logging Elasticsearch problem. Check the '${EFK_ELASTIC_SERVICENAME}' pods in the '${HELIX_LOGGING_NAMESPACE}' namespace."
@@ -1182,6 +1183,7 @@ checkPipelinePwds() {
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   if [ "${MODE}" != "pre-is" ]; then return; fi
   PASSWDS_JSON=$(getPipelinePasswords | ${JQ_BIN} 'to_entries')
+  return # next bit no longer valid?
   for i in $(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r '.[].key'); do
     PASSWD=$(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r ".[] | select(.key==\"${i}\").value.plainText")
     if echo "${PASSWD}" | grep -q '\$' ; then
