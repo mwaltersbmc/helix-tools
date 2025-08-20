@@ -239,7 +239,7 @@ checkHPNamespace() {
     if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
     logError "107" "Deployment ${DEPLOYMENT} not found in '${1}' - please check the ${NS_TYPE} namespace name." 1
   else
-    logMessage "'${1}' is a valid ${NS_TYPE} namespace." 1
+    logMessage "${NS_TYPE} namespace is '${1}'."
   fi
   checkPodStatus "${1}"
 }
@@ -259,7 +259,7 @@ checkISNamespace() {
       logError "107" "cacerts secret not found in '${1}' namespace - please check the ${NS_TYPE} namespace name." 1
     fi
   fi
-  logMessage "'${1}' appears to be a valid ${NS_TYPE} namespace." 1
+  logMessage "${NS_TYPE} namespace is '${1}'."
   checkPodStatus "${1}"
 }
 
@@ -298,7 +298,7 @@ getVersions() {
   HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json)
   HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
-  logMessage "Helix Platform version '${HP_VERSION}' using DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}'."
+  logMessage "Helix Platform version '${HP_VERSION}' with DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}'."
   if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
     logWarning "002" "Helix Platform DEPLOYMENT_SIZE is '${HP_DEPLOYMENT_SIZE}' - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products are/will be installed."
   fi
@@ -455,7 +455,7 @@ setVarsFromPlatform() {
 getRSSODetails() {
   RSSO_ADMIN_TAS_CM=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm rsso-admin-tas -o json)
   RSSO_URL=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.rssourl + "/rsso"')
-  logMessage "RSSO URL is '${RSSO_URL}'." 1
+  logMessage "RSSO URL is '${RSSO_URL}'."
   RSSO_USERNAME=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.username')
   logMessage "RSSO username is '${RSSO_USERNAME}'." 1
   RSSO_PASSWORD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret rsso-admin-tas -o jsonpath='{.data.password}' | ${BASE64_BIN} -d)
