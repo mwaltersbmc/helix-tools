@@ -700,7 +700,7 @@ validateRealm() {
   REALM_DOMAINS=($(echo "${RSSO_REALM}" | ${JQ_BIN} -r '.domainMapping.domain[]' | tr "\n" " "))
   BAD_DOMAINS=0
   validateRealmDomains
-  if [ "${BAD_DOMAINS}" == "1" ]; then
+  if [ "${BAD_DOMAINS}" == "1" ] && [ "${VERBOSITY}" == "1" ]; then
     logMessage "Application Domains found in SSO Realm '${REALM_NAME}' are:"
     printf '  %s\n' "${REALM_DOMAINS[@]}"
   fi
