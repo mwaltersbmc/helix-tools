@@ -475,14 +475,15 @@ getDomain() {
 
 checkHelixLoggingDeployed() {
   HELIX_LOGGING_DEPLOYED=0
-  if HELIX_LOGGING_NAMESPACE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment -A | grep efk-elasticsearch-kibana | awk '{print $1}' 2>/dev/null) ; then
+  HELIX_LOGGING_NAMESPACE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment -A | grep efk-elasticsearch-kibana | awk '{print $1}' 2>/dev/null)
+  if [ -n "${HELIX_LOGGING_NAMESPACE}" ]; then
     HELIX_LOGGING_DEPLOYED=1
-    logMessage "Helix Logging is installed in the '${HELIX_LOGGING_NAMESPACE}' namespace."
+    logMessage "Helix Logging found in the '${HELIX_LOGGING_NAMESPACE}' namespace."
     HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get secret efk-elasticsearch-kibana -o json  | ${JQ_BIN} -r '.data["kibana-password"] | @base64d')
     HELIX_LOGGING_PASSWORD_URI=$(printf %s "${HELIX_LOGGING_PASSWORD}" | ${JQ_BIN} -sRr @uri)
     checkEFKClusterHealth
   else
-    logMessage "Helix Logging is not installed."
+    logMessage "Helix Logging not found."
     if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o jsonpath='{.data.bmc_helix_logging_config}' | grep -q 'ENABLE_LOG_SHIPPER_IN_PODS=true'; then
       logWarning "003" "ENABLE_LOG_SHIPPER_IN_PODS=true - consider installing Helix Logging to reduce error messages in Helix Platform pod logs."
     fi
