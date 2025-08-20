@@ -1511,8 +1511,12 @@ validateISDetails() {
       logError "149" "DB_SSL_ENABLED should not be selected."
     fi
 
-    if ! [[ "${IS_DB_PORT}" =~ ^[0-9]+$ ]]; then
-      logError "240" "DB_PORT value must be a number and not '${IS_DB_PORT}'."
+    if [ "${IS_DB_PORT}" == "" ]; then
+        logError "240" "DB_PORT cannot be blank."
+    else
+      if ! [[ "${IS_DB_PORT}" =~ ^[0-9]+$ ]]; then
+        logError "240" "DB_PORT value must be a number and not '${IS_DB_PORT}'."
+      fi
     fi
 
     if [ "${IS_IS_DATABASE_ALWAYS_ON}" == "true" ]; then
