@@ -2993,6 +2993,13 @@ updateISCacerts() {
       replaceISCacertsSecret
       logMessage "cacerts secret in '${IS_NAMESPACE}' namespace replaced with '${NEWCACERTS}'."
     else
+        logMessage "No changes made to the cacerts secret in the '${IS_NAMESPACE}' namespace."
+    fi
+  else
+    if askYesNo "New cacerts file may not be valid - are you sure you want to replace the cacerts secret?"; then
+      replaceISCacertsSecret
+      logMessage "cacerts secret in '${IS_NAMESPACE}' namespace replaced with '${NEWCACERTS}'."
+    else
       logMessage "No changes made to the cacerts secret in the '${IS_NAMESPACE}' namespace."
     fi
   fi
@@ -3625,7 +3632,7 @@ applyARLicense() {
     logError "999" "License with key '${IS_LICENSE_KEY}' is already present." 1
   fi
   echo "${IS_LICENSE_JSON}"
-  ${CURL_BIN} -o /dev/null -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT $ARJWT" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null 
+  ${CURL_BIN} -o /dev/null -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT $ARJWT" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null
   logMessage "License applied."
 }
 
