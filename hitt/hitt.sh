@@ -645,11 +645,23 @@ EOF
 
   # Wait for job to complete
   if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete job/"${SEALTCTL}" --timeout=90s > /dev/null 2>&1; then
+    debugTCTLJob
     logError "204" "Timed out waiting for job ${SEALTCTL} to complete."
     return 1
   else
     return 0
   fi
+}
+
+debugTCTLJob() {
+  echo -e "\nJob description:" >sealtctl.log
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" describe job/"${SEALTCTL}" 2>/dev/null >>sealtctl.log
+  echo -e "\nGet pods:" >>sealtctl.log
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --selector=job-name="${SEALTCTL}" 2>/dev/null >>sealtctl.log
+  echo -e "\nDescribe pods:" >>sealtctl.log
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" describe pods --selector=job-name="${SEALTCTL}" 2>/dev/null >>sealtctl.log
+  echo -e "\nJob logs:" >>sealtctl.log
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} 2>/dev/null >>sealtctl.log
 }
 
 getRealmDetails() {
@@ -1475,6 +1487,7 @@ validateISDetails() {
       logWarning "013" "BMC_HELIX_ITSM_INSIGHTS is selected in the INTEROPS section but HELIX_ITSM_INSIGHTS is not selected as a product to install."
     fi
 
+# Removed as not expected to be selected for pre-is
 #    if [ "${IS_SUPPORT_ASSISTANT_TOOL}" != "true" ]; then
 #      logWarning "SUPPORT_ASSISTANT_TOOL not selected - Support Assistant Tool is recommended to provide access to application logs."
 #    fi
