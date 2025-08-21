@@ -1,0 +1,29 @@
+BMC Image Manager Script
+
+A tool for downloading BMC Helix container images from containers.bmc.com
+
+Usage: imagemgr.sh -a <sync|pull|push|save|load> <-i image name|-f image file> [-t target registry] [-n <number of parallel actions>]
+
+Where:
+
+-a  the action to perform and is a required option.
+-i  an image name - eg containers.bmc.com/bmc:AR22106-RTM
+-f  a list, one entry per line, of image names.  BMC image lists are included in the Helix product docs.
+-t  the local registry server hostname.  Required for sync/push/load actions unless set in the script as the TARGET_REGISTRY variable.
+-n  optionally set the number of parallel docker operations.  Defaults to 2 but can probably be increased to 4 or 6 for better performance.
+
+The script will attempt a docker login to the registry servers when run and prompt for credentials if not cached.  All operations require either an image name or file containing a list of images to process.
+
+Actions:
+sync - pulls from BMC DTR, tags to customer registry format, pushes to target registry, deletes image from local docker.
+pull - pulls from BMC DTR and images are retained in local docker (docker image ls).
+push - assumes input images are present in local docker (from using pull action) and will tag and push to target registry server.  Does not delete images from local docker.
+save - pulls from BMC DTR, saves images as gzip'd tar files in current directory and deletes from local docker.
+load - assumes images are present in current directory (from using save action) and loads, tags and pushes to target registry.  Deletes from local docker after push.
+
+The save option will automatically name the files using URL encoding to avoid issues with /: and other similar characters in the image name.
+
+The script will check to make sure there is more than 10GB of free disk space in the current and /var/lib/docker directories to try and avoid running out of space.  Space is checked on every pull/save operation.
+Required disk space may be changed by modifying DISK_REQUIRED value in the script.
+
+Progress is output to the screen and saved in a results.txt file.  Errors are logged in an errors.txt file but should not block processing.  Log lines being with a number to allow actions run in parallel to be differentiated. 

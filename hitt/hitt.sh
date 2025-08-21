@@ -2873,7 +2873,7 @@ checkDERequirements() {
     fi
   done
   if [ -n "${MISSING_BINS[*]}" ]; then
-    logError "239" "One or more of the required OS tools were not found. Please ensure these commands are available - '${MISSING_BINS[*]}' - note 'yq' is only required for ITSM 25.3.01 and later."
+    logError "239" "One or more of the required OS tools were not found. Please ensure these commands are available - '${MISSING_BINS[*]}'. Note: 'yq' is only required for ITSM 25.3.01 and later."
   fi
 
   if [ "${MODE}" == "jenkins" ]; then
