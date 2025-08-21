@@ -670,7 +670,7 @@ getRealmDetails() {
   if echo "${RSSO_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     echo "Realms found in RSSO are:"
     ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} -r '" - " + .realms[].id'
-    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values in hitt.conf." 1
+    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check realm names and the IS_CUSTOMER_SERVICE/IS_ENVIRONMENT values in hitt.conf." 1
   else
     logMessage "SSO realm '${REALM_NAME}' found for the SAAS_TENANT." 1
   fi
