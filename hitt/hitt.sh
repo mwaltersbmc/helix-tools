@@ -2551,32 +2551,32 @@ checkJenkinsGlobalLibs() {
       LIB_TYPE=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").retrieverType')
       LIB_IMPLICIT=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").implicit')
       LIB_URL=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${i}'").remoteUrl')
+      LIB_PATH=$(echo "${LIB_URL#*://}")
+      REPO_PATH=$(echo "${LIB_PATH#*/}")
+      if [[ "${REPO_PATH}" =~ ^~ ]] ; then
+        REPO_PATH=$(eval echo "${REPO_PATH}")
+      else
+        REPO_PATH="/${REPO_PATH}"
+      fi
+
       if [ "${LIB_VERSION}" != "master" ]; then
         logError "150" "The 'Default version' of the '${LIB_NAME}' library is not the expected value of 'master'."
       fi
       if [ "${LIB_TYPE}" != "SCMSourceRetriever" ]; then
         logError "179" "The 'Retrieval method' of the '${LIB_NAME}' library is not the expected value 'Modern SCM'."
       fi
-      if [[ ! "${LIB_URL}" =~ ^ssh://.* ]]; then
+      if [[ ! "${LIB_URL}" =~ ^ssh://.* ]] || ! echo "${LIB_PATH}" | grep -q "^${CRED_USER}@" ; then
         logError "233" "The 'Project Repository' value of the '${LIB_NAME}' global pipeline library is not set correctly, it should begin with 'ssh://<GIT_USER>@'."
+      fi
+      if [[ "${REPO_PATH}" =~ [[:space:]]+$ ]]; then
+        logError "248" "The 'Project Repository' value of the '${LIB_NAME}' global pipeline library has a trailing space which must be removed."
+        REPO_PATH=$(echo -n "${REPO_PATH}" | sed 's/[[:space:]]\+$//') # trim trailing spaces
+      fi
+      if [ ! -d "${REPO_PATH}" ]; then
+        logError "234" "The '${REPO_PATH}' directory in the 'Project Repository' value of the '${LIB_NAME}' global pipeline library does not exist.  Verify the path to the directory."
       else
-        LIB_PATH=$(echo "${LIB_URL#*://}")
-        if ! echo "${LIB_PATH}" | grep -q "^${CRED_USER}@" ; then
-          logError "233" "The 'Project Repository' value of the '${LIB_NAME}' global pipeline library is not set correctly, it should begin with 'ssh://<GIT_USER>@'."
-        else
-          REPO_PATH=$(echo "${LIB_PATH#*/}")
-          if [[ "${REPO_PATH}" =~ ^~ ]] ; then
-            REPO_PATH=$(eval echo "${REPO_PATH}")
-          else
-            REPO_PATH="/${REPO_PATH}"
-          fi
-          if [ ! -d "${REPO_PATH}" ]; then
-            logError "234" "The .git repo directory in the 'Project Repository' value of the '${LIB_NAME}' global pipeline library does not exist.  Verify the path to the directory."
-          else
-            if [ "${REPO_PATH##*/}" != "${i}.git" ]; then
-              logError "246" "'${REPO_PATH##*/}' is not the expected git repository for this global library - expected '${i}.git'."
-            fi
-          fi
+        if [ "${REPO_PATH##*/}" != "${i}.git" ]; then
+          logError "246" "'${REPO_PATH##*/}' is not the expected git repository for this global library - expected '${i}.git'."
         fi
       fi
       case "${LIB_NAME}" in
@@ -5311,6 +5311,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
     \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
     \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
+  },
+  {
+    \"id\": \"248\",
+    \"cause\": \"There are one or more trailing spaces at the end of the named value.\",
+    \"impact\": \"Deployment pipelines will fail.\",
+    \"remediation\": \"Go to Manage Jenkins->System and remove the trailing spaces.\"
   }
 ]"
 
