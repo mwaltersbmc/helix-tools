@@ -1581,7 +1581,7 @@ validateISDetails() {
       fi
     fi
 
-    if [ "$HELIX_LOGGING_DEPLOYED" == 1 ]; then
+    if [ "$HELIX_LOGGING_DEPLOYED" == 1 ] && [ "${IS_LOGS_ELASTICSEARCH_HOSTNAME}" != "" ]; then
       if [ "${IS_LOGS_ELASTICSEARCH_TLS}" != "true" ]; then
         logError "151" "LOGS_ELASTICSEARCH_TLS '${IS_LOGS_ELASTICSEARCH_TLS}' is not the expected value of 'true'."
       else
