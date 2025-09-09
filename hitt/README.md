@@ -35,7 +35,7 @@ HITT supports different modes for Helix and Jenkins validation:
 
 > Each mode targets a different stage of the deployment lifecycle.
 
-The HITT script requires minimal manual configuration and will read the information it needs from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
+The HITT script requires minimal configuration and will read the information it needs from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
 
 There are some optional tests that will attempt to validate the Helix IS database.  These require the use of a Java SQL client, called JISQL, and JDBC drivers for each database type.  To enable these tests, download the dbjars.tgz file and save it in the same directory as the hitt.sh script.  HITT will run the SQL checks when this file is present.
 
