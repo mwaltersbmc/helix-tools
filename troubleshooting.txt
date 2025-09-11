@@ -63,8 +63,8 @@ Import pem file to cacerts
 $ keytool -importcert -v -alias <alias name> -file <certificatefilename> -keystore cacerts
 
 Recreate IS secret from good cacerts
-$ kubectl delete secret cacerts -n IS-NS
-$ kubectl create secret -n IS-NS generic cacerts --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
+$ kubectl -n IS-NS delete secret cacerts
+$ kubectl -n IS-NS create secret generic cacerts --from-file=cacerts=newcacertsfilename --dry-run=client -o yaml | kubectl apply -f -
 
 Get certs from LB/Ingress
 $ openssl s_client -showcerts -connect LB_HOST:443

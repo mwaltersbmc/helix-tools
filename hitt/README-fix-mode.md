@@ -49,7 +49,7 @@ Creates or updates the SSO realm required by the Helix Service management applic
 
 #### `"cacerts new-cacerts-file"` - update the cacerts secret with a new file
 ```bash
-bash hitt.sh -f "cacerts /path/to/newcacerts"
+bash hitt.sh -f "cacerts /path/to/newcacertsfile"
 ```
 Updates the `cacerts` secret in the Helix IS namespace with a new cacerts file.  Used when the `HELIX_ONPREM_DEPLOYMENT` pipeline was run but the cacerts file was not attached or the existing secret needs to be updated with one containing a new third party certificate.  If the new cacerts file is valid you will be prompted to confirm the update.
 
