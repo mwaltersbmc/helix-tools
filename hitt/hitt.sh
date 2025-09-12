@@ -3060,7 +3060,7 @@ buildRealmJSON() {
          "${IS_PREFIX}-dwpcatalog.${CLUSTER_DOMAIN}",
          "${IS_PREFIX}-vchat.${CLUSTER_DOMAIN}",
          "${IS_PREFIX}-chat.${CLUSTER_DOMAIN}",
-         "${IS_PREFIX}-int.${CLUSTER_DOMAIN}".
+         "${IS_PREFIX}-int.${CLUSTER_DOMAIN}",
          "${IS_PREFIX}-reporting.${CLUSTER_DOMAIN}"
        ]
      },
