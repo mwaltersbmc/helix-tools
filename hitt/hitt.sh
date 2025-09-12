@@ -2177,16 +2177,14 @@ checkISDBLatency() {
   fi
   logMessage "Attempting to test latency between cluster and IS DB server '${IS_DATABASE_HOST_NAME}'..."
   PING_NAMESPACE="${HP_NAMESPACE}"
-  PING_APP=rsso
-  PING_CONTAINER=rsso
+  PING_SELECTOR="data=postgres"
   if [ "${MODE}" == "post-is" ]; then
     PING_NAMESPACE="${IS_NAMESPACE}"
-    PING_APP=platform-fts
-    PING_CONTAINER=platform
+    PING_SELECTOR="app=platform-fts"
   fi
-  PING_POD=$(${KUBECTL_BIN} -n "${PING_NAMESPACE}" get pod --no-headers -l app="${PING_APP}" -o custom-columns=:metadata.name --field-selector status.phase=Running | head -1)
+  PING_POD=$(${KUBECTL_BIN} -n "${PING_NAMESPACE}" get pod --no-headers -l "${PING_SELECTOR}" -o custom-columns=:metadata.name --field-selector status.phase=Running | head -1)
   if [ ! -z "${PING_POD}" ]; then
-    PING_RESULT=$(${KUBECTL_BIN} -n "${PING_NAMESPACE}" exec -i "${PING_POD}" -c "${PING_CONTAINER}" -- env IS_DATABASE_HOST_NAME="${IS_DATABASE_HOST_NAME}" IS_DB_PORT="${IS_DB_PORT}"  bash -s <<'EOF'
+    PING_RESULT=$(${KUBECTL_BIN} -n "${PING_NAMESPACE}" exec -i "${PING_POD}" -- env IS_DATABASE_HOST_NAME="${IS_DATABASE_HOST_NAME}" IS_DB_PORT="${IS_DB_PORT}"  bash -s 2> >(grep -v 'Defaulted container') <<'EOF'
       total_ms=0
       if bash -c "</dev/tcp/${IS_DATABASE_HOST_NAME}/${IS_DB_PORT}" 2>/dev/null; then
         overhead_sec=$( (time bash -c exit) 2>&1 | grep real | sed -E 's/real[[:space:]]+0m([0-9]+\.[0-9]+)s/\1/')
