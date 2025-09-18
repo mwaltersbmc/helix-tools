@@ -1306,11 +1306,15 @@ validateISDetails() {
       logError "220" "CHECKOUT_USING_USER is not set to the expected value of the Jenkins credentials ID used to access the git repository files - usually 'github'."
     fi
 
-    if [ ! -d "${IS_GIT_USER_HOME_DIR}" ]; then
-      logError "222" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not a valid directory."
-    fi
-    if [[ ! "${IS_GIT_USER_HOME_DIR}" =~ ^/.* ]]; then
-      logError "244" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid - it must be an absolute path beginning with '/' - eg: '/home/git'."
+    if [ "${IS_GIT_USER_HOME_DIR}" == "" ]; then
+      logError "131" "GIT_USER_HOME_DIR value is blank but must be set to the home directory of the git user."
+    else
+      if [ ! -d "${IS_GIT_USER_HOME_DIR}" ]; then
+        logError "222" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not a valid directory."
+      fi
+      if [[ ! "${IS_GIT_USER_HOME_DIR}" =~ ^/.* ]]; then
+        logError "244" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid - it must be an absolute path beginning with '/' - eg: '/home/git'."
+      fi
     fi
 
     if [[ ! "${IS_GIT_REPO_DIR}" =~ ^ssh://.* ]]; then
