@@ -3493,6 +3493,7 @@ fixSSH() {
   SSH_DIR="${HOME_DIR}/.ssh"
   KEY_FILE="${SSH_DIR}/id_rsa"
   AUTHORIZED_KEYS="${GIT_HOME_DIR}/.ssh/authorized_keys"
+  chmod 700 "${GIT_HOME_DIR}"
   # Set correct perms or create ~/.ssh and key files
   if [ -d "${SSH_DIR}" ]; then
     chmod 700 "${SSH_DIR}"
@@ -3708,32 +3709,34 @@ resetSSOPasswd() {
 validateSSHPermissions() {
   SSH_DIR="$HOME/.ssh"
   SSH_ERROR=0
-  logMessage "Validating SSH directory and file permissions..."
+  local dir
+  logMessage "Validating directory and file permissions for SSH..."
 
   if [ ! -d "$SSH_DIR" ]; then
     logError "235" "SSH directory '$SSH_DIR' does not exist. Please see the product documentation for the steps to set up ssh for the git user."
     return
   fi
 
-  if [ "$(stat -c "%a" "$SSH_DIR")" != "700" ]; then
-    logWarning "042" "Permissions on '$SSH_DIR' should be 700, found $(stat -c "%a" "$SSH_DIR")."
-    SSH_ERROR=1
-  fi
-
-  if [ "$(stat -c "%U" "$SSH_DIR")" != "${GIT_USER}" ]; then
-    logWarning "042" "Owner of '$SSH_DIR' is not '${GIT_USER}'."
-    SSH_ERROR=1
-  fi
+  for dir in "$HOME" "$SSH_DIR"; do
+    if [ "$(stat -c "%a" "$dir")" != "700" ]; then
+      logError "249" "Permissions on '$dir' should be 700, found $(stat -c "%a" "$dir")."
+      SSH_ERROR=1
+    fi
+    if [ "$(stat -c "%U" "$dir")" != "${GIT_USER}" ]; then
+      logError "249" "Owner of '$dir' is not '${GIT_USER}'."
+      SSH_ERROR=1
+    fi
+  done
 
   # Check authorized_keys
   SSH_AUTH_KEYS="$SSH_DIR/authorized_keys"
   if [ -f "${SSH_AUTH_KEYS}" ]; then
     if [ "$(stat -c "%a" "${SSH_AUTH_KEYS}")" != "600" ]; then
-      logWarning "042" "Permissions on '${SSH_AUTH_KEYS}' should be 600."
+      logError "249" "Permissions on '${SSH_AUTH_KEYS}' should be 600."
       SSH_ERROR=1
     fi
     if [ "$(stat -c "%U" "${SSH_AUTH_KEYS}")" != "${GIT_USER}" ]; then
-      logWarning "042" "Owner of '${SSH_AUTH_KEYS}' is not '${GIT_USER}'."
+      logError "249" "Owner of '${SSH_AUTH_KEYS}' is not '${GIT_USER}'."
       SSH_ERROR=1
     fi
   fi
@@ -3743,7 +3746,7 @@ validateSSHPermissions() {
     [ -f "$key" ] || continue
     [[ "$key" == *.pub ]] && continue
     if [ "$(stat -c "%a" "$key")" != "600" ]; then
-      logWarning "042" "Private key '$key' should have 600 permissions."
+      logError "249" "Private key '$key' should have 600 permissions."
       SSH_ERROR=1
     fi
   done
@@ -3752,7 +3755,7 @@ validateSSHPermissions() {
   for pubkey in "$SSH_DIR"/*.pub; do
     [ -f "$pubkey" ] || continue
     if [ "$(stat -c "%a" "$pubkey")" != "644" ]; then
-      logWarning "042" "Public key '$pubkey' should have 644 permissions."
+      logError "249" "Public key '$pubkey' should have 644 permissions."
       SSH_ERROR=1
     fi
   done
@@ -4420,9 +4423,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"042\",
-    \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
-    \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
-    \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
+    \"cause\": \"\",
+    \"impact\": \"\",
+    \"remediation\": \"\"
   },
   {
     \"id\": \"043\",
@@ -5323,6 +5326,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"There are one or more trailing spaces at the end of the named value.\",
     \"impact\": \"Deployment pipelines will fail.\",
     \"remediation\": \"Go to Manage Jenkins->System and remove the trailing spaces.\"
+  },
+  {
+    \"id\": \"249\",
+    \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
+    \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
+    \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
   }
 ]"
 
