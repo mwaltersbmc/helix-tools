@@ -3867,9 +3867,11 @@ fi
 
 # Print Jenkins credentials and exit
 if [[ ! -z "${DUMP_JCREDS}" ]]; then
-  logStatus "Dumping Jenkins credentials..."
+  logStatus "Jenkins credentials..."
   checkJenkinsIsRunning
   validateJenkinsCredentials
+  logMessage "Pipeline passwords:"
+  getPipelinePasswords | ${JQ_BIN} -r 'to_entries | sort_by(.key)[] | "        \u001b[32m\(.key)\u001b[0m / \u001b[31m\(.value.plainText)\u001b[0m"'
   exit
 fi
 
