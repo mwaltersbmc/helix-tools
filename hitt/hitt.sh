@@ -3828,7 +3828,8 @@ if [ "${https_proxy}" != "" ] && [ "${DISABLE_PROXY}" == "0" ]; then
     PROXY_HOST="${PROXY_STRING%%:*}"
   fi
   if [ "${no_proxy}" != "" ]; then
-    JAVA_NO_PROXY_HOSTS=$(echo ${no_proxy} | tr ',' '|')
+    #JAVA_NO_PROXY_HOSTS=$(echo ${no_proxy} | tr ',' '|')
+    JAVA_NO_PROXY_HOSTS=$(echo ${no_proxy} | tr ',' ' ' | tr -s ' ' | tr ' ' '|')
     JAVA_NO_PROXY_STRING="-Dhttp.nonProxyHosts=${JAVA_NO_PROXY_HOSTS}"
   fi
   PROXY_PORT="${PROXY_STRING##*:}"
