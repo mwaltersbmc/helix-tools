@@ -2054,7 +2054,7 @@ checkISDBSettings() {
       DB_VERSION=$(echo "${SQL_RESULT}" | awk '{print $1}')
       if [ ! -z "${IS_DB_VERSION}" ]; then
         if [ "${DB_VERSION}" != "${IS_DB_VERSION}" ] && [ "${DB_VERSION}" != "1" ]; then
-          logError "181" "Database is not the expected version - found '${DB_VERSION}' but expected '${IS_DB_VERSION}'."
+          logError "181" "Database is not the expected version - found '${DB_VERSION}' but expected '${IS_DB_VERSION}'.  This is expected when running an upgrade."
         else
           if [ "${DB_VERSION}" != "1" ]; then
             logMessage "Database is the expected version - '${DB_VERSION}'." 1
