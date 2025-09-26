@@ -1428,12 +1428,12 @@ validateISDetails() {
 
     if [ "${IS_CLUSTER_DOMAIN}" != "" ]; then
       if [ "${IS_CLUSTER_DOMAIN}" != "${CLUSTER_DOMAIN}" ]; then
-        logError "142" "The ${CLUSTER_DOMAIN_LABEL} value '${IS_CLUSTER_DOMAIN}' does not match that used for the Helix Platform '${CLUSTER_DOMAIN}'."
+        logError "142" "The ${IS_CLUSTER_DOMAIN_LABEL} value '${IS_CLUSTER_DOMAIN}' does not match that used for the Helix Platform '${CLUSTER_DOMAIN}'."
       else
-        logMessage "${CLUSTER_DOMAIN_LABEL} is the expected value of '${CLUSTER_DOMAIN}'." 1
+        logMessage "${IS_CLUSTER_DOMAIN_LABEL} is the expected value of '${CLUSTER_DOMAIN}'." 1
       fi
     else
-      logError "131" "The ${CLUSTER_DOMAIN_LABEL} value cannot be blank.  The expected value is '${CLUSTER_DOMAIN}'."
+      logError "131" "The ${IS_CLUSTER_DOMAIN_LABEL} value cannot be blank.  The expected value is '${CLUSTER_DOMAIN}'."
     fi
 
     if [ "${IS_INPUT_CONFIG_METHOD}" != "Generate_Input_File" ]; then
