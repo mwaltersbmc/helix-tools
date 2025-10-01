@@ -194,10 +194,10 @@ cleanUp() {
       CLEANUP_FILES_TO_RM=("${CLEANUP_FILES[@]}" "${CLEANUP_STOP_FILES[@]}")
   fi
   for i in "${CLEANUP_FILES_TO_RM[@]}"; do
-    rm -f ${i}
+    rm -f ./${i}
   done
   for i in "${CLEANUP_DIRS[@]}"; do
-    rm -rf ${i}
+    rm -rf ./${i}
   done
 }
 
