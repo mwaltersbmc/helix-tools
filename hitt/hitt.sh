@@ -295,7 +295,10 @@ getVersions() {
     OS_VERSION=$(grep "^VERSION=" /etc/os-release | cut -d '=' -f2)
     logMessage "Running on ${OS_NAME} version ${OS_VERSION}."
   fi
-  HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json)
+  HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json 2>>${HITT_ERR_FILE})
+  if [ "${HP_CONFIG_MAP_JSON}" == "" ]; then
+    logError "999" "Unable to read the 'helix-on-prem-config' configMap from the Helix Platform namespace - cannot continue until the Platform is installed." 1
+  fi
   HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
   logMessage "Helix Platform version '${HP_VERSION}' with DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}'."
