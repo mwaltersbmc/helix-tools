@@ -2342,13 +2342,17 @@ checkJenkinsNodes() {
 
   NODE_LABELS=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[].assignedLabels[].name')
   UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
-  if [ ${UBER_VERSION::5} -ge 20252 ]; then
-    HELM_NODE_LABEL="ansible-master-latest"
+  if [ "${UBER_VERSION}" == "" ]; then
+    logMessage "Could not read the PLATFORM_HELM_VERSION value from the HELIX_ONPREM_DEPLOYMENT pipeline - node label checks skipped."
   else
-    HELM_NODE_LABEL="ansible-master"
-  fi
-  if ! echo "${NODE_LABELS}" | grep -Fxq "${HELM_NODE_LABEL}" ; then
-    logError "194" "No Jenkins nodes found with the label '${HELM_NODE_LABEL}'."
+    if [ ${UBER_VERSION::5} -ge 20252 ]; then
+      HELM_NODE_LABEL="ansible-master-latest"
+    else
+      HELM_NODE_LABEL="ansible-master"
+    fi
+    if ! echo "${NODE_LABELS}" | grep -Fxq "${HELM_NODE_LABEL}" ; then
+      logError "194" "No Jenkins nodes found with the required label '${HELM_NODE_LABEL}'."
+    fi
   fi
 }
 
