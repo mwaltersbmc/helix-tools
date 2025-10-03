@@ -1059,6 +1059,7 @@ createPipelineVarsArray() {
     IS_DATABASE_ALWAYS_ON
     LOGS_ELASTICSEARCH_HOSTNAME
     LOGS_ELASTICSEARCH_TLS
+    OS_RESTRICTED_SCC
     AR_DB_NAME
     AR_DB_USER
     AR_DB_CASE_SENSITIVE
@@ -1311,6 +1312,12 @@ validateISDetails() {
     fi
     if [ "${IS_CHECKOUT_USING_USER}" != "github" ]; then
       logError "220" "CHECKOUT_USING_USER is not set to the expected value of the Jenkins credentials ID used to access the git repository files - usually 'github'."
+    fi
+
+    if [ "${OPENSHIFT}" == "1" ]; then
+      if [ "${IS_OS_RESTRICTED_SCC}" != "true" ]; then
+        logWarning "042" "OS_RESTRICTED_SCC is not selected - this is usually required for OpenShift clusters."
+      fi
     fi
 
     if [ "${IS_GIT_USER_HOME_DIR}" == "" ]; then
@@ -4433,9 +4440,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"042\",
-    \"cause\": \"\",
-    \"impact\": \"\",
-    \"remediation\": \"\"
+    \"cause\": \"The OS_RESTRICTED_SCC option is not selected but the cluster type is OpenShift.\",
+    \"impact\": \"Pods will may be blocked from starting and deployment will fail.\",
+    \"remediation\": \"Check if the cluster uses restricted SCCs and select the option if required.\"
   },
   {
     \"id\": \"043\",
@@ -5329,7 +5336,7 @@ ALL_MSGS_JSON="[
     \"id\": \"247\",
     \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
     \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
-    \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
+    \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts ~/.ssh/authorized_keys && chmod 644 ~/.ssh/id_rsa.pub.\"
   },
   {
     \"id\": \"248\",
