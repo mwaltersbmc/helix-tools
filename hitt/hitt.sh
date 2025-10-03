@@ -1650,6 +1650,12 @@ validateISDetails() {
       logMessage "RSSO_ADMIN_USER is the expected value of '${IS_RSSO_ADMIN_USER}'." 1
     fi
 
+    if [ "${IS_RSSO_ADMIN_PASSWORD}" != "${RSSO_PASSWORD}" ]; then
+      logError "999" "RSSO_ADMIN_PASSWORD does not match the Helix Platform RSSO password."
+    else
+      logMessage "RSSO_ADMIN_PASSWORD is the expected value." 1
+    fi
+
     if [ "${IS_HELIX_PLATFORM_NAMESPACE}" != "${HP_NAMESPACE}" ]; then
       logError "157" "HELIX_PLATFORM_NAMESPACE '${IS_HELIX_PLATFORM_NAMESPACE}' is not the expected value of '${HP_NAMESPACE}'."
     else
