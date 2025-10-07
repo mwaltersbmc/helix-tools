@@ -1651,7 +1651,7 @@ validateISDetails() {
     fi
 
     if [ "${IS_RSSO_ADMIN_PASSWORD}" != "${RSSO_PASSWORD}" ]; then
-      logError "999" "RSSO_ADMIN_PASSWORD does not match the Helix Platform RSSO password."
+      logError "250" "RSSO_ADMIN_PASSWORD does not match the Helix Platform RSSO password."
     else
       logMessage "RSSO_ADMIN_PASSWORD is the expected value." 1
     fi
@@ -5359,6 +5359,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
     \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
     \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
+  },
+  {
+    \"id\": \"250\",
+    \"cause\": \"The value of the RSSO_ADMIN_PASSWORD does not match the Helix Platform RSSO password..\",
+    \"impact\": \"HELIX_ONPREM_DEPLOYMENT pipeline will fail at the RSSO validation stage.\",
+    \"remediation\": \"Update the RSSO_ADMIN_PASSWORD to the correct value.\"
   }
 ]"
 
