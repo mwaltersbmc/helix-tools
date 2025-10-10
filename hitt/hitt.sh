@@ -3795,6 +3795,17 @@ getPipelineConsoleOutput() {
   ${CURL_BIN} -skf "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1^^}/lastBuild/consoleText"
 }
 
+getK8sNodeDetails() {
+  local OUTPUT_FILE=k8s-nodes.txt
+  local node
+  # Check if the user can list nodes
+  if ${KUBECTL_BIN} auth can-i list nodes --all-namespaces > /dev/null 2>&1; then
+      ${KUBECTL_BIN} get nodes --no-headers -o custom-columns=":metadata.name" | while read -r node; do
+          ${KUBECTL_BIN} describe node "$node" >> "$OUTPUT_FILE"
+      done
+  fi
+}
+
 #End functions
 
 # MAIN Start
@@ -3998,6 +4009,7 @@ if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
   logError "201" "It is recommended to install the Helix Platform and Helix IS in their own namespaces."
 fi
 checkHPNamespace "${HP_NAMESPACE}"
+getK8sNodeDetails
 getPods ${HP_NAMESPACE}
 getEvents ${HP_NAMESPACE}
 if [ "${MODE}" != "post-hp" ]; then
