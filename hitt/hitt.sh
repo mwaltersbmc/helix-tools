@@ -5358,7 +5358,7 @@ ALL_MSGS_JSON="[
     \"id\": \"247\",
     \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
     \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
-    \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts ~/.ssh/authorized_keys && chmod 644 ~/.ssh/id_rsa.pub.\"
+    \"remediation\": \"Review permissions on the files/directories noted in the error.\"
   },
   {
     \"id\": \"248\",
