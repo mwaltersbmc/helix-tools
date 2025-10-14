@@ -3742,8 +3742,8 @@ validateSSHPermissions() {
   fi
 
   for dir in "$HOME" "$SSH_DIR"; do
-    if [ "$(stat -c "%a" "$dir")" != "700" ]; then
-      logError "249" "Permissions on '$dir' should be 700, found $(stat -c "%a" "$dir")."
+    if find "$dir" -maxdepth 0 -perm /go=w; then
+      logError "249" "'$dir' directory should not have write permssion for group/other - ssh may not work."
       SSH_ERROR=1
     fi
     if [ "$(stat -c "%U" "$dir")" != "${GIT_USER}" ]; then
@@ -3787,7 +3787,7 @@ validateSSHPermissions() {
   if [ "${SSH_ERROR}" -eq 0 ]; then
     logMessage "SSH permissions and ownership are valid." 1
   else
-    logError "247" "One or more SSH permission issues detected. Fix with: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub"
+    logError "247" "One or more SSH permission issues detected. Review permissions on the files/directories reported in the errors."
   fi
 }
 
@@ -5370,7 +5370,7 @@ ALL_MSGS_JSON="[
     \"id\": \"249\",
     \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
     \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
-    \"remediation\": \"Fix by running: chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub.\"
+    \"remediation\": \"Review permissions on the files/directories noted in the error.\"
   },
   {
     \"id\": \"250\",
