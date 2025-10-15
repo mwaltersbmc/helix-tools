@@ -3742,7 +3742,7 @@ validateSSHPermissions() {
   fi
 
   for dir in "$HOME" "$SSH_DIR"; do
-    if find "$dir" -maxdepth 0 -perm /go=w; then
+    if [ $(find "$dir" -maxdepth 0 -perm /go=w | wc -l) != "0" ]; then
       logError "249" "'$dir' directory should not have write permssion for group/other - ssh may not work."
       SSH_ERROR=1
     fi
