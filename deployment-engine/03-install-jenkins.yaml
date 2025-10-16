@@ -7,6 +7,29 @@
     - name: Load default config variables
       include_vars: 00-variables.yaml
 
+    - name: Add Jenkins repository
+      ansible.builtin.yum_repository:
+        name: jenkins
+        description: Jenkins repo
+        baseurl: https://pkg.jenkins.io/redhat-stable
+        gpgkey: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+      when: ansible_os_family|lower == "redhat"
+
+    - name: Ubuntu block
+      block:
+      - name: Add Jenkins GPG key
+        ansible.builtin.get_url:
+          url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+          dest: /etc/apt/keyrings/jenkins-keyring.asc
+          mode: '0644'
+
+      - name: Add Jenkins repository into sources list
+        ansible.builtin.apt_repository:
+          repo: 'deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/'
+          state: present
+
+      when: ansible_os_family|lower == "debian"
+
     - name: Install Jenkins
       package:
         name: jenkins

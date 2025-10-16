@@ -16,27 +16,24 @@
       ansible.builtin.yum:
         name: epel-release
       ignore_errors: true
-
-    - name: Add Jenkins repository
-      ansible.builtin.yum_repository:
-        name: jenkins
-        description: Jenkins repo
-        baseurl: https://pkg.jenkins.io/redhat-stable
-        gpgkey: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+      when: ansible_os_family|lower == "redhat"
 
     - name: Install software
       package:
         name: '{{ item }}'
         state: present
+      ignore_errors: true
       loop:
         - dos2unix
         - coreutils
         - git
         - gtk3
-        - java-17-openjdk
+        - java-21-openjdk
+        - openjdk-21-jdk-headless # Ubuntu
         - jq
         - openssl
         - openssl-libs
+        - libssl-dev # Ubuntu
         - python3-pip
         - python3-jmespath
         - sshpass
@@ -44,6 +41,7 @@
         - unzip
         - wget
         - xmlstarlet
+        - zip
 
     - name: Update ansible.cfg [defaults]
       ini_file:
