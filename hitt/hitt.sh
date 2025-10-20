@@ -1396,7 +1396,11 @@ validateISDetails() {
       logError "137" "The ${IS_CLUSTER_LABEL} value '${IS_CLUSTER}' is not a valid context in your kubeconfig file. Available contexts are:"
       ${KUBECTL_BIN} config get-contexts 2>/dev/null
     else
-      logMessage "${IS_CLUSTER_LABEL} '${IS_CLUSTER}' is a valid kubeconfig context." 1
+      if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" --context "${IS_CLUSTER}" get secret &> /dev/null ; then
+        logError "251" "The ${IS_CLUSTER_LABEL} value '${IS_CLUSTER}' does not appear to have permssions for the '${IS_NAMESPACE}' namespace."
+      else
+        logMessage "${IS_CLUSTER_LABEL} '${IS_CLUSTER}' is a valid kubeconfig context." 1
+      fi
     fi
 
     if [ "${IS_CLOUD}" == "true" ]; then
@@ -2529,6 +2533,20 @@ validateJenkinsKubeconfig() {
     logWarning "028" "Failed to extract kubeconfig file from Jenkins - skipping validation."
     return
   fi
+#  KUBECONFIG_JSON=$(KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} config view -o json 2>/dev/null)
+#  KUBECONFIG_CONTEXTS=($(echo "${KUBECONFIG_JSON}" | ${JQ_BIN} -r '.contexts[].name'))
+#  if [ "${#KUBECONFIG_CONTEXTS[@]}" -eq 0 ]; then
+#    logError "197" "Unable to verify kubeconfig file from Jenkins KUBECONFIG credential."
+#    return
+#  fi
+#  if [ "${#KUBECONFIG_CONTEXTS[@]}" != "1" ]; then
+#    logMessage "Multiple contexts found in kubeconfig file - please select the cluster context you plan to use:"
+#    while [ "${SELECTED_CONTEXT}" == "" ]; do
+#        SELECTED_CONTEXT=$(selectFromArray KUBECONFIG_CONTEXTS)
+#    done
+#    KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} use-context "${SELECTED_CONTEXT}" &> /dev/null
+#  fi
+
   if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} -n "${HP_NAMESPACE}" cluster-info > /dev/null 2>>${HITT_ERR_FILE}; then
     logError "197" "Unable to verify kubeconfig file from Jenkins KUBECONFIG credential."
     SKIP_CLEANUP=1
@@ -5374,9 +5392,15 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"250\",
-    \"cause\": \"The value of the RSSO_ADMIN_PASSWORD does not match the Helix Platform RSSO password..\",
+    \"cause\": \"The value of the RSSO_ADMIN_PASSWORD does not match the Helix Platform RSSO password.\",
     \"impact\": \"HELIX_ONPREM_DEPLOYMENT pipeline will fail at the RSSO validation stage.\",
     \"remediation\": \"Update the RSSO_ADMIN_PASSWORD to the correct value.\"
+  },
+  {
+    \"id\": \"251\",
+    \"cause\": \"The cluster context value is present in the kubeconfig but failed to return values from the cluster.\",
+    \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
+    \"remediation\": \"Validate the context and cluster permissions it has assigned.\"
   }
 ]"
 
