@@ -305,6 +305,12 @@ getVersions() {
   if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
     logWarning "002" "Helix Platform DEPLOYMENT_SIZE is '${HP_DEPLOYMENT_SIZE}' - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products are/will be installed."
   fi
+  HP_SM_PLATFORM_CORE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^SM_PLATFORM_CORE | cut -d '=' -f2)
+  if [ "${HP_SM_PLATFORM_CORE}"  == "yes" ]; then
+    logMessage "Helix Platform CORE deployment for ITSM only." 1
+  else
+    HP_SM_PLATFORM_CORE=no
+  fi
 
   if [ "${MODE}" == "post-is" ]; then
     IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
@@ -348,7 +354,7 @@ setVarsFromPlatform() {
   FTS_ELASTIC_CERTNAME="esnode"
   EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
   LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helixingress-master -o jsonpath='{.spec.rules[0].host}')
-  TMS_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress tms-ingress -o jsonpath='{.spec.rules[0].host}')
+  TMS_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helix-tms-ingress-master -o jsonpath='{.spec.rules[0].host}')
   MINIO_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio -o jsonpath='{.spec.rules[0].host}')
   MINIO_API_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio-api -o jsonpath='{.spec.rules[0].host}')
   KIBANA_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress efk-elasticsearch-kibana -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
@@ -424,8 +430,8 @@ setVarsFromPlatform() {
       ADE_INFRA_CLIENT_IMAGE_TAG=25300-v232-ade-infra-clients-alpine
       ;;
     25.4.00)
-      TCTL_VER=712
-      ADE_INFRA_CLIENT_IMAGE_TAG=25400-v261-ade-infra-clients-alpine
+      TCTL_VER=724
+      ADE_INFRA_CLIENT_IMAGE_TAG=25400-v309-ade-infra-clients-alpine
       ;;
     *)
       ;;
@@ -476,7 +482,8 @@ getRSSODetails() {
 }
 
 getDomain() {
-  CLUSTER_DOMAIN=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="DOMAIN_NAME")].value}')
+  # CLUSTER_DOMAIN=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="DOMAIN_NAME")].value}')
+  CLUSTER_DOMAIN=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.infra_config' | grep ^DOMAIN | cut -d '=' -f2)
   [[ "${MODE}" =~ ^p ]] && logMessage "Helix domain is '${CLUSTER_DOMAIN}'."
 }
 
@@ -522,7 +529,6 @@ getTenantDetails() {
   else
     HP_TENANT="${TENANT_ARRAY[0]}"
   fi
-
   logMessage "Helix Platform tenant is '${HP_TENANT}'."
   PORTAL_HOSTNAME=$(echo "${TENANT_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${HP_TENANT}'").host')
   if isTenantActivated ; then
@@ -675,9 +681,10 @@ getRealmDetails() {
   REALM_NAME="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
   RSSO_REALM=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}")
   if echo "${RSSO_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
+    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check realm names and the IS_CUSTOMER_SERVICE/IS_ENVIRONMENT values in hitt.conf."
     echo "Realms found in RSSO are:"
     ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} -r '" - " + .realms[].id'
-    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check realm names and the IS_CUSTOMER_SERVICE/IS_ENVIRONMENT values in hitt.conf." 1
+    exit 1
   else
     logMessage "SSO realm '${REALM_NAME}' found for the SAAS_TENANT." 1
   fi
@@ -3924,7 +3931,7 @@ if [[ ! -z "${DUMP_JCREDS}" ]]; then
   logStatus "Jenkins credentials..."
   checkJenkinsIsRunning
   validateJenkinsCredentials
-  logMessage "Pipeline passwords:"
+  logStatus "Pipeline passwords:"
   getPipelinePasswords | ${JQ_BIN} -r 'to_entries | sort_by(.key)[] | "        \u001b[32m\(.key)\u001b[0m / \u001b[31m\(.value.plainText)\u001b[0m"'
   exit
 fi
@@ -4046,10 +4053,14 @@ logStatus "Getting RSSO details..."
 getRSSODetails
 logStatus "Getting domain..."
 getDomain
-logStatus "Getting tenant details from Helix Platform..."
-getTenantDetails
-logStatus "Checking for ITSM services in Helix Platform..."
-checkServiceDetails
+if [ "${HP_SM_PLATFORM_CORE}" == "yes" ]; then
+  logMessage "Helix Platform CORE deployment for ITSM - skipping tenant and ARSERVICES checks..."
+else
+  logStatus "Getting tenant details from Helix Platform..."
+  getTenantDetails
+  logStatus "Checking for ITSM services in Helix Platform..."
+  checkServiceDetails
+fi
 logStatus "Checking FTS Elasticsearch cluster status..."
 checkFTSElasticStatus
 logStatus "Getting realm details from RSSO..."
