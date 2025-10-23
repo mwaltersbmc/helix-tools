@@ -585,16 +585,18 @@ deployTCTL() {
   TCTL_COMMAND="${1}"
   if ! setTCTLRESTImageName ; then
     logError "202" "Unable to find job with TCTL image details."
-    return 1
-  fi
-  TCTL_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o json)
-  #  TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o jsonpath='{.spec.template.spec.containers[0].image}')
-  TCTL_IMAGE=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].image')
-  TCTL_RUNASUSER=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].securityContext.runAsUser')
-  TCTL_RUNASGROUP=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].securityContext.runAsGroup')
-  if [ -z "${TCTL_IMAGE}" ]; then
-    logError "203" "Unable to get TCTL image name from job ${TCTL_JOB_NAME}."
-    return 1
+    TCTL_IMAGE="${HP_REGISTRY_SERVER}/bmc/tctlrest-${TCTL_VER}"
+#    return 1
+  else
+    TCTL_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o json)
+    #  TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o jsonpath='{.spec.template.spec.containers[0].image}')
+    TCTL_IMAGE=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].image')
+  #  TCTL_RUNASUSER=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].securityContext.runAsUser')
+  #  TCTL_RUNASGROUP=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].securityContext.runAsGroup')
+    if [ -z "${TCTL_IMAGE}" ]; then
+      logError "203" "Unable to get TCTL image name from job ${TCTL_JOB_NAME}."
+      return 1
+    fi
   fi
   logMessage "Deploying '${SEALTCTL}' job and waiting for it to complete..."
   cat <<EOF | ${KUBECTL_BIN} -n "${HP_NAMESPACE}" apply -f - >/dev/null
@@ -640,8 +642,8 @@ spec:
           capabilities:
             drop: ["ALL"]
           runAsNonRoot: true
-          runAsUser: ${TCTL_RUNASUSER}
-          runAsGroup: ${TCTL_RUNASGROUP}
+#          runAsUser: ${TCTL_RUNASUSER}
+#          runAsGroup: ${TCTL_RUNASGROUP}
           seccompProfile:
             type: RuntimeDefault
         resources:
