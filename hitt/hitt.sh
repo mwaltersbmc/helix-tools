@@ -3876,7 +3876,8 @@ fi
 # Proxy settings
 if [ "${https_proxy}" != "" ] && [ "${DISABLE_PROXY}" == "0" ]; then
   logMessage "Proxy environment variables are set - run HITT with -x option to ignore them."
-  PROXY_STRING="${https_proxy#*://}"
+  PROXY_STRING="${https_proxy#*://}" # strip https://
+  PROXY_STRING="${PROXY_STRING%/}" # strip any trailing /
   # authentication required?
   if echo "${https_proxy}" | grep -q "@" ; then
     PROXY_CREDS="${PROXY_STRING%@*}"
