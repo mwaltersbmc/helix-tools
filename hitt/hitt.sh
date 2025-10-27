@@ -811,7 +811,7 @@ validateAliasAccessibleFromDE(){
       if echo "${1}" | grep -q reporting ; then
         MSG_SUFFIX="Note: alias only applies to ITSM 25.3.01 and later."
       fi
-      logWarning "043" "URL 'https://${1}' is not accessible from the Deployment Engine system. ${MSG_SUFFIX}"
+      logWarning "043" "URL 'https://${1}' did not return an expected response code - '${HTTP_CODE}'. ${MSG_SUFFIX}"
       MSG_SUFFIX=""
       ;;
   esac
@@ -1723,7 +1723,7 @@ getCacertsFile() {
   fi
 }
 
-validateCacerts() {
+validateCacertsFile() {
   VALID_CACERTS=0
   getCacertsFile
   if [ "${SKIP_CACERTS}" == "1" ]; then
@@ -3062,7 +3062,7 @@ getPodNameByLabel() {
 
 updateISCacerts() {
   cp "${NEWCACERTS}" sealcacerts
-  validateCacerts
+  validateCacertsFile
   if [ "${VALID_CACERTS}" == "0" ]; then
     if askYesNo "New cacerts file is valid - do you want to replace the cacerts secret?"; then
       replaceISCacertsSecret
@@ -3875,7 +3875,7 @@ fi
 
 # Proxy settings
 if [ "${https_proxy}" != "" ] && [ "${DISABLE_PROXY}" == "0" ]; then
-  logMessage "Proxy environment variables are set."
+  logMessage "Proxy environment variables are set - run HITT with -x option to ignore them."
   PROXY_STRING="${https_proxy#*://}"
   # authentication required?
   if echo "${https_proxy}" | grep -q "@" ; then
@@ -4085,7 +4085,7 @@ if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking IS registry details..."
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
-  validateCacerts
+  validateCacertsFile
   logStatus "Checking IS Configuration..."
   checkISRESTReady
   checkISLicenseStatus
