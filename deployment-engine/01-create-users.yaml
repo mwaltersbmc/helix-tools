@@ -96,6 +96,22 @@
         src: "{{ installer_files_directory }}/kubeconfig"
         dest: ~{{ git_user }}/.kube/config
 
+    - name: Add collections for git user
+      become: true
+      become_user: "{{ git_user }}"
+      community.general.ansible_galaxy_install:
+        type: collection
+        name: '{{ item }}'
+        force: true
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
+      with_items:
+        - community.docker:4
+        - ansible.posix
+        - community.crypto
+        - community.general
+        - kubernetes.core
+
     - name: Set ownership of the home directories and files
       ansible.builtin.file:
         path: '/home/{{ item }}'
