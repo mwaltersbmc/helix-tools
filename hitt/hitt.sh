@@ -3833,6 +3833,20 @@ getK8sNodeDetails() {
   fi
 }
 
+getPodConditionTime() {
+    local CONDITION="$1"
+    local NAMESPACE_NAME="$2"
+    local POD_NAME="$3"
+    ISO_TIME=$(${KUBECTL_BIN} -n "${NAMESPACE_NAME}" get pod "${POD_NAME}" -o json | jq ".status.conditions[] | select(.type == \"${CONDITION}\" and .status == \"True\") | .lastTransitionTime" | tr -d '"\n')
+    date -d ${ISO_TIME} +%s
+}
+
+getPodStartupTime() {
+  POD_SCHEDULED_EPOCH=$(getPodConditionTime "PodScheduled" "${1}" "${2}")
+  POD_READY_EPOCH=$(getPodConditionTime "Ready" "${1}" "${2}")
+  DIFF=$(( POD_READY_EPOCH - POD_SCHEDULED_EPOCH ))
+  printf "%s" "$(date -u -d "@${DIFF}" +%T)"   # prints HH:MM:SS (UTC)
+}
 #End functions
 
 # MAIN Start
@@ -4109,6 +4123,10 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
 fi
 
 if [ "${MODE}" == "post-is" ]; then
+  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod platform-fts-0 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep -q True &> /dev/null; then
+    STARTUP_TIME=$(getPodStartupTime "${IS_NAMESPACE}" platform-fts-0)
+    logMessage "Getting platform-fts-0 pod startup time: ${STARTUP_TIME}"
+  fi
   logStatus "Checking Helix IS platform-admin-ext service..."
   checkPlatformAdminExtSvc
   logStatus "Checking Support Assistant Tool..."
