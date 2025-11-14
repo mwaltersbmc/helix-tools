@@ -3098,14 +3098,16 @@ replaceISCacertsSecret() {
 
 fixSATRole() {
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get role assisttool-rl >/dev/null 2>&1; then
-    logError "999" "'assisttool-rl' role is already present in the '${IS_NAMESPACE}' namespace."  1
+    logWarning "999" "'assisttool-rl' role is already present in the '${IS_NAMESPACE}' namespace."
+  else
+    ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create role assisttool-rl --verb=get --verb=list --verb=watch --resource=pods >/dev/null 2>&1
   fi
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get rolebindings assisttool-rlb >/dev/null 2>&1; then
-    logError "999" "'assisttool-rlb' rolebinding is already present in the '${IS_NAMESPACE}' namespace."  1
+    logWarning "999" "'assisttool-rlb' rolebinding is already present in the '${IS_NAMESPACE}' namespace."
+  else
+    ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create rolebinding assisttool-rlb --role=assisttool-rl --serviceaccount="${IS_NAMESPACE}":default >/dev/null 2>&1
   fi
-  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create role assisttool-rl --verb=get --verb=list --verb=watch --resource=pods >/dev/null 2>&1
-  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create rolebinding assisttool-rlb --role=assisttool-rl --serviceaccount="${IS_NAMESPACE}":default >/dev/null 2>&1
-  logStatus "Support Assistant Tool 'assisttool-rl' role and 'assisttool-rlb' rolebinding created in the '${IS_NAMESPACE}' namespace."
+  logStatus "Support Assistant Tool 'assisttool-rl' role and 'assisttool-rlb' rolebinding created/updated in the '${IS_NAMESPACE}' namespace."
 }
 
 buildRealmJSON() {
@@ -3670,6 +3672,8 @@ addJenkinsNodeLabel() {
 }
 
 getISDbID() {
+  checkToolVersion kubectl
+  getVersions
   getDomain
   buildISAliasesArray
   getISAdminCreds
