@@ -463,6 +463,12 @@ setVarsFromPlatform() {
       logError "223" "Helix Platform 24.4 is installed but the 24.4.00.001 hotfix has not been applied - please download this update from the BMC EPD and install it."
     fi
   fi
+
+  if compare "${HP_VERSION%.*} >= 25.4" ; then
+    HP_TENANT_ACTIVATED_STATUS="REG_AUTOCOMPLETED"
+  else
+    HP_TENANT_ACTIVATED_STATUS="REG_COMPLETED"
+  fi
 }
 
 getRSSODetails() {
@@ -534,7 +540,7 @@ getTenantDetails() {
   if isTenantActivated ; then
     logMessage "Tenant has been activated."
   else
-    logWarning "041" "Tenant has not been activated - please check for activation email."
+    logWarning "041" "Tenant has not been activated."
   fi
   logMessage "Helix Portal hostname is '${PORTAL_HOSTNAME}'."
   HP_COMPANY_NAME=$(echo "${HP_TENANT%%.*}")
@@ -545,7 +551,7 @@ isTenantActivated() {
   # HP_TENANT
   PG_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "application=patroni,data=pool")
   TENANT_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "select status from localuser where realm='${HP_TENANT}'" 2>/dev/null)
-  echo "${TENANT_STATUS}" | grep -q "REG_COMPLETED"
+  echo "${TENANT_STATUS}" | grep -q "${HP_TENANT_ACTIVATED_STATUS}"
 }
 
 selectFromArray () {
@@ -3729,6 +3735,10 @@ askYesNo() {
 activateHP() {
   checkToolVersion kubectl
   getVersions
+  if compare "${HP_VERSION%.*} >= 25.4" ; then
+    logMessage "The activatehp fix is not valid for Helix Platform versions 25.4.00 and above."
+    exit
+  fi
   setVarsFromPlatform
   getRSSODetails
   getDomain
@@ -3736,7 +3746,7 @@ activateHP() {
   HP_TENANT_ID="${HP_TENANT#*.}"
   if ! isTenantActivated ; then
     ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "update localuser set password = '\x020a7e17c23b9cb42174e31d1d39085f305bdbab57544b163e1c2be70c7523b43eb1f1e8b092ed5b13f05aff838d32141181892e14bbfdbd75ab235640adfc30731f9c7f72d24f2a2ecba2fa22d2dd50ca85020d15213956c22f09e87f76fa4398' where login = 'hannah_admin' and realm='${HP_TENANT}' and status = 'REG_PENDING'" > /dev/null 2>&1
-    ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "update localuser set status = 'REG_COMPLETED' where login = 'hannah_admin' and realm='${HP_TENANT}' and status = 'REG_PENDING'" > /dev/null 2>&1
+    ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "update localuser set status = '${HP_TENANT_ACTIVATED_STATUS}' where login = 'hannah_admin' and realm='${HP_TENANT}' and status = 'REG_PENDING'" > /dev/null 2>&1
     logMessage "Tenant '${HP_TENANT}' activated."
     exit
   fi
@@ -4516,9 +4526,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"041\",
-    \"cause\": \"The named Helix Platform tenant has not been activated using the link in the activation email.\",
+    \"cause\": \"The named Helix Platform tenant has not been activated.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline may encounter issues.\",
-    \"remediation\": \"Use the link in the activation email to set the first user password and activate the tenant.\"
+    \"remediation\": \"Use the link in the activation email or login to set the first user password and activate the tenant.\"
   },
   {
     \"id\": \"042\",
