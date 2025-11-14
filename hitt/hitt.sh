@@ -551,7 +551,7 @@ isTenantActivated() {
   # HP_TENANT
   PG_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "application=patroni,data=pool")
   TENANT_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${PG_POD}" -- psql -d ade_rsso -U postgres -tc "select status from localuser where realm='${HP_TENANT}'" 2>/dev/null)
-  echo "${TENANT_STATUS}" | grep -q "${HP_TENANT_ACTIVATED_STATUS}"
+  echo "${TENANT_STATUS}" | grep -q "REG_.*COMPLETED"
 }
 
 selectFromArray () {
