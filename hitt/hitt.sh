@@ -3844,9 +3844,22 @@ getPodConditionTime() {
 getPodStartupTime() {
   POD_SCHEDULED_EPOCH=$(getPodConditionTime "PodScheduled" "${1}" "${2}")
   POD_READY_EPOCH=$(getPodConditionTime "Ready" "${1}" "${2}")
-  DIFF=$(( POD_READY_EPOCH - POD_SCHEDULED_EPOCH ))
-  printf "%s" "$(date -u -d "@${DIFF}" +%T)"   # prints HH:MM:SS (UTC)
+  echo $(( POD_READY_EPOCH - POD_SCHEDULED_EPOCH ))
 }
+
+logPlatformFTSStartTime() {
+  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod platform-fts-0 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep -q True &> /dev/null; then
+    STARTUP_SECS=$(getPodStartupTime "${IS_NAMESPACE}" platform-fts-0)
+    STARTUP_TIME=$(printf "%s" "$(date -u -d "@${STARTUP_SECS}" +%T)")   # prints HH:MM:SS (UTC))
+  else
+    return
+  fi
+  logMessage "platform-fts-0 pod startup time: ${STARTUP_TIME}"
+  if [ "${STARTUP_SECS}" -gt 720 ]; then
+    logWarning "044"  "platform-fts-0 pod took more than 12 minutes to start - possible db latency or performance issue."
+  fi
+}
+
 #End functions
 
 # MAIN Start
@@ -4123,10 +4136,7 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
 fi
 
 if [ "${MODE}" == "post-is" ]; then
-  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod platform-fts-0 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep -q True &> /dev/null; then
-    STARTUP_TIME=$(getPodStartupTime "${IS_NAMESPACE}" platform-fts-0)
-    logMessage "Getting platform-fts-0 pod startup time: ${STARTUP_TIME}"
-  fi
+  logPlatformFTSStartTime
   logStatus "Checking Helix IS platform-admin-ext service..."
   checkPlatformAdminExtSvc
   logStatus "Checking Support Assistant Tool..."
@@ -4518,9 +4528,15 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"043\",
-    \"cause\": \"The named alias is accessible from the Deployment Engine system using a curl command.\",
+    \"cause\": \"The named alias is not accessible from the Deployment Engine system using a curl command.\",
     \"impact\": \"Deployment may fail as some aliases, RESTAPI for example, are used by the pipeline scripts.\",
     \"remediation\": \"Make sure the aliases are correctly set up and accessible - check firewall settings etc.\"
+  },
+  {
+    \"id\": \"044\",
+    \"cause\": \"The platform-fts pod took longer than expected to become ready.\",
+    \"impact\": \"This may indicate poor latency between the pod and the IS database system or some other performance issue.\",
+    \"remediation\": \"Check the db latency or contact BMC Support if you observe performance related issues.\"
   },
   {
     \"id\": \"100\",
