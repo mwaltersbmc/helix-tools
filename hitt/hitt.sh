@@ -3870,6 +3870,30 @@ logPlatformFTSStartTime() {
   fi
 }
 
+showFixHelp() { # fix mode help
+  echo "HITT fix mode options - see https://bit.ly/hittfix"
+  echo .
+  echo 'Usage: bash hitt.sh -f <fixmode>|"<fixmode options>"'
+  echo -e "
+    \tssh \t\t| Set up/update passwordless ssh for the git user.
+    \trealm \t\t| Create/update the Helix Service Management realm in SSO.
+    \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
+    \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
+    \tgetdbid \t| Displays the database ID (DBID) for the system - used for licensing.
+    \tarlicense \t| Apply an Innovation Suite/AR server license to the system.
+    \tresetssopwd \t| Resets the Helix SSO admin user password to the BMC default value.
+    \tjenkins \t| Jenkins specific fixes - see below.
+    "
+  echo -e '\tJenkins fixmode options:'
+  echo -e "
+    \tscriptapproval \t| Approves the scripts required by the deployment pipelines.
+    \tpipelinelibs \t| Create/update the Global Trusted Pipeline Library definitions.
+    \tcredentials \t| Create/update all the required credentials, except kubeconfig - see the 'kubeconfig' option.
+    \tkubeconfig \t| Create/update the kubeconfig credential with a new kubeconfig file.
+    \tall \t\t| Runs all of the Jenkins fixes except for 'dryrun'.
+    \tdryrun \t\t| Trigger a dry run of all the HELIX pipelines.
+    "
+}
 #End functions
 
 # MAIN Start
@@ -4032,6 +4056,9 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     resetssopwd)
       resetSSOPasswd
+      ;;
+    help)
+      showFixHelp
       ;;
     *)
     logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
