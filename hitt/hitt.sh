@@ -2791,8 +2791,12 @@ validateJenkinsCredentials() {
     if ! which sshpass  > /dev/null 2>&1 ; then
       logWarning "038" "'sshpass' command not found - please install it to enable Jenkins credentials password validation."
     else
-      if ! sshpass -p "${CRED_PWD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${CRED_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
-        logError "231" "The password set for the git user in the Jenkins credentials is not correct. Run 'bash $0 -j' to display the values."
+      if ssh -v -o BatchMode=yes "${CRED_USER}@${LONG_HOSTNAME}" whoami 2>&1 | grep -i continue | grep -qi password ; then
+        if ! sshpass -p "${CRED_PWD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${CRED_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
+          logError "231" "The password set for the git user in the Jenkins credentials is not correct. Run 'bash $0 -j' to display the values."
+        fi
+      else
+        logWarning "045" "ssh PasswordAuthentication appears to be disabled - skipping Jenkins credentials password validation..."
       fi
     fi
   fi
@@ -4578,6 +4582,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The platform-fts pod took longer than expected to become ready.\",
     \"impact\": \"This may indicate poor latency between the pod and the IS database system or some other performance issue.\",
     \"remediation\": \"Check the db latency or contact BMC Support if you observe performance related issues.\"
+  },
+    {
+    \"id\": \"045\",
+    \"cause\": \"'PasswordAuthentication no' appears to be set in the /etc/ssh/sshd_config file.\",
+    \"impact\": \"Checks to validate the git user password set in Jenkins credentials cannot be run and pipelines may fail.\",
+    \"remediation\": \"Check the /etc/ssh/sshd_config file and comment out 'PasswordAuthentication no' or set the value to yes.\"
   },
   {
     \"id\": \"100\",
