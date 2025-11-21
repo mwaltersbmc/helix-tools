@@ -521,6 +521,11 @@ checkEFKClusterHealth() {
 }
 
 getTenantDetails() {
+  if [ "${HP_SM_PLATFORM_CORE}"  == "yes" ]; then
+    logMessage "Helix Platform CORE deployment for ITSM - skipping tenant checks..."
+    HP_TENANT="core"
+    return
+  fi
   TENANT_JSON=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/tenant -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} .tenants)
   TENANT_ARRAY=($(echo "${TENANT_JSON}" | ${JQ_BIN} -r .[].name | grep -v SAAS_TENANT))
   if [ "${#TENANT_ARRAY[@]}" == "0" ]; then
@@ -592,7 +597,7 @@ deployTCTL() {
   if ! setTCTLRESTImageName ; then
     logError "202" "Unable to find job with TCTL image details."
     TCTL_IMAGE="${HP_REGISTRY_SERVER}/bmc/tctlrest-${TCTL_VER}"
-#    return 1
+    return 1
   else
     TCTL_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o json)
     #  TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o jsonpath='{.spec.template.spec.containers[0].image}')
@@ -699,6 +704,9 @@ getRealmDetails() {
 }
 
 checkTenantRealms() {
+  if [ "${HP_SM_PLATFORM_CORE}"  == "yes" ]; then
+    return
+  fi
   TENANT_REALM=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}" -H "X-RSSO-TENANT-IMP: ${PORTAL_HOSTNAME}")
   if ! echo "${TENANT_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     logError "117" "Helix IS realm '${REALM_NAME}' exists for tenant '${HP_TENANT}' when it should be configured for the SAAS_TENANT."
@@ -767,7 +775,8 @@ validateRealmDomains() {
     WILDCARD_CERT=0
   fi
 
-  ADE_ALIAS_ARRAY=("${LB_HOST}" "${TMS_LB_HOST}" "${MINIO_LB_HOST}" "${MINIO_API_LB_HOST}" "${PORTAL_HOSTNAME}")
+  ADE_ALIAS_ARRAY=("${LB_HOST}" "${TMS_LB_HOST}" "${MINIO_LB_HOST}" "${MINIO_API_LB_HOST}")
+  [[ -n "${PORTAL_HOSTNAME}" ]] && ADE_ALIAS_ARRAY+=("${PORTAL_HOSTNAME}")
   [[ -n "${KIBANA_LB_HOST}" ]] && ADE_ALIAS_ARRAY+=("${KIBANA_LB_HOST}")
   for i in "${ADE_ALIAS_ARRAY[@]}"; do
     validateAliasInDNS "${i}"
@@ -857,6 +866,10 @@ logLBCertDetails() {
 }
 
 checkServiceDetails() {
+  if [ "${HP_SM_PLATFORM_CORE}" == "yes" ]; then
+    logMessage "Helix Platform CORE deployment for ITSM - skipping ARSERVICES checks..."
+    return
+  fi
   deleteTCTLJob
   if ! deployTCTL "get service"; then
     logError "123" "Failed to get Helix Platform ARSERVICES status."
@@ -3197,34 +3210,37 @@ fixSSORealm() {
   getDomain
   getTenantDetails
   HP_TENANT_ID="${HP_TENANT#*.}"
-  deleteTCTLJob
-  deployTCTL "get tenant ${HP_TENANT_ID} -o json"
-  getTCTLOutput full
-  deleteTCTLJob
-  # Get JSON from tctl pod output
-  TMP_JSON=$(awk  '
-    /Response: *{/ {
-      json_started=1
-      depth=1
-      line = substr($0, index($0, "{"))
-      print line
-      next
-    }
-    json_started {
-      print
-      depth += gsub(/{/, "{")
-      depth -= gsub(/}/, "}")
-      if (depth == 0) exit
-    }
-  ' <<< "${TCTL_OUTPUT}")
+  if [ "${HP_SM_PLATFORM_CORE}"  == "no" ]; then
+    deleteTCTLJob
+    deployTCTL "get tenant ${HP_TENANT_ID} -o json"
+    getTCTLOutput full
+    deleteTCTLJob
+    # Get JSON from tctl pod output
+    TMP_JSON=$(awk  '
+      /Response: *{/ {
+        json_started=1
+        depth=1
+        line = substr($0, index($0, "{"))
+        print line
+        next
+      }
+      json_started {
+        print
+        depth += gsub(/{/, "{")
+        depth -= gsub(/}/, "}")
+        if (depth == 0) exit
+      }
+    ' <<< "${TCTL_OUTPUT}")
+  fi
 
   buildRealmJSON
 
-  REALM_AUTH_TYPE=$(echo "${TMP_JSON}" | ${JQ_BIN} -r '.auth_context.type')
-  if [ "${REALM_AUTH_TYPE}" == "OIDC" ]; then # INTEROPS has been run so portal alias should be in Application Domains
-    REALM_JSON=$(echo "${REALM_JSON}" | ${JQ_BIN} --arg ND "${PORTAL_HOSTNAME}" '.domainMapping.domain += [$ND]')
+  if [ "${HP_SM_PLATFORM_CORE}"  == "no" ]; then
+    REALM_AUTH_TYPE=$(echo "${TMP_JSON}" | ${JQ_BIN} -r '.auth_context.type')
+    if [ "${REALM_AUTH_TYPE}" == "OIDC" ]; then # INTEROPS has been run so portal alias should be in Application Domains
+      REALM_JSON=$(echo "${REALM_JSON}" | ${JQ_BIN} --arg ND "${PORTAL_HOSTNAME}" '.domainMapping.domain += [$ND]')
+    fi
   fi
-
   if ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
     CURL_ACTION=POST
     URL_SUFFIX=""
@@ -4128,14 +4144,10 @@ logStatus "Getting RSSO details..."
 getRSSODetails
 logStatus "Getting domain..."
 getDomain
-if [ "${HP_SM_PLATFORM_CORE}" == "yes" ]; then
-  logMessage "Helix Platform CORE deployment for ITSM - skipping tenant and ARSERVICES checks..."
-else
-  logStatus "Getting tenant details from Helix Platform..."
-  getTenantDetails
-  logStatus "Checking for ITSM services in Helix Platform..."
-  checkServiceDetails
-fi
+logStatus "Getting tenant details from Helix Platform..."
+getTenantDetails
+logStatus "Checking for ITSM services in Helix Platform..."
+checkServiceDetails
 logStatus "Checking FTS Elasticsearch cluster status..."
 checkFTSElasticStatus
 logStatus "Getting realm details from RSSO..."
