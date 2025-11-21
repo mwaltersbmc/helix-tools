@@ -382,60 +382,61 @@ setVarsFromPlatform() {
 
   case "${HP_VERSION}" in
     22.2.01)
-      TCTL_VER=110
+      TCTL_REST_VER=110
       ADE_INFRA_CLIENT_IMAGE_TAG=22201-1-v4-ade-infra-clients-1
       ;;
     22.4)
-      TCTL_VER=230
+      TCTL_REST_VER=230
       ADE_INFRA_CLIENT_IMAGE_TAG=22400-v9-ade-infra-clients-1
       ;;
     23.1.02)
-      TCTL_VER=255
+      TCTL_REST_VER=255
       ADE_INFRA_CLIENT_IMAGE_TAG=23102-v3-ade-infra-clients-1
       ;;
     23.2.02)
-      TCTL_VER=310
+      TCTL_REST_VER=310
       ADE_INFRA_CLIENT_IMAGE_TAG=23202-v1-ade-infra-clients-1
       ;;
     23.4.00)
-      TCTL_VER=370
+      TCTL_REST_VER=370
       ADE_INFRA_CLIENT_IMAGE_TAG=23400-v2-ade-infra-clients-1
       ;;
     24.1.00)
-      TCTL_VER=420
+      TCTL_REST_VER=420
       ADE_INFRA_CLIENT_IMAGE_TAG=24100-v5-ade-infra-clients-1
       ;;
     24.2.00)
-      TCTL_VER=472
+      TCTL_REST_VER=472
       ADE_INFRA_CLIENT_IMAGE_TAG=24200-v6-ade-infra-clients-alpine
       ;;
     24.3.00)
-      TCTL_VER=529
+      TCTL_REST_VER=529
       ADE_INFRA_CLIENT_IMAGE_TAG=24300-v46-ade-infra-clients-alpine
       ;;
     24.4.00)
-      TCTL_VER=574
+      TCTL_REST_VER=574
       ADE_INFRA_CLIENT_IMAGE_TAG=24400-v71-ade-infra-clients-alpine
       ;;
     25.1.00)
-      TCTL_VER=614
+      TCTL_REST_VER=614
       ADE_INFRA_CLIENT_IMAGE_TAG=25100-v151-ade-infra-clients-alpine
       ;;
     25.2.00)
-      TCTL_VER=654
+      TCTL_REST_VER=654
       ADE_INFRA_CLIENT_IMAGE_TAG=25200-v97-ade-infra-clients-alpine
       ;;
     25.3.00)
-      TCTL_VER=685
+      TCTL_REST_VER=685
       ADE_INFRA_CLIENT_IMAGE_TAG=25300-v232-ade-infra-clients-alpine
       ;;
     25.4.00)
-      TCTL_VER=724
-      ADE_INFRA_CLIENT_IMAGE_TAG=25400-v309-ade-infra-clients-alpine
+      TCTL_REST_VER=724
+      ADE_INFRA_CLIENT_IMAGE_TAG=25400-v335-ade-infra-clients-alpine
       ;;
     *)
       ;;
   esac
+  # TCTL_REST_VER in compact.config ADE_INFRA_CLIENT_IMAGE_TAG in infra/infra-images-tag.config
 
   HP_COMPANY_NAME_LABEL="COMPANY_NAME"
   if compare "${HP_VERSION%.*} >= 24.2" ; then
@@ -596,7 +597,7 @@ deployTCTL() {
   TCTL_COMMAND="${1}"
   if ! setTCTLRESTImageName ; then
     logError "202" "Unable to find job with TCTL image details."
-    TCTL_IMAGE="${HP_REGISTRY_SERVER}/bmc/tctlrest-${TCTL_VER}"
+    TCTL_IMAGE="${HP_REGISTRY_SERVER}/bmc/tctlrest-${TCTL_REST_VER}"
     return 1
   else
     TCTL_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o json)
