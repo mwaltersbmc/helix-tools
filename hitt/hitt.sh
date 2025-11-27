@@ -306,8 +306,10 @@ getVersions() {
     logWarning "002" "Helix Platform DEPLOYMENT_SIZE is '${HP_DEPLOYMENT_SIZE}' - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products are/will be installed."
   fi
   HP_SM_PLATFORM_CORE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^SM_PLATFORM_CORE | cut -d '=' -f2)
-  if [ "${HP_SM_PLATFORM_CORE}"  == "yes" ]; then
+  NUM_TMS_PODS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pod -l app=tms 2>/dev/null | wc -l)
+  if [ "${HP_SM_PLATFORM_CORE}"  == "yes" ] || [ "${NUM_TMS_PODS}"  == "0" ] ; then
     logMessage "Helix Platform CORE deployment for ITSM only." 1
+    HP_SM_PLATFORM_CORE=yes
   else
     HP_SM_PLATFORM_CORE=no
   fi
@@ -736,10 +738,10 @@ validateRealm() {
   if [ "${REALM_TENANT}" == "" ]; then
     logError "232" "RSSO realm Tenant is blank - recommended value is '${HP_TENANT}'."
   else
-    if [ "${REALM_TENANT}" != "${HP_TENANT}" ]; then
+    if [ "${REALM_TENANT}" != "${HP_TENANT}" ] && [ "${SM_PLATFORM_CORE}"  == "no" ]; then
       logWarning "004" "Unexpected TENANT value in realm - recommended value is '${HP_TENANT}' but found '${REALM_TENANT}'."
     else
-      logMessage "Tenant '${REALM_TENANT}' is the expected value." 1
+      logMessage "TENANT is '${REALM_TENANT}'." 1
     fi
   fi
   REALM_DOMAINS=($(echo "${RSSO_REALM}" | ${JQ_BIN} -r '.domainMapping.domain[]' | tr "\n" " "))
@@ -813,7 +815,7 @@ validateRealmDomains() {
     logWarning "005" "Alias '${PORTAL_HOSTNAME}' not found in the realm Application Domains list. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
   # Should not be present in pre-is unless INTEROPS run
-  if [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
+  if [ "${SM_PLATFORM_CORE}" == "no" ] && [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
     logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is expected after the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
 }
@@ -1696,7 +1698,7 @@ validateISDetails() {
       logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of '${HP_NAMESPACE}'." 1
     fi
 
-    if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ]; then
+    if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ] && [ "${SM_PLATFORM_CORE}" == "no" ]; then
       logError "158" "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' is not the expected value of '${HP_COMPANY_NAME}'."
     else
       logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of '${HP_COMPANY_NAME}'." 1
