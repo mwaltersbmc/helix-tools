@@ -2256,7 +2256,7 @@ checkISDBLatency() {
         over_frac=${overhead_sec#*.}
         over_frac=$(printf "%-3s" "$over_frac" | tr ' ' '0')
         overhead_ms=$((over_int * 1000 + 10#$over_frac))
-        for i in {1..3}; do
+        for i in {1..10}; do
           sec=$( (time bash -c "</dev/tcp/${IS_DATABASE_HOST_NAME}/${IS_DB_PORT}") 2>&1 | grep real | sed -E 's/real[[:space:]]+0m([0-9]+\.[0-9]+)s/\1/')
           int=${sec%.*}
           frac=${sec#*.}
