@@ -3661,6 +3661,9 @@ fixJenkins() {
     nodes)
       fixJenkinsNodes
       ;;
+    plugins)
+      fixJenkinsPlugins
+      ;;
     all)
       fixJenkinsCredentials
       fixJenkinsPipelineLibs
@@ -3671,6 +3674,22 @@ fixJenkins() {
       logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
       ;;
   esac
+}
+
+fixJenkinsPlugins() {
+  logMessage "Getting list of Jenkins recommended plugins..."
+  JENKINS_RECOMMENDED_PLUGINS_URL=https://raw.githubusercontent.com/jenkinsci/jenkins/refs/heads/master/core/src/main/resources/jenkins/install/platform-plugins.json
+  JENKINS_RECOMMENDED_PLUGINS_XML=$(${CURL_BIN} -s "${JENKINS_RECOMMENDED_PLUGINS_URL}" | ${JQ_BIN} -r '
+  "<jenkins>",
+  (.[] | .plugins[] | "    <install plugin=\"\(.name)@latest\" />"),
+  "</jenkins>"
+')
+
+  if [ $(echo "${JENKINS_RECOMMENDED_PLUGINS_XML}" | wc -l) == "0" ]; then
+    logError "999" "Failed to get list of Jenkins recommended plugins from '${JENKINS_RECOMMENDED_PLUGINS_URL}'" 1
+  fi
+  logMessage "Installing Jenkins recommended plugins..."
+  ${CURL_BIN} --max-time 3 -b .cookies -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" -d "${JENKINS_RECOMMENDED_PLUGINS_XML}" -H "Content-Type: text/xml" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/installNecessaryPlugins" 2>>${HITT_ERR_FILE}
 }
 
 fixJenkinsNodes() {
@@ -3922,6 +3941,7 @@ showFixHelp() { # fix mode help
     \tdryrun \t\t| Trigger a dry run of all the HELIX pipelines.
     "
 }
+
 #End functions
 
 # MAIN Start
