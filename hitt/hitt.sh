@@ -365,7 +365,8 @@ setVarsFromPlatform() {
   FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
   LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
   LOG_ELASTICSEARCH_USERNAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_USERNAME | @base64d')
-  FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
+  #FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
+  FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods -l "$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get svc "${FTS_ELASTIC_SERVICENAME}" -o jsonpath='{.spec.selector}' | ${JQ_BIN} -r 'to_entries | map("\(.key)=\(.value)") | join(",")')" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -n 1)
   # Catch cases where the LB_HOST is the same as the IS CUSTOMER_SERVICE-ENVIRONMENT.CLUSTER_DOMAIN
   if [ "${IS_ENVIRONMENT}" == "prod" ]; then
     IS_PREFIX="${IS_CUSTOMER_SERVICE}"
