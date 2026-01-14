@@ -1572,6 +1572,9 @@ validateISDetails() {
     if [ "${IS_IMAGESECRET_NAME}" == "" ]; then
       logError "243" "IMAGESECRET_NAME is blank - you must provide a value for this parameter to be used as the registry credentials secret name."
     fi
+    if [ "${IS_IMAGESECRET_NAME}" == "helix-es-secret" ]; then
+      logError "252" "IMAGESECRET_NAME value of 'helix-es-secret' is not valid as it conflicts with a BMC secret name. Please change the value."
+    fi
 
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${HP_REGISTRY_USERNAME}" ]; then
       logError "148" "IMAGE_REGISTRY_USERNAME '${IS_IMAGE_REGISTRY_USERNAME}' does not match the Helix Platform registry username '${HP_REGISTRY_USERNAME}'."
@@ -5537,6 +5540,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The cluster context value is present in the kubeconfig but failed to return values from the cluster.\",
     \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
     \"remediation\": \"Validate the context and cluster permissions it has assigned.\"
+  },
+  {
+    \"id\": \"252\",
+    \"cause\": \"The IMAGESECRET_NAME value is set to the same name as a BMC provided secret.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Change the name you provided for IMAGESECRET_NAME.\"
   }
 ]"
 
