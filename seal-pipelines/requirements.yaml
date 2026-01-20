@@ -3,4 +3,5 @@
 ---
 collections:
   - community.general
+    version: "<12.0.0"
   - kubernetes.core

@@ -109,7 +109,7 @@
         - community.docker:4
         - ansible.posix
         - community.crypto
-        - community.general
+        - community.general:11.4.0
         - kubernetes.core
 
     - name: Set ownership of the home directories and files
