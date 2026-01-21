@@ -1142,6 +1142,9 @@ createInputFileVarsArray() {
 
 downloadJenkinsCLIJar() {
   ${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
+  if [ ! -f jenkins-cli.jar ]; then
+    logError "999" "Failed to download jenkins-cli.jar file from Jenkins." 1
+  fi
 }
 
 getPipelinePasswords() {
@@ -3946,6 +3949,53 @@ showFixHelp() { # fix mode help
     "
 }
 
+getJenkinsPipelineValues() {
+  if [ ${#PIPELINEARGS[@]} -ne 2 ]; then
+    logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N>\"" 1
+  fi
+  local PIPELINE_NAME=HELIX_ONPREM_DEPLOYMENT
+  local PIPELINE_BUILD=${PIPELINEARGS[1]}
+
+  case "${PIPELINE_BUILD}" in
+    defaults)
+      PIPELINE_ENDPOINT="api/json?depth=1"
+      ;;
+    last)
+      PIPELINE_ENDPOINT="lastBuild/api/json"
+      ;;
+    lastsuccessful)
+      PIPELINE_ENDPOINT="lastSuccessfulBuild/api/json"
+      ;;
+    [0-9]*)
+      PIPELINE_ENDPOINT="${PIPELINE_BUILD}/api/json"
+      ;;
+    *)
+      logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N>\"" 1
+      ;;
+  esac
+  RESPONSE_FILE=$(mktemp)
+  HTTP_CODE=$(${CURL_BIN} --max-time 3 -b .cookies -ksv -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
+    -w "%{http_code}" \
+    -o "${RESPONSE_FILE}" \
+     "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${PIPELINE_NAME}/${PIPELINE_ENDPOINT}" 2>/dev/null)
+
+  if [ "$HTTP_CODE" -eq 200 ]; then
+    echo "Success (200): Parsing JSON..."
+    cat "$RESPONSE_FILE" | ${JQ_BIN}
+  elif [ "$HTTP_CODE" -eq 404 ]; then
+    echo "Error (404): Job or Build not found."
+  elif [ "$HTTP_CODE" -eq 401 ]; then
+    echo "Error (401): Authentication failed. Check your API Token."
+  else
+    echo "Error: Jenkins returned status code $HTTP_CODE"
+    cat "$RESPONSE_FILE" # Show the error message from Jenkins
+  fi
+
+  # Cleanup
+  rm -f "${RESPONSE_FILE}"
+  exit
+}
+
 #End functions
 
 # MAIN Start
@@ -4122,6 +4172,27 @@ fi
 if [ -n "${PIPELINE_NAME}" ]; then
   checkJenkinsIsRunning
   getPipelineConsoleOutput "${PIPELINE_NAME}"
+  exit
+fi
+
+if [ "${MODE}" == "pipeline" ]; then
+  logStatus "Running HITT in pipeline mode '${PIPELINEARGS[0]}'..."
+  checkJenkinsIsRunning
+  read -ra PIPELINEARGS <<< "${PIPELINEOPTS}"
+  case "${PIPELINEARGS[0]}" in
+    get)
+      getJenkinsPipelineValues
+      ;;
+    build)
+      if [ ${#PIPELINEARGS[@]} -eq 1 ]; then
+        logError "999" "Usage: bash $0 -f \"jenkins fixtype <fixoptions>\"" 1
+      fi
+      ;;
+    *)
+    logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option." 1
+    ;;
+  esac
+
   exit
 fi
 
@@ -5549,7 +5620,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-while getopts "b:cde:f:gh:i:e:jlm:n:o:pqs:t:u:vw:x" options; do
+while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
   case "${options}" in
     b)
       BUNDLE_ID="${OPTARG}"
@@ -5592,6 +5663,13 @@ while getopts "b:cde:f:gh:i:e:jlm:n:o:pqs:t:u:vw:x" options; do
     j)
       DUMP_JCREDS=1
       SKIP_UPDATE_CHECK=1
+      ;;
+    k)
+      if [ $# -ne 2 ]; then
+        logError "999" "When using PIPELINE mode commands with options you must enclose them in double quotes - eg: bash $0 -k \"build filename\"" 1
+      fi
+      MODE=pipeline
+      PIPELINEOPTS="${OPTARG}"
       ;;
     l)
       CREATE_LOGS=0
