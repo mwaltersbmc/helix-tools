@@ -2364,16 +2364,20 @@ checkJenkinsConfig() {
   [[ "${SKIP_JENKINS}" == 1 ]] && return
   logMessage "Checking plugins..."
   checkJenkinsPlugins
-  logMessage "Checking nodes..."
-  checkJenkinsNodes
-  logMessage "Checking credentials..."
-  validateJenkinsCredentials
-  logMessage "Checking global pipeline libraries..."
-  checkJenkinsGlobalLibs
   logMessage "Checking approved scripts..."
   checkJenkinsScriptApprovals
-  logMessage "Checking ssh configuration..."
-  checkSSHSetup
+  if isJenkinsInCluster ; then
+    logMessage "Jenkins running in cluster - skipping remaining checks...alias"
+  else
+    logMessage "Checking nodes..."
+    checkJenkinsNodes
+    logMessage "Checking credentials..."
+    validateJenkinsCredentials
+    logMessage "Checking global pipeline libraries..."
+    checkJenkinsGlobalLibs
+    logMessage "Checking ssh configuration..."
+    checkSSHSetup
+  fi
 }
 
 getPipelineParameterDefault() {
