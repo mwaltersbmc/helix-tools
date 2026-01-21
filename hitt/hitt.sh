@@ -2956,6 +2956,9 @@ versionFmt() {
 }
 
 checkDERequirements() {
+  if isJenkinsInCluster ; then
+    return
+  fi
   logMessage "Checking OS binaries..."
   MISSING_BINS=()
   for i in ansible dos2unix git jq python xmlstarlet yq; do
