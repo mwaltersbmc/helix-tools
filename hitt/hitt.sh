@@ -3646,9 +3646,22 @@ triggerHelixDryRun() {
   runJenkinsCurl "${SCRIPT}"
 }
 
+isJenkinsInCluster() {
+  JENKINS_AGENTS=($(${CURL_BIN} -gks "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json?tree=computer[displayName]" | ${JQ_BIN} -r '.computer[].displayName'))
+  if printf '%s\0' "${JENKINS_AGENTS[@]}" | grep -Fqz -- 'jenkins-agent'; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 fixJenkins() {
   checkJenkinsIsRunning
-  getJenkinsCrumb
+  #getJenkinsCrumb
+  if isJenkinsInCluster && ([[ "${FIXARGS[1]}" != "kubeconfig" ]] && [[ "${FIXARGS[1]}" != "dryrun" ]]); then
+    logError "999" "Jenkins fixmode '${FIXARGS[1]}' is not supported when Jenkins is running in the cluster - only 'kubeconfig' and 'dryrun' are valid."
+  fi
+  exit
   case "${FIXARGS[1]}" in
     kubeconfig)
       fixJenkinsKubeconfig
