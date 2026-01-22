@@ -1045,7 +1045,9 @@ createPipelineVarsArray() {
     CHECKOUT_USING_USER
     CUSTOM_BINARY_PATH
     GIT_USER_HOME_DIR
+    CONTAINERIZED_GIT
     GIT_REPO_DIR
+    HELM_NODE
     IS_CLOUD
     ROUTE_ENABLED
     ROUTE_TLS_ENABLED
@@ -1061,7 +1063,6 @@ createPipelineVarsArray() {
     DEPLOYMENT_TYPE
     CUSTOMER_SIZE
     ENVIRONMENT_SIZE
-    HELM_NODE
     SOURCE_VERSION
     PLATFORM_HELM_VERSION
     HELIX_ITSM_INSIGHTS
@@ -1271,17 +1272,51 @@ grepInputFile() {
   grep "^${1}" "${INPUT_CONFIG_FILE}"  | awk -F '"' '{print $2}'
 }
 
+getGITEACredentials() {
+  SCRIPT='import groovy.json.JsonBuilder
+    def env = System.getenv()
+    def result = [
+        GITEA_ADMIN_USER: env.get("GITEA_ADMIN_USER") ?: "Not Found",
+        GITEA_ADMIN_PASS: env.get("GITEA_ADMIN_PASS") ?: "Not Found"
+    ]
+    def json = new JsonBuilder(result)
+    println json.toPrettyString()'
+    runJenkinsCurl "${SCRIPT}"
+}
+
+
 cloneCustomerConfigsRepo() {
   SKIP_REPO=0
   export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
   GIT_REPO_DIR=$(parseJenkinsParam GIT_REPO_DIR)
   INPUT_CONFIG_FILE="configsrepo/customer/${IS_CUSTOMER_SERVICE}/${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}.sh"
-  if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
-    logError "129" "Failed to clone ${GIT_REPO_DIR}/CUSTOMER_CONFIGS/onprem-remedyserver-config.git"
-    SKIP_REPO=1
-    return
+  if isJenkinsInCluster ; then
+    GITEA_CREDS_JSON=$(getGITEACredentials)
+    GITEA_USER=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_USER')
+    GITEA_USER_PWD=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_PASS')
+    GITEA_HOST=$(${KUBECTL_BIN} get ingress -A -o custom-columns="HOSTS:.spec.rules[*].host" | grep gitea)
+    if [ -z "${GITEA_HOST}" ] ; then
+      logMessage "Unable to find GITEA ingress - skipping checks..."
+      SKIP_REPO=1
+      return
+    else
+      GITEA_URL="https://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}"
+    fi
+    if ! ${GIT_BIN} clone "${GITEA_URL}"/ciadmin/onprem-remedyserver-config configsrepo > /dev/null 2>&1 ; then
+      logError "129" "Failed to clone onprem-remedyserver-config from GITEA."
+      SKIP_REPO=1
+      return
+    else
+      logMessage "Cloned onprem-remedyserver-config repo to configsrepo directory." 1
+    fi
   else
-    logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory." 1
+    if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
+      logError "129" "Failed to clone ${GIT_REPO_DIR}/CUSTOMER_CONFIGS/onprem-remedyserver-config.git"
+      SKIP_REPO=1
+      return
+    else
+      logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory." 1
+    fi
   fi
   if [ ! -f "${INPUT_CONFIG_FILE}" ]; then
     logError "130" "Input configuration file '${INPUT_CONFIG_FILE}' not found. Has the HELIX_GENERATE_CONFIG pipeline been run successfully?"
@@ -1356,23 +1391,44 @@ validateISDetails() {
       fi
     fi
 
+    if isJenkinsInCluster && [ "${IS_CONTAINERIZED_GIT}" != "true" ]; then
+        logError "xxx" "CONTAINERIZED_GIT must be selected when Jenkins is containerized."
+    fi
+
+    if ! isJenkinsInCluster && [ "${IS_CONTAINERIZED_GIT}" = "true" ]; then
+        logError "xxx" "CONTAINERIZED_GIT is only valid when Jenkins is containerized."
+    fi
+
+    if [[ ! "${IS_GIT_USER_HOME_DIR}" =~ ^/.* ]]; then
+      logError "244" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid - it must be an absolute path beginning with '/' - eg: '/home/git'."
+    fi
+
     if [ "${IS_GIT_USER_HOME_DIR}" == "" ]; then
-      logError "131" "GIT_USER_HOME_DIR value is blank but must be set to the home directory of the git user."
+      logError "131" "GIT_USER_HOME_DIR value cannot be blank."
     else
-      if [ ! -d "${IS_GIT_USER_HOME_DIR}" ]; then
-        logError "222" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not a valid directory."
-      fi
-      if [[ ! "${IS_GIT_USER_HOME_DIR}" =~ ^/.* ]]; then
-        logError "244" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid - it must be an absolute path beginning with '/' - eg: '/home/git'."
+      if isJenkinsInCluster ; then
+        if [ "${IS_GIT_USER_HOME_DIR}" != "/home/jenkins" ]; then
+          logError "xxx" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid for containerized Jenkins - must be '/home/jenkins'."
+        fi
+      else
+        if [ ! -d "${IS_GIT_USER_HOME_DIR}" ]; then
+          logError "222" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not a valid directory."
+        fi
       fi
     fi
 
-    if [[ ! "${IS_GIT_REPO_DIR}" =~ ^ssh://.* ]]; then
-      logError "221" "GIT_REPO_DIR value is blank or not in the expected format of 'ssh://<Jenkins server host name>/home/git/git_repo'."
+    if isJenkinsInCluster ; then
+      if [ "${IS_GIT_REPO_DIR}" != "http://gitea:3000/ciadmin" ]; then
+        logError "xxx" "GIT_REPO_DIR value must be 'http://gitea:3000/ciadmin' for containerized Jenkins."
+      fi
     else
-      REPO_PATH=$(echo ${IS_GIT_REPO_DIR} | sed -e 's#ssh://[^/]*##')
-      if [ ! -d "${REPO_PATH}" ]; then
-        logError "224" "The directory used in the GIT_REPO_DIR value '${IS_GIT_REPO_DIR}' is not valid."
+      if [[ ! "${IS_GIT_REPO_DIR}" =~ ^ssh://.* ]]; then
+        logError "221" "GIT_REPO_DIR value is blank or not in the expected format of 'ssh://<Jenkins server host name>/home/git/git_repo'."
+      else
+        REPO_PATH=$(echo ${IS_GIT_REPO_DIR} | sed -e 's#ssh://[^/]*##')
+        if [ ! -d "${REPO_PATH}" ]; then
+          logError "224" "The directory used in the GIT_REPO_DIR value '${IS_GIT_REPO_DIR}' is not valid."
+        fi
       fi
     fi
 
@@ -2961,6 +3017,7 @@ versionFmt() {
 
 checkDERequirements() {
   if isJenkinsInCluster ; then
+    logMessage "Jenkins is running in cluster skipping checks..."
     return
   fi
   logMessage "Checking OS binaries..."
@@ -3654,9 +3711,11 @@ triggerHelixDryRun() {
 }
 
 isJenkinsInCluster() {
+  if [ -n "${K8S_JENKINS}" ]; then return 0; fi
   JENKINS_AGENTS=($(${CURL_BIN} -gks "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json?tree=computer[displayName]" | ${JQ_BIN} -r '.computer[].displayName'))
   if printf '%s\0' "${JENKINS_AGENTS[@]}" | grep -Fqz -- 'jenkins-agent'; then
     return 0
+    K8S_JENKINS=1
   else
     return 1
   fi
@@ -3975,10 +4034,11 @@ getJenkinsPipelineValues() {
   fi
   local PIPELINE_NAME=HELIX_ONPREM_DEPLOYMENT
   local PIPELINE_BUILD=${PIPELINEARGS[1]}
-
+  JQ_FILTER='.actions[] | select(._class == "hudson.model.ParametersAction") | .parameters[] | "\(.name)=\(.value)"'
   case "${PIPELINE_BUILD}" in
     defaults)
       PIPELINE_ENDPOINT="api/json?depth=1"
+      JQ_FILTER='.property[] | select(._class == "hudson.model.ParametersDefinitionProperty") | .parameterDefinitions[] | "\(.name)=\(.defaultParameterValue.value // .choices[0])"'
       ;;
     last)
       PIPELINE_ENDPOINT="lastBuild/api/json"
@@ -4000,20 +4060,45 @@ getJenkinsPipelineValues() {
      "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${PIPELINE_NAME}/${PIPELINE_ENDPOINT}" 2>/dev/null)
 
   if [ "$HTTP_CODE" -eq 200 ]; then
-    echo "Success (200): Parsing JSON..."
-    cat "$RESPONSE_FILE" | ${JQ_BIN}
+    cat "$RESPONSE_FILE" | ${JQ_BIN} -r "${JQ_FILTER}" | grep -v '^SEPARATOR'
   elif [ "$HTTP_CODE" -eq 404 ]; then
-    echo "Error (404): Job or Build not found."
+    logError "999" "Job not found in Jenkins."
   elif [ "$HTTP_CODE" -eq 401 ]; then
-    echo "Error (401): Authentication failed. Check your API Token."
+    logError "999" "Authentication error - please check Jenkins credentials in hitt.conf."
   else
-    echo "Error: Jenkins returned status code $HTTP_CODE"
+    logError "999" "Error: Jenkins returned status code '$HTTP_CODE'."
     cat "$RESPONSE_FILE" # Show the error message from Jenkins
   fi
 
   # Cleanup
   rm -f "${RESPONSE_FILE}"
   exit
+}
+
+buildJenkinsPipelineFromFile() {
+  downloadJenkinsCLIJar
+  local JOB_NAME=HELIX_ONPREM_DEPLOYMENT
+  PIPELINE_INI_FILE="config.ini"
+
+  # Start building the command array to avoid shell expansion issues
+  JENKINS_BUILD_CMD=(${JAVA_BIN} "-jar" "jenkins-cli.jar" "-s" "$JENKINS_URL" $AUTH "build" "$JOB_NAME")
+
+# Parse INI and append parameters safely
+while IFS='=' read -r key value; do
+    # Skip comments, headers, or empty lines
+    [[ "$key" =~ ^\[.*\]$ || -z "$key" || "$key" =~ ^# ]] && continue
+
+    # Trim whitespace
+    key=$(echo "$key" | xargs)
+    value=$(echo "$value" | xargs)
+
+    # Add to command array as separate arguments
+    # This prevents the shell from breaking 'value' apart if it has spaces
+    JENKINS_BUILD_CMD+=("-p" "$key=$value")
+done < "$PIPELINE_INI_FILE"
+
+# Execute the array
+"${JENKINS_BUILD_CMD[@]}"
 }
 
 #End functions
@@ -4204,6 +4289,7 @@ if [ "${MODE}" == "pipeline" ]; then
       getJenkinsPipelineValues
       ;;
     build)
+      buildJenkinsPipelineFromFile
       if [ ${#PIPELINEARGS[@]} -eq 1 ]; then
         logError "999" "Usage: bash $0 -f \"jenkins fixtype <fixoptions>\"" 1
       fi
@@ -4326,7 +4412,7 @@ tidyUp
 # START
 # Set vars and process command line
 SCRIPT_VERSION=1
-HITT_CONFIG_FILE=hitt.conf
+: "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short)
 LONG_HOSTNAME=$(hostname --long)
