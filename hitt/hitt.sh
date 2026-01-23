@@ -1292,15 +1292,24 @@ cloneCustomerConfigsRepo() {
   INPUT_CONFIG_FILE="configsrepo/customer/${IS_CUSTOMER_SERVICE}/${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}.sh"
   if isJenkinsInCluster ; then
     GITEA_CREDS_JSON=$(getGITEACredentials)
-    GITEA_USER=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_USER')
-    GITEA_USER_PWD=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_PASS')
-    GITEA_HOST=$(${KUBECTL_BIN} get ingress -A -o custom-columns="HOSTS:.spec.rules[*].host" | grep gitea)
+    GITEA_ADMIN_USER=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_USER')
+    GITEA_ADMIN_PASS=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_PASS')
+    #Check for GITEA ingress
+    GITEA_HOST=$(${KUBECTL_BIN} get ingress -A -o custom-columns=":metadata.name,:.spec.rules[*].host" --no-headers | grep ^gitea | awk '{print $2}')
+    if [ -n "${GITEA_HOST}" ] ; then
+      GITEA_URL="https://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}"
+    fi
+    # If ingress not found check for exposed svc
     if [ -z "${GITEA_HOST}" ] ; then
-      logMessage "Unable to find GITEA ingress - skipping checks..."
+      GITEA_HOST=$(${KUBECTL_BIN} get svc -A -o custom-columns=":metadata.name,:.spec.externalIPs[0]" --no-headers| grep ^gitea | awk '{print $2}')
+      if [ -n "${GITEA_HOST}" ] ; then
+        GITEA_URL="http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}:3000"
+      fi
+    fi
+    if [ -z "${GITEA_HOST}" ] ; then
+      logMessage "Unable to find GITEA host details - skipping checks..."
       SKIP_REPO=1
       return
-    else
-      GITEA_URL="https://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}"
     fi
     if ! ${GIT_BIN} clone "${GITEA_URL}"/ciadmin/onprem-remedyserver-config configsrepo > /dev/null 2>&1 ; then
       logError "129" "Failed to clone onprem-remedyserver-config from GITEA."
