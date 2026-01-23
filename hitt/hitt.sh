@@ -4275,6 +4275,7 @@ if [ "${MODE}" == "fix" ]; then
 fi
 
 if [ -n "${PIPELINE_NAME}" ]; then
+  if [ "${PIPELINE_NAME}" == "msgs" ]; then echo "${ALL_MSGS_JSON}"; exit; fi
   checkJenkinsIsRunning
   getPipelineConsoleOutput "${PIPELINE_NAME}"
   exit
@@ -4535,6 +4536,8 @@ AE4ABAcATgEHAE4HAE7/ADQAEAcAEgcATgEHAE4BBwBQBwBOBwBOBwBOBwBOBwBOBwBOBwBPBwA5
 AAEAAP8AJgAQBwASBwBOAQcATgEHAFAHAE4HAE4HAE4HAE4HAE4HAE4HAE8HADkHAE4BAAAFFQBT
 AAAABAABAEIAAwBUAAAAAgBVANkAAAASAAIAjgCKANgACQDyAPUA8wAZAFwAAAA4AAkAXQABAF4A
 XQABAG0AXQABAIMAXQABAIUAXQABAIkAXQABAJAAXQABAJEAXQABAJMAXQABAKE="
+#MSG_PAYLOAD=""
+#ALL_MSGS_JSON=$(echo "${MSG_PAYLOAD}" | ${BASE64_BIN} -d | zcat 2>/dev/null)
 ALL_MSGS_JSON="[
   {
     \"id\": \"001\",
@@ -5795,6 +5798,8 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
       SKIP_UPDATE_CHECK=1
       ;;
     k)
+      QUIET=1
+      SKIP_UPDATE_CHECK=1
       if [ $# -ne 2 ]; then
         logError "999" "When using PIPELINE mode commands with options you must enclose them in double quotes - eg: bash $0 -k \"build filename\"" 1
       fi
@@ -5812,6 +5817,8 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
       IS_ENVIRONMENT_OVERRIDE="${OPTARG}"
       ;;
     o)
+      QUIET=1
+      SKIP_UPDATE_CHECK=1
       if [ $# -ne 2 ]; then
         logError "999" "Usage: bash $0 -o PIPELINE_NAME" 1
       fi
