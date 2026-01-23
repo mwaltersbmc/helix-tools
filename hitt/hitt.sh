@@ -1392,11 +1392,11 @@ validateISDetails() {
     fi
 
     if isJenkinsInCluster && [ "${IS_CONTAINERIZED_GIT}" != "true" ]; then
-        logError "xxx" "CONTAINERIZED_GIT must be selected when Jenkins is containerized."
+      logError "253" "CONTAINERIZED_GIT must be selected when Jenkins/GITEA are containerized."
     fi
 
     if ! isJenkinsInCluster && [ "${IS_CONTAINERIZED_GIT}" = "true" ]; then
-        logError "xxx" "CONTAINERIZED_GIT is only valid when Jenkins is containerized."
+        logError "254" "CONTAINERIZED_GIT is only valid when Jenkins/GITEA are containerized."
     fi
 
     if [[ ! "${IS_GIT_USER_HOME_DIR}" =~ ^/.* ]]; then
@@ -1408,7 +1408,7 @@ validateISDetails() {
     else
       if isJenkinsInCluster ; then
         if [ "${IS_GIT_USER_HOME_DIR}" != "/home/jenkins" ]; then
-          logError "xxx" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid for containerized Jenkins - must be '/home/jenkins'."
+          logError "255" "GIT_USER_HOME_DIR value '${IS_GIT_USER_HOME_DIR}' is not valid for containerized Jenkins - must be '/home/jenkins'."
         fi
       else
         if [ ! -d "${IS_GIT_USER_HOME_DIR}" ]; then
@@ -1419,7 +1419,7 @@ validateISDetails() {
 
     if isJenkinsInCluster ; then
       if [ "${IS_GIT_REPO_DIR}" != "http://gitea:3000/ciadmin" ]; then
-        logError "xxx" "GIT_REPO_DIR value must be 'http://gitea:3000/ciadmin' for containerized Jenkins."
+        logError "256" "GIT_REPO_DIR value must be 'http://gitea:3000/ciadmin' for containerized Jenkins."
       fi
     else
       if [[ ! "${IS_GIT_REPO_DIR}" =~ ^ssh://.* ]]; then
@@ -5723,6 +5723,30 @@ ALL_MSGS_JSON="[
     \"cause\": \"The IMAGESECRET_NAME value is set to the same name as a BMC provided secret.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Change the name you provided for IMAGESECRET_NAME.\"
+  },
+  {
+    \"id\": \"253\",
+    \"cause\": \"Jenkins and GITEA are running as containers so the CONTAINERIZED_GIT must be selected.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Select the CONTAINERIZED_GIT option.\"
+  },
+  {
+    \"id\": \"254\",
+    \"cause\": \"The CONTAINERIZED_GIT option should only be selected when Jenkins/GITEA are running in containers.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Deselect the CONTAINERIZED_GIT option.\"
+  },
+  {
+    \"id\": \"255\",
+    \"cause\": \"GIT_USER_HOME_DIR value must be '/home/jenkins' when Jenkins/GITEA are containerized.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Set the GIT_USER_HOME_DIR value to'/home/jenkins'.\"
+  },
+  {
+    \"id\": \"256\",
+    \"cause\": \"GIT_REPO_DIR value must be 'http://gitea:3000/ciadmin' when Jenkins/GITEA are containerized.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Set the GIT_REPO_DIR value to 'http://gitea:3000/ciadmin'.\"
   }
 ]"
 
