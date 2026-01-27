@@ -2757,22 +2757,60 @@ checkJenkinsGlobalLibs() {
 }
 
 getPipelineValuesJSON() {
-  SCRIPT='import groovy.json.JsonOutput
+  SCRIPT="import groovy.json.JsonOutput
     import hudson.model.ParametersAction
-    def jobName = "HELIX_ONPREM_DEPLOYMENT"
+    def jobName = 'HELIX_ONPREM_DEPLOYMENT'
     def job = Jenkins.instance.getItemByFullName(jobName)
-    def lastBuild = job.getLastCompletedBuild()
+    def lastBuild = job.${1}(${2})
     def paramsAction = lastBuild.getAction(ParametersAction)
     def paramMap = [:]
     paramsAction.getParameters().each { param ->
         paramMap[param.getName()] = param.getValue().toString()
     }
     def json = JsonOutput.prettyPrint(JsonOutput.toJson(paramMap))
-    println json'
+    println json"
   runJenkinsCurl "${SCRIPT}"
 }
 
+
 getPipelineDefaults() {
+  SCRIPT="import groovy.json.JsonOutput
+    import hudson.model.*
+    def jobName = '${1}'
+    def job = Jenkins.instance.getItemByFullName(jobName)
+    def prop = job.getProperty(ParametersDefinitionProperty)
+    def result = [:]
+    if (prop) {
+        prop.parameterDefinitions.each { param ->
+            def value = null
+            switch (param) {
+                case ChoiceParameterDefinition:
+                    value = param.choices ? param.choices[0] : ''
+                    break
+                case PasswordParameterDefinition:
+                    // Extracts plain text from the default secret
+                    value = param.defaultValueAsSecret?.getPlainText() ?: ''
+                    break
+                case BooleanParameterDefinition:
+                    // Boolean must be handled carefully as 'false' is a valid value
+                    value = param.defaultValue
+                    break
+                case StringParameterDefinition:
+                case TextParameterDefinition:
+                    value = param.defaultValue ?: ''
+                    break
+                default:
+                    break
+            }
+            result[param.name] = value
+        }
+    }
+    println JsonOutput.prettyPrint(JsonOutput.toJson(result))"
+    runJenkinsCurl "${SCRIPT}"
+  }
+
+# Old version
+xgetPipelineDefaults() {
   SCRIPT="import groovy.json.JsonOutput
     def jobName = '${1}'
     def job = Jenkins.instance.getItemByFullName(jobName)
@@ -3138,7 +3176,7 @@ getJenkinsCrumb() {
 
 runJenkinsCurl() {
   #1 groovy script
-  ${CURL_BIN} --max-time 3 -b .cookies --data-urlencode "script=${1}" -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_ERR_FILE}
+  ${CURL_BIN} --max-time 3 -b .cookies --data-urlencode "script=${1}" -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_ERR_FILE}
 }
 
 isOpenShift() {
@@ -3784,7 +3822,7 @@ fixJenkinsPlugins() {
     logError "999" "Failed to get list of Jenkins recommended plugins from '${JENKINS_RECOMMENDED_PLUGINS_URL}'" 1
   fi
   logMessage "Installing Jenkins recommended plugins..."
-  ${CURL_BIN} --max-time 3 -b .cookies -sv -H "Jenkins-Crumb:${JENKINS_CRUMB}" -d "${JENKINS_RECOMMENDED_PLUGINS_XML}" -H "Content-Type: text/xml" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/installNecessaryPlugins" 2>>${HITT_ERR_FILE}
+  ${CURL_BIN} --max-time 3 -b .cookies -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" -d "${JENKINS_RECOMMENDED_PLUGINS_XML}" -H "Content-Type: text/xml" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/installNecessaryPlugins" 2>>${HITT_ERR_FILE}
 }
 
 fixJenkinsNodes() {
@@ -4046,42 +4084,22 @@ getJenkinsPipelineValues() {
   JQ_FILTER='.actions[] | select(._class == "hudson.model.ParametersAction") | .parameters[] | "\(.name)=\(.value)"'
   case "${PIPELINE_BUILD}" in
     defaults)
-      PIPELINE_ENDPOINT="api/json?depth=1"
-      JQ_FILTER='.property[] | select(._class == "hudson.model.ParametersDefinitionProperty") | .parameterDefinitions[] | "\(.name)=\(.defaultParameterValue.value // .choices[0])"'
+      PIPELINE_VALUES_JSON=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
       ;;
     last)
-      PIPELINE_ENDPOINT="lastBuild/api/json"
+      PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getLastBuild)
       ;;
     lastsuccessful)
-      PIPELINE_ENDPOINT="lastSuccessfulBuild/api/json"
+      PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getLastSuccessfulBuild)
       ;;
     [0-9]*)
-      PIPELINE_ENDPOINT="${PIPELINE_BUILD}/api/json"
+      PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getBuildByNumber ${PIPELINE_BUILD})
       ;;
     *)
       logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N>\"" 1
       ;;
   esac
-  RESPONSE_FILE=$(mktemp)
-  HTTP_CODE=$(${CURL_BIN} --max-time 3 -b .cookies -ksv -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
-    -w "%{http_code}" \
-    -o "${RESPONSE_FILE}" \
-     "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${PIPELINE_NAME}/${PIPELINE_ENDPOINT}" 2>/dev/null)
-
-  if [ "$HTTP_CODE" -eq 200 ]; then
-    cat "$RESPONSE_FILE" | ${JQ_BIN} -r "${JQ_FILTER}" | grep -v '^SEPARATOR'
-  elif [ "$HTTP_CODE" -eq 404 ]; then
-    logError "999" "Job not found in Jenkins."
-  elif [ "$HTTP_CODE" -eq 401 ]; then
-    logError "999" "Authentication error - please check Jenkins credentials in hitt.conf."
-  else
-    logError "999" "Error: Jenkins returned status code '$HTTP_CODE'."
-    cat "$RESPONSE_FILE" # Show the error message from Jenkins
-  fi
-
-  # Cleanup
-  rm -f "${RESPONSE_FILE}"
-  exit
+  echo "${PIPELINE_VALUES_JSON}" | ${JQ_BIN} -r 'with_entries(select(.key | startswith("SEPARATOR") | not))'
 }
 
 buildJenkinsPipelineFromFile() {
