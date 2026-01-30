@@ -18,6 +18,7 @@ curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbja
 - [Proxy Support](#proxy-support)
 - [Running HITT](#running-hitt)
 - [Log Files](#log-files)
+- [Pipeline Mode](#pipeline-mode)
 - [tctl Mode](#tctl-mode)
 - [Bundle Deployment Status](#get-is-bundle-deployment-status)
 - [Advanced CLI Options](#advanced-cli-options)
@@ -128,6 +129,36 @@ There are some additional messages which are not logged by default but can be en
 Quiet mode `-q` only prints the summary messages.
 
 **NOTE** - passwords are not logged unless the `-p` switch is used.
+
+### Pipeline Mode ###
+
+There are two pipeline mode options - `get` and `build` - which are intended to help migrate pipeline values between different Jenkins systems, such as switching from a local server to the container based Jenkins that was introduced in the 26.1.01 release.
+
+`get` - Fetches and displays the HELIX_ONPREM_DEPLOYMENT pipeline values from different builds:
+
+| Option       | Output
+|------------|-----------------------------------------------------------------------------|
+| `get defaults `  | The default values of the pipeline.                     |
+| `get last`  | Values from the last build of the pipeline regardless of whether it succeeded or not.              |
+| `get lastsuccessful`   | Values from the last successfull build of the pipeline. |
+| `get N`  | Values from numbered build.               |
+
+The values are output to the console in JSON format unless you provide a filename to save them to.
+
+```bash
+bash hitt.sh -k "get <defaults|last|lastsuccessful|N [filename]"
+# Examples:
+bash hitt.sh -t "get defaults"
+bash hitt.sh -t "get 7 values.json"
+```
+
+`build` - Starts a new build of the HELIX_ONPREM_DEPLOYMENT pipeline using the values from a file created with the `get` option. The build is expected to fail as only non-default values are included in the input file.  Also, all of the PRODUCT sub-pipeline selection options are set to `false` to prevent a deployment from starting.  This is to allow you to rebuild the failed jon and update values.
+
+```bash
+bash hitt.sh -k "build filename"
+# Example:
+bash hitt.sh -t "build values.json"
+```
 
 ### tctl Mode ###
 
