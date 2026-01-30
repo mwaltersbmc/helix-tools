@@ -340,6 +340,9 @@ setISDBVersion() {
       [[ "${1}" == "25.3.01" ]] && IS_DB_VERSION=215
       [[ "${1}" == "25.4.01" ]] && IS_DB_VERSION=216
       ;;
+    26)
+      [[ "${1}" == "26.1.01" ]] && IS_DB_VERSION=220
+      ;;
     *)
       logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
   esac
@@ -436,6 +439,10 @@ setVarsFromPlatform() {
     25.4.00)
       TCTL_REST_VER=724
       ADE_INFRA_CLIENT_IMAGE_TAG=25400-v335-ade-infra-clients-alpine
+      ;;
+    26.1.00)
+      TCTL_REST_VER=737
+      ADE_INFRA_CLIENT_IMAGE_TAG=26100-v1-ade-infra-clients-alpine
       ;;
     *)
       ;;
