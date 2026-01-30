@@ -4053,7 +4053,7 @@ logPlatformFTSStartTime() {
 showFixHelp() { # fix mode help
   echo "HITT fix mode options - see https://bit.ly/hittfix"
   echo .
-  echo 'Usage: bash hitt.sh -f <fixmode>|"<fixmode options>"'
+  echo 'Usage: bash hitt.sh -f "<fixmode> [fixmode options]""'
   echo -e "
     \tssh \t\t| Set up/update passwordless ssh for the git user.
     \trealm \t\t| Create/update the Helix Service Management realm in SSO.
@@ -4076,11 +4076,16 @@ showFixHelp() { # fix mode help
 }
 
 getJenkinsPipelineValues() {
-  if [ ${#PIPELINEARGS[@]} -ne 2 ]; then
-    logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N>\"" 1
+  if [ ${#PIPELINEARGS[@]} -lt 2 ]; then
+    logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N> [filename]\"" 1
   fi
+
   local PIPELINE_NAME=HELIX_ONPREM_DEPLOYMENT
   local PIPELINE_BUILD=${PIPELINEARGS[1]}
+  local PIPELINE_JSON_FILE="/dev/stdout"
+  if [ ${#PIPELINEARGS[@]} -eq 3 ]; then
+    PIPELINE_JSON_FILE="${PIPELINEARGS[2]}"
+  fi
   JQ_FILTER='.actions[] | select(._class == "hudson.model.ParametersAction") | .parameters[] | "\(.name)=\(.value)"'
   case "${PIPELINE_BUILD}" in
     defaults)
@@ -4096,36 +4101,62 @@ getJenkinsPipelineValues() {
       PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getBuildByNumber ${PIPELINE_BUILD})
       ;;
     *)
-      logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N>\"" 1
+      logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N> [filename]\"" 1
       ;;
   esac
-  echo "${PIPELINE_VALUES_JSON}" | ${JQ_BIN} -r 'with_entries(select(.key | startswith("SEPARATOR") | not))'
+  echo "${PIPELINE_VALUES_JSON}" | ${JQ_BIN} -r 'walk(
+    if type == "object" then
+      with_entries(
+        select(
+          (.value != "" and (.key | startswith("SEPARATOR") | not))
+        )
+      )
+    elif type == "array" then
+      map(select(. != ""))
+    else
+      .
+    end
+  )' > "${PIPELINE_JSON_FILE}"
+  if [ "${PIPELINE_JSON_FILE}" != "/dev/stdout" ]; then
+    logMessage "Pipeline values saved to '${PIPELINE_JSON_FILE}'"
+  fi
 }
 
 buildJenkinsPipelineFromFile() {
-  downloadJenkinsCLIJar
-  local JOB_NAME=HELIX_ONPREM_DEPLOYMENT
-  PIPELINE_INI_FILE="config.ini"
-
-  # Start building the command array to avoid shell expansion issues
-  JENKINS_BUILD_CMD=(${JAVA_BIN} "-jar" "jenkins-cli.jar" "-s" "$JENKINS_URL" $AUTH "build" "$JOB_NAME")
-
-# Parse INI and append parameters safely
-while IFS='=' read -r key value; do
-    # Skip comments, headers, or empty lines
-    [[ "$key" =~ ^\[.*\]$ || -z "$key" || "$key" =~ ^# ]] && continue
-
-    # Trim whitespace
-    key=$(echo "$key" | xargs)
-    value=$(echo "$value" | xargs)
-
-    # Add to command array as separate arguments
-    # This prevents the shell from breaking 'value' apart if it has spaces
-    JENKINS_BUILD_CMD+=("-p" "$key=$value")
-done < "$PIPELINE_INI_FILE"
-
-# Execute the array
-"${JENKINS_BUILD_CMD[@]}"
+  if [ ${#PIPELINEARGS[@]} -ne 2 ]; then
+    logError "999" "Usage: bash $0 -k \"build json_values_file\"" 1
+  fi
+  JOB_NAME=HELIX_ONPREM_DEPLOYMENT
+  PIPELINE_JSON_FILE="${PIPELINEARGS[1]}"
+  if [ ! -f "${PIPELINE_JSON_FILE}" ]; then
+    logError "999" "HELIX_ONPREM_DEPLOYMENT pipeline values JSON file '${PIPELINE_JSON_FILE}' not found." 1
+  fi
+  if ! ${JQ_BIN} . "${PIPELINE_JSON_FILE}" &>/dev/null ; then
+    logError "999" "Pipeline values file '${PIPELINE_JSON_FILE}' is not a valid JSON file." 1
+  fi
+  # Clean up input JSON
+  PIPELINE_JSON=$(${JQ_BIN} -c '
+    del(.CUSTOM_CERTIFICATE, .DB_SSL_CERT, .INPUT_CONFIG_FILE) |
+    . + {
+      "HELIX_GENERATE_CONFIG": "false",
+      "HELIX_PLATFORM_DEPLOY": "false",
+      "HELIX_NONPLATFORM_DEPLOY": "false",
+      "HELIX_CONFIGURE_ITSM": "false",
+      "HELIX_SMARTAPPS_DEPLOY": "false",
+      "SUPPORT_ASSISTANT_TOOL": "false",
+      "HELIX_INTEROPS_DEPLOY": "false",
+      "HELIX_FULL_STACK_UPGRADE": "false",
+      "HELIX_POST_DEPLOY_CONFIG": "false",
+      "HELIX_DR": "false",
+      "SCALE_DOWN": "false",
+      "HELIX_RESTART": "false"
+    } |
+    to_entries | map({name: .key, value: .value}) |
+    {parameter: .}
+    ' "${PIPELINE_JSON_FILE}"
+  )
+  logMessage "Building HELIX_ONPREM_DEPLOYMENT pipeline with values from '${PIPELINE_JSON_FILE}'."
+  ${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_JSON}" -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${JOB_NAME}/build" 2>>${HITT_ERR_FILE}
 }
 
 #End functions
@@ -4269,7 +4300,7 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     jenkins)
       if [ ${#FIXARGS[@]} -eq 1 ]; then
-        logError "999" "Usage: bash $0 -f \"jenkins fixtype <fixoptions>\"" 1
+        logError "999" "Usage: bash $0 -f \"jenkins fixtype [fixoptions]\"" 1
       fi
       fixJenkins
       ;;
@@ -4281,7 +4312,7 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     arlicense)
       if [ ${#FIXARGS[@]} -eq 1 ]; then
-        logError "999" "Usage: bash $0 -f \"arlicense key <expiry>\"" 1
+        logError "999" "Usage: bash $0 -f \"arlicense key [expiry]\"" 1
       fi
       applyARLicense
       ;;
@@ -4318,15 +4349,11 @@ if [ "${MODE}" == "pipeline" ]; then
       ;;
     build)
       buildJenkinsPipelineFromFile
-      if [ ${#PIPELINEARGS[@]} -eq 1 ]; then
-        logError "999" "Usage: bash $0 -f \"jenkins fixtype <fixoptions>\"" 1
-      fi
       ;;
     *)
     logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option." 1
     ;;
   esac
-
   exit
 fi
 
@@ -4445,7 +4472,7 @@ HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hit
 SHORT_HOSTNAME=$(hostname --short)
 LONG_HOSTNAME=$(hostname --long)
 GIT_USER=$(whoami)
-DEBUG=0
+: "${DEBUG=0}"
 FAIL=0
 WARN=0
 SKIP_JENKINS=0
@@ -5825,7 +5852,6 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
       SKIP_UPDATE_CHECK=1
       ;;
     k)
-      QUIET=1
       SKIP_UPDATE_CHECK=1
       if [ $# -ne 2 ]; then
         logError "999" "When using PIPELINE mode commands with options you must enclose them in double quotes - eg: bash $0 -k \"build filename\"" 1
