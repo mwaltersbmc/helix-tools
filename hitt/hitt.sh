@@ -571,6 +571,15 @@ isTenantActivated() {
   echo "${TENANT_STATUS}" | grep -q "REG_.*COMPLETED"
 }
 
+checkPlatformSSL() {
+  TAS_POD=$(getPodNameByLabel "${HP_NAMESPACE}" "app=tas")
+  if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${TAS_POD}" -- sh -c "curl --cacert /apps/data/cacerts https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}" &>/dev/null; then
+    logError "257" "Helix Platform custom_cacert.pem file does not appear to be valid for the Service Management aliases."
+  else
+    logMessage "Helix Platform custom_cacert.pem appears valid for Service Management aliases." 1
+  fi
+}
+
 selectFromArray () {
   ARRAY="${1}[@]"
   select i in "${!ARRAY}"; do
@@ -4422,6 +4431,8 @@ getRealmDetails
 logStatus "Checking realm..."
 checkTenantRealms
 validateRealm
+logMessage "Checking Helix Platform certificates..."
+checkPlatformSSL
 
 if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking Jenkins is accessible..."
@@ -5811,6 +5822,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"GIT_REPO_DIR value must be 'http://gitea:3000/ciadmin' when Jenkins/GITEA are containerized.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Set the GIT_REPO_DIR value to 'http://gitea:3000/ciadmin'.\"
+  },
+  {
+    \"id\": \"257\",
+    \"cause\": \"The custom_cacert.pem file used during the Helix Platform deployment does not appear to contain the certificates needed for the Service Management aliases.\",
+    \"impact\": \"HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Validate the custom_cacerts.pem and follow the docs to update the system.\"
   }
 ]"
 
