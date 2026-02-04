@@ -1796,108 +1796,148 @@ validateISDetails() {
 
 getCacertsFile() {
   SKIP_CACERTS=0
-  if [ "${MODE}" == "pre-is" ]; then
-    if [ -f configsrepo/customer/customCerts/cacerts ] ; then
-      cp -f configsrepo/customer/customCerts/cacerts sealcacerts
-      logMessage "cacerts file found in CUSTOMER_CONFIGS repo."
-      return
-    else
-      logWarning "017" "Custom cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
-      export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
-      if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/ITSM_REPO/itsm-on-premise-installer.git itsmrepo > /dev/null 2>&1 ; then
-        logError "129" "Failed to clone ${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git"
-        SKIP_CACERTS=1
+  if [ "${1}" == "IS" ]; then
+    if [ "${MODE}" == "pre-is" ]; then
+      if [ -f configsrepo/customer/customCerts/cacerts ] ; then
+        cp -f configsrepo/customer/customCerts/cacerts ${CACERTS_FILENAME}
+        logMessage "cacerts file found in CUSTOMER_CONFIGS repo."
         return
       else
-        logMessage "Using default cacerts file from ITSM_REPO."
-        cp -f itsmrepo/pipeline/tasks/cacerts sealcacerts
+        logWarning "017" "Custom cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
+        export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
+        if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/ITSM_REPO/itsm-on-premise-installer.git itsmrepo > /dev/null 2>&1 ; then
+          logError "129" "Failed to clone ${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git"
+          SKIP_CACERTS=1
+          return
+        else
+          logMessage "Using default cacerts file from ITSM_REPO."
+          cp -f itsmrepo/pipeline/tasks/cacerts ${CACERTS_FILENAME}
+        fi
+      fi
+    fi
+
+    if [ "${MODE}" == "post-is" ]; then
+      logMessage "Extracting cacerts file from Helix IS cacerts secret..." 1
+      if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts > /dev/null 2>&1; then
+        logError "159" "'cacerts' secret not found in Helix IS namespace."
+        SKIP_CACERTS=1
+        return
+      fi
+      IS_CACERTS_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o json)
+      IS_CACERTS=$(echo "${IS_CACERTS_JSON}" | ${JQ_BIN} -r '.data.cacerts')
+      if [ "${IS_CACERTS}" == "null" ]; then
+        logError "160" "Required file 'cacerts' not found in the cacerts secret. File(s) in the secret are:"
+        echo "${IS_CACERTS_JSON}" | ${JQ_BIN} '.data | keys'
+        SKIP_CACERTS=1
+      else
+        echo "${IS_CACERTS}" | ${BASE64_BIN} -d > "${CACERTS_FILENAME}"
       fi
     fi
   fi
 
-  if [ "${MODE}" == "post-is" ]; then
-    logMessage "Extracting cacerts file from Helix IS cacerts secret..." 1
-    if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts > /dev/null 2>&1; then
-      logError "159" "'cacerts' secret not found in Helix IS namespace."
+  if [ "${1}" == "HP" ]; then
+    logMessage "Extracting cacerts file from Helix Platform cacertcm configMap..." 1
+    if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm cacertcm > /dev/null 2>&1; then
+      logError "159" "'cacertcm' configMap not found in Helix Platform namespace."
       SKIP_CACERTS=1
       return
     fi
-    IS_CACERTS_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o json)
-    IS_CACERTS=$(echo "${IS_CACERTS_JSON}" | ${JQ_BIN} -r '.data.cacerts')
-    if [ "${IS_CACERTS}" == "null" ]; then
-      logError "160" "Required file 'cacerts' not found in the cacerts secret. File(s) in the secret are:"
-      echo "${IS_CACERTS_JSON}" | ${JQ_BIN} '.data | keys'
+    HP_CACERTS_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm cacertcm -o json)
+    HP_CACERTS=$(echo "${HP_CACERTS_JSON}" | ${JQ_BIN} -r '.binaryData.cacerts')
+    if [ "${HP_CACERTS}" == "null" ]; then
+      logError "160" "Required file 'cacerts' not found in the cacertcm configMap. File(s) in the configMap are:"
+      echo "${HP_CACERTS_JSON}" | ${JQ_BIN} '.data | keys'
       SKIP_CACERTS=1
     else
-      echo "${IS_CACERTS}" | ${BASE64_BIN} -d > sealcacerts
+      echo "${HP_CACERTS}" | ${BASE64_BIN} -d > "${CACERTS_FILENAME}"
     fi
   fi
 }
 
 validateCacertsFile() {
   VALID_CACERTS=0
-  getCacertsFile
+  case "${1}" in
+    IS)
+      CACERTS_SOURCE="Service Management"
+      CACERTS_FILENAME=is-sealcacerts
+      ;;
+    HP)
+      CACERTS_SOURCE="Helix Platform"
+      CACERTS_FILENAME=hp-sealcacerts
+      IS_CACERTS_SSL_TRUSTSTORE_PASSWORD="changeit"
+      ;;
+    *)
+      VALID_CACERTS=1
+      SKIP_CACERTS=1
+      return
+      ;;
+  esac
+  getCacertsFile ${1}
   if [ "${SKIP_CACERTS}" == "1" ]; then
-    logMessage "cacerts file not found - skipping checks."
+    logMessage "${CACERTS_SOURCE} cacerts file not found - skipping checks."
     VALID_CACERTS=1
     return
   fi
-  CACERTS_FILETYPE=$(file sealcacerts | cut -f 2- -d ' ')
+  CACERTS_FILETYPE=$(file "${CACERTS_FILENAME}" | cut -f 2- -d ' ')
   if [ "${CACERTS_FILETYPE,,}" != "java keystore" ]; then
-    logError "161" "cacerts file is of type '${CACERTS_FILETYPE}' and not the expected Java keystore."
+    logError "161" "${CACERTS_SOURCE} cacerts file is of type '${CACERTS_FILETYPE}' and not the expected Java keystore."
     VALID_CACERTS=1
     SKIP_CLEANUP=1
     return
   else
-    logMessage "cacerts file is a valid Java keystore." 1
+    logMessage "${CACERTS_SOURCE} cacerts file is a valid Java keystore." 1
   fi
 
-  if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" == "" ]; then
-    IS_CACERTS_SSL_TRUSTSTORE_PASSWORD="changeit"
-  fi
+  logMessage "Processing cacerts..."
+  # Convert JKS to pem
+  #  ${KEYTOOL_BIN} -importkeystore -srckeystore ${CACERTS_FILENAME} -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
+  #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
+  #  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
+  unpackSSLPoke
 
-  if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "changeit" ]; then
-    logMessage "CACERTS_SSL_TRUSTSTORE_PASSWORD is set - using non-default password for cacerts." 1
-    if ! ${KEYTOOL_BIN} -list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1 ; then
-      logError "214" "The value of CACERTS_SSL_TRUSTSTORE_PASSWORD is not set to the correct password for the cacerts file."
-      return
+  if [ "${1}" == "IS" ]; then
+    if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" == "" ]; then
+      IS_CACERTS_SSL_TRUSTSTORE_PASSWORD="changeit"
+    fi
+
+    if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" != "changeit" ]; then
+      logMessage "CACERTS_SSL_TRUSTSTORE_PASSWORD is set - using non-default password for cacerts." 1
+      if ! ${KEYTOOL_BIN} -list -keystore ${CACERTS_FILENAME} -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1 ; then
+        logError "214" "The value of CACERTS_SSL_TRUSTSTORE_PASSWORD is not set to the correct password for the cacerts file."
+        return
+      fi
+    fi
+
+    if ! ${KEYTOOL_BIN} -list -keystore ${CACERTS_FILENAME} -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
+      logError "162" "cacerts file does not contain the expected '${FTS_ELASTIC_CERTNAME}' certificate required for FTS Elasticsearch connection."
+      VALID_CACERTS=1
+    else
+      logMessage "cacerts file contains the expected Elasticsearch '${FTS_ELASTIC_CERTNAME}' certificate." 1
+    fi
+
+    if ! ${JAVA_BIN} "-Djavax.net.ssl.trustStore=${CACERTS_FILENAME}" "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" ${JAVA_PROXY_STRING} SSLPoke "${LB_HOST}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
+      logError "163" "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
+      VALID_CACERTS=1
     fi
   fi
 
-  if ! ${KEYTOOL_BIN} -list -keystore sealcacerts -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${FTS_ELASTIC_CERTNAME}" > /dev/null 2>&1 ; then
-    logError "162" "cacerts file does not contain the expected '${FTS_ELASTIC_CERTNAME}' certificate required for FTS Elasticsearch connection."
-    VALID_CACERTS=1
-  else
-    logMessage "cacerts file contains the expected Elasticsearch '${FTS_ELASTIC_CERTNAME}' certificate." 1
-  fi
-
-  # Convert JKS to pem
-  logMessage "Processing cacerts..."
-  unpackSSLPoke
-  #  ${KEYTOOL_BIN} -importkeystore -srckeystore sealcacerts -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
-#  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
-#  if ! ${CURL_BIN} -s "${RSSO_URL}" --cacert sealstore.pem > /dev/null 2>&1 ; then
-  if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" ${JAVA_PROXY_STRING} SSLPoke "${LB_HOST}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
-    logError "163" "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
-    VALID_CACERTS=1
-  fi
   for i in "${IS_ALIAS_SUFFIXES[@]}"; do
     TARGET="${IS_ALIAS_PREFIX}-${i}.${CLUSTER_DOMAIN}"
 #    if ! ${CURL_BIN} -s "https://${TARGET}" --cacert sealstore.pem > /dev/null 2>&1; then
-    if ! ${JAVA_BIN} -Djavax.net.ssl.trustStore=sealcacerts "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" ${JAVA_PROXY_STRING} SSLPoke "${TARGET}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
+    if ! ${JAVA_BIN} "-Djavax.net.ssl.trustStore=${CACERTS_FILENAME}" "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" ${JAVA_PROXY_STRING} SSLPoke "${TARGET}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
       if echo "${TARGET}" | grep -q reporting ; then
         MSG_SUFFIX="Note: only required for ITSM 25.3.01 and later."
       fi
-      logError "164" "Certificate for '${TARGET}' not found in cacerts. ${MSG_SUFFIX}"
+      logError "164" "Certificate for '${TARGET}' not found in ${CACERTS_SOURCE} cacerts. ${MSG_SUFFIX}"
       MSG_SUFFIX=""
       VALID_CACERTS=1
     else
-      logMessage "  - valid certificate for '${TARGET}' found in cacerts file." 1
+      logMessage "  - valid certificate for '${TARGET}' found in ${CACERTS_SOURCE} cacerts file." 1
     fi
   done
 
   if [ "${VALID_CACERTS}" == 0 ]; then
-    logMessage "cacerts file appears valid." 1
+    logMessage "${CACERTS_SOURCE} cacerts file appears valid." 1
   else
     SKIP_CLEANUP=1
   fi
@@ -3222,8 +3262,9 @@ getPodNameByLabel() {
 }
 
 updateISCacerts() {
-  cp "${NEWCACERTS}" sealcacerts
-  validateCacertsFile
+  CACERTS_FILENAME="is-sealcacerts"
+  cp "${NEWCACERTS}" "${CACERTS_FILENAME}"
+  validateCacertsFile IS
   if [ "${VALID_CACERTS}" == "0" ]; then
     if askYesNo "New cacerts file is valid - do you want to replace the cacerts secret?"; then
       replaceISCacertsSecret
@@ -3248,7 +3289,7 @@ replaceISCacertsSecret() {
     logMessage "Current cacerts secret saved as ${BACKUP_FILE}."
   fi
   ${KUBECTL_BIN} -n "${IS_NAMESPACE}" delete secret cacerts >/dev/null 2>&1
-  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts=sealcacerts --dry-run=client -o yaml | ${KUBECTL_BIN} apply -f - >/dev/null 2>&1
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts="${CACERTS_FILENAME}" --dry-run=client -o yaml | ${KUBECTL_BIN} apply -f - >/dev/null 2>&1
 }
 
 fixSATRole() {
@@ -4431,8 +4472,8 @@ getRealmDetails
 logStatus "Checking realm..."
 checkTenantRealms
 validateRealm
-logMessage "Checking Helix Platform certificates..."
-checkPlatformSSL
+logStatus "Checking Helix Platform certificates..."
+validateCacertsFile HP
 
 if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking Jenkins is accessible..."
@@ -4448,7 +4489,7 @@ if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking IS registry details..."
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
-  validateCacertsFile
+  validateCacertsFile IS
   logStatus "Checking IS Configuration..."
   checkISRESTReady
   checkISLicenseStatus
@@ -4503,7 +4544,7 @@ HITT_MSG_FILE=hittmsgs.log
 VALUES_LOG_FILE=values.log
 VALUES_JSON_FILE=values.json
 CLEANUP_DIRS=(configsrepo itsmrepo)
-CLEANUP_FILES=(sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cookies)
+CLEANUP_FILES=(is-sealcacerts hp-sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cookies)
 CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}")
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
@@ -5237,21 +5278,21 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"159\",
-    \"cause\": \"The cacerts secret required by the Helix Service Management applications is missing from the Helix IS namespace.\",
-    \"impact\": \"Helix Service Management applications will be inaccessible.\",
-    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation.\"
+    \"cause\": \"The named cacerts object required by the Helix applications is missing.\",
+    \"impact\": \"Helix applications will be inaccessible.\",
+    \"remediation\": \"Recreate the cacerts object using the process detailed in the product documentation.\"
   },
   {
     \"id\": \"160\",
-    \"cause\": \"The cacerts secret in the Helix Service Management namespace does not contain the Java keystore in a file named 'cacerts'.\",
-    \"impact\": \"Helix Service Management applications will be inaccessible.\",
-    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation and ensure that the Java keystore file is named 'cacerts'.\"
+    \"cause\": \"The named cacerts object does not contain the Java keystore in a file named 'cacerts'.\",
+    \"impact\": \"Helix applications will be inaccessible.\",
+    \"remediation\": \"Recreate the cacerts object using the process detailed in the product documentation and ensure that the Java keystore file is named 'cacerts'.\"
   },
   {
     \"id\": \"161\",
-    \"cause\": \"The cacerts file in the cacerts secret in the Helix Service Management namespace must be a Java keystore and not any other type of certificate file.\",
-    \"impact\": \"Helix Service Management applications will be inaccessible.\",
-    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation and ensure that the cacerts file is a Java keystore.\"
+    \"cause\": \"The cacerts file in the named object must be a Java keystore and not any other type of certificate file.\",
+    \"impact\": \"Helix applications will be inaccessible.\",
+    \"remediation\": \"Recreate the cacerts object using the process detailed in the product documentation and ensure that the cacerts file is a Java keystore.\"
   },
   {
     \"id\": \"162\",
