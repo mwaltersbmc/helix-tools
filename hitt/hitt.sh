@@ -3045,13 +3045,13 @@ case "${PLATFORM_EXT_SVC_TYPE}" in
 esac
 }
 
-getPods() {
+logPods() {
   # ns name
   logMessage "Getting pods from '${1}'..." 1
   ${KUBECTL_BIN} -n ${1} get pods -o wide 2>/dev/null > k8s-get-pods-${1}.log
 }
 
-getEvents() {
+logEvents() {
   # ns name
   logMessage "Getting events from '${1}'..." 1
   ${KUBECTL_BIN} -n ${1} events 2>/dev/null > k8s-events-${1}.log
@@ -4069,7 +4069,7 @@ getPipelineConsoleOutput() {
   ${CURL_BIN} -skf "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1^^}/lastBuild/consoleText"
 }
 
-getK8sNodeDetails() {
+logK8sNodeDetails() {
   local OUTPUT_FILE=k8s-nodes.txt
   local node
   # Check if the user can list nodes
@@ -4415,14 +4415,14 @@ if [ "${MODE}" == "pipeline" ]; then
 fi
 
 # Validate action
-[[ "${MODE}" =~ ^post-hp$|^pre-is$|^post-is$ ]] || usage
+[[ "${MODE}" =~ ^pre-hp|^post-hp$|^pre-is$|^post-is$ ]] || usage
 
 # MODE is required
 if [[ -z ${MODE} ]]; then
   logError "200" "Mode must be specified with -m <post-hp|pre-is|post-is>" 1
 fi
 
-if [ "${MODE}" == "post-hp" ]; then
+if [ "${MODE}" == "post-hp" ] || [ "${MODE}" == "pre-hp" ]; then
   SKIP_JENKINS=1
 fi
 
@@ -4442,13 +4442,13 @@ if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
   logError "201" "It is recommended to install the Helix Platform and Helix IS in their own namespaces."
 fi
 checkHPNamespace "${HP_NAMESPACE}"
-getK8sNodeDetails
-getPods ${HP_NAMESPACE}
-getEvents ${HP_NAMESPACE}
+logK8sNodeDetails
+logPods ${HP_NAMESPACE}
+logEvents ${HP_NAMESPACE}
 if [ "${MODE}" != "post-hp" ]; then
   checkISNamespace "${IS_NAMESPACE}"
-  getPods ${IS_NAMESPACE}
-  getEvents ${IS_NAMESPACE}
+  logPods ${IS_NAMESPACE}
+  logEvents ${IS_NAMESPACE}
 fi
 logStatus "Getting versions..."
 isOpenShift
