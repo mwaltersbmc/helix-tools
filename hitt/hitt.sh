@@ -6,6 +6,9 @@
 # FUNCTIONS Start
 
 getConfValues() {
+  if [ "${MODE}" == "pre-hp" ]; then
+    NS_ARRAY=("PENDING" "${NS_ARRAY[@]}")
+  fi
   logStatus "Please select your Helix Platform namespace..."
   HP_NAMESPACE=$(selectFromArray NS_ARRAY)
   logStatus "Please select your Helix IS namespace..."
@@ -4234,7 +4237,7 @@ if [ ! -f "${HITT_CONFIG_FILE}" ]; then
   fi
   NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
   logStatus "HITT config file '${HITT_CONFIG_FILE}' not found - creating..."
-  logStatus "Please use the following steps to configure the HITT and create your config file..."
+  logStatus "Please use the following steps to configure the HITT script and create your config file..."
   getConfValues
   createHITTconf "${HITT_CONFIG_FILE}"
 else
