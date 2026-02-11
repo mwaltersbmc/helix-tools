@@ -4508,7 +4508,6 @@ if [ "${MODE}" != "post-hp" ]; then
   logStatus "Getting IS details..."
   getISDetailsFromK8s
   getISDetailsFromJenkins
-  generateISDbID
   logStatus "Checking IS details..."
   validateISDetails
   checkPipelinePwds
@@ -4535,6 +4534,7 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
   logStatus "Checking IS DB settings..."
   checkISDBSettings
   checkISDBLatency
+  generateISDbID
 fi
 
 if [ "${MODE}" == "post-is" ]; then
