@@ -197,10 +197,10 @@ cleanUp() {
       CLEANUP_FILES_TO_RM=("${CLEANUP_FILES[@]}" "${CLEANUP_STOP_FILES[@]}")
   fi
   for i in "${CLEANUP_FILES_TO_RM[@]}"; do
-    rm -f ./${i}
+    rm -f "./${i}"
   done
   for i in "${CLEANUP_DIRS[@]}"; do
-    rm -rf ./${i}
+    rm -rf "./${i}"
   done
 }
 
@@ -3907,6 +3907,28 @@ addJenkinsNodeLabel() {
   runJenkinsCurl "${SCRIPT}" >/dev/null
 }
 
+generateISDbID() {
+  # Create the source string (all uppercase)
+  if [ -z "${IS_DB_TYPE}" ] || [ -z "${IS_DATABASE_HOST_NAME}" ] || [ -z "${IS_AR_DB_NAME}" ]; then
+    return
+  fi
+  case "${IS_DB_TYPE^^}" in
+    MSSQL)
+        DB_TYPE="SQL -- SQL SERVER"
+        ;;
+    ORACLE)
+        DB_TYPE="SQL -- ORACLE"
+        ;;
+    POSTGRES)
+        DB_TYPE="POSTGRESQL"
+        ;;
+  esac
+  IS_DBID_SOURCE="${DB_TYPE^^}|${IS_DATABASE_HOST_NAME^^}|${IS_AR_DB_NAME^^}"
+  # Generate SHA-256 hash and encode to base64 without padding
+  IS_DBID=$(printf "%s" "${IS_DBID_SOURCE}" | ${OPENSSL_BIN} dgst -sha256 -binary | ${BASE64_BIN} | tr -d '=')
+  logMessage "IS DB ID will be '${IS_DBID}' from '${IS_DBID_SOURCE}'."
+}
+
 getISDbID() {
   checkToolVersion kubectl
   getVersions
@@ -4486,6 +4508,7 @@ if [ "${MODE}" != "post-hp" ]; then
   logStatus "Getting IS details..."
   getISDetailsFromK8s
   getISDetailsFromJenkins
+  generateISDbID
   logStatus "Checking IS details..."
   validateISDetails
   checkPipelinePwds
