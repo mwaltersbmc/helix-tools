@@ -994,12 +994,12 @@ getValueFromPlatformSecret() {
 }
 
 checkJenkinsIsRunning() {
-  JENKINS_RESCODE=$(${CURL_BIN} -k -s -o /dev/null -w "%{http_code}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
+  JENKINS_RESCODE=$(${CURL_BIN} -k -s -o /dev/null -w "%{http_code}" "${JENKINS_URL}")
   case "${JENKINS_RESCODE}" in
     200)
-      JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}")
+      JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_URL}")
       JENKINS_VERSION=$(echo "${JENKINS_RESPONSE}" | grep -i 'X-Jenkins:' | awk '{print $2}' | tr -d '\r')
-      logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
+      logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_LOG_URL}."
       getJenkinsCrumb
       ;;
     401|403)
@@ -1007,7 +1007,7 @@ checkJenkinsIsRunning() {
       SKIP_JENKINS=1
       ;;
     *)
-      logError "126" "Jenkins not found on ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT} - skipping Jenkins tests."
+      logError "126" "Jenkins not found on ${JENKINS_LOG_URL} - skipping Jenkins tests."
       systemctl status jenkins > jenkins-status.log 2>&1
       SKIP_JENKINS=1
       ;;
@@ -1016,13 +1016,13 @@ checkJenkinsIsRunning() {
 
 getLastBuildFromJenkins() {
   # PIPELINE_NAME
-  BUILD_NUMBER=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/lastBuild/buildNumber")
+  BUILD_NUMBER=$(${CURL_BIN} -sk "${JENKINS_URL}/job/${1}/lastBuild/buildNumber")
   echo "${BUILD_NUMBER}"
 }
 
 savePipelineConsoleOutput() {
   # PIPELINE_NAME / BUILD_NUMBER
-  ${CURL_BIN} -skf "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1}/${2}/consoleText" > "${1}.log"
+  ${CURL_BIN} -skf "${JENKINS_URL}/job/${1}/${2}/consoleText" > "${1}.log"
 }
 
 saveAllPipelineConsoleOutput() {
@@ -1040,7 +1040,7 @@ getISDetailsFromJenkins() {
   #downloadJenkinsCLIJar
   #checkJenkinsCLIJavaVersion
   logMessage "Reading values from Jenkins..."
-  JENKINS_JSON=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
+  JENKINS_JSON=$(${CURL_BIN} -sk "${JENKINS_URL}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
   checkJenkinsJobResult
   JENKINS_ONPREM_DEPLOYMENT_LASTBUILD=$(getLastBuildFromJenkins HELIX_ONPREM_DEPLOYMENT)
   JENKINS_GENERATE_CONFIG_LASTBUILD=$(getLastBuildFromJenkins HELIX_GENERATE_CONFIG)
@@ -1161,7 +1161,7 @@ createInputFileVarsArray() {
 }
 
 downloadJenkinsCLIJar() {
-  ${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
+  ${CURL_BIN} -sk "${JENKINS_URL}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
   if [ ! -f jenkins-cli.jar ]; then
     logError "999" "Failed to download jenkins-cli.jar file from Jenkins." 1
   fi
@@ -1583,7 +1583,7 @@ validateISDetails() {
     if isBlank "${IS_HELM_NODE}" ; then
       logError "144" "HELM_NODE is blank."
     else
-      NODE_ARRAY=($(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json" | ${JQ_BIN} -r .computer[].displayName | grep -v Built ))
+      NODE_ARRAY=($(${CURL_BIN} -sk "${JENKINS_URL}/computer/api/json" | ${JQ_BIN} -r .computer[].displayName | grep -v Built ))
       NODE_MATCH=0
       for i in "${NODE_ARRAY[@]}"; do
         if [ "${IS_HELM_NODE}" == "${i}" ]; then NODE_MATCH=1; fi
@@ -2510,7 +2510,7 @@ getPipelineParameterDefault() {
 }
 
 checkJenkinsNodes() {
-  NODE_STATUS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/manage/computer/api/json?depth=1")
+  NODE_STATUS=$(${CURL_BIN} -sk "${JENKINS_URL}/manage/computer/api/json?depth=1")
   OFFLINE_NODES=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[]| select(.offline=='true').displayName')
   if [ ! -z "${OFFLINE_NODES}" ] ; then
     logError "193" "One or more Jenkins nodes found in an 'offline' state."
@@ -2606,7 +2606,7 @@ checkJenkinsPlugins() {
     pipeline-stage-view
     pipeline-rest-api
     )
-  JK_PLUGINS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
+  JK_PLUGINS=$(${CURL_BIN} -sk "${JENKINS_URL}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
   for i in "${EXPECTED_PLUGINS[@]}" ; do
     if ! echo "${JK_PLUGINS}" | grep -wq "${i}" ; then
       logError "195" "Jenkins plugin '${i}' is missing."
@@ -2622,7 +2622,7 @@ checkJenkinsPlugins() {
 checkJenkinsCredentials() {
   # Get list of credentials and check for expected IDs
   EXPECTED_CREDENTIALS="${JENKINS_CREDS[@]}"
-  JK_CREDS=$(${CURL_BIN} -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
+  JK_CREDS=$(${CURL_BIN} -sk "${JENKINS_URL}/credentials/api/json?depth=3"  | ${JQ_BIN} -r '.stores.system.domains._.credentials[].id')
   for i in "${EXPECTED_CREDENTIALS[@]}" ; do
     if ! echo "${JK_CREDS}" | grep -wq "${i}" ; then
       logError "196" "Jenkins credentials with id '${i}' is missing."
@@ -3230,12 +3230,12 @@ EOF
 }
 
 getJenkinsCrumb() {
-  JENKINS_CRUMB=$(${CURL_BIN} -c .cookies -sk "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/crumbIssuer/api/json" | ${JQ_BIN} -r .crumb )
+  JENKINS_CRUMB=$(${CURL_BIN} -c .cookies -sk "${JENKINS_URL}/crumbIssuer/api/json" | ${JQ_BIN} -r .crumb )
 }
 
 runJenkinsCurl() {
   #1 groovy script
-  ${CURL_BIN} --max-time 3 -b .cookies --data-urlencode "script=${1}" -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/scriptText" 2>>${HITT_ERR_FILE}
+  ${CURL_BIN} --max-time 3 -b .cookies --data-urlencode "script=${1}" -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/scriptText" 2>>${HITT_ERR_FILE}
 }
 
 isOpenShift() {
@@ -3819,7 +3819,7 @@ triggerHelixDryRun() {
 
 isJenkinsInCluster() {
   if [ -n "${K8S_JENKINS}" ]; then return 0; fi
-  JENKINS_AGENTS=($(${CURL_BIN} -gks "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/computer/api/json?tree=computer[displayName]" | ${JQ_BIN} -r '.computer[].displayName'))
+  JENKINS_AGENTS=($(${CURL_BIN} -gks "${JENKINS_URL}/computer/api/json?tree=computer[displayName]" | ${JQ_BIN} -r '.computer[].displayName'))
   if printf '%s\0' "${JENKINS_AGENTS[@]}" | grep -Fqz -- 'jenkins-agent'; then
     return 0
     K8S_JENKINS=1
@@ -3882,7 +3882,7 @@ fixJenkinsPlugins() {
     logError "999" "Failed to get list of Jenkins recommended plugins from '${JENKINS_RECOMMENDED_PLUGINS_URL}'" 1
   fi
   logMessage "Installing Jenkins recommended plugins..."
-  ${CURL_BIN} --max-time 3 -b .cookies -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" -d "${JENKINS_RECOMMENDED_PLUGINS_XML}" -H "Content-Type: text/xml" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/pluginManager/installNecessaryPlugins" 2>>${HITT_ERR_FILE}
+  ${CURL_BIN} --max-time 3 -b .cookies -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" -d "${JENKINS_RECOMMENDED_PLUGINS_XML}" -H "Content-Type: text/xml" "${JENKINS_URL}/pluginManager/installNecessaryPlugins" 2>>${HITT_ERR_FILE}
 }
 
 fixJenkinsNodes() {
@@ -4091,7 +4091,7 @@ validateSSHPermissions() {
 }
 
 getPipelineConsoleOutput() {
-  ${CURL_BIN} -skf "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${1^^}/lastBuild/consoleText"
+  ${CURL_BIN} -skf "${JENKINS_URL}/job/${1^^}/lastBuild/consoleText"
 }
 
 logK8sNodeDetails() {
@@ -4238,7 +4238,7 @@ buildJenkinsPipelineFromFile() {
     ' "${PIPELINE_JSON_FILE}"
   )
   logMessage "Building HELIX_ONPREM_DEPLOYMENT pipeline with values from '${PIPELINE_JSON_FILE}'."
-  ${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_JSON}" -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}/job/${JOB_NAME}/build" 2>>${HITT_ERR_FILE}
+  ${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_JSON}" -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${JOB_NAME}/build" 2>>${HITT_ERR_FILE}
 }
 
 #End functions
@@ -4320,6 +4320,13 @@ fi
 if [ -n "${JENKINS_USERNAME}" ]; then
   JENKINS_PASSWORD=$(printf %s "${JENKINS_PASSWORD}" | ${JQ_BIN} -sRr @uri)
   JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
+fi
+
+# Build JENKINS_URL
+JENKINS_URL="${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}"
+if [ "${JENKINS_PROTOCOL}" == "https" ] && [ "${JENKINS_PORT}" == "443" ]; then
+  JENKINS_URL="${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}"
+  JENKINS_LOG_URL="${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}"
 fi
 
 # Remove old files
