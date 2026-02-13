@@ -1330,7 +1330,7 @@ cloneCustomerConfigsRepo() {
       SKIP_REPO=1
       return
     fi
-    if ! ${GIT_BIN} clone "${GITEA_URL}"/ciadmin/onprem-remedyserver-config configsrepo > /dev/null 2>&1 ; then
+    if ! ${GIT_BIN} clone "${GITEA_URL}/${GITEA_ADMIN_USER}/onprem-remedyserver-config" configsrepo > /dev/null 2>&1 ; then
       logError "129" "Failed to clone onprem-remedyserver-config from GITEA."
       SKIP_REPO=1
       return
@@ -1446,8 +1446,8 @@ validateISDetails() {
     fi
 
     if isJenkinsInCluster ; then
-      if [ "${IS_GIT_REPO_DIR}" != "http://gitea:3000/ciadmin" ]; then
-        logError "256" "GIT_REPO_DIR value must be 'http://gitea:3000/ciadmin' for containerized Jenkins."
+      if [ "${IS_GIT_REPO_DIR}" != "http://gitea:3000/${GITEA_ADMIN_USER}" ]; then
+        logError "256" "GIT_REPO_DIR value must be 'http://gitea:3000/${GITEA_ADMIN_USER}' for containerized Jenkins."
       fi
     else
       if [[ ! "${IS_GIT_REPO_DIR}" =~ ^ssh://.* ]]; then
@@ -5886,9 +5886,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"256\",
-    \"cause\": \"GIT_REPO_DIR value must be 'http://gitea:3000/ciadmin' when Jenkins/GITEA are containerized.\",
+    \"cause\": \"GIT_REPO_DIR value is not valie when Jenkins/GITEA are containerized.\",
     \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Set the GIT_REPO_DIR value to 'http://gitea:3000/ciadmin'.\"
+    \"remediation\": \"Set the GIT_REPO_DIR value to suggested value.\"
   },
   {
     \"id\": \"257\",
