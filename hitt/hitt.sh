@@ -3834,7 +3834,6 @@ fixJenkins() {
   if isJenkinsInCluster && ([[ "${FIXARGS[1]}" != "kubeconfig" ]] && [[ "${FIXARGS[1]}" != "dryrun" ]]); then
     logError "999" "Jenkins fixmode '${FIXARGS[1]}' is not supported when Jenkins is running in the cluster - only 'kubeconfig' and 'dryrun' are valid."
   fi
-  exit
   case "${FIXARGS[1]}" in
     kubeconfig)
       fixJenkinsKubeconfig
