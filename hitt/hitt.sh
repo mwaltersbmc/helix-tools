@@ -3961,6 +3961,8 @@ applyARLicense() {
     fi
   fi
   [[ ! -z "${INVALID_IS_LICENSE+x}" ]] && exit
+  checkToolVersion kubectl
+  getVersions
   getDomain
   buildISAliasesArray
   getISAdminCreds
@@ -3974,9 +3976,19 @@ applyARLicense() {
   if [[ $NUM_LICS -ne 0 ]]; then
     logError "999" "License with key '${IS_LICENSE_KEY}' is already present." 1
   fi
-  echo "${IS_LICENSE_JSON}"
-  ${CURL_BIN} -o /dev/null -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT $ARJWT" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null
-  logMessage "License applied."
+  local HTTP_RESPONSE=$(mktemp)
+  local HTTP_CODE=$(${CURL_BIN} -o "${HTTP_RESPONSE}" -sk -w "%{http_code}" -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT $ARJWT" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null)
+  case "${HTTP_CODE}" in
+    200|201)
+      logMessage "License applied - ${IS_LICENSE_JSON}"
+      ;;
+    *)
+      logError "999" "Failed to apply license - '${HTTP_CODE}'."
+      cat "${HTTP_RESPONSE}" | sed 's/^/        /'
+      echo
+      rm -f "${HTTP_RESPONSE}"
+      ;;
+  esac
 }
 
 askYesNo() {
