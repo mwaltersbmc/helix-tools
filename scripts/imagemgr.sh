@@ -19,7 +19,7 @@ DOCKER_ROOT_DIR=$(docker info --format '{{json .DockerRootDir}}' | tr -d \")
 
 # Functions
 usage() {
-  echo "Usage: $0 -a <sync|pull|push|save|load|verify|compare> <-i image name|-f image file> [-t target registry] [-n <number of parallel actions>] [-k skip registry login]"
+  echo "Usage: $0 -a <sync|pull|push|save|load|verify|compare> <-i image name|-f image file> [-t target registry] [-n <number of parallel actions>] [-k skip registry login] [-p project:newproject]"
   exit 1
 }
 
@@ -141,6 +141,9 @@ process_image(){
 #  IMAGE_TAG=$(echo "${SOURCE_IMAGE}" | awk -F":" '{print $NF}')
   IMAGE_FILENAME=$(URLEncode "${SOURCE_IMAGE}")
   TARGET_IMAGE="${TARGET_REGISTRY}/${SOURCE_IMAGE#*/}"
+  if [ "${PROJECT}" != "" ]; then
+    TARGET_IMAGE=$(echo "${TARGET_IMAGE}" | sed "s,/${PROJECT_SOURCE}/,/${PROJECT_TARGET}/,g")
+  fi
 
   case ${ACTION} in
     sync)
@@ -221,7 +224,7 @@ URLEncode(){
 # -t target registry
 # -k skip docker login
 
-while getopts "a:f:i:n:s:t:k" options; do
+while getopts "a:f:i:n:p:s:t:k" options; do
   case "${options}" in
     a)
       ACTION=${OPTARG}
@@ -234,6 +237,9 @@ while getopts "a:f:i:n:s:t:k" options; do
       ;;
     n)
       NUM_ACTIONS=${OPTARG}
+      ;;
+    p)
+      PROJECT=${OPTARG}
       ;;
     s)
       SOURCE_REGISTRY=${OPTARG}
@@ -282,20 +288,30 @@ done
 
   # Either -f or -i required
   if [[ -z ${IMAGE_FILE} && -z ${IMAGE_NAME} ]]; then
-    echo "Either -f image file or -i image name must be provided."
+    echo "Either -f image-file or -i image-name must be provided."
     exit 1
   fi
 
   # IMAGE_FILE must exist if -f used
   if [[ -n ${IMAGE_FILE} && ! -f ${IMAGE_FILE} ]]; then
-    echo "Image file ${IMAGE_FILE} not found.  Please check the name and try again."
+    echo "Image file '${IMAGE_FILE}' not found.  Please check the name and try again."
     exit 1
   fi
 
   # -s not valid with -i
   if [[ -n ${IMAGE_NAME} && -n ${SOURCE_REGISTRY} ]]; then
-    echo "Source registry (-s) not valid with image name (-i).  Change the image name and try again."
+    echo "Source registry (-s) not valid with image name (-i)."
     exit 1
+  fi
+
+  # Is project string valid?
+  if [[ -n "${PROJECT}" ]]; then
+    if [[ ! "${PROJECT}" =~ ^([^:]+):([^:]+)$ ]]; then
+        echo "Project substitution string (-p ${PROJECT}) must be in 'currentproject:newproject' format."
+        exit 1
+    fi
+    PROJECT_SOURCE="${BASH_REMATCH[1]}"
+    PROJECT_TARGET="${BASH_REMATCH[2]}"
   fi
 
 check_tools
@@ -339,6 +355,10 @@ for SOURCE_IMAGE in "${IMAGE_ARRAY[@]}"; do
     sleep 1
     CURRENT_JOBS=$(jobs | wc -l)
   done
+    if [[ ! "${SOURCE_IMAGE}" == *"/${PROJECT_SOURCE}/"* ]]; then
+    log_error "" "SOURCE_IMAGE '${SOURCE_IMAGE}' does not include '/${PROJECT_SOURCE}/'."
+    continue
+  fi
   ((COUNT++))
   process_image "${SOURCE_IMAGE}" &
   CURRENT_JOBS=$(jobs | wc -l)
