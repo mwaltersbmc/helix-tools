@@ -2208,14 +2208,14 @@ checkISDBSettings() {
   JISQL_USERNAME="${IS_AR_DB_USER}"
   JISQL_PASSWORD="${IS_AR_DB_PASSWORD}"
   JISQL_DB_NAME="${IS_AR_DB_NAME}"
-  if [ "${IS_DATABASE_RESTORE}" == "true" ]; then
+  if [ "${IS_DATABASE_RESTORE}" == "true" ] && [ "${IS_DB_TYPE}" == "postgres" ]; then
     if [ -z "${IS_DATABASE_ADMIN_USER}" ] || [ -z "${IS_DATABASE_ADMIN_PASSWORD}" ]; then
       logError "246" "DATABASE_ADMIN_USER and/or DATABASE_ADMIN_PASSWORD are blank - skipping checks."
       SKIP_AR_DB_CHECKS=1
     fi
     JISQL_USERNAME="${IS_DATABASE_ADMIN_USER}"
     JISQL_PASSWORD="${IS_DATABASE_ADMIN_PASSWORD}"
-    JISQL_DB_NAME="postgres"
+    #JISQL_DB_NAME="postgres"
   fi
   [[ -n "${SKIP_AR_DB_CHECKS}" ]] && return
   if [ -f dbjars.tgz ]; then
@@ -3942,6 +3942,8 @@ getISDbID() {
 }
 
 applyARLicense() {
+  local HTTP_RESPONSE
+  local HTTP_CODE
   IS_LICENSE_KEY="${FIXARGS[1]^^}"
   IS_LICENSE_EXPIRY=""
   # Validate inputs
@@ -3976,8 +3978,8 @@ applyARLicense() {
   if [[ $NUM_LICS -ne 0 ]]; then
     logError "999" "License with key '${IS_LICENSE_KEY}' is already present." 1
   fi
-  local HTTP_RESPONSE=$(mktemp)
-  local HTTP_CODE=$(${CURL_BIN} -o "${HTTP_RESPONSE}" -sk -w "%{http_code}" -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT $ARJWT" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null)
+  HTTP_RESPONSE=$(mktemp)
+  HTTP_CODE=$(${CURL_BIN} -o "${HTTP_RESPONSE}" -sk -w "%{http_code}" -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT $ARJWT" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null)
   case "${HTTP_CODE}" in
     200|201)
       logMessage "License applied - ${IS_LICENSE_JSON}"
@@ -4120,7 +4122,7 @@ getPodConditionTime() {
     local CONDITION="$1"
     local NAMESPACE_NAME="$2"
     local POD_NAME="$3"
-    ISO_TIME=$(${KUBECTL_BIN} -n "${NAMESPACE_NAME}" get pod "${POD_NAME}" -o json | jq ".status.conditions[] | select(.type == \"${CONDITION}\" and .status == \"True\") | .lastTransitionTime" | tr -d '"\n')
+    ISO_TIME=$(${KUBECTL_BIN} -n "${NAMESPACE_NAME}" get pod "${POD_NAME}" -o json | ${JQ_BIN} ".status.conditions[] | select(.type == \"${CONDITION}\" and .status == \"True\") | .lastTransitionTime" | tr -d '"\n')
     date -d ${ISO_TIME} +%s
 }
 
