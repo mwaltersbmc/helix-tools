@@ -78,6 +78,7 @@ verify_image() {
   log_result "Verifying image ${1}"
   if ! docker manifest inspect "${1}" >/dev/null; then
     log_error "verify" "${1}"
+    log_missing "${1}"
     exit
   fi
   log_result "Image ${1} found."
@@ -192,6 +193,10 @@ log_error(){
 
 log_result(){
   printf "%03d - ${1}\n" ${COUNT} | tee -a results.txt
+}
+
+log_missing() {
+  echo "${1}" >> missing.txt
 }
 
 URLEncode(){
@@ -355,8 +360,8 @@ for SOURCE_IMAGE in "${IMAGE_ARRAY[@]}"; do
     sleep 1
     CURRENT_JOBS=$(jobs | wc -l)
   done
-    if [[ ! "${SOURCE_IMAGE}" == *"/${PROJECT_SOURCE}/"* ]]; then
-    log_error "" "SOURCE_IMAGE '${SOURCE_IMAGE}' does not include '/${PROJECT_SOURCE}/'."
+  if [[ -n "${PROJECT}" ]] && [[ ! "${SOURCE_IMAGE}" == *"/${PROJECT_SOURCE}/"* ]]; then
+    log_error "${ACTION}" "'${SOURCE_IMAGE}' does not include '/${PROJECT_SOURCE}/'."
     continue
   fi
   ((COUNT++))
