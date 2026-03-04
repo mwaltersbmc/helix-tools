@@ -1064,7 +1064,7 @@ createPipelineVarsArray() {
     CHECKOUT_USING_USER
     CUSTOM_BINARY_PATH
     GIT_USER_HOME_DIR
-    CONTAINERIZED_GIT
+    CONTAINERIZED_DE
     GIT_REPO_DIR
     HELM_NODE
     IS_CLOUD
@@ -1321,7 +1321,7 @@ cloneCustomerConfigsRepo() {
     # If ingress not found check for exposed svc
     if [ -z "${GITEA_HOST}" ] ; then
       GITEA_HOST=$(${KUBECTL_BIN} get svc -A -o custom-columns=":metadata.name,:.spec.externalIPs[0]" --no-headers| grep ^gitea | awk '{print $2}')
-      if [ -n "${GITEA_HOST}" ] ; then
+      if [ -n "${GITEA_HOST}" ] && [ "${GITEA_HOST}" != "<none>" ]; then
         GITEA_URL="http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}:3000"
       fi
     fi
@@ -1419,12 +1419,12 @@ validateISDetails() {
       fi
     fi
 
-    if isJenkinsInCluster && [ "${IS_CONTAINERIZED_GIT}" != "true" ]; then
-      logError "253" "CONTAINERIZED_GIT must be selected when Jenkins/GITEA are containerized."
+    if isJenkinsInCluster && [ "${IS_CONTAINERIZED_DE}" != "true" ]; then
+      logError "253" "CONTAINERIZED_DE must be selected when Jenkins/GITEA are containerized."
     fi
 
-    if ! isJenkinsInCluster && [ "${IS_CONTAINERIZED_GIT}" = "true" ]; then
-        logError "254" "CONTAINERIZED_GIT is only valid when Jenkins/GITEA are containerized."
+    if ! isJenkinsInCluster && [ "${IS_CONTAINERIZED_DE}" = "true" ]; then
+        logError "254" "CONTAINERIZED_DE is only valid when Jenkins/GITEA are containerized."
     fi
 
     if [[ ! "${IS_GIT_USER_HOME_DIR}" =~ ^/.* ]]; then
@@ -5888,15 +5888,15 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"253\",
-    \"cause\": \"Jenkins and GITEA are running as containers so the CONTAINERIZED_GIT must be selected.\",
+    \"cause\": \"Jenkins and GITEA are running as containers so the CONTAINERIZED_DE must be selected.\",
     \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Select the CONTAINERIZED_GIT option.\"
+    \"remediation\": \"Select the CONTAINERIZED_DE option.\"
   },
   {
     \"id\": \"254\",
-    \"cause\": \"The CONTAINERIZED_GIT option should only be selected when Jenkins/GITEA are running in containers.\",
+    \"cause\": \"The CONTAINERIZED_DE option should only be selected when Jenkins/GITEA are running in containers.\",
     \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Deselect the CONTAINERIZED_GIT option.\"
+    \"remediation\": \"Deselect the CONTAINERIZED_DE option.\"
   },
   {
     \"id\": \"255\",
