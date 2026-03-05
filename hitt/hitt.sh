@@ -51,7 +51,6 @@ BASE64_BIN=base64
 GIT_BIN=git
 JAVA_BIN=java
 TAR_BIN=tar
-NC_BIN=nc
 HOST_BIN=host
 ZIP_BIN=zip
 UNZIP_BIN=unzip
@@ -2278,11 +2277,8 @@ buildJISQLcmd() {
 }
 
 testNetConnection () {
-  if ! ${NC_BIN} -z -w 5 "${1}" "${2}" > /dev/null 2>&1; then
-    return 1
-  else
-    return 0
-fi
+  # Try to open the connection; exit code 0 if success, non-zero if fail
+  (echo > /dev/tcp/"${1}"/"${2}") >/dev/null 2>&1
 }
 
 checkISDBSettings() {
@@ -4688,7 +4684,7 @@ CLEANUP_DIRS=(configsrepo itsmrepo)
 CLEANUP_FILES=(is-sealcacerts hp-sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cookies)
 CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}")
 CLEANUP_STOP_FILES=()
-REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar nc host zip unzip)
+REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int reporting)
 JENKINS_CREDS=(git github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
 IS_ALIAS_ARRAY=()
