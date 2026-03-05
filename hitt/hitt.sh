@@ -1272,7 +1272,8 @@ getPipelineValues() {
   fi
   #IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
   setISDBVersion "${IS_PIPELINE_VERSION}"
-  cloneCustomerConfigsRepo
+  #cloneCustomerConfigsRepo
+  cloneGitRepos
 }
 
 checkPipelinePwds() {
@@ -1322,6 +1323,76 @@ getGITEACredentials() {
     runJenkinsCurl "${SCRIPT}"
 }
 
+cloneGitRepos() {
+  SKIP_REPO=0
+  export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
+  GIT_REPO_DIR=$(parseJenkinsParam GIT_REPO_DIR)
+  INPUT_CONFIG_FILE="configsrepo/customer/${IS_CUSTOMER_SERVICE}/${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}.sh"
+
+  if isJenkinsInCluster ; then
+    GITEA_CREDS_JSON=$(getGITEACredentials)
+    GITEA_ADMIN_USER=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_USER')
+    GITEA_ADMIN_PASS=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_PASS')
+    #Check for GITEA ingress
+    GITEA_HOST=$(${KUBECTL_BIN} get ingress -A -o custom-columns=":metadata.name,:.spec.rules[*].host" --no-headers | grep ^gitea | awk '{print $2}')
+    if [ -n "${GITEA_HOST}" ] ; then
+      GITEA_URL="https://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}"
+    fi
+    # If ingress not found check for exposed svc
+    if [ -z "${GITEA_HOST}" ] ; then
+      GITEA_HOST=$(${KUBECTL_BIN} get svc -A -o custom-columns=":metadata.name,:.spec.externalIPs[0]" --no-headers| grep ^gitea | awk '{print $2}')
+      if [ -n "${GITEA_HOST}" ] && [ "${GITEA_HOST}" != "<none>" ]; then
+        GITEA_URL="http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}:3000"
+      else
+        GITEA_HOST=""
+      fi
+    fi
+    if [ -z "${GITEA_HOST}" ] ; then
+      logMessage "Unable to find GITEA host connection details - skipping checks."
+      SKIP_REPO=1
+      return
+    fi
+    if ! ${GIT_BIN} clone "${GITEA_URL}/${GITEA_ADMIN_USER}/onprem-remedyserver-config" configsrepo > /dev/null 2>&1 ; then
+      logError "129" "Failed to clone CUSTOMER_CONFIGS from GITEA."
+      SKIP_REPO=1
+      return
+    else
+      logMessage "Cloned CUSTOMER_CONFIGS to configsrepo directory." 1
+    fi
+    if ! ${GIT_BIN} clone "${GITEA_URL}/${GITEA_ADMIN_USER}/itsm-on-premise-installer" itsmrepo > /dev/null 2>&1 ; then
+      logError "129" "Failed to clone ITSM_REPO from GITEA."
+      SKIP_REPO=1
+      return
+    else
+      logMessage "Cloned ITSM_REPO to itsmrepo directory." 1
+    fi
+  else
+    if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
+      logError "129" "Failed to clone ${GIT_REPO_DIR}/CUSTOMER_CONFIGS/onprem-remedyserver-config.git"
+      SKIP_REPO=1
+      return
+    else
+      logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory." 1
+    fi
+    if ! ${GIT_BIN} clone "${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git" itsmrepo > /dev/null 2>&1 ; then
+      logError "129" "Failed to clone ${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git"
+      SKIP_REPO=1
+      return
+    else
+      logMessage "Cloned ITSM_REPO to itsmrepo directory." 1
+    fi
+  fi
+  if [ ! -f "${INPUT_CONFIG_FILE}" ]; then
+    logError "130" "Input configuration file '${INPUT_CONFIG_FILE}' not found. Has the HELIX_GENERATE_CONFIG pipeline been run successfully?"
+    SKIP_REPO=1
+    return
+  else
+    logMessage "Input config file found '${INPUT_CONFIG_FILE}'." 1
+    #getInputFileValues
+  fi
+}
+
+
 
 cloneCustomerConfigsRepo() {
   SKIP_REPO=0
@@ -1347,16 +1418,16 @@ cloneCustomerConfigsRepo() {
       fi
     fi
     if [ -z "${GITEA_HOST}" ] ; then
-      logMessage "Unable to find GITEA host connection details - skipping checks..."
+      logMessage "Unable to find GITEA host connection details - skipping checks."
       SKIP_REPO=1
       return
     fi
     if ! ${GIT_BIN} clone "${GITEA_URL}/${GITEA_ADMIN_USER}/onprem-remedyserver-config" configsrepo > /dev/null 2>&1 ; then
-      logError "129" "Failed to clone onprem-remedyserver-config from GITEA."
+      logError "129" "Failed to clone CUSTOMER_CONFIGS from GITEA."
       SKIP_REPO=1
       return
     else
-      logMessage "Cloned onprem-remedyserver-config repo to configsrepo directory." 1
+      logMessage "Cloned CUSTOMER_CONFIGS repo to configsrepo directory." 1
     fi
   else
     if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/CUSTOMER_CONFIGS/onprem-remedyserver-config.git configsrepo > /dev/null 2>&1 ; then
@@ -1819,24 +1890,22 @@ validateISDetails() {
 }
 
 getCacertsFile() {
-  SKIP_CACERTS=0
+  SKIP_CACERTS=1
   if [ "${1}" == "IS" ]; then
     if [ "${MODE}" == "pre-is" ]; then
       if [ -f configsrepo/customer/customCerts/cacerts ] ; then
+        SKIP_CACERTS=0
         cp -f configsrepo/customer/customCerts/cacerts ${CACERTS_FILENAME}
-        logMessage "cacerts file found in CUSTOMER_CONFIGS repo."
+        logMessage "Using cacerts file from CUSTOMER_CONFIGS repo."
         return
       else
         logWarning "017" "Custom cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
-        export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
-        if ! ${GIT_BIN} clone "${GIT_REPO_DIR}"/ITSM_REPO/itsm-on-premise-installer.git itsmrepo > /dev/null 2>&1 ; then
-          logError "129" "Failed to clone ${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git"
-          SKIP_CACERTS=1
-          return
-        else
-          logMessage "Using default cacerts file from ITSM_REPO."
-          cp -f itsmrepo/pipeline/tasks/cacerts ${CACERTS_FILENAME}
-        fi
+      fi
+      if [ -f itsmrepo/pipeline/tasks/cacerts ] ; then
+        SKIP_CACERTS=0
+        cp -f itsmrepo/pipeline/tasks/cacerts ${CACERTS_FILENAME}
+        logMessage "Using cacerts file from ITSM_REPO."
+        return
       fi
     fi
 
@@ -1844,7 +1913,6 @@ getCacertsFile() {
       logMessage "Extracting cacerts file from Helix IS cacerts secret..." 1
       if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts > /dev/null 2>&1; then
         logError "159" "'cacerts' secret not found in Helix IS namespace."
-        SKIP_CACERTS=1
         return
       fi
       IS_CACERTS_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o json)
@@ -1852,8 +1920,8 @@ getCacertsFile() {
       if [ "${IS_CACERTS}" == "null" ]; then
         logError "160" "Required file 'cacerts' not found in the cacerts secret. File(s) in the secret are:"
         echo "${IS_CACERTS_JSON}" | ${JQ_BIN} '.data | keys'
-        SKIP_CACERTS=1
       else
+        SKIP_CACERTS=0
         echo "${IS_CACERTS}" | ${BASE64_BIN} -d > "${CACERTS_FILENAME}"
       fi
     fi
@@ -1863,7 +1931,6 @@ getCacertsFile() {
     logMessage "Extracting cacerts file from Helix Platform cacertcm configMap..." 1
     if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm cacertcm > /dev/null 2>&1; then
       logError "159" "'cacertcm' configMap not found in Helix Platform namespace."
-      SKIP_CACERTS=1
       return
     fi
     HP_CACERTS_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm cacertcm -o json)
@@ -1871,14 +1938,18 @@ getCacertsFile() {
     if [ "${HP_CACERTS}" == "null" ]; then
       logError "160" "Required file 'cacerts' not found in the cacertcm configMap. File(s) in the configMap are:"
       echo "${HP_CACERTS_JSON}" | ${JQ_BIN} '.data | keys'
-      SKIP_CACERTS=1
     else
+      SKIP_CACERTS=0
       echo "${HP_CACERTS}" | ${BASE64_BIN} -d > "${CACERTS_FILENAME}"
     fi
   fi
 }
 
 validateCacertsFile() {
+#  if [ "${SKIP_REPO}" == "1" ]; then
+#    logMessage "CUSTOMER_CONFIGS repo not available - skipping checks."
+#    return
+#  fi
   VALID_CACERTS=0
   case "${1}" in
     IS)
@@ -1898,7 +1969,7 @@ validateCacertsFile() {
   esac
   getCacertsFile ${1}
   if [ "${SKIP_CACERTS}" == "1" ]; then
-    logMessage "${CACERTS_SOURCE} cacerts file not found - skipping checks."
+    logWarning "046" "${CACERTS_SOURCE} cacerts file not found - skipping checks."
     VALID_CACERTS=1
     return
   fi
@@ -2515,7 +2586,7 @@ checkJenkinsConfig() {
   logMessage "Checking approved scripts..."
   checkJenkinsScriptApprovals
   if isJenkinsInCluster ; then
-    logMessage "Jenkins running in cluster - skipping remaining checks...alias"
+    logMessage "Jenkins running in cluster - skipping remaining checks..."
   else
     logMessage "Checking nodes..."
     checkJenkinsNodes
@@ -3147,7 +3218,7 @@ versionFmt() {
 
 checkDERequirements() {
   if isJenkinsInCluster ; then
-    logMessage "Jenkins is running in cluster skipping checks..."
+    logMessage "Jenkins is running in cluster skipping checks."
     return
   fi
   logMessage "Checking OS binaries..."
@@ -4991,6 +5062,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"'PasswordAuthentication no' appears to be set in the /etc/ssh/sshd_config file.\",
     \"impact\": \"Checks to validate the git user password set in Jenkins credentials cannot be run and pipelines may fail.\",
     \"remediation\": \"Check the /etc/ssh/sshd_config file and comment out 'PasswordAuthentication no' or set the value to yes.\"
+  },
+    {
+    \"id\": \"046\",
+    \"cause\": \"The cacerts file for the named application was not found.\",
+    \"impact\": \"Checks to validate the certificates have not been run and deployment failures or application issues may result.\",
+    \"remediation\": \"Provide the required certificates as detailed in the product documentation.\"
   },
   {
     \"id\": \"100\",
