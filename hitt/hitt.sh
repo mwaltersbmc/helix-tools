@@ -1045,7 +1045,8 @@ getISDetailsFromJenkins() {
   JENKINS_ONPREM_DEPLOYMENT_LASTBUILD=$(getLastBuildFromJenkins HELIX_ONPREM_DEPLOYMENT)
   JENKINS_GENERATE_CONFIG_LASTBUILD=$(getLastBuildFromJenkins HELIX_GENERATE_CONFIG)
   logMessage "Last pipeline build numbers are - HELIX_ONPREM_DEPLOYMENT/${JENKINS_ONPREM_DEPLOYMENT_LASTBUILD} and HELIX_GENERATE_CONFIG/${JENKINS_GENERATE_CONFIG_LASTBUILD}." 1
-  JENKINS_PARAMS=$(echo "${JENKINS_JSON}" | ${JQ_BIN} -r '.actions[] | select(._class=="hudson.model.ParametersAction") .parameters[]')
+  JENKINS_PARAMS=$(getPipelineValuesJSON getLastBuild)
+  #JENKINS_PARAMS=$(echo "${JENKINS_JSON}" | ${JQ_BIN} -r '.actions[] | select(._class=="hudson.model.ParametersAction") .parameters[]')
   getPipelineValues
 }
 
@@ -1056,7 +1057,8 @@ checkJenkinsJobResult() {
 }
 
 parseJenkinsParam() {
-  echo "${JENKINS_PARAMS}" | ${JQ_BIN} -r ' . | select(.name=="'"$1"'") .value'
+  echo "${JENKINS_PARAMS}" | ${JQ_BIN} -r ".${1}"
+  #echo "${JENKINS_PARAMS}" | ${JQ_BIN} -r ' . | select(.name=="'"$1"'") .value'
 }
 
 createPipelineVarsArray() {
@@ -1139,6 +1141,20 @@ createPipelineVarsArray() {
     BMC_HELIX_DWP
     BMC_HELIX_INNOVATION_STUDIO
     BMC_HELIX_DWPA
+    CACERTS_SSL_TRUSTSTORE_PASSWORD
+    LOGS_ELASTICSEARCH_PASSWORD
+    IMAGE_REGISTRY_PASSWORD
+    DATABASE_ADMIN_PASSWORD
+    AR_DB_PASSWORD
+    PLATFORM_SR_DB_PASSWORD
+    FTS_ELASTICSEARCH_USER_PASSWORD
+    BAKEDUSER_HANNAH_ADMIN_PASSWORD
+    AR_SERVER_APP_SERVICE_PASSWORD
+    AR_SERVER_DSO_USER_PASSWORD
+    AR_SERVER_MIDTIER_SERVICE_PASSWORD
+    VC_RKM_PASSWORD
+    VC_PROXY_USER_PASSWORD
+    RSSO_ADMIN_PASSWORD
   )
 }
 
@@ -1251,7 +1267,10 @@ getPipelineValues() {
   if [[ "${IS_CUSTOMER_SIZE}" =~ M ]] || [[ "${IS_CUSTOMER_SIZE}" =~ L ]]; then
     IS_PLATFORM_INT=1
   fi
-  IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
+  if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" == "" ]; then
+    IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
+  fi
+  #IS_IMAGE_REGISTRY_PASSWORD=$(getPipelinePasswords | ${JQ_BIN} -r '.IMAGE_REGISTRY_PASSWORD.plainText')
   setISDBVersion "${IS_PIPELINE_VERSION}"
   cloneCustomerConfigsRepo
 }
@@ -1323,10 +1342,12 @@ cloneCustomerConfigsRepo() {
       GITEA_HOST=$(${KUBECTL_BIN} get svc -A -o custom-columns=":metadata.name,:.spec.externalIPs[0]" --no-headers| grep ^gitea | awk '{print $2}')
       if [ -n "${GITEA_HOST}" ] && [ "${GITEA_HOST}" != "<none>" ]; then
         GITEA_URL="http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}:3000"
+      else
+        GITEA_HOST=""
       fi
     fi
     if [ -z "${GITEA_HOST}" ] ; then
-      logMessage "Unable to find GITEA host details - skipping checks..."
+      logMessage "Unable to find GITEA host connection details - skipping checks..."
       SKIP_REPO=1
       return
     fi
@@ -1352,7 +1373,7 @@ cloneCustomerConfigsRepo() {
     return
   else
     logMessage "Input config file found '${INPUT_CONFIG_FILE}'." 1
-    getInputFileValues
+    #getInputFileValues
   fi
 }
 
@@ -2464,13 +2485,16 @@ dumpVARs() {
     echo "ENVIRONMENT=${ISP_ENVIRONMENT}" >> "${VALUES_LOG_FILE}"
     echo "FTS_ELASTICSEARCH_USERNAME=${IS_FTS_ELASTICSEARCH_USERNAME}" >> "${VALUES_LOG_FILE}"
     for i in "${PIPELINE_VARS[@]}"; do
+      if [ "${LOG_PASSWDS}" == "0" ] && [[ "${i}" =~ "PASSWORD" ]]; then
+        continue
+      fi
       v="IS_${i}"
       echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
     done
-    if [ "${LOG_PASSWDS}" == "1" ]; then
-      echo "${PASSWDS_JSON}" | ${JQ_BIN} -r '.[] | select(.value.plainText != "") | "\(.key)=\(.value.plainText)"' >> "${VALUES_LOG_FILE}"
-    fi
-    echo "${JENKINS_PARAMS}" > "${VALUES_JSON_FILE}"
+    #if [ "${LOG_PASSWDS}" == "1" ]; then
+    #  echo "${PASSWDS_JSON}" | ${JQ_BIN} -r '.[] | select(.value.plainText != "") | "\(.key)=\(.value.plainText)"' >> "${VALUES_LOG_FILE}"
+    #fi
+    #echo "${JENKINS_PARAMS}" > "${VALUES_JSON_FILE}"
   fi
 
   if [ "${MODE}" == "post-is" ]; then
