@@ -1011,6 +1011,10 @@ checkJenkinsIsRunning() {
       SKIP_JENKINS=1
       ;;
   esac
+  if [ "$1" == "1" ] && [ "${SKIP_JENKINS}" == "1" ]; then
+    logStatus "Can't continue without access to Jenkins."
+    exit 1
+  fi
 }
 
 getLastBuildFromJenkins() {
@@ -3920,7 +3924,7 @@ isJenkinsInCluster() {
 }
 
 fixJenkins() {
-  checkJenkinsIsRunning
+  checkJenkinsIsRunning 1
   #getJenkinsCrumb
   if isJenkinsInCluster && ([[ "${FIXARGS[1]}" != "kubeconfig" ]] && [[ "${FIXARGS[1]}" != "dryrun" ]]); then
     logError "999" "Jenkins fixmode '${FIXARGS[1]}' is not supported when Jenkins is running in the cluster - only 'kubeconfig' and 'dryrun' are valid."
@@ -4451,7 +4455,7 @@ fi
 # Print Jenkins credentials and exit
 if [[ ! -z "${DUMP_JCREDS}" ]]; then
   logStatus "Jenkins credentials..."
-  checkJenkinsIsRunning
+  checkJenkinsIsRunning 1
   validateJenkinsCredentials
   logStatus "Pipeline passwords:"
   getPipelinePasswords | ${JQ_BIN} -r 'to_entries | sort_by(.key)[] | "        \u001b[32m\(.key)\u001b[0m / \u001b[31m\(.value.plainText)\u001b[0m"'
@@ -4460,7 +4464,7 @@ fi
 
 if [ "${MODE}" == "jenkins" ]; then
   logStatus "Running Jenkins config checks only..."
-  checkJenkinsIsRunning
+  checkJenkinsIsRunning 1
   checkJenkinsConfig
   checkDERequirements
   tidyUp
@@ -4527,14 +4531,14 @@ fi
 
 if [ -n "${PIPELINE_NAME}" ]; then
   if [ "${PIPELINE_NAME}" == "msgs" ]; then echo "${ALL_MSGS_JSON}"; exit; fi
-  checkJenkinsIsRunning
+  checkJenkinsIsRunning 1
   getPipelineConsoleOutput "${PIPELINE_NAME}"
   exit
 fi
 
 if [ "${MODE}" == "pipeline" ]; then
   logStatus "Running HITT in pipeline mode '${PIPELINEARGS[0]}'..."
-  checkJenkinsIsRunning
+  checkJenkinsIsRunning 1
   read -ra PIPELINEARGS <<< "${PIPELINEOPTS}"
   case "${PIPELINEARGS[0]}" in
     get)
