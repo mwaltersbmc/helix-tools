@@ -16,6 +16,11 @@ SKIP_LOGIN=F
 CURRENT_JOBS=0
 COUNT=0
 DOCKER_ROOT_DIR=$(docker info --format '{{json .DockerRootDir}}' | tr -d \")
+BOLD=$'\e[1m'
+NORMAL=$'\e[0m'
+RED=$'\e[31m'
+YELLOW=$'\e[33m'
+GREEN=$'\e[32m'
 
 # Functions
 usage() {
@@ -25,7 +30,7 @@ usage() {
 
 pull_image() {
   check_disk_space "${DOCKER_ROOT_DIR}"
-  log_result "Pulling ${SOURCE_IMAGE}"
+  log_result "Pulling ${SOURCE_IMAGE}" ${YELLOW}
   if ! docker pull -q "${SOURCE_IMAGE}" > /dev/null; then
     log_error "pull" "${SOURCE_IMAGE}"
     exit
@@ -33,7 +38,7 @@ pull_image() {
 }
 
 tag_image() {
-  log_result "Tagging ${SOURCE_IMAGE} as ${TARGET_IMAGE}"
+  log_result "Tagging ${SOURCE_IMAGE} as ${TARGET_IMAGE}" ${YELLOW}
   if ! docker tag "${SOURCE_IMAGE}" "${TARGET_IMAGE}"; then
     log_error "tag" "${SOURCE_IMAGE}"
     exit
@@ -41,7 +46,7 @@ tag_image() {
 }
 
 push_image() {
-  log_result "Pushing ${TARGET_IMAGE}"
+  log_result "Pushing ${TARGET_IMAGE}" ${YELLOW}
   if ! docker push -q "${TARGET_IMAGE}" > /dev/null; then
     log_error "push" "${TARGET_IMAGE}"
     exit
@@ -50,7 +55,7 @@ push_image() {
 
 save_image() {
   check_disk_space $(pwd)
-  log_result "Saving ${SOURCE_IMAGE}"
+  log_result "Saving ${SOURCE_IMAGE}" ${YELLOW}
   if ! docker save "${SOURCE_IMAGE}" | gzip > "${IMAGE_FILENAME}" ; then
     log_error "save" "${SOURCE_IMAGE}"
     exit
@@ -58,7 +63,7 @@ save_image() {
 }
 
 load_image() {
-  log_result "Loading ${SOURCE_IMAGE}"
+  log_result "Loading ${SOURCE_IMAGE}" ${YELLOW}
   if ! docker load < "${IMAGE_FILENAME}" > /dev/null; then
     log_error "load" "${SOURCE_IMAGE}"
     exit
@@ -66,26 +71,26 @@ load_image() {
 }
 
 delete_image() {
-  log_result "Deleting local image ${1}"
+  log_result "Deleting local image ${1}" ${YELLOW}
   if ! docker rmi "${1}" >/dev/null; then
     log_error "delete" "${1}"
     exit
   fi
-  log_result "Deleted ${1} from the local system."
+  log_result "Deleted ${1} from the local system." ${GREEN}
 }
 
 verify_image() {
-  log_result "Verifying image ${1}"
+  log_result "Verifying image ${1}" ${YELLOW}
   if ! docker manifest inspect "${1}" >/dev/null; then
     log_error "verify" "${1}"
     log_missing "${1}"
     exit
   fi
-  log_result "Image ${1} found."
+  log_result "Image ${1} found." ${GREEN}
 }
 
 compare_images() {
-  log_result "Comparing images ${SOURCE_IMAGE} / ${TARGET_IMAGE}"
+  log_result "Comparing images ${SOURCE_IMAGE} / ${TARGET_IMAGE}" ${YELLOW}
   SOURCE_DIGEST=""
   TARGET_DIGEST=""
   SOURCE_DIGEST=$(docker manifest inspect "${SOURCE_IMAGE}" 2>/dev/null | jq .config.digest)
@@ -104,7 +109,7 @@ compare_images() {
     log_error "compare" "${TARGET_IMAGE}"
     exit
   else
-    log_result "Images ${SOURCE_IMAGE} and ${TARGET_IMAGE} match."
+    log_result "Images ${SOURCE_IMAGE} and ${TARGET_IMAGE} match." ${GREEN}
   fi
 }
 
@@ -188,11 +193,11 @@ process_image(){
 
 # Requires $1 action $2 image name
 log_error(){
-  printf "%03d - Failed to ${1} ${2}\n" ${COUNT} | tee -a errors.txt
+  printf "${RED}%03d${NORMAL} - Failed to ${1} ${2}\n" ${COUNT} | tee -a errors.txt
 }
 
 log_result(){
-  printf "%03d - ${1}\n" ${COUNT} | tee -a results.txt
+  printf "${2}%03d${NORMAL} - ${1}\n" ${COUNT} | tee -a results.txt
 }
 
 log_missing() {
