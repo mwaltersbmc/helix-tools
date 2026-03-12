@@ -4319,7 +4319,7 @@ buildJenkinsPipelineFromFile() {
   JOB_NAME=HELIX_ONPREM_DEPLOYMENT
   PIPELINE_JSON_FILE="${PIPELINEARGS[1]}"
   if [ ! -f "${PIPELINE_JSON_FILE}" ]; then
-    logError "999" "HELIX_ONPREM_DEPLOYMENT pipeline values JSON file '${PIPELINE_JSON_FILE}' not found." 1
+    logError "999" "HELIX_ONPREM_DEPLOYMENT pipeline values file '${PIPELINE_JSON_FILE}' not found." 1
   fi
   if ! ${JQ_BIN} . "${PIPELINE_JSON_FILE}" &>/dev/null ; then
     logError "999" "Pipeline values file '${PIPELINE_JSON_FILE}' is not a valid JSON file." 1
@@ -4340,15 +4340,36 @@ buildJenkinsPipelineFromFile() {
       "HELIX_DR": "false",
       "SCALE_DOWN": "false",
       "HELIX_RESTART": "false"
-    } |
-    to_entries | map({name: .key, value: .value}) |
-    {parameter: .}
+    }
     ' "${PIPELINE_JSON_FILE}"
   )
   # Get the defaults for the current pipeline from Jenkins
   PIPELINE_DEFAULTS_JSON=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
 
+  # Different pipeline version?
+  INPUT_VERSION=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} -r '.PLATFORM_HELM_VERSION')
+  DEFAULTS_VERSION=$(echo "${PIPELINE_DEFAULTS_JSON}" | ${JQ_BIN} -r '.PLATFORM_HELM_VERSION')
+  if [ "${INPUT_VERSION}" != ${DEFAULTS_VERSION} ]; then
+    PIPELINE_INPUT_JSON=$(echo ${PIPELINE_INPUT_JSON} | ${JQ_BIN} --arg inputVersion "${INPUT_VERSION}" -c '
+      del(.AGENT, .HELM_NODE, .PLATFORM_HELM_VERSION, .SMARTAPPS_HELM_VERSION) |
+      . + {
+        "SOURCE_VERSION": $inputVersion
+        }')
+  fi
 
+  # if target is containerized Jenkins, remove additional params
+  if isJenkinsInCluster; then
+    PIPELINE_INPUT_JSON=$(echo ${PIPELINE_INPUT_JSON} | ${JQ_BIN} -c 'del(.AGENT, .HELM_NODE, .GIT_REPO_DIR, .GIT_USER_HOME_DIR)')
+  fi
+
+  # Remove parameters not present in the new pipeline from the input JSON
+  PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} --argjson defaults "${PIPELINE_DEFAULTS_JSON}" -c '
+    with_entries(
+      select(.key as $k | $defaults | has($k))
+    )')
+
+  # Format JSON for Jenkins
+  PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} '. | to_entries | map({name: .key, value: .value}) | {parameter: .}')
   logMessage "Building HELIX_ONPREM_DEPLOYMENT pipeline with values from '${PIPELINE_JSON_FILE}'."
   ${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_INPUT_JSON}" -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${JOB_NAME}/build" 2>>${HITT_ERR_FILE}
 }
@@ -6023,7 +6044,7 @@ ALL_MSGS_JSON="[
   }
 ]"
 
-if [ -t 1 ]; then
+if [ ! -t 1 ]; then
   REDIRECT=1
 fi
 
@@ -6078,7 +6099,7 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
       fi
       MODE=pipeline
       if [ -n "${REDIRECT}" ]; then
-        QUIET=2
+        QUIET=1
       fi
       PIPELINEOPTS="${OPTARG}"
       ;;
