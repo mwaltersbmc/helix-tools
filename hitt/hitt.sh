@@ -6071,7 +6071,10 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
       ;;
     f)
       SKIP_UPDATE_CHECK=1
-      if [ $# -ne 2 ]; then
+      # Check if the next argument in the list is a "stray" (doesn't start with -)
+      # ${!OPTIND} is a Bash feature that gets the value of the argument at that index
+      NEXT_VAL="${!OPTIND}"
+      if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
         logError "999" "When using FIX mode commands with options you must enclose them in double quotes - eg: bash $0 -f \"cacerts /path/to/new/cacerts-file\"" 1
       fi
       MODE=fix
@@ -6094,13 +6097,12 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
       ;;
     k)
       SKIP_UPDATE_CHECK=1
-      if [ $# -ne 2 ]; then
+      NEXT_VAL="${!OPTIND}"
+      if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
         logError "999" "When using PIPELINE mode commands with options you must enclose them in double quotes - eg: bash $0 -k \"build filename\"" 1
       fi
       MODE=pipeline
-      if [ -n "${REDIRECT}" ]; then
-        QUIET=1
-      fi
+      [[ -n "${REDIRECT}" ]] && QUIET=1
       PIPELINEOPTS="${OPTARG}"
       ;;
     l)
@@ -6116,7 +6118,8 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
     o)
       QUIET=1
       SKIP_UPDATE_CHECK=1
-      if [ $# -ne 2 ]; then
+      NEXT_VAL="${!OPTIND}"
+      if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
         logError "999" "Usage: bash $0 -o PIPELINE_NAME" 1
       fi
       PIPELINE_NAME="${OPTARG}"
@@ -6135,7 +6138,8 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
     t)
       TCTL_CMD="${OPTARG}"
       SKIP_UPDATE_CHECK=1
-      if [ $# -ne 2 ]; then
+      NEXT_VAL="${!OPTIND}"
+      if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
         logError "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
       fi
       ;;
