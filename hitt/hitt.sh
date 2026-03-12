@@ -4324,9 +4324,9 @@ buildJenkinsPipelineFromFile() {
   if ! ${JQ_BIN} . "${PIPELINE_JSON_FILE}" &>/dev/null ; then
     logError "999" "Pipeline values file '${PIPELINE_JSON_FILE}' is not a valid JSON file." 1
   fi
-  # Clean up input JSON
-  PIPELINE_JSON=$(${JQ_BIN} -c '
-    del(.CUSTOM_CERTIFICATE, .DB_SSL_CERT, .INPUT_CONFIG_FILE) |
+  # Load and clean up input JSON
+  PIPELINE_INPUT_JSON=$(${JQ_BIN} -c '
+    del(.CACERTS_FILE, .CUSTOM_CERTIFICATE, .DB_SSL_CERT, .INPUT_CONFIG_FILE) |
     . + {
       "HELIX_GENERATE_CONFIG": "false",
       "HELIX_PLATFORM_DEPLOY": "false",
@@ -4345,8 +4345,12 @@ buildJenkinsPipelineFromFile() {
     {parameter: .}
     ' "${PIPELINE_JSON_FILE}"
   )
+  # Get the defaults for the current pipeline from Jenkins
+  PIPELINE_DEFAULTS_JSON=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
+
+
   logMessage "Building HELIX_ONPREM_DEPLOYMENT pipeline with values from '${PIPELINE_JSON_FILE}'."
-  ${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_JSON}" -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${JOB_NAME}/build" 2>>${HITT_ERR_FILE}
+  ${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_INPUT_JSON}" -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${JOB_NAME}/build" 2>>${HITT_ERR_FILE}
 }
 
 #End functions
@@ -6019,6 +6023,10 @@ ALL_MSGS_JSON="[
   }
 ]"
 
+if [ -t 1 ]; then
+  REDIRECT=1
+fi
+
 while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
   case "${options}" in
     b)
@@ -6069,6 +6077,9 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
         logError "999" "When using PIPELINE mode commands with options you must enclose them in double quotes - eg: bash $0 -k \"build filename\"" 1
       fi
       MODE=pipeline
+      if [ -n "${REDIRECT}" ]; then
+        QUIET=2
+      fi
       PIPELINEOPTS="${OPTARG}"
       ;;
     l)
