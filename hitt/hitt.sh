@@ -6,6 +6,7 @@
 # FUNCTIONS Start
 
 getConfValues() {
+  JENKINS_PROTOCOL_ARRAY=(http https)
   if [ "${MODE}" == "pre-hp" ]; then
     NS_ARRAY=("PENDING" "${NS_ARRAY[@]}")
   fi
@@ -19,6 +20,19 @@ getConfValues() {
   logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:"
   read -p "Username : " JENKINS_USERNAME
   read -s -p "Password : " JENKINS_PASSWORD
+  echo
+  echo
+  if askYesNo "${BOLD}Are you using a containerized Deployment Engine?${NORMAL}" ; then
+    echo "Please enter your Jenkins details:"
+    read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME
+    read -p "Jenkins port number : " JENKINS_PORT
+    echo "Jenkins protocol :"
+    JENKINS_PROTOCOL=$(selectFromArray JENKINS_PROTOCOL_ARRAY)
+  else
+    JENKINS_HOSTNAME=localhost
+    JENKINS_PROTOCOL=http
+    JENKINS_PORT=8080
+  fi
 }
 
 createHITTconf() {
@@ -37,9 +51,9 @@ IS_ENVIRONMENT=${IS_ENVIRONMENT}
 # Enclose username/password in single quotes to avoid issues with special characters
 JENKINS_USERNAME='${JENKINS_USERNAME}'
 JENKINS_PASSWORD='${JENKINS_PASSWORD}'
-JENKINS_HOSTNAME=localhost
-JENKINS_PROTOCOL=http
-JENKINS_PORT=8080
+JENKINS_HOSTNAME=${JENKINS_HOSTNAME}
+JENKINS_PROTOCOL=${JENKINS_PROTOCOL}
+JENKINS_PORT=${JENKINS_PORT}
 
 # Required Tools - set full path to binary if not present on path
 KUBECTL_BIN=kubectl
@@ -4722,11 +4736,11 @@ VERBOSITY=0
 QUIET=0
 SKIP_UPDATE_CHECK=0
 DISABLE_PROXY=0
-BOLD="\e[1m"
-NORMAL="\e[0m"
-RED="\e[31m"
-YELLOW="\e[33m"
-GREEN="\e[32m"
+BOLD=$'\e[1m'
+NORMAL=$'\e[0m'
+RED=$'\e[31m'
+YELLOW=$'\e[33m'
+GREEN=$'\e[32m'
 SEALTCTL=sealtctl
 KUBECTL_BIN=kubectl
 JQ_BIN=jq
