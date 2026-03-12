@@ -25,9 +25,11 @@ getConfValues() {
   if askYesNo "${BOLD}Are you using a containerized Deployment Engine?${NORMAL}" ; then
     echo "Please enter your Jenkins details:"
     read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME
-    read -p "Jenkins port number : " JENKINS_PORT
     echo "Jenkins protocol :"
     JENKINS_PROTOCOL=$(selectFromArray JENKINS_PROTOCOL_ARRAY)
+    [[ "${JENKINS_PROTOCOL}" == "https" ]] && JENKINS_PORT_NUM=443 || JENKINS_PORT_NUM=8080
+    read -p "Jenkins port number [${JENKINS_PORT_NUM}]: " JENKINS_PORTX
+    JENKINS_PORT=${JENKINS_PORTX:-$JENKINS_PORT_NUM}
   else
     JENKINS_HOSTNAME=localhost
     JENKINS_PROTOCOL=http
