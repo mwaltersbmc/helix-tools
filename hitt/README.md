@@ -152,7 +152,11 @@ bash hitt.sh -t "get defaults"
 bash hitt.sh -t "get 7 values.json"
 ```
 
-`build` - Starts a new build of the HELIX_ONPREM_DEPLOYMENT pipeline using the values from a file created with the `get` option. The build is expected to fail as only non-default values are included in the input file.  Also, all of the PRODUCT sub-pipeline selection options are set to `false` to prevent a deployment from starting.  This is to allow you to rebuild the failed jon and update values.
+You can use the saved values file to populate the pipeline on another Jenkins system.  You will need to create a new `hitt.conf` file for the target Jenkins - the easiest way to do this is to copy the hitt script and saved values file to a new directory.  Run hitt and provide the new Jenkins details and then use the `build` option to use the values to start a new build of the HELIX_ONPREM_DEPLOYMENT pipeline.
+
+`build` - Starts a new build of the HELIX_ONPREM_DEPLOYMENT pipeline using the values from a file created with the `get` option. The build is expected to fail as only non-default values are included in the input file.  Also, all the PRODUCT sub-pipeline selection options are set to `false` to prevent a deployment from starting.  This is to allow you to rebuild the failed job and update values.
+
+> **After using the `build` option, select the HELIX_ONPREM_DEPLOYMENT pipeline in the target Jenkins and rebuild the last job.  Review the values carefully and update them as required.**
 
 ```bash
 bash hitt.sh -k "build filename"
