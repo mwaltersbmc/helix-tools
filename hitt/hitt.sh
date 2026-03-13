@@ -4397,6 +4397,7 @@ main() {
 
 NOW=$(date)
 logStatus "Welcome to the Helix IS Triage Tool - ${NOW}."
+logStatus "Using config file '${HITT_CONFIG_FILE}'."
 logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
 
@@ -6064,14 +6065,14 @@ if [ ! -t 1 ]; then
   REDIRECT=1
 fi
 
-while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
+while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
   case "${options}" in
     b)
       BUNDLE_ID="${OPTARG}"
       SKIP_UPDATE_CHECK=1
       ;;
     c)
-      SKIP_CLEANUP=1
+      HITT_CONFIG_FILE="${OPTARG}"
       ;;
     d)
       DEBUG=1
@@ -6172,6 +6173,9 @@ while getopts "b:cde:f:gh:i:jk:lm:n:o:pqs:t:u:vw:x" options; do
       ;;
     x)
       DISABLE_PROXY=1
+      ;;
+    z)
+      SKIP_CLEANUP=1
       ;;
     :)
       echo -e "${BOLD}ERROR:${NORMAL} -${OPTARG} requires an argument."

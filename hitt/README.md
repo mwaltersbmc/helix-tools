@@ -42,7 +42,9 @@ There are some optional tests that will attempt to validate the Helix IS databas
 
 ### Configuration ###
 
-HITT is configured by a file called `hitt.conf` which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.  If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used. There is also a section where you can enter details about your Jenkins which may be left as-is unless it requires credentials, uses https, or is running on a non-default port. Enclose the `JENKINS_USERNAME` and `JENKINS_PASSWORD` values in single quotes.  If your Jenkins is configured to use SSL change the `JENKINS_PROTOCOL` to `https` and set the `JENKINS_PORT` appropriately.
+HITT is configured by a file called `hitt.conf` which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.  If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used.
+
+You can use a different config file by using the `-c filename` command line option.  This may be useful when using the pipeline mode option to migrate pipeline values between Jenkins systems.
 
 The `hitt.conf` file:
 
@@ -152,7 +154,7 @@ bash hitt.sh -t "get defaults"
 bash hitt.sh -t "get 7 values.json"
 ```
 
-You can use the saved values file to populate the pipeline on another Jenkins system.  You will need to create a new `hitt.conf` file for the target Jenkins - the easiest way to do this is to copy the hitt script and saved values file to a new directory.  Run hitt and provide the new Jenkins details and then use the `build` option to use the values to start a new build of the HELIX_ONPREM_DEPLOYMENT pipeline.
+You can use the saved values file to populate the pipeline on another Jenkins system.  You will need to create a new hitt configuraton file for the target Jenkins - either by using the `-c` option or by copying the hitt script and saved values file to a new directory.  Run hitt and provide the new Jenkins details and then use the `build` option to use the values to start a new build of the HELIX_ONPREM_DEPLOYMENT pipeline.
 
 `build` - Starts a new build of the HELIX_ONPREM_DEPLOYMENT pipeline using the values from a file created with the `get` option. The build is expected to fail as only non-default values are included in the input file.  Also, all the PRODUCT sub-pipeline selection options are set to `false` to prevent a deployment from starting.  This is to allow you to rebuild the failed job and update values.
 
@@ -252,7 +254,7 @@ Checking out Revision cc2013d91e7f786c9a744527dfc61a29c00e7338 (refs/remotes/ori
 
 There are several extra command line switches which may be helpful for troubleshooting.
 
-`-c`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not delete temporary files after execution.\
+`-c filename`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Use alternative config file.\
 `-d`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enables `set -x` debugging output.\
 `-e #`&nbsp;&nbsp;&nbsp;Exit script on the specified error number `#`.  Use `-e 0` to stop on the first error.\
 `-j`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
@@ -260,6 +262,7 @@ There are several extra command line switches which may be helpful for troublesh
 `-q`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\
 `-v`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging.\
 `-x`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ignore proxy environment variables.
+`-z`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not delete temporary files after execution.\
 
 ### Checks Summary ###
 
