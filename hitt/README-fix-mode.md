@@ -1,6 +1,6 @@
 # HITT Fix Mode #
 
-**HITT**'s fix mode provides a quick way to resolve some common Helix Deployment Engine/Jenkins and post-deployment configuration issues.
+**HITT's** fix mode provides a quick way to resolve some common Helix Deployment Engine/Jenkins and post-deployment configuration issues.
 
 ## Modes ##
 
@@ -12,6 +12,7 @@
 | `sat`   | Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool in the Helix IS namespace. |
 | `arlicense`   | Apply an Innovation Suite/AR server license to the system. |
 | `getdbid`   | Displays the database ID (DBID) for the system - used for licensing. |
+| `gendbid`   | Generates a database ID (DBID) using the values provided. |
 | `resetssopwd`   | Resets the Helix SSO admin user password to the BMC default value. |
 | `jenkins`  | Jenkins specific fixes - see below. |
 
@@ -31,7 +32,8 @@ Fix modes are called using the `-f <fixmode>` command line option.  Some of the 
 ```bash
 Examples:
 bash hitt.sh -f sat # Run the Support Assistant Tool fix
-bash hitt.sh -f "cacerts ~/newcacerts" # Update the cacerts secret with the ~/newcacerts file
+bash hitt.sh -f "cacerts /tmp/newcacerts" # Update the cacerts secret with the newcacerts file
+bash hitt.sh -f "gendbid mssql my-db-server.acme.com arsystem" # Generate the DBID using the command line values.
 ```
 
 #### `ssh` - set up passwordless ssh for the git user
@@ -67,11 +69,19 @@ bash hitt.sh -f "arlicense LTD-761066 28-Apr-27"
 ```
 Applies a permanent or temporary server license to the system.
 
-#### `getdbid` - add the role and rolebinding needed by the Support Assistant Tool
+#### `getdbid` - get the IS DBID from the system
 ```bash
 bash hitt.sh -f getdbid
 ```
 Displays the DB ID of the system that is required to generate a server license via the BMC web site.
+
+#### `gendbid` - generate an IS DBID from the provided values.
+```bash
+bash hitt.sh -f "gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME"
+```
+Generates the DB ID required to generate a server license via the BMC web site.  Useful to get a new license before making changes to the DB hostname.\
+DB_TYPE is one of mssql|oracle|postgres\
+DATABASE_HOST_NAME and AR_DB_NAME are the values you will use in the HELIX_ONPREM_DEPLOYMENT pipeline.
 
 #### `resetssopwd` - resets the Helix SSO admin user password to the BMC default value
 ```bash

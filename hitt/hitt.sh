@@ -4269,6 +4269,7 @@ showFixHelp() { # fix mode help
     \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
     \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
     \tgetdbid \t| Displays the database ID (DBID) for the system - used for licensing.
+    \tgendbid \t| Generate a database ID (DBID) from the provided values.
     \tarlicense \t| Apply an Innovation Suite/AR server license to the system.
     \tresetssopwd \t| Resets the Helix SSO admin user password to the BMC default value.
     \tjenkins \t| Jenkins specific fixes - see below.
