@@ -4024,14 +4024,17 @@ generateISDbID() {
   fi
   case "${IS_DB_TYPE^^}" in
     MSSQL)
-        DB_TYPE="SQL -- SQL SERVER"
-        ;;
+      DB_TYPE="SQL -- SQL SERVER"
+      ;;
     ORACLE)
-        DB_TYPE="SQL -- ORACLE"
-        ;;
+      DB_TYPE="SQL -- ORACLE"
+      ;;
     POSTGRES)
-        DB_TYPE="POSTGRESQL"
-        ;;
+      DB_TYPE="POSTGRESQL"
+      ;;
+    *)
+      logError "999" "Invalid DB_TYPE '${IS_DB_TYPE}' - valid options are mssql|oracle|postgres." 1
+      ;;
   esac
   IS_DBID_SOURCE="${DB_TYPE^^}|${IS_DATABASE_HOST_NAME^^}|${IS_AR_DB_NAME^^}"
   # Generate SHA-256 hash and encode to base64 without padding
@@ -4548,6 +4551,15 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     getdbid)
       getISDbID
+      ;;
+    gendbid)
+      if [ ${#FIXARGS[@]} -ne 4 ]; then
+        logError "999" "Usage: bash $0 -f \"gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME\"" 1
+      fi
+      IS_DB_TYPE="${FIXARGS[1]}"
+      IS_DATABASE_HOST_NAME="${FIXARGS[2]}"
+      IS_AR_DB_NAME="${FIXARGS[3]}"
+      generateISDbID
       ;;
     arlicense)
       if [ ${#FIXARGS[@]} -eq 1 ]; then
