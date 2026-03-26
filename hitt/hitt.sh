@@ -1174,6 +1174,7 @@ createPipelineVarsArray() {
     VC_RKM_PASSWORD
     VC_PROXY_USER_PASSWORD
     RSSO_ADMIN_PASSWORD
+    AR_SERVER_ALIAS
   )
 }
 
@@ -1283,6 +1284,13 @@ getPipelineValues() {
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
     logError "128" "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all required values in the HELIX_ONPREM_DEPLOYMENT pipeline." 1
   fi
+  if ! isRFC1123 "${ISP_CUSTOMER_SERVICE}" ; then
+    logError "258" "The CUSTOMER_SERVICE value '${ISP_CUSTOMER_SERVICE}' is not valid - it should consist of lower case alphanumeric, '-' or '.' characters."
+  fi
+  if ! isRFC1123 "${ISP_ENVIRONMENT}" ; then
+    logError "258" "The ENVIRONMENT value '${ISP_ENVIRONMENT}' is not valid - it should consist of lower case alphanumeric, '-' or '.' characters."
+  fi
+
   if [[ "${IS_CUSTOMER_SIZE}" =~ M ]] || [[ "${IS_CUSTOMER_SIZE}" =~ L ]]; then
     IS_PLATFORM_INT=1
   fi
@@ -1681,6 +1689,9 @@ validateISDetails() {
       else
         logMessage "${IS_CLUSTER_DOMAIN_LABEL} is the expected value of '${CLUSTER_DOMAIN}'." 1
       fi
+      if ! isRFC1123 "${IS_CLUSTER_DOMAIN}" ; then
+        logError "258" "The ${IS_CLUSTER_DOMAIN_LABEL} value '${IS_CLUSTER_DOMAIN}' is not valid - it should only consist of lower case alphanumeric, '-' or '.' characters."
+      fi
     else
       logError "131" "The ${IS_CLUSTER_DOMAIN_LABEL} value cannot be blank.  The expected value is '${CLUSTER_DOMAIN}'."
     fi
@@ -1853,6 +1864,10 @@ validateISDetails() {
         logMessage "LOGS_ELASTICSEARCH_PASSWORD matches the Helix Platform KIBANA_PASSWORD." 1
       fi
       checkIsValidElastic "${IS_LOGS_ELASTICSEARCH_HOSTNAME}" "LOGS_ELASTICSEARCH_HOSTNAME"
+    fi
+
+    if ! isRFC1123 "${IS_AR_SERVER_ALIAS}" ; then
+      logError "258" "The AR_SERVER_ALIAS value '${IS_AR_SERVER_ALIAS}' is not valid - it should consist of lower case alphanumeric, '-' or '.' characters."
     fi
 
     if [ "${IS_PLATFORM_INT}" == "1" ] ; then
@@ -2391,6 +2406,22 @@ isIPAddress() {
   else
     echo 1
   fi
+}
+
+isRFC1123() {
+  local INPUT="$1"
+  local LABEL_REGEX='^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'
+
+  # Reject empty input, leading/trailing/consecutive dots
+  [[ "$INPUT" =~ ^\. ]] && return 1
+  [[ "$INPUT" =~ \.$ ]] && return 1
+  [[ "$INPUT" =~ \.\. ]] && return 1
+
+  IFS='.' read -ra LABELS <<< "$INPUT"
+  for LABEL in "${LABELS[@]}"; do
+      [[ "${LABEL}" =~ $LABEL_REGEX ]] || return 1
+  done
+  return 0
 }
 
 reportResults() {
@@ -6071,6 +6102,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The custom_cacert.pem file used during the Helix Platform deployment does not appear to contain the certificates needed for the Service Management aliases.\",
     \"impact\": \"HELIX_ITSM_INTEROPS pipeline will fail.\",
     \"remediation\": \"Validate the custom_cacerts.pem and follow the docs to update the system.\"
+  },
+  {
+    \"id\": \"258\",
+    \"cause\": \"The value of the named parameter is not valid. It must consist of lower case alphanumeric characters or '-'.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Update the value to a valid string.\"
   }
 ]"
 
