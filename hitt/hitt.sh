@@ -196,7 +196,7 @@ checkToolVersion() {
 
 checkBinary() {
   if ! which "${1}" > /dev/null 2>&1 ; then
-    logError "105" "${1} command not found in path. Please set ${BINARY} variable with the full path to the file."
+    logError "105" "${1} command not found in path. Please set ${1^^}_BIN variable with the full path to the file."
   else
     logMessage "${1} command found ($(which ${1}))." 1
     checkToolVersion "${2}"
@@ -773,7 +773,7 @@ validateRealm() {
   if [ "${REALM_TENANT}" == "" ]; then
     logError "232" "RSSO realm Tenant is blank - recommended value is '${HP_TENANT}'."
   else
-    if [ "${REALM_TENANT}" != "${HP_TENANT}" ] && [ "${SM_PLATFORM_CORE}"  == "no" ]; then
+    if [ "${REALM_TENANT}" != "${HP_TENANT}" ] && [ "${HP_SM_PLATFORM_CORE}"  == "no" ]; then
       logWarning "004" "Unexpected TENANT value in realm - recommended value is '${HP_TENANT}' but found '${REALM_TENANT}'."
     else
       logMessage "TENANT is '${REALM_TENANT}'." 1
@@ -1628,7 +1628,7 @@ validateISDetails() {
       ${KUBECTL_BIN} config get-contexts 2>/dev/null
     else
       if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" --context "${IS_CLUSTER}" get secret &> /dev/null ; then
-        logError "251" "The ${IS_CLUSTER_LABEL} value '${IS_CLUSTER}' does not appear to have permssions for the '${IS_NAMESPACE}' namespace."
+        logError "251" "The ${IS_CLUSTER_LABEL} value '${IS_CLUSTER}' does not appear to have permissions for the '${IS_NAMESPACE}' namespace."
       else
         logMessage "${IS_CLUSTER_LABEL} '${IS_CLUSTER}' is a valid kubeconfig context." 1
       fi
@@ -2126,7 +2126,7 @@ checkFTSElasticSettings() {
   BAD_FTS_ELASTIC=0
   logMessage "FTS_ELASTICSEARCH_USERNAME is '${IS_FTS_ELASTICSEARCH_USERNAME}'." 1
   if [ "${IS_FTS_ELASTICSEARCH_PORT}" != "9200" ]; then
-    logError "173 ""FTS_ELASTICSEARCH_PORT '${IS_FTS_ELASTICSEARCH_PORT}' is not the expected value of 9200."
+    logError "173" "FTS_ELASTICSEARCH_PORT '${IS_FTS_ELASTICSEARCH_PORT}' is not the expected value of 9200."
     BAD_FTS_ELASTIC=1
   else
     logMessage "FTS_ELASTICSEARCH_PORT is the expected value of '9200'." 1
