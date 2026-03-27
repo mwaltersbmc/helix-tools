@@ -1836,6 +1836,7 @@ validateISDetails() {
       if [ "${IS_DB_TYPE}" != "oracle" ]; then
         logError "217" "DB_JDBC_URL is only valid for Oracle databases - use with MSSQL/Postgres will cause a failure in the HELIX_SMARTAPPS_DEPLOY pipeline.  Please check with BMC Support."
       fi
+      logWarning "047" "DB_JDBC_URL is set - make sure that the ONS port (6200) is open from the cluster to the DB server."
     fi
 
     if [ "${#IS_SMARTREPORTING_DB_PASSWORD}" -gt 28 ]; then
@@ -3313,10 +3314,11 @@ checkDERequirements() {
       MAX_ANSIBLE_VERSION="2.18"
     fi
 
-    ANSIBLE_VERS=$(ansible-playbook /dev/stdin << EOF 2>/dev/null | grep 'msg:' | xargs
-      - hosts: localhost
-        gather_facts: true
-        tasks:
+    ANSIBLE_VERS=$(ansible-playbook /dev/stdin << 'EOF' 2>/dev/null | grep 'msg:' | xargs
+    ---
+    - hosts: localhost
+      gather_facts: true
+      tasks:
         - debug:
             msg: "{{ ansible_version.full }}={{ ansible_python_version }}={{ ansible_python.executable }}"
 EOF
@@ -5154,6 +5156,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The cacerts file for the named application was not found.\",
     \"impact\": \"Checks to validate the certificates have not been run and deployment failures or application issues may result.\",
     \"remediation\": \"Provide the required certificates as detailed in the product documentation.\"
+  },
+  {
+    \"id\": \"047\",
+    \"cause\": \"DB_JDBC_URL is set which requires port 6200 on the DB server to be accessible if using RAC.\",
+    \"impact\": \"Platform pods will not start.\",
+    \"remediation\": \"Make sure the ONS port (6200) is open for connections from Kubernetes.\"
   },
   {
     \"id\": \"100\",
