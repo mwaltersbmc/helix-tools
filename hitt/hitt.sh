@@ -4665,15 +4665,18 @@ if [ $(whoami) == "root" ]; then
   echo
   logWarning "035" "The HITT script should be run as the git user, not as root."
 fi
-logStatus "Checking namespaces..."
+logStatus "Checking cluster and namespaces..."
 if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
   logError "201" "It is recommended to install the Helix Platform and Helix IS in their own namespaces."
 fi
-checkHPNamespace "${HP_NAMESPACE}"
+logMessage "Gathering cluster information..."
 logK8sNodeDetails
+logMessage "Gathering Helix Platform namespace information..."
+checkHPNamespace "${HP_NAMESPACE}"
 logPods ${HP_NAMESPACE}
 logEvents ${HP_NAMESPACE}
 if [ "${MODE}" != "post-hp" ]; then
+  logMessage "Gathering Helix IS namespace information..."
   checkISNamespace "${IS_NAMESPACE}"
   logPods ${IS_NAMESPACE}
   logEvents ${IS_NAMESPACE}
