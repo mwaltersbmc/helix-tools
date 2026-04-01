@@ -19,7 +19,7 @@ getConfValues() {
   read -p "ENVIRONMENT : " IS_ENVIRONMENT
   logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:"
   read -p "Username : " JENKINS_USERNAME
-  read -s -p "Password : " JENKINS_PASSWORD
+  read -r -s -p "Password : " JENKINS_PASSWORD
   echo
   echo
   if askYesNo "${BOLD}Are you using a containerized Deployment Engine?${NORMAL}" ; then
@@ -100,7 +100,7 @@ logWarning() {
 
 logMessage() {
   # Print message
-  if [ -z ${2} ]; then
+  if [ -z "${2}" ]; then
     MSG_LEVEL=0
   else
     MSG_LEVEL=${2}
@@ -807,7 +807,7 @@ buildISAliasesArray() {
 validateRealmDomains() {
   logMessage "Checking for expected hostname aliases in realm Application Domains, DNS & Helix certificate..." 1
   # Check for wildcard certain
-  if ${OPENSSL_BIN} s_client -connect "${LB_HOST}:443" ${OPENSSL_PROXY_STRING} </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -q "*.${CLUSTER_DOMAIN}" ; then
+  if ${OPENSSL_BIN} s_client -connect "${LB_HOST}:443" ${OPENSSL_PROXY_STRING} </dev/null 2>/dev/null | ${OPENSSL_BIN} x509 -noout -text | grep "DNS:" | grep -Fq "*.${CLUSTER_DOMAIN}" ; then
     logMessage "Helix certificate is a wildcard for '*.${CLUSTER_DOMAIN}'." 1
     WILDCARD_CERT=1
   else
@@ -3782,7 +3782,7 @@ updateJenkinsUserCredentials() {
           credentialsStore.addCredentials(domain, newCred)
       }"
     runJenkinsCurl "${SCRIPT}" >/dev/null
-    logMessage "Updated Jenkins "${cred}" credentials."
+    logMessage "Updated Jenkins '${cred}' credentials."
   done
 }
 
@@ -3878,7 +3878,7 @@ fixJenkinsCredentials() {
     logError "999" "The 'sshpass' command was not found but is required to enable Jenkins credentials password validation. Please install 'sshpass'." 1
   fi
   logStatus "Please enter your GIT user password:"
-  read -s -p "GIT user password : " GIT_USER_PASSWORD
+  read -r -s -p "GIT user password : " GIT_USER_PASSWORD
   if ! sshpass -p "${GIT_USER_PASSWORD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${GIT_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
     logError "999" "The GIT user password is incorrect." 1
   fi
@@ -4566,7 +4566,7 @@ fi
 
 if [ "${MODE}" == "fix" ]; then
   # Parse FIXOPTS to array
-  read -ra FIXARGS <<< "${FIXOPTS}"
+  read -r -a FIXARGS <<< "${FIXOPTS}"
   logStatus "Running HITT in fix mode '${FIXARGS[0]}'..."
   case "${FIXARGS[0]}" in
     cacerts)
@@ -4629,9 +4629,9 @@ if [ -n "${PIPELINE_NAME}" ]; then
 fi
 
 if [ "${MODE}" == "pipeline" ]; then
+  read -r -a PIPELINEARGS <<< "${PIPELINEOPTS}"
   logStatus "Running HITT in pipeline mode '${PIPELINEARGS[0]}'..."
   checkJenkinsIsRunning 1
-  read -ra PIPELINEARGS <<< "${PIPELINEOPTS}"
   case "${PIPELINEARGS[0]}" in
     get)
       getJenkinsPipelineValues
