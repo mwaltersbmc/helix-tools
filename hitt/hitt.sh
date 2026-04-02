@@ -4092,6 +4092,19 @@ getISDbID() {
   logMessage "DB ID for this system is '${IS_DBID}'."
 }
 
+getISJWTToken() {
+  checkToolVersion kubectl
+  getVersions
+  getDomain
+  buildISAliasesArray
+  getISAdminCreds
+  logStatus "Getting IS REST API JWT for user '${IS_ADMIN_USER}'..."
+  if ! getISJWT; then
+    logError "999" "Failed to authenticate user '${IS_ADMIN_USER}' - can't get JWT." 1
+  fi
+  printf 'ARJWT="%s"\n' "${ARJWT}"
+}
+
 applyARLicense() {
   local HTTP_RESPONSE
   local HTTP_CODE
@@ -4306,6 +4319,7 @@ showFixHelp() { # fix mode help
     \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
     \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
     \tgetdbid \t| Displays the database ID (DBID) for the system - used for licensing.
+    \tgetjwt \t| Print an AR-JWT token for the IS REST API (hannah_admin credentials from the cluster).
     \tgendbid \t| Generate a database ID (DBID) from the provided values.
     \tarlicense \t| Apply an Innovation Suite/AR server license to the system.
     \tresetssopwd \t| Resets the Helix SSO admin user password to the BMC default value.
@@ -4589,6 +4603,9 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     getdbid)
       getISDbID
+      ;;
+    getjwt)
+      getISJWTToken
       ;;
     gendbid)
       if [ ${#FIXARGS[@]} -ne 4 ]; then

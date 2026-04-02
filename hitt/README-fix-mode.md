@@ -12,6 +12,7 @@
 | `sat`   | Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool in the Helix IS namespace. |
 | `arlicense`   | Apply an Innovation Suite/AR server license to the system. |
 | `getdbid`   | Displays the database ID (DBID) for the system - used for licensing. |
+| `getjwt`   | Prints an AR-JWT token for the IS REST API using `hannah_admin` credentials from the cluster. |
 | `gendbid`   | Generates a database ID (DBID) using the values provided. |
 | `resetssopwd`   | Resets the Helix SSO admin user password to the BMC default value. |
 | `jenkins`  | Jenkins specific fixes - see below. |
@@ -74,6 +75,12 @@ Applies a permanent or temporary server license to the system.
 bash hitt.sh -f getdbid
 ```
 Displays the DB ID of the system that is required to generate a server license via the BMC web site.
+
+#### `getjwt` - get an AR-JWT token for the IS REST API
+```bash
+bash hitt.sh -f getjwt
+```
+Authenticates to IS RESTAPI with the `hannah_admin` credentials and prints the string to set the ARJWT variable.
 
 #### `gendbid` - generate an IS DBID from the provided values.
 ```bash
