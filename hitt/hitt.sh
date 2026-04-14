@@ -31,9 +31,9 @@ getConfValues() {
 
   if [ ${#HP_NS_CANDIDATES[@]} -eq 1 ]; then
     HP_NAMESPACE="${HP_NS_CANDIDATES[0]}"
-    logStatus "Auto-selected Helix Platform namespace: ${HP_NAMESPACE}"
+    logStatus "Auto-selected Helix Platform namespace: ${HP_NAMESPACE}" 1
   else
-    logStatus "Please select your Helix Platform namespace..."
+    logStatus "Please select your Helix Platform namespace..." 1
     if [ ${#HP_NS_CANDIDATES[@]} -gt 1 ]; then
       HP_NAMESPACE=$(selectFromArray HP_NS_CANDIDATES)
     else
@@ -43,19 +43,19 @@ getConfValues() {
 
   if [ ${#IS_NS_CANDIDATES[@]} -eq 1 ] && [[ "${IS_NS_CANDIDATES[0]}" != "${HP_NAMESPACE}" ]]; then
     IS_NAMESPACE="${IS_NS_CANDIDATES[0]}"
-    logStatus "Auto-selected Helix IS namespace: ${IS_NAMESPACE}"
+    logStatus "Auto-selected Helix IS namespace: ${IS_NAMESPACE}" 1
   else
-    logStatus "Please select your Helix IS namespace..."
+    logStatus "Please select your Helix IS namespace..." 1
     if [ ${#IS_NS_CANDIDATES[@]} -gt 1 ]; then
       IS_NAMESPACE=$(selectFromArray IS_NS_CANDIDATES)
     else
       IS_NAMESPACE=$(selectFromArray NS_ARRAY)
     fi
   fi
-  logStatus "Please enter your HELIX_ONPREM_DEPLOYMENT pipeline CUSTOMER_SERVICE and ENVIRONMENT values:"
+  logStatus "Please enter your HELIX_ONPREM_DEPLOYMENT pipeline CUSTOMER_SERVICE and ENVIRONMENT values:" 1
   read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE
   read -p "ENVIRONMENT : " IS_ENVIRONMENT
-  logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:"
+  logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
   read -p "Username : " JENKINS_USERNAME
   read -r -s -p "Password : " JENKINS_PASSWORD
   echo
@@ -146,8 +146,11 @@ logMessage() {
   [[ ${MSG_LEVEL} -le ${VERBOSITY} ]] && [[ "${QUIET}" == "0" ]] && echo -e "\t${1}"
 }
 
+# Second arg optional: pass 1 to print even when QUIET=1 (otherwise only prints when QUIET=0).
 logStatus() {
-  [[ "${QUIET}" == "0" ]] && echo -e "\n${BOLD}${1}${NORMAL}"
+  if [[ "${QUIET}" == "0" ]] || [[ "${2}" == "1" ]]; then
+    echo -e "\n${BOLD}${1}${NORMAL}"
+  fi
 }
 
 stopOnError() {
