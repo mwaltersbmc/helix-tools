@@ -4720,7 +4720,7 @@ logStatus "${BOLD}Starting HITT in ${MODE} mode...${NORMAL}"
 # Check command line tools present
 logStatus "Checking for required tools in path..."
 checkRequiredTools
-if [ $(whoami) == "root" ]; then
+if [ "$(whoami)" == "root" ] && ! isJenkinsInCluster; then
   echo
   logWarning "035" "The HITT script should be run as the git user, not as root."
 fi
