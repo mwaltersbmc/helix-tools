@@ -5,15 +5,53 @@
 
 # FUNCTIONS Start
 
+# Populate HP_NS_CANDIDATES / IS_NS_CANDIDATES from cluster (rsso / midtier-user deployments).
+# Uses NS_ARRAY; skips the PENDING sentinel (not a real namespace name).
+discoverHelixNamespaceCandidates() {
+  HP_NS_CANDIDATES=()
+  IS_NS_CANDIDATES=()
+  local ns
+  for ns in "${NS_ARRAY[@]}"; do
+    [[ "${ns}" == "PENDING" ]] && continue
+    if ${KUBECTL_BIN} -n "${ns}" get deployment rsso >/dev/null 2>&1; then
+      HP_NS_CANDIDATES+=("${ns}")
+    fi
+    if ${KUBECTL_BIN} -n "${ns}" get deployment midtier-user >/dev/null 2>&1; then
+      IS_NS_CANDIDATES+=("${ns}")
+    fi
+  done
+}
+
 getConfValues() {
   JENKINS_PROTOCOL_ARRAY=(http https)
   if [ "${MODE}" == "pre-hp" ]; then
     NS_ARRAY=("PENDING" "${NS_ARRAY[@]}")
   fi
-  logStatus "Please select your Helix Platform namespace..."
-  HP_NAMESPACE=$(selectFromArray NS_ARRAY)
-  logStatus "Please select your Helix IS namespace..."
-  IS_NAMESPACE=$(selectFromArray NS_ARRAY)
+  discoverHelixNamespaceCandidates
+
+  if [ ${#HP_NS_CANDIDATES[@]} -eq 1 ]; then
+    HP_NAMESPACE="${HP_NS_CANDIDATES[0]}"
+    logStatus "Auto-selected Helix Platform namespace: ${HP_NAMESPACE}"
+  else
+    logStatus "Please select your Helix Platform namespace..."
+    if [ ${#HP_NS_CANDIDATES[@]} -gt 1 ]; then
+      HP_NAMESPACE=$(selectFromArray HP_NS_CANDIDATES)
+    else
+      HP_NAMESPACE=$(selectFromArray NS_ARRAY)
+    fi
+  fi
+
+  if [ ${#IS_NS_CANDIDATES[@]} -eq 1 ] && [[ "${IS_NS_CANDIDATES[0]}" != "${HP_NAMESPACE}" ]]; then
+    IS_NAMESPACE="${IS_NS_CANDIDATES[0]}"
+    logStatus "Auto-selected Helix IS namespace: ${IS_NAMESPACE}"
+  else
+    logStatus "Please select your Helix IS namespace..."
+    if [ ${#IS_NS_CANDIDATES[@]} -gt 1 ]; then
+      IS_NAMESPACE=$(selectFromArray IS_NS_CANDIDATES)
+    else
+      IS_NAMESPACE=$(selectFromArray NS_ARRAY)
+    fi
+  fi
   logStatus "Please enter your HELIX_ONPREM_DEPLOYMENT pipeline CUSTOMER_SERVICE and ENVIRONMENT values:"
   read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE
   read -p "ENVIRONMENT : " IS_ENVIRONMENT

@@ -42,7 +42,11 @@ There are some optional tests that will attempt to validate the Helix IS databas
 
 ### Configuration ###
 
-HITT is configured by a file called `hitt.conf` which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.  If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used.
+HITT is configured by a file called `hitt.conf` which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.
+
+When the config file is created interactively, HITT probes the cluster for the Helix Platform `rsso` deployment and the Helix IS `midtier-user` deployment. If exactly one namespace matches each role (and the IS namespace is not the same as the Platform namespace), those values are filled in automatically. If several namespaces match a role, the menu lists only those candidates. If none match, you choose from all cluster namespaces as before.
+
+If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used.
 
 You can use a different config file by using the `-c filename` command line option.  This may be useful when using the pipeline mode option to migrate pipeline values between Jenkins systems.
 
