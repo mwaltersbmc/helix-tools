@@ -2563,26 +2563,37 @@ checkISDBLatency() {
     PING_SELECTOR="app=platform-fts"
   fi
   PING_POD=$(${KUBECTL_BIN} -n "${PING_NAMESPACE}" get pod --no-headers -l "${PING_SELECTOR}" -o custom-columns=:metadata.name --field-selector status.phase=Running | head -1)
-  if [ ! -z "${PING_POD}" ]; then
+  if [ -n "${PING_POD}" ]; then
     PING_RESULT=$(${KUBECTL_BIN} -n "${PING_NAMESPACE}" exec -i "${PING_POD}" -- env IS_DATABASE_HOST_NAME="${IS_DATABASE_HOST_NAME}" IS_DB_PORT="${IS_DB_PORT}"  bash -s 2> >(grep -v 'Defaulted container') <<'EOF'
       total_ms=0
-      if bash -c "</dev/tcp/${IS_DATABASE_HOST_NAME}/${IS_DB_PORT}" 2>/dev/null; then
-        overhead_sec=$( (time bash -c exit) 2>&1 | grep real | sed -E 's/real[[:space:]]+0m([0-9]+\.[0-9]+)s/\1/')
-        over_int=${overhead_sec%.*}
-        over_frac=${overhead_sec#*.}
-        over_frac=$(printf "%-3s" "$over_frac" | tr ' ' '0')
-        overhead_ms=$((over_int * 1000 + 10#$over_frac))
-        for i in {1..10}; do
-          sec=$( (time bash -c "</dev/tcp/${IS_DATABASE_HOST_NAME}/${IS_DB_PORT}") 2>&1 | grep real | sed -E 's/real[[:space:]]+0m([0-9]+\.[0-9]+)s/\1/')
-          int=${sec%.*}
-          frac=${sec#*.}
-          frac=$(printf "%-3s" "$frac" | tr ' ' '0')
-          ms=$((int * 1000 + 10#$frac))
-          adj_ms=$(( ms > overhead_ms ? ms - overhead_ms : 0 ))
-          total_ms=$((total_ms + adj_ms))
+      count=0
+      if timeout 2 bash -c "</dev/tcp/${IS_DATABASE_HOST_NAME}/${IS_DB_PORT}" 2>/dev/null; then
+        # Average bash startup overhead over 3 samples for a more stable baseline
+        overhead_total=0
+        for o in {1..3}; do
+          os=$( (time bash -c exit) 2>&1 | grep real | sed -E 's/real[[:space:]]+([0-9]+)m([0-9]+\.[0-9]+)s/\1 \2/')
+          om=${os%% *}
+          of=${os##* }
+          of=$(printf "%-3s" "${of#*.}" | tr ' ' '0')
+          overhead_total=$(( overhead_total + om * 60000 + 10#$of ))
         done
-        avg_ms=$((total_ms / 3))
-        echo "${avg_ms}"
+        overhead_ms=$(( overhead_total / 3 ))
+        for i in {1..10}; do
+          sec=$( (time timeout 2 bash -c "</dev/tcp/${IS_DATABASE_HOST_NAME}/${IS_DB_PORT}") 2>&1 | grep real | sed -E 's/real[[:space:]]+([0-9]+)m([0-9]+\.[0-9]+)s/\1 \2/')
+          [ -z "$sec" ] && continue
+          m=${sec%% *}
+          f=${sec##* }
+          f=$(printf "%-3s" "${f#*.}" | tr ' ' '0')
+          ms=$(( m * 60000 + 10#$f ))
+          adj_ms=$(( ms > overhead_ms ? ms - overhead_ms : 0 ))
+          total_ms=$(( total_ms + adj_ms ))
+          count=$(( count + 1 ))
+        done
+        if [ "$count" -gt 0 ]; then
+          echo $(( total_ms / count ))
+        else
+          echo "FAILED"
+        fi
       else
         echo "FAILED"
       fi
@@ -2598,6 +2609,8 @@ EOF
     else
       logError "188" "Unexpected response from IS DB latency test.  Is the DATABASE_HOST_NAME '${IS_DATABASE_HOST_NAME}' accessible from the '${PING_NAMESPACE}/${PING_POD}' pod?"
     fi
+  else
+    logError "188" "No running pod found with selector '${PING_SELECTOR}' in namespace '${PING_NAMESPACE}' - cannot test IS DB latency."
   fi
 }
 
