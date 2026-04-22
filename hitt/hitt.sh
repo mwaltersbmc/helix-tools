@@ -4492,8 +4492,8 @@ buildJenkinsPipelineFromFile() {
   # Different pipeline version?
   INPUT_VERSION=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} -r '.PLATFORM_HELM_VERSION')
   DEFAULTS_VERSION=$(echo "${PIPELINE_DEFAULTS_JSON}" | ${JQ_BIN} -r '.PLATFORM_HELM_VERSION')
-  if [ "${INPUT_VERSION}" != ${DEFAULTS_VERSION} ]; then
-    PIPELINE_INPUT_JSON=$(echo ${PIPELINE_INPUT_JSON} | ${JQ_BIN} --arg inputVersion "${INPUT_VERSION}" -c '
+  if [ "${INPUT_VERSION}" != "${DEFAULTS_VERSION}" ]; then
+    PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} --arg inputVersion "${INPUT_VERSION}" -c '
       del(.AGENT, .HELM_NODE, .PLATFORM_HELM_VERSION, .SMARTAPPS_HELM_VERSION) |
       . + {
         "SOURCE_VERSION": $inputVersion
@@ -4502,7 +4502,7 @@ buildJenkinsPipelineFromFile() {
 
   # if target is containerized Jenkins, remove additional params
   if isJenkinsInCluster; then
-    PIPELINE_INPUT_JSON=$(echo ${PIPELINE_INPUT_JSON} | ${JQ_BIN} -c 'del(.AGENT, .HELM_NODE, .GIT_REPO_DIR, .GIT_USER_HOME_DIR)')
+    PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} -c 'del(.AGENT, .HELM_NODE, .GIT_REPO_DIR, .GIT_USER_HOME_DIR)')
   fi
 
   # Remove parameters not present in the new pipeline from the input JSON
