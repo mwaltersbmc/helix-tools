@@ -53,8 +53,11 @@ getConfValues() {
     fi
   fi
   logStatus "Please enter your HELIX_ONPREM_DEPLOYMENT pipeline CUSTOMER_SERVICE and ENVIRONMENT values:" 1
-  read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE
-  read -p "ENVIRONMENT : " IS_ENVIRONMENT
+  #read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE
+  while [[ -z "${IS_CUSTOMER_SERVICE}" ]]; do read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE; done
+  #read -p "ENVIRONMENT : " IS_ENVIRONMENT
+  while [[ -z "${IS_ENVIRONMENT}" ]]; do read -p "ENVIRONMENT : " IS_ENVIRONMENT; done
+
   logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
   read -p "Username : " JENKINS_USERNAME
   read -r -s -p "Password : " JENKINS_PASSWORD
@@ -65,7 +68,8 @@ getConfValues() {
   if [ "${REPLY}" != "1" ]; then
   #if askYesNo "${BOLD}Are you using a containerized Deployment Engine?${NORMAL}" ; then
     logStatus "Please enter your Jenkins details:"
-    read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME
+    #read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME
+  while [[ -z "${JENKINS_HOSTNAME}" ]]; do read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME; done
     echo "Jenkins protocol :"
     JENKINS_PROTOCOL=$(selectFromArray JENKINS_PROTOCOL_ARRAY)
     [[ "${JENKINS_PROTOCOL}" == "https" ]] && JENKINS_PORT_NUM=443 || JENKINS_PORT_NUM=8080
@@ -647,16 +651,16 @@ selectFromArray() {
   local options=("${!ARRAY_REF}")
 
   # PS3 is the prompt displayed by the select command
-  local OLD_PS3="$PS3"
+  local OLD_PS3="${PS3}"
   PS3="Select a valid option (1-${#options[@]}): "
 
   select i in "${options[@]}"; do
-    if [[ -n "$i" ]]; then
-      echo "$i"
-      PS3="$OLD_PS3" # Restore original prompt
+    if [[ -n "${i}" ]]; then
+      echo "${i}"
+      PS3="${OLD_PS3}" # Restore original prompt
       break
     else
-      echo "Error: '$REPLY' is not a valid choice."
+      echo "Error: '${REPLY}' is not a valid choice." >&2
     fi
   done
 }
