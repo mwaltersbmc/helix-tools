@@ -59,9 +59,12 @@ getConfValues() {
   read -p "Username : " JENKINS_USERNAME
   read -r -s -p "Password : " JENKINS_PASSWORD
   echo
-  echo
-  if askYesNo "${BOLD}Are you using a containerized Deployment Engine?${NORMAL}" ; then
-    echo "Please enter your Jenkins details:"
+  JENKINS_LOCATION_ARRAY=("Locally on this Deployment Engine system." "Remotely as a pod in the Kubernetes cluster.")
+  logStatus "Where is Jenkins running?"
+  selectFromArray JENKINS_LOCATION_ARRAY
+  if [ "${REPLY}" != "1" ]; then
+  #if askYesNo "${BOLD}Are you using a containerized Deployment Engine?${NORMAL}" ; then
+    logStatus "Please enter your Jenkins details:"
     read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME
     echo "Jenkins protocol :"
     JENKINS_PROTOCOL=$(selectFromArray JENKINS_PROTOCOL_ARRAY)
@@ -639,7 +642,7 @@ checkPlatformSSL() {
   fi
 }
 
-selectFromArray () {
+selectFromArray() {
   ARRAY="${1}[@]"
   select i in "${!ARRAY}"; do
     echo "${i}";
