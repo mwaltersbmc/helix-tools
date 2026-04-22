@@ -146,28 +146,28 @@ There are two pipeline mode options - `get` and `build` - which are intended to 
 |------------|-----------------------------------------------------------------------------|
 | `get defaults `  | The default values of the pipeline.                     |
 | `get last`  | Values from the last build of the pipeline regardless of whether it succeeded or not.              |
-| `get lastsuccessful`   | Values from the last successfull build of the pipeline. |
+| `get lastsuccessful`   | Values from the last successful build of the pipeline. |
 | `get N`  | Values from numbered build.               |
 
 The values are output to the console in JSON format unless you provide a filename to save them to.
 
 ```bash
-bash hitt.sh -k "get <defaults|last|lastsuccessful|N [filename]"
+bash hitt.sh -k "get <defaults|last|lastsuccessful|N> [filename]"
 # Examples:
-bash hitt.sh -t "get defaults"
-bash hitt.sh -t "get 7 values.json"
+bash hitt.sh -k "get defaults"
+bash hitt.sh -k "get 7 values.json"
 ```
 
-You can use the saved values file to populate the pipeline on another Jenkins system.  You will need to create a new hitt configuraton file for the target Jenkins - either by using the `-c` option or by copying the hitt script and saved values file to a new directory.  Run hitt and provide the new Jenkins details and then use the `build` option to use the values to start a new build of the HELIX_ONPREM_DEPLOYMENT pipeline.
+You can use the saved values file to populate the pipeline on another Jenkins system.  You will need to create a new hitt configuration file for the target Jenkins - either by using the `-c` option or by copying the hitt script and saved values file to a new directory.  Run hitt and provide the new Jenkins details and then use the `build` option to use the values to start a new build of the HELIX_ONPREM_DEPLOYMENT pipeline.
 
 `build` - Starts a new build of the HELIX_ONPREM_DEPLOYMENT pipeline using the values from a file created with the `get` option. The build is expected to fail as only non-default values are included in the input file.  Also, all the PRODUCT sub-pipeline selection options are set to `false` to prevent a deployment from starting.  This is to allow you to rebuild the failed job and update values.
 
 > **After using the `build` option, select the HELIX_ONPREM_DEPLOYMENT pipeline in the target Jenkins and rebuild the last job.  Review the values carefully and update them as required.**
 
 ```bash
-bash hitt.sh -k "build filename"
+bash hitt.sh -k "build json_values_file"
 # Example:
-bash hitt.sh -t "build values.json"
+bash hitt.sh -k "build values.json"
 ```
 
 ### tctl Mode ###
