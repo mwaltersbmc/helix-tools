@@ -643,10 +643,21 @@ checkPlatformSSL() {
 }
 
 selectFromArray() {
-  ARRAY="${1}[@]"
-  select i in "${!ARRAY}"; do
-    echo "${i}";
-    break;
+  local ARRAY_REF="${1}[@]"
+  local options=("${!ARRAY_REF}")
+
+  # PS3 is the prompt displayed by the select command
+  local OLD_PS3="$PS3"
+  PS3="Select a valid option (1-${#options[@]}): "
+
+  select i in "${options[@]}"; do
+    if [[ -n "$i" ]]; then
+      echo "$i"
+      PS3="$OLD_PS3" # Restore original prompt
+      break
+    else
+      echo "Error: '$REPLY' is not a valid choice."
+    fi
   done
 }
 
