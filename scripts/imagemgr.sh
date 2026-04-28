@@ -346,6 +346,7 @@ if [[ -n ${IMAGE_FILE} ]]; then
     #continue
     IMAGE_ARRAY+=($(echo "${IMAGE}"  | tr -d '[:space:]'))
   done < <(cat ${IMAGE_FILE} | grep -v '^#' | sed '/^[[:space:]]*$/d')
+  echo "${#IMAGE_ARRAY[@]} image(s) to process." | tee -a results.txt
 fi
 
 # Image name provided on command line -i
