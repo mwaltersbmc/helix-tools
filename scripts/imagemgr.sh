@@ -21,6 +21,8 @@ NORMAL=$'\e[0m'
 RED=$'\e[31m'
 YELLOW=$'\e[33m'
 GREEN=$'\e[32m'
+BLUE=$'\e[34m'
+PURPLE=$'\e[35m'
 
 # Functions
 usage() {
@@ -38,7 +40,7 @@ pull_image() {
 }
 
 tag_image() {
-  log_result "Tagging ${SOURCE_IMAGE} as ${TARGET_IMAGE}" ${YELLOW}
+  log_result "Tagging ${SOURCE_IMAGE} as ${TARGET_IMAGE}" ${BLUE}
   if ! docker tag "${SOURCE_IMAGE}" "${TARGET_IMAGE}"; then
     log_error "tag" "${SOURCE_IMAGE}"
     exit
@@ -46,7 +48,7 @@ tag_image() {
 }
 
 push_image() {
-  log_result "Pushing ${TARGET_IMAGE}" ${YELLOW}
+  log_result "Pushing ${TARGET_IMAGE}" ${PURPLE}
   if ! docker push -q "${TARGET_IMAGE}" > /dev/null; then
     log_error "push" "${TARGET_IMAGE}"
     exit
