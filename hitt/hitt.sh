@@ -1870,11 +1870,20 @@ validateISDetails() {
       fi
     fi
 
-    if [ "${IS_PIPELINE_MODE}" == "FRESH" ] && [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "false" ]; then
-      logWarning "040" "DATABASE_RESTORE is not selected - please make sure you have restored the appropriate Postgres database dump."
-    else
-      logMessage "Postgres database dump will be restored."
+    if [ "${IS_PIPELINE_MODE}" == "FRESH" ]; then
+      if [ "${IS_DB_TYPE}" == "postgres" ]; then
+        if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
+          logWarning "040" "DATABASE_RESTORE is not selected - please make sure you have restored the appropriate Postgres database dump."
+        else
+          logMessage "Postgres database dump will be restored by pipeline."
+        fi
+      else
+          logMessage "Please make sure you have restored the appropriate ${IS_DB_TYPE^^} database dump."
+      fi
     fi
+#    else
+#      logMessage "Postgres database dump will be restored."
+#    fi
 
     if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ]; then
       if [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "true" ]; then
