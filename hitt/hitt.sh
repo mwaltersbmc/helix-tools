@@ -3802,7 +3802,7 @@ fixJenkinsPipelineLibs() {
     PLIMPLICIT=$(echo "${pl}" | awk -F',' '{ print $4 }')
 
     if [ ${#FIXARGS[@]} -eq 2 ]; then
-      PLPATHS_ARRAY=($(find ~ -type d -name "${PLGIT}"))
+      PLPATHS_ARRAY=($(find ~ -type d -name "${PLGIT}" 2>/dev/null))
       PATH_TO_PL=""
       if [ ${#PLPATHS_ARRAY[@]} -eq 0 ]; then
         logError "999" "Unable to find the pipeline libraries git directory - please use 'bash $0 -f \"jenkins pipelinelibs /path/to/LIBRARY_REPO\"'". 1
