@@ -3808,7 +3808,7 @@ fixJenkinsPipelineLibs() {
         logError "999" "Unable to find the pipeline libraries git directory - please use 'bash $0 -f \"jenkins pipelinelibs /path/to/LIBRARY_REPO\"'". 1
       elif [ ${#PLPATHS_ARRAY[@]} -eq 1 ]; then
         PATH_TO_PL="${PLPATHS_ARRAY[0]}"
-        logStatus "Auto-selected '${PLNAME}' git directory: ${PATH_TO_PL}" 1
+        logMessage "Auto-selected '${PLNAME}' git directory: ${PATH_TO_PL}" 1
       else
         logStatus "Select the '${PLNAME}' git directory:"
         while [ "${PATH_TO_PL}" == "" ]; do
