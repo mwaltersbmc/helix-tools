@@ -2666,7 +2666,7 @@ checkISDockerLogin() {
     if ! which docker > /dev/null 2>&1 ; then
       LOG_MSG="'docker' command not found in path"
     else
-      LOG_MSG="'docker' command returned an error"
+      LOG_MSG="'docker ps' command returned an error"
     fi
     logWarning "022" "${LOG_MSG} - skipping registry credentials check."
     return
