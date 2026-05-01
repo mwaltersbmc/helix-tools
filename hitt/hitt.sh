@@ -1269,7 +1269,6 @@ getPipelinePasswords() {
     def jenkins = Jenkins.instance
     def job = jenkins.getItemByFullName(jobName)
     def lastBuild = job.getLastBuild()
-    def parametersAction = lastBuild.getAction(ParametersAction)
     def parameters = lastBuild.getAction(ParametersAction.class)?.getParameters()
     def paramMap = [:]
     if (parameters != null) {
@@ -1298,8 +1297,7 @@ checkJenkinsSSH() {
 }
 
 runJenkinsSSH() {
-  SCRIPT="import groovy.json.JsonOutput
-    def output=['bash', '-c', 'ssh -o StrictHostKeyChecking=accept-new ${USER}@${LONG_HOSTNAME} whoami'].execute().text.trim()
+  SCRIPT="def output=['bash', '-c', 'ssh -o StrictHostKeyChecking=accept-new ${USER}@${LONG_HOSTNAME} whoami'].execute().text.trim()
     println output"
   runJenkinsCurl "${SCRIPT}"
 }
@@ -2952,11 +2950,8 @@ validateJenkinsKubeconfig() {
 
 getJenkinsGlobalLibs() {
   SCRIPT='import groovy.json.JsonOutput
-    import jenkins.model.Jenkins
     import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
     import org.jenkinsci.plugins.workflow.libs.SCMSourceRetriever
-    import jenkins.scm.api.SCMSource
-    def jenkins = Jenkins.get()
     def globalLibraries = GlobalLibraries.get()
     def libraryDetails = globalLibraries.libraries.collect { lib ->
         def retrieverType = lib.retriever?.class?.simpleName
@@ -3045,6 +3040,7 @@ checkJenkinsGlobalLibs() {
 
 getPipelineValuesJSON() {
   SCRIPT="import groovy.json.JsonOutput
+    import jenkins.model.Jenkins
     import hudson.model.ParametersAction
     def jobName = 'HELIX_ONPREM_DEPLOYMENT'
     def job = Jenkins.instance.getItemByFullName(jobName)
@@ -3062,6 +3058,7 @@ getPipelineValuesJSON() {
 
 getPipelineDefaults() {
   SCRIPT="import groovy.json.JsonOutput
+    import jenkins.model.Jenkins
     import hudson.model.*
     def jobName = '${1}'
     def job = Jenkins.instance.getItemByFullName(jobName)
@@ -3099,6 +3096,8 @@ getPipelineDefaults() {
 # Old version
 xgetPipelineDefaults() {
   SCRIPT="import groovy.json.JsonOutput
+    import jenkins.model.Jenkins
+    import hudson.model.ParametersDefinitionProperty
     def jobName = '${1}'
     def job = Jenkins.instance.getItemByFullName(jobName)
     def parameterDefs = job.getProperty(ParametersDefinitionProperty)?.parameterDefinitions
@@ -3231,8 +3230,7 @@ validateJenkinsCredentials() {
 }
 
 getJenkinsApprovedScripts() {
-  SCRIPT='import jenkins.model.*
-    import org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval
+  SCRIPT='import org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval
     import groovy.json.JsonOutput
     ScriptApproval scriptApproval = ScriptApproval.get()
     List<String> approvedSignatures = scriptApproval.getApprovedSignatures()
@@ -3736,11 +3734,7 @@ encodeKubeconfig() {
 }
 
 fixJenkinsScriptApproval () {
-  SCRIPT='import java.lang.reflect.*;
-    import jenkins.model.Jenkins;
-    import jenkins.model.*;
-    import org.jenkinsci.plugins.scriptsecurity.scripts.*;
-    import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.*;
+  SCRIPT='import org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval
     scriptApproval = ScriptApproval.get()
     alreadyApproved = new HashSet<>(Arrays.asList(scriptApproval.getApprovedSignatures()))
     approveSignature("method org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper getRawBuild")
@@ -3918,7 +3912,6 @@ updateJenkinsSecretFileCredentials() {
     import org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl
     import hudson.util.Secret
     import com.cloudbees.plugins.credentials.SecretBytes
-    import com.cloudbees.plugins.credentials.CredentialsProvider
     def credentialsId = 'TOKENS'
     def description = 'tokens.json'
     def fileName = 'tokens.json'
