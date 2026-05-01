@@ -2949,16 +2949,31 @@ validateJenkinsKubeconfig() {
 }
 
 getJenkinsGlobalLibs() {
-  SCRIPT='import groovy.json.JsonOutput
-    import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
+  # Optional first argument: trusted (default) or untrusted — which Jenkins global library list to read.
+  local scope="${1:-trusted}"
+  local GLOBAL_LIBS_JAVA
+  case "${scope}" in
+    trusted)
+      GLOBAL_LIBS_JAVA="GlobalLibraries"
+      ;;
+    untrusted)
+      GLOBAL_LIBS_JAVA="GlobalUntrustedLibraries"
+      ;;
+    *)
+      logError "999" "getJenkinsGlobalLibs: first argument must be 'trusted' or 'untrusted' (default: trusted)." 1
+      ;;
+  esac
+
+  SCRIPT="import groovy.json.JsonOutput
+    import org.jenkinsci.plugins.workflow.libs.${GLOBAL_LIBS_JAVA}
     import org.jenkinsci.plugins.workflow.libs.SCMSourceRetriever
-    def globalLibraries = GlobalLibraries.get()
+    def globalLibraries = ${GLOBAL_LIBS_JAVA}.get()
     def libraryDetails = globalLibraries.libraries.collect { lib ->
         def retrieverType = lib.retriever?.class?.simpleName
         def remoteUrl = null
         if (lib.retriever instanceof SCMSourceRetriever) {
             def scmSource = lib.retriever.scm
-            if (scmSource && scmSource.hasProperty("remote")) {
+            if (scmSource && scmSource.hasProperty(\"remote\")) {
                 remoteUrl = scmSource.remote
             }
         }
@@ -2971,13 +2986,14 @@ getJenkinsGlobalLibs() {
         ]
     }
     def jsonOutput = JsonOutput.toJson(libraryDetails)
-    println(JsonOutput.prettyPrint(jsonOutput))'
+    println(JsonOutput.prettyPrint(jsonOutput))"
 
   runJenkinsCurl "${SCRIPT}"
 }
 
 checkJenkinsGlobalLibs() {
-  JLIBS_JSON=$(getJenkinsGlobalLibs)
+  JLIBS_JSON=$(getJenkinsGlobalLibs trusted)
+  UNTRUSTED_JSON=$(getJenkinsGlobalLibs untrusted)
   JENKINS_LIBS=(pipeline-framework JENKINS-27413-workaround-library)
   MISSING_LIBS=""
   for i in "${JENKINS_LIBS[@]}" ; do
@@ -3031,8 +3047,32 @@ checkJenkinsGlobalLibs() {
         esac
     fi
   done
+  LIB_DUP_TRUSTED=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '[.[].name] | group_by(.) | map(select(length > 1) | .[0]) | join(" ")')
+  if [ -n "${LIB_DUP_TRUSTED}" ]; then
+    logError "260" "Duplicate Global Trusted Pipeline Library name(s) in Jenkins: '${LIB_DUP_TRUSTED}'. Each name must appear only once under Global Trusted Libraries." 1
+  fi
+  LIB_DUP_UNTRUSTED=$(echo "${UNTRUSTED_JSON}" | ${JQ_BIN} -r '[.[].name] | group_by(.) | map(select(length > 1) | .[0]) | join(" ")')
+  if [ -n "${LIB_DUP_UNTRUSTED}" ]; then
+    logError "261" "Duplicate Global Untrusted Pipeline Library name(s) in Jenkins: '${LIB_DUP_UNTRUSTED}'. Each name must appear only once under Global Untrusted Libraries." 1
+  fi
+  LIB_IN_BOTH=$(printf '%s\n%s\n' "${JLIBS_JSON}" "${UNTRUSTED_JSON}" | ${JQ_BIN} -s -r '.[0] as $t | .[1] as $u | ($t | map(.name)) as $tn | ($u | map(.name)) as $un | ($tn | unique | map(select(. as $n | ($un | index($n) != null))) | join(" "))')
+  if [ -n "${LIB_IN_BOTH}" ]; then
+    logError "259" "The following pipeline libraries are defined in both Global Trusted Libraries and Global Untrusted Libraries: '${LIB_IN_BOTH}'. Remove the duplicate so each library exists in only one list." 1
+  fi
   if [ "${MISSING_LIBS}" != "" ]; then
-    logError "215" "One or more Jenkins global pipeline libraries not found -${MISSING_LIBS}"
+    UNTRUSTED_FOUND=""
+    for i in "${JENKINS_LIBS[@]}" ; do
+      if ! echo "${JLIBS_JSON}" | ${JQ_BIN} -e --arg n "${i}" '.[] | select(.name==$n)' >/dev/null 2>&1; then
+        if echo "${UNTRUSTED_JSON}" | ${JQ_BIN} -e --arg n "${i}" '.[] | select(.name==$n)' >/dev/null 2>&1; then
+          UNTRUSTED_FOUND+=" '${i}'"
+        fi
+      fi
+    done
+    ERR_MSG="One or more Jenkins global pipeline libraries not found under Global Trusted Libraries -'${MISSING_LIBS}'"
+    if [ "${UNTRUSTED_FOUND}" != "" ]; then
+      ERR_MSG+=" These libraries are configured under Global Untrusted Libraries instead:'${UNTRUSTED_FOUND}'; move them to Global Trusted Libraries."
+    fi
+    logError "215" "${ERR_MSG}" 1
   else
     logMessage "Expected global pipeline libraries found in Jenkins." 1
   fi
@@ -6217,6 +6257,24 @@ ALL_MSGS_JSON="[
     \"cause\": \"The value of the named parameter is not valid. It must consist of lower case alphanumeric characters or '-'.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Update the value to a valid string.\"
+  },
+  {
+    \"id\": \"259\",
+    \"cause\": \"The same pipeline library name is configured under both Global Trusted Libraries and Global Untrusted Libraries in Jenkins.\",
+    \"impact\": \"Library resolution is ambiguous and may not match the intended trusted/untrusted behavior.\",
+    \"remediation\": \"Remove the library from one of the two global lists so it is defined in only Global Trusted Libraries or only Global Untrusted Libraries.\"
+  },
+  {
+    \"id\": \"260\",
+    \"cause\": \"The same library name appears more than once under Global Trusted Libraries in Jenkins.\",
+    \"impact\": \"Pipeline shared library configuration is invalid.\",
+    \"remediation\": \"Edit Jenkins global configuration and delete duplicate Global Trusted Library entries with the same name.\"
+  },
+  {
+    \"id\": \"261\",
+    \"cause\": \"The same library name appears more than once under Global Untrusted Libraries in Jenkins.\",
+    \"impact\": \"Pipeline shared library configuration is invalid.\",
+    \"remediation\": \"Edit Jenkins global configuration and delete duplicate Global Untrusted Library entries with the same name.\"
   }
 ]"
 
