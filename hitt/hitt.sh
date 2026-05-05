@@ -2641,26 +2641,26 @@ EOF
 
 checkISDockerLogin() {
   SKIP_REGISTRY=0
+  IS_HARBOR_REGISTRY_HOSTNAME=$(echo "${IS_HARBOR_REGISTRY_HOST%%/*}")
   getRegistryDetailsFromIS
-  if [ "${SKIP_REGISTRY}" == "1" ]; then
-    logError "189" "Failed to get IS registry details - skipping checks."
-    return
+  if [ "${MODE}" == "post-is" ]; then
+    if [ "${SKIP_REGISTRY}" == "1" ]; then
+      logError "189" "Failed to get IS registry details - skipping checks."
+      return
+    fi
+    IS_HARBOR_REGISTRY_HOSTNAME=$(echo "${IS_SECRET_HARBOR_REGISTRY_HOST%%/*}")
   fi
 
-  if [ "${MODE}" == "pre-is" ]; then
+  if [ "${MODE}" == "pre-is" ] && [ "${SKIP_REGISTRY}" == "0" ]; then
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${IS_SECRET_HARBOR_REGISTRY_HOST}" ]; then
       logError "190" "HARBOR_REGISTRY_HOST '${IS_HARBOR_REGISTRY_HOST}' does not match the value in the registry secret '${IS_SECRET_HARBOR_REGISTRY_HOST}'."
-      return
     fi
     if [ "${IS_IMAGE_REGISTRY_USERNAME}" != "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" ]; then
       logError "190" "IMAGE_REGISTRY_USERNAME '${IS_IMAGE_REGISTRY_USERNAME}' does not match the value in the registry secret '${IS_SECRET_IMAGE_REGISTRY_USERNAME}'."
-      return
     fi
-#    if [ "${IS_IMAGE_REGISTRY_PASSWORD}" != "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" ]; then
-#      logError "IMAGE_REGISTRY_PASSWORD does not match the value in the registry secret."
-#      return
-#    fi
   fi
+
+
 
   if ! docker ps > /dev/null 2>&1; then
     if ! which docker > /dev/null 2>&1 ; then
@@ -4560,6 +4560,22 @@ buildJenkinsPipelineFromFile() {
   PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} '. | to_entries | map({name: .key, value: .value}) | {parameter: .}')
   logMessage "Building HELIX_ONPREM_DEPLOYMENT pipeline with values from '${PIPELINE_JSON_FILE}'."
   ${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_INPUT_JSON}" -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${JOB_NAME}/build" 2>>${HITT_ERR_FILE}
+}
+
+URLEncode() {
+	local dataLength="${#1}"
+	local index
+	for ((index = 0;index < dataLength;index++)); do
+		local char="${1:index:1}"
+		case $char in
+			[a-zA-Z0-9.~_-])
+				printf "$char"
+				;;
+			*)
+				printf "%%%02X" "'$char"
+				;;
+		esac
+	done
 }
 
 #End functions
