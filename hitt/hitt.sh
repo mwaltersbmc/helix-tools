@@ -3049,15 +3049,15 @@ checkJenkinsGlobalLibs() {
   done
   LIB_DUP_TRUSTED=$(echo "${JLIBS_JSON}" | ${JQ_BIN} -r '[.[].name] | group_by(.) | map(select(length > 1) | .[0]) | join(" ")')
   if [ -n "${LIB_DUP_TRUSTED}" ]; then
-    logError "260" "Duplicate Global Trusted Pipeline Library name(s) in Jenkins: '${LIB_DUP_TRUSTED}'. Each name must appear only once under Global Trusted Libraries." 1
+    logError "260" "Duplicate Global Trusted Pipeline Library name(s) in Jenkins: '${LIB_DUP_TRUSTED}'. Each name must appear only once under Global Trusted Libraries."
   fi
   LIB_DUP_UNTRUSTED=$(echo "${UNTRUSTED_JSON}" | ${JQ_BIN} -r '[.[].name] | group_by(.) | map(select(length > 1) | .[0]) | join(" ")')
   if [ -n "${LIB_DUP_UNTRUSTED}" ]; then
-    logError "261" "Duplicate Global Untrusted Pipeline Library name(s) in Jenkins: '${LIB_DUP_UNTRUSTED}'. Each name must appear only once under Global Untrusted Libraries." 1
+    logError "261" "Duplicate Global Untrusted Pipeline Library name(s) in Jenkins: '${LIB_DUP_UNTRUSTED}'. Each name must appear only once under Global Untrusted Libraries."
   fi
   LIB_IN_BOTH=$(printf '%s\n%s\n' "${JLIBS_JSON}" "${UNTRUSTED_JSON}" | ${JQ_BIN} -s -r '.[0] as $t | .[1] as $u | ($t | map(.name)) as $tn | ($u | map(.name)) as $un | ($tn | unique | map(select(. as $n | ($un | index($n) != null))) | join(" "))')
   if [ -n "${LIB_IN_BOTH}" ]; then
-    logError "259" "The following pipeline libraries are defined in both Global Trusted Libraries and Global Untrusted Libraries: '${LIB_IN_BOTH}'. Remove the duplicate so each library exists in only one list." 1
+    logError "259" "The following pipeline libraries are defined in both Global Trusted Libraries and Global Untrusted Libraries: '${LIB_IN_BOTH}'. Remove the duplicate so each library exists in only one list."
   fi
   if [ "${MISSING_LIBS}" != "" ]; then
     UNTRUSTED_FOUND=""
