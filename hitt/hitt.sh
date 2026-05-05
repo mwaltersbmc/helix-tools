@@ -2411,7 +2411,7 @@ checkISDBSettings() {
     fi
     JISQL_USERNAME="${IS_DATABASE_ADMIN_USER}"
     JISQL_PASSWORD="${IS_DATABASE_ADMIN_PASSWORD}"
-    #JISQL_DB_NAME="postgres"
+    JISQL_DB_NAME="postgres"
   fi
   [[ -n "${SKIP_AR_DB_CHECKS}" ]] && return
   if [ -f dbjars.tgz ]; then
