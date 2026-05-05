@@ -1082,7 +1082,9 @@ checkJenkinsIsRunning() {
       ;;
     *)
       logError "126" "Jenkins not found on ${JENKINS_LOG_URL} - skipping Jenkins tests."
-      systemctl status jenkins > jenkins-status.log 2>&1
+      if ! isJenkinsInCluster; then
+        systemctl status jenkins > jenkins-status.log 2>&1
+      fi
       SKIP_JENKINS=1
       ;;
   esac
@@ -4429,7 +4431,7 @@ logPlatformFTSStartTime() {
 showFixHelp() { # fix mode help
   echo "HITT fix mode options - see https://bit.ly/hittfix"
   echo .
-  echo 'Usage: bash hitt.sh -f "<fixmode> [fixmode options]""'
+  echo 'Usage: bash hitt.sh -f "<fixmode> [fixmode options]"'
   echo -e "
     \tssh \t\t| Set up/update passwordless ssh for the git user.
     \trealm \t\t| Create/update the Helix Service Management realm in SSO.
@@ -6109,7 +6111,7 @@ ALL_MSGS_JSON="[
     \"id\": \"230\",
     \"cause\": \"One or more of the Jenkins credentials have different passwords when they should all be set to the password of the git user.\",
     \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Run 'bash hitt.sh -j' to diplay the passwords and then, in Jenkins go to Manage Jenkins->Credentials, and update those that have the wrong value.\"
+    \"remediation\": \"Run 'bash hitt.sh -j' to display the passwords and then, in Jenkins go to Manage Jenkins->Credentials, and update those that have the wrong value.\"
   },
   {
     \"id\": \"231\",
