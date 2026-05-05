@@ -3438,12 +3438,12 @@ checkDERequirements() {
     fi
 
     ANSIBLE_VERS=$(ansible-playbook /dev/stdin << 'EOF' 2>/dev/null | grep 'msg:' | xargs
-    ---
-    - hosts: localhost
-      gather_facts: true
-      tasks:
-        - debug:
-            msg: "{{ ansible_version.full }}={{ ansible_python_version }}={{ ansible_python.executable }}"
+---
+- hosts: localhost
+  gather_facts: true
+  tasks:
+    - debug:
+        msg: "{{ ansible_version.full }}={{ ansible_python_version }}={{ ansible_python.executable }}"
 EOF
     )
     ANSIBLE_VERS_CLEAN="${ANSIBLE_VERS#msg: }"
