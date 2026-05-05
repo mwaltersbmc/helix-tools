@@ -4673,6 +4673,11 @@ cleanUp start
 # Run tctl command and then exit
 if [[ ! -z "${TCTL_CMD}" ]]; then
   logStatus "Running in tctl only mode..."
+  checkToolVersion kubectl
+  getVersions
+  if [ "${HP_SM_PLATFORM_CORE}"  == "yes" ]; then
+    logError "262" "Helix Platform CORE deployment - no tenant services deployed." 1
+  fi
   deleteTCTLJob
   deployTCTL "${TCTL_CMD}"
   logMessage "tctl output is...\n"
@@ -6291,6 +6296,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The same library name appears more than once under Global Untrusted Libraries in Jenkins.\",
     \"impact\": \"Pipeline shared library configuration is invalid.\",
     \"remediation\": \"Edit Jenkins global configuration and delete duplicate Global Untrusted Library entries with the same name.\"
+  },
+  {
+    \"id\": \"262\",
+    \"cause\": \"The Helix Platform is a CORE mode deployment with no tenant services.\",
+    \"impact\": \"tctl commands are not applicable and will not work.\",
+    \"remediation\": \"No Helix Platform tenant features are installed.\"
   }
 ]"
 
