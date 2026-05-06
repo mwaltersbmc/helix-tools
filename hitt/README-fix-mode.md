@@ -67,6 +67,8 @@ Creates the default role and rolebinding required by the Support Assistant Tool.
 bash hitt.sh -f "arlicense BRD-128754"
 or
 bash hitt.sh -f "arlicense LTD-761066 28-Apr-27"
+or
+bash hitt.sh -f "arlicense SHY-351098-GH-165"
 ```
 Applies a permanent or temporary server license to the system.
 
