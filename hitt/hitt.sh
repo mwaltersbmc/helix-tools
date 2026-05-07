@@ -1686,8 +1686,11 @@ validateISDetails() {
 #      logError "242" "HELIX_FULL_STACK_UPGRADE is selected but this not valid when the DEPLOYMENT_MODE is '${IS_DEPLOYMENT_MODE}'."
     fi
 
-    if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ]; then
+    if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ] && ! isJenkinsInCluster; then
       logWarning "008" "CUSTOM_BINARY_PATH option is selected - this is not usually required and may be a mistake."
+    fi
+    if [ "${IS_CUSTOM_BINARY_PATH}" == "true" ] && isJenkinsInCluster; then
+      logError "263" "CUSTOM_BINARY_PATH option is selected - this is not supported when using a containerized Deployment Engine."
     fi
 
     if ! ${KUBECTL_BIN} config get-contexts "${IS_CLUSTER}" > /dev/null 2>&1; then
@@ -6304,6 +6307,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The Helix Platform is a CORE mode deployment with no tenant services.\",
     \"impact\": \"tctl commands are not applicable and will not work.\",
     \"remediation\": \"No Helix Platform tenant features are installed.\"
+  },
+  {
+    \"id\": \"263\",
+    \"cause\": \"CUSTOM_BINARY_PATH is selected but this is not supported when Jenkins is running in a pod.\",
+    \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
+    \"remediation\": \"Deselect the CUSTOM_BINARY_PATH option.\"
   }
 ]"
 
