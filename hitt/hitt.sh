@@ -2288,7 +2288,7 @@ checkISTenant() {
   logMessage "Checking IS Tenant..."
   getISTenant
   logMessage "IS tenant name: '${IS_TENANT_NAME}', domainIdentifier: '${IS_TENANT_DOMID}', virtualHostname: '${IS_TENANT_VHOSTNAME}'." 1
-  return
+  return # skipping following as still under review
   if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
     logError "xxx" "IS tenant name is '${IS_TENANT_NAME}' and not the expected '${IS_CUSTOMER_SERVICE}'."
   fi
@@ -4081,8 +4081,7 @@ triggerHelixDryRun() {
       def causeAction = new CauseAction(new Cause.UserIdCause())
       def future = job.scheduleBuild2(0, causeAction)
       def build = future.get()
-      }
-    return"
+    }"
   logMessage "Started dry runs of Helix deployment pipelines..."
   runJenkinsCurl "${SCRIPT}"
 }
