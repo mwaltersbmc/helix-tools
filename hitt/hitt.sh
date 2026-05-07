@@ -4088,8 +4088,8 @@ isJenkinsInCluster() {
   if [ -n "${K8S_JENKINS}" ]; then return 0; fi
   JENKINS_AGENTS=($(${CURL_BIN} -gks "${JENKINS_URL}/computer/api/json?tree=computer[displayName]" | ${JQ_BIN} -r '.computer[].displayName'))
   if printf '%s\0' "${JENKINS_AGENTS[@]}" | grep -Fqz -- 'jenkins-agent'; then
-    return 0
     K8S_JENKINS=1
+    return 0
   else
     return 1
   fi
@@ -4231,7 +4231,7 @@ applyARLicense() {
   IS_LICENSE_EXPIRY=""
   # Validate inputs
   if [[ ! "${IS_LICENSE_KEY}" =~ ^[A-Z]{3}-[0-9]{6}(-[A-Z]{2}-[0-9]{3})?$ ]]; then
-      logError "999" "Invalid license key format '${FIXARGS[1]}'. Expected format is 'XXX-nnnnnn' or 'XXX-nnnnnn-XX-nnn' where X is a letter and n is a number."
+    logError "999" "Invalid license key format '${FIXARGS[1]}'. Expected format is 'XXX-nnnnnn' or 'XXX-nnnnnn-XX-nnn' where X is a letter and n is a number."
     INVALID_IS_LICENSE=1
   else
     IS_LICENSE_JSON="{\"values\":{\"License Type\":\"AR Server\",\"Number of Licenses\":1,\"Key\":\"${IS_LICENSE_KEY}\"}}"
