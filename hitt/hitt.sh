@@ -397,7 +397,7 @@ setISDBVersion() {
       IS_DB_VERSION=200
       ;;
     23)
-      [[ "${1}" == "23.3.03" ]] && IS_DB_VERSION=201
+      IS_DB_VERSION=201
       [[ "${1}" == "23.3.04" ]] && IS_DB_VERSION=203
       ;;
     25)
@@ -408,6 +408,7 @@ setISDBVersion() {
       ;;
     26)
       [[ "${1}" == "26.1.01" ]] && IS_DB_VERSION=236
+      [[ "${1}" == "26.2.01" ]] && IS_DB_VERSION=236
       ;;
     *)
       logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
