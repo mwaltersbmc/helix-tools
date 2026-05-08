@@ -4460,6 +4460,23 @@ showFixHelp() { # fix mode help
     "
 }
 
+showUtilHelp() { # fix mode help
+  echo "HITT utility mode options - see https://bit.ly/gethitt"
+  echo .
+  echo 'Usage: bash hitt.sh -u "<utilmode> [utilmode options]"'
+  echo -e "
+    \tdecodesecret \t| Decodes and displays the contents of a Kubernetes secret.
+    \tgetdbid \t| Displays the database ID (DBID) for the system - used for licensing.
+    \tgetjwt \t| Print an AR-JWT token for the IS REST API (hannah_admin credentials from the cluster).
+    \tgendbid \t| Generate a database ID (DBID) from the provided values (DB_TYPE DATABASE_HOST_NAME AR_DB_NAME).
+    "
+#  echo -e '\tJenkins fixmode options:'
+#  echo -e "
+#    \tscriptapproval \t| Approves the scripts required by the deployment pipelines.
+#    \tpipelinelibs \t| Create/update the Global Trusted Pipeline Library definitions.
+#    "
+}
+
 getJenkinsPipelineValues() {
   if [ ${#PIPELINEARGS[@]} -lt 2 ]; then
     logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N> [filename]\"" 1
@@ -4583,6 +4600,20 @@ URLEncode() {
 				;;
 		esac
 	done
+}
+
+decodeK8sSecret() {
+  K8S_SECRET=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o json 2>/dev/null)
+  # Check secret was found
+  if [[ -z "${K8S_SECRET}" ]]; then
+    logError "999" "Secret '${2}' not found in '${1}' namespace." 1
+  fi
+  # Test that it contains data we can decode
+  if ! echo "${K8S_SECRET}" | ${JQ_BIN} -e '.data | type == "object" and length > 0' >/dev/null 2>&1; then
+    logError "999" "Secret '${2}' does not contain data that can be decoded by HITT." 1
+  fi
+  # Decode
+  echo "${K8S_SECRET}" | ${JQ_BIN} -r '.data | to_entries[] | "\(.key): \(.value | @base64d)"'
 }
 
 #End functions
@@ -4746,21 +4777,6 @@ if [ "${MODE}" == "fix" ]; then
     ssh)
       fixSSH "${GIT_USER}"
       ;;
-    getdbid)
-      getISDbID
-      ;;
-    getjwt)
-      getISJWTToken
-      ;;
-    gendbid)
-      if [ ${#FIXARGS[@]} -ne 4 ]; then
-        logError "999" "Usage: bash $0 -f \"gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME\"" 1
-      fi
-      IS_DB_TYPE="${FIXARGS[1]}"
-      IS_DATABASE_HOST_NAME="${FIXARGS[2]}"
-      IS_AR_DB_NAME="${FIXARGS[3]}"
-      generateISDbID
-      ;;
     arlicense)
       if [ ${#FIXARGS[@]} -eq 1 ]; then
         logError "999" "Usage: bash $0 -f \"arlicense key [expiry]\"" 1
@@ -4803,6 +4819,42 @@ if [ "${MODE}" == "pipeline" ]; then
       ;;
     *)
     logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option." 1
+    ;;
+  esac
+  exit
+fi
+
+if [ "${MODE}" == "utility" ]; then
+  # Parse UTILOPTS to array
+  read -r -a UTILARGS <<< "${UTILOPTS}"
+  logStatus "Running HITT in utility mode '${UTILARGS[0]}'..."
+  case "${UTILARGS[0]}" in
+    decodesecret)
+      if [ ${#UTILARGS[@]} -ne 3 ]; then
+        logError "999" "Usage: bash $0 -u \"decodesecret NAMESPACE SECRETNAME \"" 1
+      fi
+      decodeK8sSecret "${UTILARGS[1]}" "${UTILARGS[2]}"
+      ;;
+    getdbid)
+      getISDbID
+      ;;
+    getjwt)
+      getISJWTToken
+      ;;
+    gendbid)
+      if [ ${#UTILARGS[@]} -ne 4 ]; then
+        logError "999" "Usage: bash $0 -u \"gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME\"" 1
+      fi
+      IS_DB_TYPE="${UTILARGS[1]}"
+      IS_DATABASE_HOST_NAME="${UTILARGS[2]}"
+      IS_AR_DB_NAME="${UTILARGS[3]}"
+      generateISDbID
+      ;;
+    help)
+      showUtilHelp
+      ;;
+    *)
+    logError "999" "'${UTILARGS[0]}' is not a valid fix mode option." 1
     ;;
   esac
   exit
@@ -6411,6 +6463,10 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
       QUIET=1
       SKIP_UPDATE_CHECK=1
       ;;
+    r)
+      CONF_OVERRIDE=1
+      JENKINS_USERNAME_OVERRIDE="${OPTARG}"
+      ;;
     s)
       CONF_OVERRIDE=1
       IS_CUSTOMER_SERVICE_OVERRIDE="${OPTARG}"
@@ -6424,8 +6480,15 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
       fi
       ;;
     u)
-      CONF_OVERRIDE=1
-      JENKINS_USERNAME_OVERRIDE="${OPTARG}"
+      SKIP_UPDATE_CHECK=1
+      # Check if the next argument in the list is a "stray" (doesn't start with -)
+      # ${!OPTIND} is a Bash feature that gets the value of the argument at that index
+      NEXT_VAL="${!OPTIND}"
+      if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
+        logError "999" "When using UTILITY mode commands with options you must enclose them in double quotes - eg: bash $0 -u \"command option\"" 1
+      fi
+      MODE=utility
+      UTILOPTS="${OPTARG}"
       ;;
     v)
       VERBOSITY=1
