@@ -1555,6 +1555,9 @@ validateISDetails() {
     logMessage "TENANT_DOMAIN matches the realm Tenant '${REALM_TENANT}'." 1
   fi
 
+  if [[ "${IS_RSSO_URL}" != https* ]]; then
+    logError "264" "The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline '${IS_RSSO_URL}' does not start with the required 'https://'."
+  fi
   if [ "${IS_RSSO_URL}" != "${RSSO_URL}" ]; then
     logError "133" "The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline '${IS_RSSO_URL}' does not match the Helix Platform RSSO_URL '${RSSO_URL}'."
   else
@@ -6312,6 +6315,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"CUSTOM_BINARY_PATH is selected but this is not supported when Jenkins is running in a pod.\",
     \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
     \"remediation\": \"Deselect the CUSTOM_BINARY_PATH option.\"
+  },
+  {
+    \"id\": \"264\",
+    \"cause\": \"RSSO_URL value does not start with 'https//'.\",
+    \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
+    \"remediation\": \"Update the value and add the missing prefix.\"
   }
 ]"
 
