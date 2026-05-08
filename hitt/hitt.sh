@@ -4461,11 +4461,11 @@ showFixHelp() { # fix mode help
 }
 
 showUtilHelp() { # fix mode help
-  echo "HITT utility mode options - see https://bit.ly/gethitt"
+  echo "HITT utility mode options - see https://bit.ly/hittutil"
   echo .
   echo 'Usage: bash hitt.sh -u "<utilmode> [utilmode options]"'
   echo -e "
-    \tdecodesecret \t| Decodes and displays the contents of a Kubernetes secret.
+    \tdecodesecret \t| Decodes and displays Kubernetes secret data.
     \tgetdbid \t| Displays the database ID (DBID) for the system - used for licensing.
     \tgetjwt \t| Print an AR-JWT token for the IS REST API (hannah_admin credentials from the cluster).
     \tgendbid \t| Generate a database ID (DBID) from the provided values (DB_TYPE DATABASE_HOST_NAME AR_DB_NAME).
@@ -4603,6 +4603,7 @@ URLEncode() {
 }
 
 decodeK8sSecret() {
+  local K8S_SECRET
   K8S_SECRET=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o json 2>/dev/null)
   # Check secret was found
   if [[ -z "${K8S_SECRET}" ]]; then
@@ -4854,7 +4855,7 @@ if [ "${MODE}" == "utility" ]; then
       showUtilHelp
       ;;
     *)
-    logError "999" "'${UTILARGS[0]}' is not a valid fix mode option." 1
+    logError "999" "'${UTILARGS[0]}' is not a valid utility mode option." 1
     ;;
   esac
   exit
