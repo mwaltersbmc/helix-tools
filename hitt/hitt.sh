@@ -4356,9 +4356,9 @@ applyARLicense() {
       logError "999" "Failed to apply license - '${HTTP_CODE}'."
       cat "${HTTP_RESPONSE}" | sed 's/^/        /'
       echo
-      rm -f "${HTTP_RESPONSE}"
       ;;
   esac
+  rm -f "${HTTP_RESPONSE}"
 }
 
 askYesNo() {
