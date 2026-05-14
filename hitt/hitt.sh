@@ -51,9 +51,9 @@ getEPjson() {
       name: .metadata.name,
       version: .metadata.labels["helix-de/version"],
       host: .spec.externalIPs[0],
-      # Find the nodePort for the port named "http" or port 80
+      # Find port for the port named "http"
       protocol: "http",
-      port: 80
+      port: (.spec.ports[] | select(.name == "http" | .port)
     }),
     # NodePorts
     (.items[] | select(.kind == "Service" and .metadata.name == $name and (.spec.type == "NodePort")) | {
@@ -61,9 +61,9 @@ getEPjson() {
       name: .metadata.name,
       version: .metadata.labels["helix-de/version"],
       host: $nip,
-      # Find the nodePort for the port named "http" or port 80
+      # Find the nodePort for the port named "http"
       protocol: "http",
-      port: (.spec.ports[] | select(.name == "http" or .port == 80) | .nodePort)
+      port: (.spec.ports[] | select(.name == "http" ) | .nodePort)
     })
   ]'
 }
@@ -1496,20 +1496,25 @@ cloneGitRepos() {
     GITEA_CREDS_JSON=$(getGITEACredentials)
     GITEA_ADMIN_USER=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_USER')
     GITEA_ADMIN_PASS=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_PASS')
-    #Check for GITEA ingress
-    GITEA_HOST=$(${KUBECTL_BIN} get ingress -A -o custom-columns=":metadata.name,:.spec.rules[*].host" --no-headers | grep ^gitea | awk '{print $2}')
-    if [ -n "${GITEA_HOST}" ] ; then
-      GITEA_URL="https://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}"
-    fi
-    # If ingress not found check for exposed svc
-    if [ -z "${GITEA_HOST}" ] ; then
-      GITEA_HOST=$(${KUBECTL_BIN} get svc -A -o custom-columns=":metadata.name,:.spec.externalIPs[0]" --no-headers| grep ^gitea | awk '{print $2}')
-      if [ -n "${GITEA_HOST}" ] && [ "${GITEA_HOST}" != "<none>" ]; then
-        GITEA_URL="http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}:3000"
-      else
-        GITEA_HOST=""
-      fi
-    fi
+    GITEA_EP_JSON=$(getEPjson gitea "${CDE_NAMESPACE}")
+    GITEA_HOST=$(echo "${GITEA_EP_JSON}" | ${JQ_BIN} -r '.[0].host')
+    GITEA_PROTOCOL=$(echo "${GITEA_EP_JSON}" | ${JQ_BIN} -r '.[0].protocol')
+    GITEA_PORT=$(echo "${GITEA_EP_JSON}" | ${JQ_BIN} -r '.[0].port')
+    GITEA_URL="${GITEA_PROTOCOL}://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}:${GITEA_PORT}"
+#    #Check for GITEA ingress
+#    GITEA_HOST=$(${KUBECTL_BIN} get ingress -A -o custom-columns=":metadata.name,:.spec.rules[*].host" --no-headers | grep ^gitea | awk '{print $2}')
+#    if [ -n "${GITEA_HOST}" ] ; then
+#      GITEA_URL="https://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}"
+#    fi
+#    # If ingress not found check for exposed svc
+#    if [ -z "${GITEA_HOST}" ] ; then
+#      GITEA_HOST=$(${KUBECTL_BIN} get svc -A -o custom-columns=":metadata.name,:.spec.externalIPs[0]" --no-headers| grep ^gitea | awk '{print $2}')
+#      if [ -n "${GITEA_HOST}" ] && [ "${GITEA_HOST}" != "<none>" ]; then
+#        GITEA_URL="http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}:3000"
+#      else
+#        GITEA_HOST=""
+#      fi
+#    fi
     if [ -z "${GITEA_HOST}" ] ; then
       logMessage "Unable to find GITEA host connection details - skipping checks."
       SKIP_REPO=1
