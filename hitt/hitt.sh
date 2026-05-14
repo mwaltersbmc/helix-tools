@@ -8,8 +8,10 @@
 # Populate HP_NS_CANDIDATES / IS_NS_CANDIDATES from cluster (rsso / midtier-user deployments).
 # Uses NS_ARRAY; skips the PENDING sentinel (not a real namespace name).
 discoverHelixNamespaceCandidates() {
+  logMessage "Scanning namespaces..."
   HP_NS_CANDIDATES=()
   IS_NS_CANDIDATES=()
+  CDE_NS_CANDIDATES=()
   local ns
   for ns in "${NS_ARRAY[@]}"; do
     [[ "${ns}" == "PENDING" ]] && continue
@@ -19,7 +21,51 @@ discoverHelixNamespaceCandidates() {
     if ${KUBECTL_BIN} -n "${ns}" get deployment midtier-user >/dev/null 2>&1; then
       IS_NS_CANDIDATES+=("${ns}")
     fi
+    if ${KUBECTL_BIN} -n "${ns}" get deployment jenkins-master >/dev/null 2>&1; then
+      CDE_NS_CANDIDATES+=("${ns}")
+    fi
   done
+}
+
+getEPjson() {
+  # getxxx svc/ing namespace
+  if ${KUBECTL_BIN} auth can-i get nodes --quiet &>/dev/null; then
+    NODE_IP=$(${KUBECTL_BIN} get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+  else
+    NODE_IP="Node IP not found - set manually in hitt config file."
+  fi
+
+  ${KUBECTL_BIN} get svc,ing -n "${2}" -o json | ${JQ_BIN} --arg name "${1}" --arg nip "${NODE_IP}" '[
+    # Process Ingresses
+    (.items[] | select(.kind == "Ingress" and .metadata.name == $name and (.status.loadBalancer.ingress | length > 0)) | {
+      type: "ingress",
+      name: .metadata.name,
+      version: .metadata.labels["helix-de/version"],
+      host: (.spec.rules[0].host),
+      protocol: "https",
+      port: 443
+    }),
+    # Exposed Services
+    (.items[] | select(.kind == "Service" and .metadata.name == $name and (.spec.externalIPs | length > 0)) | {
+      type: "exposed IP",
+      name: .metadata.name,
+      version: .metadata.labels["helix-de/version"],
+      host: .spec.externalIPs[0],
+      # Find the nodePort for the port named "http" or port 80
+      protocol: "http",
+      port: 80
+    }),
+    # NodePorts
+    (.items[] | select(.kind == "Service" and .metadata.name == $name and (.spec.type == "NodePort")) | {
+      type: "nodeport",
+      name: .metadata.name,
+      version: .metadata.labels["helix-de/version"],
+      host: $nip,
+      # Find the nodePort for the port named "http" or port 80
+      protocol: "http",
+      port: (.spec.ports[] | select(.name == "http" or .port == 80) | .nodePort)
+    })
+  ]'
 }
 
 getConfValues() {
@@ -58,28 +104,57 @@ getConfValues() {
   #read -p "ENVIRONMENT : " IS_ENVIRONMENT
   while [[ -z "${IS_ENVIRONMENT}" ]]; do read -p "ENVIRONMENT : " IS_ENVIRONMENT; done
 
-  logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
-  read -p "Username : " JENKINS_USERNAME
-  read -r -s -p "Password : " JENKINS_PASSWORD
-  echo
-  JENKINS_LOCATION_ARRAY=("Locally on this Deployment Engine system." "Remotely as a pod in the Kubernetes cluster.")
+  JENKINS_LOCATION_ARRAY=("Locally on this Deployment Engine system." "Remotely as a Containerized Deployment Engine pod in the Kubernetes cluster.")
   logStatus "Where is Jenkins running?"
   selectFromArray JENKINS_LOCATION_ARRAY
   if [ "${REPLY}" != "1" ]; then
-  #if askYesNo "${BOLD}Are you using a containerized Deployment Engine?${NORMAL}" ; then
-    logStatus "Please enter your Jenkins details:"
-    #read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME
-  while [[ -z "${JENKINS_HOSTNAME}" ]]; do read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME; done
-    echo "Jenkins protocol :"
-    JENKINS_PROTOCOL=$(selectFromArray JENKINS_PROTOCOL_ARRAY)
-    [[ "${JENKINS_PROTOCOL}" == "https" ]] && JENKINS_PORT_NUM=443 || JENKINS_PORT_NUM=8080
-    read -p "Jenkins port number [${JENKINS_PORT_NUM}]: " JENKINS_PORTX
-    JENKINS_PORT=${JENKINS_PORTX:-$JENKINS_PORT_NUM}
+
+    if [ ${#CDE_NS_CANDIDATES[@]} -eq 1 ]; then
+      CDE_NAMESPACE="${CDE_NS_CANDIDATES[0]}"
+      logStatus "Auto-selected Jenkins namespace: ${CDE_NAMESPACE}" 1
+    else
+      logStatus "Please select your Jenkins namespace..." 1
+      if [ ${#CDE_NS_CANDIDATES[@]} -gt 1 ]; then
+        CDE_NAMESPACE=$(selectFromArray CDE_NS_CANDIDATES)
+      else
+        CDE_NAMESPACE=$(selectFromArray NS_ARRAY)
+      fi
+    fi
+    # CDE - check for end points
+    JENKINS_EP_JSON=$(getEPjson jenkins-master "${CDE_NAMESPACE}")
+    JENKINS_CDE_VERSION=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[0].version')
+    echo
+    logStatus "Jenkins CDE version: ${JENKINS_CDE_VERSION}"
+    mapfile -t JENKINS_EP_ARRAY < <(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[] | "\(.host) on port \(.port) (via \(.type))"')
+    if [ ${#JENKINS_EP_ARRAY[@]} -eq 1 ]; then
+      JENKINS_HOSTNAME=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[0].host')
+      JENKINS_PROTOCOL=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[0].protocol')
+      JENKINS_PORT=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[0].port')
+    else
+      logStatus "Please select your preferred Jenkins connection..." 1
+      selectFromArray JENKINS_EP_ARRAY
+      JENKINS_HOSTNAME=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r --argjson element "${REPLY}" '.[$element-1].host')
+      JENKINS_PROTOCOL=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r --argjson element "${REPLY}" '.[$element-1].protocol')
+      JENKINS_PORT=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r --argjson element "${REPLY}" '.[$element-1].port')
+    fi
+#  logStatus "Please enter your Jenkins details:"
+#  while [[ -z "${JENKINS_HOSTNAME}" ]]; do read -p "Jenkins hostname or IP address : " JENKINS_HOSTNAME; done
+#    echo "Jenkins protocol :"
+#    JENKINS_PROTOCOL=$(selectFromArray JENKINS_PROTOCOL_ARRAY)
+#    [[ "${JENKINS_PROTOCOL}" == "https" ]] && JENKINS_PORT_NUM=443 || JENKINS_PORT_NUM=8080
+#    read -p "Jenkins port number [${JENKINS_PORT_NUM}]: " JENKINS_PORTX
+#    JENKINS_PORT=${JENKINS_PORTX:-$JENKINS_PORT_NUM}
   else
     JENKINS_HOSTNAME=localhost
     JENKINS_PROTOCOL=http
     JENKINS_PORT=8080
   fi
+  logMessage "Jenkins server - ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
+
+  logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
+  read -p "Username : " JENKINS_USERNAME
+  read -r -s -p "Password : " JENKINS_PASSWORD
+
 }
 
 createHITTconf() {
@@ -92,6 +167,7 @@ HP_NAMESPACE=${HP_NAMESPACE}
 IS_NAMESPACE=${IS_NAMESPACE}
 IS_CUSTOMER_SERVICE=${IS_CUSTOMER_SERVICE}
 IS_ENVIRONMENT=${IS_ENVIRONMENT}
+CDE_NAMESPACE=${CDE_NAMESPACE}
 
 # OPTIONAL SETTINGS
 # Set JENKINS credentials and hostname/port if required
@@ -4647,7 +4723,7 @@ else
   createHITTconf ".hitt.conf"
   checkHITTconf "${HITT_CONFIG_FILE}"
 fi
-source "${HITT_CONFIG_FILE}"
+source "./${HITT_CONFIG_FILE}"
 
 # Conf overrides
 if [ "${CONF_OVERRIDE}" == "1" ]; then
