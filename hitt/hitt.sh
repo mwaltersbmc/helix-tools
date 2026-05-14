@@ -2787,6 +2787,9 @@ dumpVARs() {
   if [ "${MODE}" == "post-is" ]; then
     createPipelineVarsArray
     for i in "${PIPELINE_VARS[@]}"; do
+      if [ "${LOG_PASSWDS}" == "0" ] && [[ "${i}" =~ "PASSWORD" ]]; then
+        continue
+      fi
       v="IS_${i}"
       if [ "${!v}" != "" ]; then
         echo "${i}=${!v}" >> "${VALUES_LOG_FILE}"
