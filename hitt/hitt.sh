@@ -53,7 +53,7 @@ getEPjson() {
       host: .spec.externalIPs[0],
       # Find port for the port named "http"
       protocol: "http",
-      port: (.spec.ports[] | select(.name == "http" | .port)
+      port: (.spec.ports[] | select(.name == "http") | .port)
     }),
     # NodePorts
     (.items[] | select(.kind == "Service" and .metadata.name == $name and (.spec.type == "NodePort")) | {
