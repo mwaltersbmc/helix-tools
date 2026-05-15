@@ -2352,7 +2352,7 @@ checkISRESTReady() {
   fi
   getISAdminCreds
   if ! getISJWT; then
-    logError "176" "Failed to authenticate user' ${IS_ADMIN_USER}' - skipping checks."
+    logError "176" "Failed to authenticate user' ${IS_USER}' - skipping checks."
     return
   fi
   IS_REST_READY=1
@@ -2393,7 +2393,7 @@ getISTenant() {
 }
 
 getISJWT() {
-  ARJWT=$(${CURL_BIN} -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/jwt/login" -H "content-type/x-www-form" -d "username=${IS_ADMIN_USER}&password=${IS_ADMIN_PASSWD}")
+  ARJWT=$(${CURL_BIN} -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/jwt/login" -H "content-type/x-www-form" -d "username=${IS_USER}&password=${IS_PASSWD}")
   if echo "${ARJWT}" | grep -q "ERROR"; then
     return 1
   else
@@ -2419,11 +2419,11 @@ checkISLicense() {
 }
 
 getISAdminCreds() {
-  IS_ADMIN_USER=hannah_admin
+  IS_USER=hannah_admin
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret > /dev/null 2>&1; then
-    IS_ADMIN_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data.ATWS_UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
+    IS_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data.ATWS_UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
   else
-    IS_ADMIN_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret atriumwebsvc -o jsonpath='{.data.UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
+    IS_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret atriumwebsvc -o jsonpath='{.data.UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
   fi
 }
 
@@ -4295,21 +4295,37 @@ getISDbID() {
   buildISAliasesArray
   getISAdminCreds
   if ! getISJWT; then
-    logError "999" "Failed to authenticate user '${IS_ADMIN_USER}' - can't get DB ID." 1
+    logError "999" "Failed to authenticate user '${IS_USER}' - can't get DB ID." 1
   fi
   IS_DBID=$(getISServerInfo dbId)
   logMessage "DB ID for this system is '${IS_DBID}'."
 }
 
 getISJWTToken() {
+  local IS_USERNAME
+  local IS_PASSWORD
+  IS_USERNAME="${1}"
+  IS_PASSWORD="${2}"
+  if [ -n "${IS_USERNAME}" ] && [ -z "${IS_PASSWORD}" ]; then
+    read -r -s -p "${IS_USERNAME} password : " IS_PASSWORD
+  fi
+  if [ -z "${IS_USERNAME}" ]; then
+    IS_USERNAME=hannah_admin
+  fi
   checkToolVersion kubectl
   getVersions
   getDomain
   buildISAliasesArray
-  getISAdminCreds
-  logStatus "Getting IS REST API JWT for user '${IS_ADMIN_USER}'..."
+  if [ "${IS_USERNAME}" == "hannah_admin" ]; then
+    getISAdminCreds
+  else
+    IS_USER="${IS_USERNAME}"
+    IS_PASSWD="${IS_PASSWORD}"
+    getISJWT
+  fi
+  logStatus "Getting IS REST API JWT for user '${IS_USERNAME}'..."
   if ! getISJWT; then
-    logError "999" "Failed to authenticate user '${IS_ADMIN_USER}' - can't get JWT." 1
+    logError "999" "Failed to authenticate user '${IS_USERNAME}' - can't get JWT." 1
   fi
   printf 'ARJWT="%s"\n' "${ARJWT}"
 }
@@ -4342,7 +4358,7 @@ applyARLicense() {
   buildISAliasesArray
   getISAdminCreds
   if ! getISJWT; then
-    logError "999" "Failed to authenticate user '${IS_ADMIN_USER}' - can't apply license." 1
+    logError "999" "Failed to authenticate user '${IS_USER}' - can't apply license." 1
   fi
   IS_LICENSE_TYPE=$(getISServerInfo licensetype)
   logMessage "Current server license type is '${IS_LICENSE_TYPE}'."
@@ -4687,19 +4703,91 @@ URLEncode() {
 	done
 }
 
+
+getUniqueFilename() {
+    local filepath="$1"
+    # Return immediately if file doesn't exist
+    if [[ ! -e "$filepath" ]]; then
+        echo "$filepath"
+        return 0
+    fi
+    # Strip extension if present
+    local dir base ext
+    dir=$(dirname "$filepath")
+    base=$(basename "$filepath")
+    if [[ "$base" == *.* ]]; then
+        ext=".${base##*.}"
+        base="${base%.*}"
+    else
+        ext=""
+    fi
+    # Find the first available name
+    local n=1
+    local candidate
+    while true; do
+        candidate="${dir}/${base}.${n}${ext}"
+        [[ ! -e "$candidate" ]] && break
+        (( n++ ))
+    done
+    echo "$candidate"
+}
+
 decodeK8sSecret() {
+  local SECRETNAME
+  local SECRETNAMESPACE
   local K8S_SECRET
-  K8S_SECRET=$(${KUBECTL_BIN} -n "${1}" get secret "${2}" -o json 2>/dev/null)
+  local BINARY_KEYS
+  SECRETNAME="${1}"
+  SECRETNAMESPACE="${2}"
+  K8S_SECRET=$(${KUBECTL_BIN} -n "${SECRETNAMESPACE}" get secret "${SECRETNAME}" -o json 2>/dev/null)
   # Check secret was found
   if [[ -z "${K8S_SECRET}" ]]; then
-    logError "999" "Secret '${2}' not found in '${1}' namespace." 1
+    logError "999" "Secret '${SECRETNAME}' not found in '${SECRETNAMESPACE}' namespace." 1
   fi
   # Test that it contains data we can decode
   if ! echo "${K8S_SECRET}" | ${JQ_BIN} -e '.data | type == "object" and length > 0' >/dev/null 2>&1; then
-    logError "999" "Secret '${2}' does not contain data that can be decoded by HITT." 1
+    logError "999" "Secret '${SECRETNAME}' does not contain data that can be decoded by HITT." 1
   fi
-  # Decode
+  # Check for binary data and decode
+  BINARY_KEYS=($(echo "${K8S_SECRET}" | ${JQ_BIN} -r '
+  .data | to_entries[] |
+  select(
+    (.value | @base64d | test("[^\\x09\\x0A\\x0D\\x20-\\x7E]"))
+  ) | .key
+  '))
+  if [ -n "${BINARY_KEYS[*]}" ]; then
+    logMessage "Binary data found - saving keys as files."
+    for k in "${BINARY_KEYS[@]}"; do
+      local fname
+      fname=$(getUniqueFilename "${k}")
+      logMessage "Saving data from key '${k}' in secret '${SECRETNAME}' as file named '${fname}'"
+      echo "${K8S_SECRET}" | ${JQ_BIN} -r --arg key "${k}" '.data[$key] | @base64d' > "${fname}"
+      # Remove key from JSON
+      K8S_SECRET=$(echo "${K8S_SECRET}" | ${JQ_BIN} --arg key "$k" 'del(.data[$key])')
+    done
+  fi
+  # Decode remainder
   echo "${K8S_SECRET}" | ${JQ_BIN} -r '.data | to_entries[] | "\(.key): \(.value | @base64d)"'
+}
+
+parseUtilGet() {
+  case "${UTILARGS[1]}" in
+    jwt)
+      getISJWTToken "${UTILARGS[2]}" "${UTILARGS[3]}"
+      ;;
+    dbid)
+      getISDbID
+      ;;
+    secret)
+      if [ ${#UTILARGS[@]} -ne 4 ]; then
+        logError "999" "Usage: bash $0 -u \"get secret SECRETNAME NAMESPACE\"" 1
+      fi
+      decodeK8sSecret "${UTILARGS[2]}" "${UTILARGS[3]}"
+      ;;
+    *)
+     logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option."
+     ;;
+  esac
 }
 
 #End functions
@@ -4915,17 +5003,8 @@ if [ "${MODE}" == "utility" ]; then
   read -r -a UTILARGS <<< "${UTILOPTS}"
   logStatus "Running HITT in utility mode '${UTILARGS[0]}'..."
   case "${UTILARGS[0]}" in
-    decodesecret)
-      if [ ${#UTILARGS[@]} -ne 3 ]; then
-        logError "999" "Usage: bash $0 -u \"decodesecret NAMESPACE SECRETNAME \"" 1
-      fi
-      decodeK8sSecret "${UTILARGS[1]}" "${UTILARGS[2]}"
-      ;;
-    getdbid)
-      getISDbID
-      ;;
-    getjwt)
-      getISJWTToken
+    get)
+      parseUtilGet
       ;;
     gendbid)
       if [ ${#UTILARGS[@]} -ne 4 ]; then
@@ -6567,6 +6646,7 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
       ;;
     u)
       SKIP_UPDATE_CHECK=1
+      [[ -n "${REDIRECT}" ]] && QUIET=1
       # Check if the next argument in the list is a "stray" (doesn't start with -)
       # ${!OPTIND} is a Bash feature that gets the value of the argument at that index
       NEXT_VAL="${!OPTIND}"
