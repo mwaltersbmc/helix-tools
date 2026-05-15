@@ -1,49 +1,58 @@
-# HITT Utility Mode #
+# HITT Utility Mode
 
-**HITT's** utilty mode provides a colllection of tools that may be useful when working with Helix deployments.
+**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, secret decode, generated DBID).
 
-## Modes ##
+Utility commands are invoked with **`-u`**. When the command has spaces or multiple words, pass the whole thing in **double quotes**.
 
-| Mode   | Description                                                                 |
-|------------|-----------------------------------------------------------------------------|
-| `getdbid`   | Displays the database ID (DBID) for the system - used for licensing. |
-| `getjwt`   | Prints an AR-JWT token for the IS REST API using `hannah_admin` credentials from the cluster. |
-| `gendbid`   | Generates a database ID (DBID) using the values provided. |
-| `decodesecret`  | Decodes Kubernetes secrets - see below. |
+## Commands
 
-## Usage ##
+| Command | Description |
+|--------|-------------|
+| `get dbid` | Displays the database ID (DBID) for the system (used for licensing). |
+| `get jwt` | Prints an AR-JWT for the IS REST API. Defaults to `hannah_admin` using credentials from the cluster; optional username/password. |
+| `get secret` | Decodes and displays Kubernetes secret `.data`. Binary keys are written to files; remaining keys are printed. Args: **SECRETNAME** **NAMESPACE**. |
+| `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
+| `help` | Prints the same summary as this file (built into the script). |
 
-Fix modes are called using the `-f <fixmode>` command line option.  Some of the fix commands require additional parameters in which case the mode and options must be enclosed in double quotes.
+## Usage
 
 ```bash
-Examples:
-bash hitt.sh -u getdbid # Get the current DBID
-bash hitt.sh -u getjwt  # Get a JWT token for hannah_admin from the IS server
-bash hitt.sh -u "decodesecret helix-is ar-global-secret" # Print the decoded contents of the ar-global-secret
+# Current DBID from the running system
+bash hitt.sh -u "get dbid"
+
+# JWT for hannah_admin (cluster credentials)
+bash hitt.sh -u "get jwt"
+
+# JWT for another user (password prompted if not given)
+bash hitt.sh -u "get jwt myuser"
+
+# Decode a secret (secret name, then namespace)
+bash hitt.sh -u "get secret ar-global-secret helix-is"
+
+# Generate DBID before deployment / license (mssql | oracle | postgres)
+bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
+
+bash hitt.sh -u help
 ```
 
-#### `getdbid` - get the IS DBID from the system
-```bash
-bash hitt.sh -f getdbid
-```
-Displays the DB ID of the system that is required to generate a server license via the BMC web site.
+### `get dbid`
 
-#### `getjwt` - get an AR-JWT token for the IS REST API
-```bash
-bash hitt.sh -f getjwt
-```
-Authenticates to IS RESTAPI with the `hannah_admin` credentials and prints the string to set the ARJWT variable.
+Uses `hitt.conf`, cluster access, and IS REST to print the current DBID.
 
-#### `gendbid` - generate an IS DBID from the provided values.
-```bash
-bash hitt.sh -f "gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME"
-```
-Generates the DB ID required to generate a server license via the BMC web site.  Useful to get a new license before making changes to the DB hostname.\
-DB_TYPE is one of mssql|oracle|postgres\
-DATABASE_HOST_NAME and AR_DB_NAME are the values you will use in the HELIX_ONPREM_DEPLOYMENT pipeline.
+### `get jwt`
 
-#### `"decodesecret NAMESPACE SECRETNAME"` - decode and display the contents of a Kubernetes secret
-```bash
-bash hitt.sh -u "decodesecret helix-is ar-global-secret"
-```
-Reads and displays data from a Kubernetes secret. Decodes base64 encoded values such as passwords.
+- With no username: uses **hannah_admin** and resolves password from the cluster (same path as normal HITT checks).
+- With a username: uses that user; password is taken from the second argument if present, otherwise prompted.
+
+### `get secret SECRETNAME NAMESPACE`
+
+Runs `kubectl get secret SECRETNAME -n NAMESPACE -o json`, base64-decodes `.data` entries, and:
+
+- Prints `key: value` lines for values that look printable (ASCII-safe).
+- For other keys, writes decoded bytes to uniquely named files in the current directory and prints a short log line.
+
+### `gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME`
+
+Generates a DBID string from the values provided. **DB_TYPE** is one of `mssql`, `oracle`, or `postgres`.
+
+See also: [README-fix-mode.md](README-fix-mode.md) for **`-f` fix mode** (cacerts, Jenkins, license apply, etc.).

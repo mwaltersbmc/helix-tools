@@ -22,6 +22,10 @@ curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbja
 - [tctl Mode](#tctl-mode)
 - [Bundle Deployment Status](#get-is-bundle-deployment-status)
 - [Advanced CLI Options](#advanced-cli-options)
+- [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, Jenkins, license, …)
+- [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `gendbid`)
+
+Built-in summaries: `bash hitt.sh -f help` and `bash hitt.sh -u help`.
 
 ## Features & Modes
 
