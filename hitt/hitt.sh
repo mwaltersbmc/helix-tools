@@ -4543,12 +4543,10 @@ showFixHelp() { # fix mode help
     \trealm \t\t| Create/update the Helix Service Management realm in SSO.
     \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
     \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
-    \tgetdbid \t| Displays the database ID (DBID) for the system - used for licensing.
-    \tgetjwt \t| Print an AR-JWT token for the IS REST API (hannah_admin credentials from the cluster).
-    \tgendbid \t| Generate a database ID (DBID) from the provided values.
     \tarlicense \t| Apply an Innovation Suite/AR server license to the system.
     \tresetssopwd \t| Resets the Helix SSO admin user password to the BMC default value.
     \tjenkins \t| Jenkins specific fixes - see below.
+    \thelp \t\t| Show this list.
     "
   echo -e '\tJenkins fixmode options:'
   echo -e "
@@ -4561,21 +4559,17 @@ showFixHelp() { # fix mode help
     "
 }
 
-showUtilHelp() { # fix mode help
+showUtilHelp() { # utility mode help
   echo "HITT utility mode options - see https://bit.ly/hittutil"
   echo .
   echo 'Usage: bash hitt.sh -u "<utilmode> [utilmode options]"'
   echo -e "
-    \tdecodesecret \t| Decodes and displays Kubernetes secret data.
-    \tgetdbid \t| Displays the database ID (DBID) for the system - used for licensing.
-    \tgetjwt \t| Print an AR-JWT token for the IS REST API (hannah_admin credentials from the cluster).
-    \tgendbid \t| Generate a database ID (DBID) from the provided values (DB_TYPE DATABASE_HOST_NAME AR_DB_NAME).
+    \tget secret \t| Decode Kubernetes secret .data (binary keys saved as files). Args: SECRETNAME NAMESPACE
+    \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
+    \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
+    \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
+    \thelp \t\t| Show this list.
     "
-#  echo -e '\tJenkins fixmode options:'
-#  echo -e "
-#    \tscriptapproval \t| Approves the scripts required by the deployment pipelines.
-#    \tpipelinelibs \t| Create/update the Global Trusted Pipeline Library definitions.
-#    "
 }
 
 getJenkinsPipelineValues() {

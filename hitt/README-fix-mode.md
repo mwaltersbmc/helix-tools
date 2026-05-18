@@ -31,7 +31,6 @@ Fix modes are called using the `-f <fixmode>` command line option.  Some of the 
 Examples:
 bash hitt.sh -f sat # Run the Support Assistant Tool fix
 bash hitt.sh -f "cacerts /tmp/newcacerts" # Update the cacerts secret with the newcacerts file
-bash hitt.sh -f "gendbid mssql my-db-server.acme.com arsystem" # Generate the DBID using the command line values.
 ```
 
 #### `ssh` - set up passwordless ssh for the git user
