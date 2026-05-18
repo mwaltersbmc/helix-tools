@@ -4784,6 +4784,41 @@ parseUtilGet() {
   esac
 }
 
+genTctlConfig() {
+  local TMS_USER
+  local TMS_PASSWD
+  local TMS_URL
+  local APPURL
+  local CLIENTSECRET
+  local CLIENTID
+  local RSSOURL
+  logMessage "Getting data from TMS..."
+  # If tms-realm-admin secret exists (v23 onwards) we should use it otherwise use the tms-superuser-job
+  if ${KUBECTL_BIN} get secret -n "${HP_NAMESPACE}" tms-realm-admin &>/dev/null; then
+    TMS_USER=$(${KUBECTL_BIN} get secret -n "${HP_NAMESPACE}" tms-realm-admin -o jsonpath='{.data.local_username}' | base64 -d)
+    TMS_PASSWD=$(${KUBECTL_BIN} get secret -n "${HP_NAMESPACE}" tms-realm-admin -o jsonpath='{.data.local_password}' | base64 -d)
+  else
+    TMS_USER=$(${KUBECTL_BIN} get job -n "${HP_NAMESPACE}" tms-superuser-job -o=jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="LOCAL_USER_NAME")].value}')
+    TMS_PASSWD=$(${KUBECTL_BIN} get job -n "${HP_NAMESPACE}" tms-superuser-job -o=jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="LOCAL_USER_PASSWORD")].value}')
+  fi
+
+  # Get the config file values
+  TMS_URL=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o=jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="ADE_PLATFORM_BASE_URL")].value}')
+  APPURL="${TMS_URL%/*}"
+  CLIENTSECRET=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret tms-auth-proxy-secret -o jsonpath='{.data.clientsecret}' | base64 -d -w 0)
+  CLIENTID=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret tms-auth-proxy-secret -o jsonpath='{.data.clientid}' | base64 -d -w 0)
+  RSSOURL=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm rsso-admin-tas -o jsonpath='{.data.rssourl}{"/rsso\n"}')
+
+  echo
+  echo -e "RSSO credentials are ${TMS_USER}/${TMS_PASSWD}" >/dev/tty
+  echo "
+  appurl: ${APPURL}
+  clientid: ${CLIENTID}
+  clientsecret: ${CLIENTSECRET}
+  enableauth: true
+  rssourl: ${RSSOURL}
+  "
+}
 #End functions
 
 # MAIN Start
@@ -4878,11 +4913,15 @@ cleanUp start
 
 # Run tctl command and then exit
 if [[ ! -z "${TCTL_CMD}" ]]; then
-  logStatus "Running in tctl only mode..."
+  logStatus "Running in tctl mode..."
   checkToolVersion kubectl
   getVersions
   if [ "${HP_SM_PLATFORM_CORE}"  == "yes" ]; then
     logError "262" "Helix Platform CORE deployment - no tenant services deployed." 1
+  fi
+  if [ "${TCTL_CMD}" == "config" ]; then
+    genTctlConfig
+    exit
   fi
   deleteTCTLJob
   deployTCTL "${TCTL_CMD}"
@@ -6633,6 +6672,7 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
     t)
       TCTL_CMD="${OPTARG}"
       SKIP_UPDATE_CHECK=1
+      [[ -n "${REDIRECT}" ]] && QUIET=1
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
         logError "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
