@@ -176,7 +176,21 @@ bash hitt.sh -k "build values.json"
 
 ### tctl Mode ###
 
-HITT may also be used to run simple `tctl` commands such as `get tenant` and `get service`.  This deploys the same job and pod used by the Jenkins HELIX_ITSM_INTEROPS pipeline and avoids having to download and configure the tctl client on a local system.  Use the `-t` switch along with the command to run enclosed in quotes:
+HITT may also be used to:
+ - generate a `tctl` config file.
+
+ Output is displayed on the screen or may be redirected to a file for use by `tctl`.
+
+ ```bash
+ bash hitt.sh -t config
+ # Examples:
+ bash hitt.sh -t config
+ bash hitt.sh -t config > config
+ ```
+
+ - run simple `tctl` commands such as `get tenant` and `get service`.
+
+ Running commands deploys the same job and pod used by the Jenkins HELIX_ITSM_INTEROPS pipeline which avoids having to download and configure the tctl client on a local system.  Use the `-t` switch along with the command to run enclosed in quotes:
 
 ```bash
 bash hitt.sh -t "tctl command"
