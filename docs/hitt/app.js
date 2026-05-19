@@ -126,7 +126,6 @@
   }
 
   function render(data) {
-    var meta = data.meta || {};
     var rawTopics = data.topics && data.topics.length ? data.topics.slice() : [];
     var cases = (data.useCases || []).slice();
 
@@ -211,25 +210,23 @@
 
     rootEl.innerHTML = "";
     rootEl.appendChild(frag);
-
-    if (meta.scriptUrl) {
-      var dl = document.getElementById("download-link");
-      if (dl) {
-        dl.href = meta.scriptUrl;
-        dl.textContent = meta.scriptUrl;
-      }
-    }
-
-    var topicCount = topicOrder.filter(function (tid) {
-      return byTopic[tid].length > 0;
-    }).length;
-    if (orphan.length) topicCount += 1;
-    return { nCases: cases.length, nTopics: topicCount };
   }
 
   function fail(msg) {
+    statusEl.hidden = false;
     statusEl.textContent = msg;
   }
+
+  document.getElementById("expand-all-btn").addEventListener("click", function () {
+    rootEl.querySelectorAll("details").forEach(function (d) {
+      d.open = true;
+    });
+  });
+  document.getElementById("collapse-all-btn").addEventListener("click", function () {
+    rootEl.querySelectorAll("details").forEach(function (d) {
+      d.open = false;
+    });
+  });
 
   function loadData() {
     if (typeof window.HITT_USE_CASES !== "undefined" && window.HITT_USE_CASES !== null) {
@@ -252,12 +249,9 @@
 
   loadData()
     .then(function (data) {
-      var counts = render(data);
-      statusEl.textContent =
-        counts.nCases +
-        " use case(s) in " +
-        counts.nTopics +
-        " topic group(s) — click a title to expand. Data: bundled JS or use-cases.json; order fields in JSON.";
+      render(data);
+      statusEl.textContent = "";
+      statusEl.hidden = true;
     })
     .catch(function (e) {
       fail(

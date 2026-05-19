@@ -10,19 +10,26 @@
     <header>
       <h1>Helix IS Triage Tool (HITT)</h1>
       <p>
-        Quick reference for common tasks. Topics and order live in
-        <code>use-cases.json</code> (edit there, then run
-        <code>update-bundled-data.ps1</code> to refresh <code>use-cases-data.js</code>). Expand a row for
-        examples; click the title again to collapse.
+        HITT helps you check and fix common setup issues for BMC Helix IS and the deployment environment around it.
+        This page groups everyday tasks in plain language—open a row to see example commands and tips, then click the
+        title again to close it. Use <strong>Expand all</strong> or <strong>Collapse all</strong> if you want to skim
+        the whole list.
       </p>
-      <p class="download">
-        Download script:
-        <a id="download-link" href="https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh"
-          >hitt.sh (raw)</a
+      <p class="intro-github">
+        <a
+          href="https://github.com/mwaltersbmc/helix-tools/tree/main/hitt"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Open the HITT folder on GitHub</a
         >
+        for the script, readme files, and related downloads.
       </p>
     </header>
     <main>
+      <div class="use-cases-toolbar" role="toolbar" aria-label="Use case list">
+        <button type="button" id="expand-all-btn" class="toolbar-btn">Expand all</button>
+        <button type="button" id="collapse-all-btn" class="toolbar-btn">Collapse all</button>
+      </div>
       <p id="status">Loading use cases…</p>
       <div id="use-cases" aria-live="polite"></div>
     </main>
