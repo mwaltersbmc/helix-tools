@@ -260,6 +260,9 @@ usage() {
     echo -e "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
     echo -e "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
     echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
+    echo
+    echo -e "${BOLD}Interactive help page with HITT use-cases available at https://bit.ly/hitthelp${NORMAL}"
+    echo
     exit 1
 }
 

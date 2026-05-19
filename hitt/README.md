@@ -4,6 +4,9 @@ The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic c
 
 > 💡 **Run this tool as the `git` user on the Deployment Engine system where Jenkins is installed.**
 
+#### **Interactive help page with HITT use-cases available at https://bit.ly/hitthelp** 
+
+
 ### Quick Start ###
 
 Run the following commands as the `git` user:
@@ -26,8 +29,6 @@ curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbja
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `gendbid`)
 
 Built-in summaries: `bash hitt.sh -f help` and `bash hitt.sh -u help`.
-
-**Web use-case reference** (expandable commands and notes): published with GitHub Pages from `/docs` (typically `https://<org>.github.io/<repo>/hitt/`). To **edit** those use cases or refresh the offline bundle, see [`../docs/hitt/README.md`](../docs/hitt/README.md).
 
 ## Features & Modes
 
