@@ -447,7 +447,7 @@ window.HITT_USE_CASES = {
       "notes": [
         "Deploys the same style job/pod used by HELIX_ITSM_INTEROPS; output prints when the job completes.",
         "Not valid for Helix Platform CORE-only deployments (script will error with the documented message).",
-        "For a static tctl client YAML snippet from the cluster (no job), use bash hitt.sh -t config instead."
+        "For a static tctl client config file, use bash hitt.sh -t config instead."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode"
     },
@@ -458,12 +458,12 @@ window.HITT_USE_CASES = {
       "title": "I want a tctl client config file",
       "commands": [
         "bash hitt.sh -t config",
-        "bash hitt.sh -t config > tctl-config.yaml"
+        "bash hitt.sh -t config > config"
       ],
       "notes": [
-        "Does not deploy the tctl job/pod. Reads TMS/RSSO secrets and deployment data from the Helix Platform namespace and prints YAML fields (appurl, clientid, clientsecret, enableauth, rssourl).",
-        "TMS credentials are also written to the terminal (/dev/tty) when available.",
-        "Requires hitt.conf and a full Helix Platform deployment (blocked on CORE-only / no tenant services)."
+        "Reads secrets and deployment data from the Helix Platform namespace and creates a tctl config file.",
+        "SSO login credentials are written to the terminal for use when authenticating tctl.",
+        "Requires hitt.conf and a full Helix Platform deployment."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode"
     },

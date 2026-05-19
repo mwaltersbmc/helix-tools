@@ -216,11 +216,3 @@ a.doc {
   font-size: 0.88rem;
   color: var(--accent);
 }
-
-footer {
-  max-width: 52rem;
-  margin: 0 auto;
-  padding: 0 1rem 2rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
