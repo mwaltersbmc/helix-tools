@@ -27,6 +27,8 @@ curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbja
 
 Built-in summaries: `bash hitt.sh -f help` and `bash hitt.sh -u help`.
 
+**Web use-case reference** (expandable commands and notes): published with GitHub Pages from `/docs` (typically `https://<org>.github.io/<repo>/hitt/`). To **edit** those use cases or refresh the offline bundle, see [`../docs/hitt/README.md`](../docs/hitt/README.md).
+
 ## Features & Modes
 
 HITT supports different modes for Helix and Jenkins validation:

@@ -1,0 +1,395 @@
+{
+  "meta": {
+    "tool": "Helix IS Triage Tool (HITT)",
+    "scriptUrl": "https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
+    "docsRepoPath": "hitt/",
+    "groupingHelp": "Edit topics[] for section titles and order. Each use case has topicId (must match a topic id) and order (sort key within that section, lower first)."
+  },
+  "topics": [
+    {
+      "id": "core-modes",
+      "title": "Setup & configuration",
+      "order": 10
+    },
+    {
+      "id": "utility",
+      "title": "Utility mode (-u)",
+      "order": 20
+    },
+    {
+      "id": "jenkins-pipelines",
+      "title": "Jenkins & pipelines",
+      "order": 30
+    },
+    {
+      "id": "fix-cluster",
+      "title": "Fix mode & cluster operations",
+      "order": 40
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Debugging & message lookup",
+      "order": 50
+    }
+  ],
+  "useCases": [
+    {
+      "id": "download-hitt",
+      "topicId": "core-modes",
+      "order": 10,
+      "title": "I want to download the HITT script",
+      "commands": [
+        "mkdir hitt && cd hitt && curl -sO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
+        "chmod a+x hitt.sh   # optional"
+      ],
+      "notes": [
+        "Optional: curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz in the same directory to enable database validation (see README).",
+        "Run as the git user on the Deployment Engine where Jenkins is installed."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#quick-start"
+    },
+    {
+      "id": "hitt-config-change",
+      "topicId": "core-modes",
+      "order": 20,
+      "title": "I want to change my HITT configuration",
+      "commands": [
+        "vi hitt.conf",
+        "Or delete the file and re-run HITT to be prompted again:",
+        "rm hitt.conf && bash hitt.sh -m post-hp"
+      ],
+      "notes": [
+        "hitt.conf holds HP_NAMESPACE, IS_NAMESPACE, IS_CUSTOMER_SERVICE, IS_ENVIRONMENT, Jenkins host/credentials, and tool paths.",
+        "Deleting hitt.conf forces the interactive wizard on next run (cluster must be reachable for namespace discovery unless you use overrides).",
+        "For a second config file without renaming the default, keep multiple files and pass -c /path/to/other.conf when you run HITT."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#configuration"
+    },
+    {
+      "id": "modes-overview",
+      "topicId": "core-modes",
+      "order": 30,
+      "title": "I want to run the standard health checks (post-HP / pre-IS / post-IS / Jenkins)",
+      "commands": [
+        "bash hitt.sh -m post-hp",
+        "bash hitt.sh -m pre-is",
+        "bash hitt.sh -m post-is",
+        "bash hitt.sh -m jenkins"
+      ],
+      "notes": [
+        "Requires hitt.conf (namespaces, CUSTOMER_SERVICE, ENVIRONMENT, Jenkins URL if applicable).",
+        "post-hp and pre-hp skip Jenkins checks; see hitt/README.md for when to use each mode."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes"
+    },
+    {
+      "id": "alt-config",
+      "topicId": "core-modes",
+      "order": 40,
+      "title": "I want to use a different hitt.conf file",
+      "commands": [
+        "bash hitt.sh -c /path/to/other.conf -m pre-is"
+      ],
+      "notes": [
+        "Combine -c with any mode or feature that normally reads hitt.conf."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#configuration"
+    },
+    {
+      "id": "utility-secret",
+      "topicId": "utility",
+      "order": 10,
+      "title": "I want to show the contents of a Kubernetes secret",
+      "commands": [
+        "bash hitt.sh -u \"get secret SECRET_NAME NAMESPACE\""
+      ],
+      "notes": [
+        "First argument is the secret name, second is the namespace (matches kubectl -n).",
+        "Printable keys are shown as text; other keys are decoded to files in the current directory (see decodeK8sSecret in hitt.sh)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "utility-dbid",
+      "topicId": "utility",
+      "order": 20,
+      "title": "I want the live IS database ID (DBID) from the cluster",
+      "commands": [
+        "bash hitt.sh -u \"get dbid\""
+      ],
+      "notes": [
+        "Uses hitt.conf, cluster access, and IS REST to read the current DBID (licensing)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "utility-jwt",
+      "topicId": "utility",
+      "order": 30,
+      "title": "I want an AR-JWT for the IS REST API",
+      "commands": [
+        "bash hitt.sh -u \"get jwt\"",
+        "bash hitt.sh -u \"get jwt myuser\""
+      ],
+      "notes": [
+        "Default user is hannah_admin with password resolved from the cluster when no user is given.",
+        "With a username only, password is prompted if not passed as a second argument."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "utility-gendbid",
+      "topicId": "utility",
+      "order": 40,
+      "title": "I want to generate a DBID string before deployment (from DB type and names)",
+      "commands": [
+        "bash hitt.sh -u \"gendbid mssql my-db-server.example.com arsystem\""
+      ],
+      "notes": [
+        "DB_TYPE is one of: mssql, oracle, postgres.",
+        "This does not call the cluster; it only computes the ID from the three values."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "utility-help",
+      "topicId": "utility",
+      "order": 50,
+      "title": "I want a quick list of utility commands",
+      "commands": [
+        "bash hitt.sh -u help"
+      ],
+      "notes": [
+        "Same content as README-utility-mode.md summary lines."
+      ]
+    },
+    {
+      "id": "pipeline-get",
+      "topicId": "jenkins-pipelines",
+      "order": 10,
+      "title": "I want to check HELIX_ONPREM_DEPLOYMENT pipeline values before a deployment",
+      "commands": [
+        "bash hitt.sh -k \"get defaults\"",
+        "bash hitt.sh -k \"get last\"",
+        "bash hitt.sh -k \"get lastsuccessful\"",
+        "bash hitt.sh -k \"get 42\"",
+        "bash hitt.sh -k \"get lastsuccessful values.json\""
+      ],
+      "notes": [
+        "Outputs JSON to the console unless you pass a filename as the last argument.",
+        "Requires Jenkins in hitt.conf and working credentials.",
+        "Useful to compare defaults vs last successful build before changing inputs."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#pipeline-mode"
+    },
+    {
+      "id": "pipeline-build",
+      "topicId": "jenkins-pipelines",
+      "order": 20,
+      "title": "I want to push saved pipeline values into Jenkins as a new parameter build",
+      "commands": [
+        "bash hitt.sh -k \"build values.json\""
+      ],
+      "notes": [
+        "After this, open HELIX_ONPREM_DEPLOYMENT in Jenkins, rebuild the last job, and review parameters (README warns the generated build is expected to fail until you adjust values).",
+        "PRODUCT sub-pipelines are forced off so a full deploy does not start from this step alone."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#pipeline-mode"
+    },
+    {
+      "id": "pipeline-console",
+      "topicId": "jenkins-pipelines",
+      "order": 30,
+      "title": "I want the latest Jenkins console log for a pipeline",
+      "commands": [
+        "bash hitt.sh -o helix_onprem_deployment"
+      ],
+      "notes": [
+        "PIPELINE_NAME is the Jenkins job name as shown in the URL (underscores)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#display-jenkins-pipeline-console-output"
+    },
+    {
+      "id": "dump-jenkins-creds",
+      "topicId": "jenkins-pipelines",
+      "order": 40,
+      "title": "I want to display Jenkins credential usernames/passwords (sensitive)",
+      "commands": [
+        "bash hitt.sh -j"
+      ],
+      "notes": [
+        "Also writes kubeconfig from Jenkins to kubeconfig.jenkins in the current directory when applicable.",
+        "Use only on a trusted machine; rotate secrets if this output is ever leaked."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options"
+    },
+    {
+      "id": "fix-kubeconfig",
+      "topicId": "jenkins-pipelines",
+      "order": 50,
+      "title": "I want to update the Jenkins kubeconfig credential with a new kubeconfig file",
+      "commands": [
+        "bash hitt.sh -f \"jenkins kubeconfig\"",
+        "bash hitt.sh -f \"jenkins kubeconfig /path/to/kubeconfig\""
+      ],
+      "notes": [
+        "Without a path, HITT uses ~/.kube/config. The file is validated before updating the Jenkins credential.",
+        "When Jenkins runs in-cluster, only certain jenkins fix sub-modes are allowed; see script messages if you hit that guard."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
+    },
+    {
+      "id": "fix-jenkins-credentials",
+      "topicId": "jenkins-pipelines",
+      "order": 60,
+      "title": "I want to refresh Jenkins username/password and related credentials (except kubeconfig)",
+      "commands": [
+        "bash hitt.sh -f \"jenkins credentials\""
+      ],
+      "notes": [
+        "You will be prompted for the git user password where required.",
+        "Does not update the kubeconfig credential; use jenkins kubeconfig separately."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
+    },
+    {
+      "id": "fix-jenkins-all",
+      "topicId": "jenkins-pipelines",
+      "order": 70,
+      "title": "I want to run all Jenkins-oriented fixes at once (new Jenkins host)",
+      "commands": [
+        "bash hitt.sh -f \"jenkins all\""
+      ],
+      "notes": [
+        "Runs the Jenkins fix bundle except dryrun. Review README-fix-mode for what each piece does."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
+    },
+    {
+      "id": "fix-cacerts",
+      "topicId": "fix-cluster",
+      "order": 10,
+      "title": "I want to replace the Helix IS cacerts secret with a new truststore file",
+      "commands": [
+        "bash hitt.sh -f \"cacerts /path/to/newcacertsfile\""
+      ],
+      "notes": [
+        "You are prompted to confirm when the new file validates."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
+    },
+    {
+      "id": "fix-arlicense",
+      "topicId": "fix-cluster",
+      "order": 20,
+      "title": "I want to apply an AR / Innovation Suite license on the running system",
+      "commands": [
+        "bash hitt.sh -f \"arlicense BRD-123456\"",
+        "bash hitt.sh -f \"arlicense LTD-761066 28-Apr-27\""
+      ],
+      "notes": [
+        "Optional expiry uses DD-Mon-YY format when required for temporary keys."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
+    },
+    {
+      "id": "fix-help",
+      "topicId": "fix-cluster",
+      "order": 30,
+      "title": "I want the list of fix modes from the script",
+      "commands": [
+        "bash hitt.sh -f help"
+      ],
+      "notes": [
+        "Prints the same categories as README-fix-mode.md tables."
+      ]
+    },
+    {
+      "id": "tctl-config",
+      "topicId": "fix-cluster",
+      "order": 35,
+      "title": "I want a tctl client config snippet (RSSO URL, client id/secret, app URL) from the cluster",
+      "commands": [
+        "bash hitt.sh -t config",
+        "bash hitt.sh -t config > tctl-config.yaml"
+      ],
+      "notes": [
+        "Special case: does not deploy the tctl job/pod. Reads TMS/RSSO secrets and deployment data from the Helix Platform namespace and prints YAML fields (appurl, clientid, clientsecret, enableauth, rssourl).",
+        "TMS credentials are also written to the terminal (/dev/tty) when available.",
+        "Requires hitt.conf and a full Helix Platform deployment (blocked on CORE-only / no tenant services)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode"
+    },
+    {
+      "id": "tctl",
+      "topicId": "fix-cluster",
+      "order": 40,
+      "title": "I want to run a simple tctl command without installing tctl locally",
+      "commands": [
+        "bash hitt.sh -t \"get tenant\"",
+        "bash hitt.sh -t \"get tenant 1912102789 -o json\""
+      ],
+      "notes": [
+        "Deploys the same style job/pod used by HELIX_ITSM_INTEROPS; output prints when the job completes.",
+        "Not valid for Helix Platform CORE-only deployments (script will error with the documented message).",
+        "For a static tctl client YAML snippet from the cluster (no job), use bash hitt.sh -t \"config\" instead."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode"
+    },
+    {
+      "id": "bundle-status",
+      "topicId": "fix-cluster",
+      "order": 50,
+      "title": "I want IS bundle deployment status from a bundle ID",
+      "commands": [
+        "bash hitt.sh -b PACKAGE_ID_FROM_PIPELINE"
+      ],
+      "notes": [
+        "ID is the value from the pipeline STATUS URI (see README example)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#get-is-bundle-deployment-status"
+    },
+    {
+      "id": "debug-trace",
+      "topicId": "troubleshooting",
+      "order": 10,
+      "title": "I want shell trace (xtrace) while HITT runs",
+      "commands": [
+        "bash hitt.sh -d -m post-is"
+      ],
+      "notes": [
+        "With default logging (no -l), HITT enables set -x before running main and still tees output to hitt.log.",
+        "If you pass -l to disable log files, the script currently runs main without the tee branch, so -d does not enable set -x in that combination—omit -l when you need xtrace."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options"
+    },
+    {
+      "id": "error-message-help",
+      "topicId": "troubleshooting",
+      "order": 20,
+      "title": "I want to see the long help text for a specific HITT message ID",
+      "commands": [
+        "bash hitt.sh -e 127"
+      ],
+      "notes": [
+        "Use the numeric ID shown in parentheses after ERROR or WARNING, e.g. (127).",
+        "The command must be exactly two script arguments after the shell name (e.g. hitt.sh -e 127) so the built-in lookup runs and then exits."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options"
+    },
+    {
+      "id": "debug-stop-on-error",
+      "topicId": "troubleshooting",
+      "order": 30,
+      "title": "I want trace plus stop early for troubleshooting (debug + stop on first matching condition)",
+      "commands": [
+        "bash hitt.sh -d -e 0 -m post-is"
+      ],
+      "notes": [
+        "-e 0 exits the script the first time stopOnError runs (any logged ERROR or WARNING that invokes it), which is useful to freeze right after the first failure while -d shows the command trace leading up to it.",
+        "You can instead stop on a specific ID: bash hitt.sh -d -e 127 -m post-is"
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options"
+    }
+  ]
+}
