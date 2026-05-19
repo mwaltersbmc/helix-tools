@@ -6,7 +6,7 @@
     <title>HITT — use cases</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body id="top">
     <header>
       <h1>Helix IS Triage Tool (HITT)</h1>
       <p>
@@ -26,6 +26,10 @@
       </p>
     </header>
     <main>
+      <nav class="topic-toc" id="topic-toc" aria-label="On this page" hidden>
+        <h2 class="toc-heading">Topics</h2>
+        <ul id="topic-toc-list" class="topic-toc-list"></ul>
+      </nav>
       <div class="use-cases-toolbar" role="toolbar" aria-label="Use case list">
         <button type="button" id="expand-all-btn" class="toolbar-btn">Expand all</button>
         <button type="button" id="collapse-all-btn" class="toolbar-btn">Collapse all</button>

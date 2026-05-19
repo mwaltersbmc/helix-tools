@@ -3,6 +3,8 @@
 
   var statusEl = document.getElementById("status");
   var rootEl = document.getElementById("use-cases");
+  var tocListEl = document.getElementById("topic-toc-list");
+  var tocNavEl = document.getElementById("topic-toc");
 
   function num(x, def) {
     if (typeof x === "number" && !isNaN(x)) return x;
@@ -36,6 +38,9 @@
     '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   var CHECK_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  var BACK_TO_TOP_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 16.5L12 13L8.5 16.5"/><path d="M15.5 10.5L12 7L8.5 10.5"/><path d="M3 20.4V3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6V20.4C21 20.7314 20.7314 21 20.4 21H3.6C3.26863 21 3 20.7314 3 20.4Z"/></svg>';
 
   function appendCommandBlock(panel, line) {
     var wrap = document.createElement("div");
@@ -125,6 +130,24 @@
     return det;
   }
 
+  function appendTopicHeader(section, titleText) {
+    var row = document.createElement("div");
+    row.className = "topic-header-row";
+    var h = document.createElement("h2");
+    h.className = "topic-title";
+    h.textContent = titleText;
+    var back = document.createElement("a");
+    back.className = "back-to-top";
+    back.href = "#top";
+    back.setAttribute("aria-label", "Back to top of page");
+    back.setAttribute("title", "Back to top");
+    back.innerHTML = BACK_TO_TOP_SVG;
+    row.appendChild(h);
+    row.appendChild(back);
+    section.appendChild(row);
+    return h;
+  }
+
   function render(data) {
     var rawTopics = data.topics && data.topics.length ? data.topics.slice() : [];
     var cases = (data.useCases || []).slice();
@@ -177,6 +200,7 @@
     });
 
     var frag = document.createDocumentFragment();
+    var tocSections = [];
 
     topicOrder.forEach(function (tid) {
       var list = byTopic[tid];
@@ -184,37 +208,54 @@
 
       var sec = document.createElement("section");
       sec.className = "topic-section";
-      var h = document.createElement("h2");
-      h.className = "topic-title";
-      h.textContent = topicMeta[tid] || tid;
-      sec.appendChild(h);
+      sec.id = "topic-" + tid;
+      var h = appendTopicHeader(sec, topicMeta[tid] || tid);
 
       list.forEach(function (uc) {
         sec.appendChild(renderUseCase(uc));
       });
       frag.appendChild(sec);
+      tocSections.push({ id: sec.id, title: h.textContent });
     });
 
     if (orphan.length) {
+      var orphanTitle = "Unassigned (set topicId on these use cases)";
       var secO = document.createElement("section");
       secO.className = "topic-section";
-      var hO = document.createElement("h2");
-      hO.className = "topic-title";
-      hO.textContent = "Unassigned (set topicId on these use cases)";
-      secO.appendChild(hO);
+      secO.id = "topic-unassigned";
+      appendTopicHeader(secO, orphanTitle);
+
       orphan.forEach(function (uc) {
         secO.appendChild(renderUseCase(uc));
       });
       frag.appendChild(secO);
+      tocSections.push({ id: secO.id, title: orphanTitle });
     }
 
     rootEl.innerHTML = "";
     rootEl.appendChild(frag);
+
+    if (tocListEl) {
+      tocListEl.innerHTML = "";
+      tocSections.forEach(function (entry) {
+        var li = document.createElement("li");
+        var a = document.createElement("a");
+        a.href = "#" + entry.id;
+        a.textContent = entry.title;
+        li.appendChild(a);
+        tocListEl.appendChild(li);
+      });
+    }
+    if (tocNavEl) {
+      tocNavEl.hidden = tocSections.length === 0;
+    }
   }
 
   function fail(msg) {
     statusEl.hidden = false;
     statusEl.textContent = msg;
+    if (tocListEl) tocListEl.innerHTML = "";
+    if (tocNavEl) tocNavEl.hidden = true;
   }
 
   document.getElementById("expand-all-btn").addEventListener("click", function () {

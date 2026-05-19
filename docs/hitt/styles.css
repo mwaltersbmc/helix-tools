@@ -64,6 +64,56 @@ main {
   padding: 0.5rem 1rem 2.5rem;
 }
 
+.topic-toc {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.topic-toc[hidden] {
+  display: none;
+}
+
+.toc-heading {
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+
+.topic-toc-list {
+  list-style: disc;
+  margin: 0;
+  padding-left: 1.35rem;
+  display: block;
+}
+
+.topic-toc-list li {
+  margin: 0.25rem 0;
+  padding-left: 0.2rem;
+}
+
+.topic-toc-list a {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.topic-toc-list a:hover {
+  text-decoration: underline;
+}
+
+.topic-toc-list a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .use-cases-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -102,19 +152,63 @@ main {
 
 .topic-section {
   margin-bottom: 1.75rem;
+  scroll-margin-top: 0.75rem;
 }
 
 .topic-section:last-child {
   margin-bottom: 0.5rem;
 }
 
-h2.topic-title {
-  font-size: 1.05rem;
-  font-weight: 650;
+.topic-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
   margin: 0 0 0.65rem;
   padding-bottom: 0.35rem;
   border-bottom: 2px solid var(--accent);
+}
+
+.topic-header-row .topic-title {
+  font-size: 1.05rem;
+  font-weight: 650;
+  margin: 0;
+  padding: 0;
+  border: none;
   color: var(--text);
+  flex: 1 1 auto;
+  min-width: min(100%, 12rem);
+}
+
+.back-to-top {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  color: var(--accent);
+  text-decoration: none;
+  border-radius: 6px;
+  line-height: 0;
+}
+
+.back-to-top svg {
+  display: block;
+}
+
+.back-to-top:hover {
+  background: rgba(9, 105, 218, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  .back-to-top:hover {
+    background: rgba(88, 166, 255, 0.1);
+  }
+}
+
+.back-to-top:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 details {
