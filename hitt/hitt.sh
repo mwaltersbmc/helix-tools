@@ -409,11 +409,11 @@ checkISNamespace() {
 }
 
 checkPodStatus() {
-  BAD_PODS=($(${KUBECTL_BIN} -n "${1}" get pod --field-selector=status.phase!=Succeeded -o json | ${JQ_BIN} -r '.items[] | select(.status.containerStatuses[]?.ready == false) | .metadata.name'))
+  BAD_PODS=($(${KUBECTL_BIN} -n "${1}" get pod --field-selector=status.phase!=Succeeded -o json | ${JQ_BIN} -r '.items[] | select(.status.containerStatuses[]?.ready == false) | .metadata.name' 2>>${HITT_ERR_FILE}))
   #if [ $(${KUBECTL_BIN} -n "${1}"  get pods -o custom-columns=":metadata.name,:status.containerStatuses[*].state.waiting.reason" | grep -v "<none>" | wc -l) != "1" ]; then
   if [ "${#BAD_PODS[@]}" != "0" ]; then
      logError "102" "One or more pods in the '${1}' namespace found in a non-ready state."
-     ${KUBECTL_BIN} -n "${1}" get pods "${BAD_PODS[@]}"
+     [[ "${QUIET}" -ne 1 ]] && ${KUBECTL_BIN} -n "${1}" get pods "${BAD_PODS[@]}"
      for i in "${BAD_PODS[@]}"; do
        logDescribePod "${1}" "${i}"
      done
