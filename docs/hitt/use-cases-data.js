@@ -309,6 +309,21 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes"
     },
     {
+      "id": "troubleshoot-failed-onprem-pipeline",
+      "topicId": "helix-deployment",
+      "order": 55,
+      "title": "I want to troubleshoot a failed HELIX_ONPREM_DEPLOYMENT pipeline build",
+      "commands": [
+        "bash hitt.sh -m pre-is",
+        "bash hitt.sh -m post-is"
+      ],
+      "notes": [
+        "Start with pre-is: it validates HELIX_ONPREM_DEPLOYMENT inputs against Jenkins and the cluster (same timing as before a fresh deploy—useful even after a failure to catch bad parameters or drift).",
+        "If the pipeline run is in service or upgrade mode (changing an already deployed environment), run post-is next. post-is exercises checks against the live Helix IS deployment and can surface issues in the current stack that relate to the failure."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes"
+    },
+    {
       "id": "pipeline-get",
       "topicId": "pipeline-mgmt",
       "order": 10,
