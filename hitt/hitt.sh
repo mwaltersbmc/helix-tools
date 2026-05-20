@@ -4568,6 +4568,7 @@ showUtilHelp() { # utility mode help
   echo 'Usage: bash hitt.sh -u "<utilmode> [utilmode options]"'
   echo -e "
     \tget secret \t| Decode Kubernetes secret .data (binary keys saved as files). Args: SECRETNAME NAMESPACE
+    \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap). Args: CM_NAME NAMESPACE
     \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
@@ -4729,6 +4730,52 @@ getUniqueFilename() {
     echo "$candidate"
 }
 
+exportK8sConfigMap() {
+  local CM_NAME="$1"
+  local CM_NAMESPACE="$2"
+  local CM_JSON
+  local export_dir
+  local nd
+  local nb
+  local key
+
+  CM_JSON=$(${KUBECTL_BIN} -n "${CM_NAMESPACE}" get configmap "${CM_NAME}" -o json 2>/dev/null)
+  if [[ -z "${CM_JSON}" ]]; then
+    logError "999" "ConfigMap '${CM_NAME}' not found in '${CM_NAMESPACE}' namespace." 1
+  fi
+  if ! echo "${CM_JSON}" | ${JQ_BIN} -e '.metadata.name' &>/dev/null; then
+    logError "999" "ConfigMap '${CM_NAME}' not found in '${CM_NAMESPACE}' namespace." 1
+  fi
+
+  export_dir=$(getUniqueFilename "${CM_NAME}")
+  mkdir -p "${export_dir}"
+
+  nd=$(echo "${CM_JSON}" | ${JQ_BIN} '(.data // {}) | keys | length')
+  nb=$(echo "${CM_JSON}" | ${JQ_BIN} '(.binaryData // {}) | keys | length')
+
+  while IFS= read -r key; do
+    [[ -z "${key}" ]] && continue
+    if [[ "${key}" == */* ]] || [[ "${key}" == *..* ]]; then
+      logError "999" "ConfigMap data key '${key}' cannot be used as a file name (contains '/' or '..')." 1
+    fi
+    echo "${CM_JSON}" | ${JQ_BIN} -r --arg k "${key}" '.data[$k]' > "${export_dir}/${key}"
+  done < <(echo "${CM_JSON}" | ${JQ_BIN} -r '.data // {} | keys[]' 2>/dev/null)
+
+  while IFS= read -r key; do
+    [[ -z "${key}" ]] && continue
+    if [[ "${key}" == */* ]] || [[ "${key}" == *..* ]]; then
+      logError "999" "ConfigMap binaryData key '${key}' cannot be used as a file name (contains '/' or '..')." 1
+    fi
+    echo "${CM_JSON}" | ${JQ_BIN} -r --arg k "${key}" '.binaryData[$k]' | ${BASE64_BIN} -d > "${export_dir}/${key}"
+  done < <(echo "${CM_JSON}" | ${JQ_BIN} -r '.binaryData // {} | keys[]' 2>/dev/null)
+
+  if [[ "${nd}" -eq 0 ]] && [[ "${nb}" -eq 0 ]]; then
+    logMessage "ConfigMap '${CM_NAME}' has no data or binaryData keys; created directory '${export_dir}'."
+  else
+    logMessage "ConfigMap '${CM_NAME}' (from ${CM_NAMESPACE}): saved ${nd} data file(s) and ${nb} binary file(s) under '${export_dir}'."
+  fi
+}
+
 decodeK8sSecret() {
   local SECRETNAME
   local SECRETNAMESPACE
@@ -4780,6 +4827,12 @@ parseUtilGet() {
         logError "999" "Usage: bash $0 -u \"get secret SECRETNAME NAMESPACE\"" 1
       fi
       decodeK8sSecret "${UTILARGS[2]}" "${UTILARGS[3]}"
+      ;;
+    configmap)
+      if [ ${#UTILARGS[@]} -ne 4 ]; then
+        logError "999" "Usage: bash $0 -u \"get configmap CM_NAME NAMESPACE\"" 1
+      fi
+      exportK8sConfigMap "${UTILARGS[2]}" "${UTILARGS[3]}"
       ;;
     *)
      logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option."

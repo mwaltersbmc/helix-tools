@@ -497,6 +497,20 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
     {
+      "id": "utility-configmap-export",
+      "topicId": "other-features",
+      "order": 25,
+      "title": "I want to export the files from a Kubernetes configMap",
+      "commands": [
+        "bash hitt.sh -u \"get configmap CONFIGMAP_NAME NAMESPACE\""
+      ],
+      "notes": [
+        "Creates a directory in the current working directory named after the ConfigMap (if that name exists, a numeric suffix is added). Each key in .data and .binaryData is written as a file using the key name.",
+        "Requires kubectl and jq; binaryData values are base64-decoded. Cluster and namespace must be reachable."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
       "id": "bundle-status",
       "topicId": "other-features",
       "order": 20,
