@@ -60,11 +60,11 @@ window.HITT_USE_CASES = {
       "order": 10,
       "title": "I want to download the HITT script",
       "commands": [
-        "mkdir hitt && cd hitt && curl -sO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
+        "mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
         "chmod a+x hitt.sh   # optional"
       ],
       "notes": [
-        "Optional: curl -O https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz in the same directory to enable database validation (see README).",
+        "Optional: curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz in the same directory to enable database validation (see README).",
         "Run as the git user on the Deployment Engine where Jenkins is installed."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#quick-start"
@@ -104,7 +104,7 @@ window.HITT_USE_CASES = {
       "order": 40,
       "title": "I want to update to the latest version of the HITT script",
       "commands": [
-        "cd /path/to/hitt && curl -sO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
+        "cd /path/to/hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
         "chmod a+x hitt.sh   # optional"
       ],
       "notes": [

@@ -14,7 +14,7 @@ $ cat /opt/bmc/ARSystem/conf/rsso.cfg
 $ cat /opt/bmc/ARSystem/conf/rsso-agent.properties
 
 Download and compile SSLPoke.java
-$ curl -s https://gist.githubusercontent.com/MatthewJDavis/50f3f92660af72c812e21b7ff6b56354/raw/7f258a30be4ddea7b67239b40ae305f6a2e98e0a/SSLPoke.java -o SSLPoke.java
+$ curl -sk https://gist.githubusercontent.com/MatthewJDavis/50f3f92660af72c812e21b7ff6b56354/raw/7f258a30be4ddea7b67239b40ae305f6a2e98e0a/SSLPoke.java -o SSLPoke.java
 $ /opt/java/bin/javac SSLPoke.java
 
 Test for valid certificate using SSLPoke
