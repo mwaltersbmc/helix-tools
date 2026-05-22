@@ -488,10 +488,11 @@ window.HITT_USE_CASES = {
       "order": 10,
       "title": "I want to show the contents of a Kubernetes secret",
       "commands": [
-        "bash hitt.sh -u \"get secret SECRET_NAME NAMESPACE\""
+        "bash hitt.sh -u \"get secret SECRET_NAME NAMESPACE\"",
+        "bash hitt.sh -u \"get secret SECRET_NAME\""
       ],
       "notes": [
-        "First argument is the secret name, second is the namespace (matches kubectl -n).",
+        "With NAMESPACE: same as kubectl -n. Without NAMESPACE: looks for the secret in IS_NAMESPACE, then HP_NAMESPACE, then CDE_NAMESPACE from hitt.conf (skipping blanks and duplicates). Exactly one match uses that namespace; more than one prompts you to choose.",
         "Printable keys are shown as text; other keys are decoded to files in the current directory (see decodeK8sSecret in hitt.sh)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
@@ -502,11 +503,13 @@ window.HITT_USE_CASES = {
       "order": 25,
       "title": "I want to export the files from a Kubernetes configMap",
       "commands": [
-        "bash hitt.sh -u \"get configmap CONFIGMAP_NAME NAMESPACE\""
+        "bash hitt.sh -u \"get configmap CONFIGMAP_NAME NAMESPACE\"",
+        "bash hitt.sh -u \"get configmap CONFIGMAP_NAME\""
       ],
       "notes": [
         "Creates a directory in the current working directory named after the ConfigMap (if that name exists, a numeric suffix is added). Each key in .data and .binaryData is written as a file using the key name.",
-        "Requires kubectl and jq; binaryData values are base64-decoded. Cluster and namespace must be reachable."
+        "Requires kubectl and jq; binaryData values are base64-decoded. Cluster and namespace must be reachable.",
+        "Without NAMESPACE: resolves the ConfigMap using IS_NAMESPACE, then HP_NAMESPACE, then CDE_NAMESPACE from hitt.conf (same rules as get secret for one match and multiple matches.)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },

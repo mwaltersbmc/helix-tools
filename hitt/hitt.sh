@@ -4567,8 +4567,8 @@ showUtilHelp() { # utility mode help
   echo .
   echo 'Usage: bash hitt.sh -u "<utilmode> [utilmode options]"'
   echo -e "
-    \tget secret \t| Decode Kubernetes secret .data (binary keys saved as files). Args: SECRETNAME NAMESPACE
-    \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap). Args: CM_NAME NAMESPACE
+    \tget secret \t| Decode Kubernetes secret .data (binary keys saved as files). Args: SECRETNAME [NAMESPACE]
+    \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap). Args: CM_NAME [NAMESPACE]
     \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
@@ -4730,6 +4730,36 @@ getUniqueFilename() {
     echo "$candidate"
 }
 
+# Populate UTIL_NS_MATCHES with namespaces (IS_NAMESPACE, then HP_NAMESPACE, then CDE_NAMESPACE,
+# non-empty and de-duplicated) where kubectl finds the given secret or configmap.
+populateUtilK8sObjectMatches() {
+  local k8s_kind="$1"
+  local object_name="$2"
+  local -a distinct_ns=()
+  local ns
+  local d
+  local seen
+
+  UTIL_NS_MATCHES=()
+  for ns in "${IS_NAMESPACE}" "${HP_NAMESPACE}" "${CDE_NAMESPACE}"; do
+    [[ -z "${ns}" ]] && continue
+    seen=0
+    for d in "${distinct_ns[@]}"; do
+      if [[ "${d}" == "${ns}" ]]; then
+        seen=1
+        break
+      fi
+    done
+    [[ "${seen}" -eq 1 ]] && continue
+    distinct_ns+=("${ns}")
+  done
+  for ns in "${distinct_ns[@]}"; do
+    if ${KUBECTL_BIN} get "${k8s_kind}" "${object_name}" -n "${ns}" &>/dev/null; then
+      UTIL_NS_MATCHES+=("${ns}")
+    fi
+  done
+}
+
 exportK8sConfigMap() {
   local CM_NAME="$1"
   local CM_NAMESPACE="$2"
@@ -4746,7 +4776,7 @@ exportK8sConfigMap() {
   if ! echo "${CM_JSON}" | ${JQ_BIN} -e '.metadata.name' &>/dev/null; then
     logError "999" "ConfigMap '${CM_NAME}' not found in '${CM_NAMESPACE}' namespace." 1
   fi
-
+  logMessage "Getting configMap '${CM_NAME}' from '${CM_NAMESPACE}' namespace..."
   export_dir=$(getUniqueFilename "${CM_NAME}")
   mkdir -p "${export_dir}"
 
@@ -4792,6 +4822,7 @@ decodeK8sSecret() {
   if ! echo "${K8S_SECRET}" | ${JQ_BIN} -e '.data | type == "object" and length > 0' >/dev/null 2>&1; then
     logError "999" "Secret '${SECRETNAME}' does not contain data that can be decoded by HITT." 1
   fi
+  logMessage "Getting secret '${SECRETNAME}' from '${SECRETNAMESPACE}' namespace..."
   # Check for binary data and decode
   BINARY_KEYS=($(echo "${K8S_SECRET}" | ${JQ_BIN} -r '
   .data | to_entries[] |
@@ -4823,16 +4854,54 @@ parseUtilGet() {
       getISDbID
       ;;
     secret)
-      if [ ${#UTILARGS[@]} -ne 4 ]; then
-        logError "999" "Usage: bash $0 -u \"get secret SECRETNAME NAMESPACE\"" 1
+      if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
+        logError "999" "Usage: bash $0 -u \"get secret SECRETNAME [NAMESPACE]\"" 1
       fi
-      decodeK8sSecret "${UTILARGS[2]}" "${UTILARGS[3]}"
+      if [ ${#UTILARGS[@]} -eq 4 ]; then
+        decodeK8sSecret "${UTILARGS[2]}" "${UTILARGS[3]}"
+      else
+        populateUtilK8sObjectMatches secret "${UTILARGS[2]}"
+        case ${#UTIL_NS_MATCHES[@]} in
+          0)
+            logError "999" "Secret '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from hitt.conf. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get secret ${UTILARGS[2]} NAMESPACE\"." 1
+            ;;
+          1)
+            decodeK8sSecret "${UTILARGS[2]}" "${UTIL_NS_MATCHES[0]}"
+            ;;
+          *)
+            if [[ "${QUIET}" == "1" ]]; then
+              logError "999" "Secret '${UTILARGS[2]}' exists in more than one configured namespace; omit -q to choose interactively, or pass NAMESPACE explicitly." 1
+            fi
+            logStatus "Secret '${UTILARGS[2]}' exists in multiple namespaces — select namespace:" 1
+            decodeK8sSecret "${UTILARGS[2]}" "$(selectFromArray UTIL_NS_MATCHES)"
+            ;;
+        esac
+      fi
       ;;
     configmap)
-      if [ ${#UTILARGS[@]} -ne 4 ]; then
-        logError "999" "Usage: bash $0 -u \"get configmap CM_NAME NAMESPACE\"" 1
+      if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
+        logError "999" "Usage: bash $0 -u \"get configmap CM_NAME [NAMESPACE]\"" 1
       fi
-      exportK8sConfigMap "${UTILARGS[2]}" "${UTILARGS[3]}"
+      if [ ${#UTILARGS[@]} -eq 4 ]; then
+        exportK8sConfigMap "${UTILARGS[2]}" "${UTILARGS[3]}"
+      else
+        populateUtilK8sObjectMatches configmap "${UTILARGS[2]}"
+        case ${#UTIL_NS_MATCHES[@]} in
+          0)
+            logError "999" "ConfigMap '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from hitt.conf. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get configmap ${UTILARGS[2]} NAMESPACE\"." 1
+            ;;
+          1)
+            exportK8sConfigMap "${UTILARGS[2]}" "${UTIL_NS_MATCHES[0]}"
+            ;;
+          *)
+            if [[ "${QUIET}" == "1" ]]; then
+              logError "999" "ConfigMap '${UTILARGS[2]}' exists in more than one configured namespace; omit -q to choose interactively, or pass NAMESPACE explicitly." 1
+            fi
+            logStatus "ConfigMap '${UTILARGS[2]}' exists in multiple namespaces — select namespace:" 1
+            exportK8sConfigMap "${UTILARGS[2]}" "$(selectFromArray UTIL_NS_MATCHES)"
+            ;;
+        esac
+      fi
       ;;
     *)
      logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option."
