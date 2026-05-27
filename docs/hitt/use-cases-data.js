@@ -514,6 +514,21 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
     {
+      "id": "utility-configmap-list-keys",
+      "topicId": "other-features",
+      "order": 22,
+      "title": "I want to list the files stored in a Kubernetes configMap",
+      "commands": [
+        "bash hitt.sh -v -u \"get configmap CONFIGMAP_NAME NAMESPACE\"",
+        "bash hitt.sh -v -u \"get configmap CONFIGMAP_NAME\""
+      ],
+      "notes": [
+        "The global -v (verbose) flag with get configmap lists the key names under .data and .binaryData only; nothing is written to disk.",
+        "Optional NAMESPACE uses the same IS_NAMESPACE → HP_NAMESPACE → CDE_NAMESPACE resolution as get configmap without -v."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
       "id": "bundle-status",
       "topicId": "other-features",
       "order": 20,

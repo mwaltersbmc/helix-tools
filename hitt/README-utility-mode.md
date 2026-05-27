@@ -11,7 +11,7 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 | `get dbid` | Displays the database ID (DBID) for the system (used for licensing). |
 | `get jwt` | Prints an AR-JWT for the IS REST API. Defaults to `hannah_admin` using credentials from the cluster; optional username/password. |
 | `get secret` | Decodes and displays Kubernetes secret `.data`. Binary keys are written to files; remaining keys are printed. Args: **SECRETNAME** [**NAMESPACE**]. If namespace is omitted, searches `IS_NAMESPACE`, then `HP_NAMESPACE`, then `CDE_NAMESPACE` from `hitt.conf`; prompts if more than one match (use explicit namespace with `-q` / automation). |
-| `get configmap` | Exports ConfigMap `.data` and `.binaryData` keys to files under a new directory (named after the ConfigMap, with a numeric suffix if that name already exists). Args: **CM_NAME** [**NAMESPACE**]. Optional namespace uses the same search and prompt rules as `get secret`. |
+| `get configmap` | Exports ConfigMap `.data` and `.binaryData` keys to files under a new directory (named after the ConfigMap, with a numeric suffix if that name already exists). With **`-v`**, lists key names only (no files). Args: **CM_NAME** [**NAMESPACE**]. Optional namespace uses the same search and prompt rules as `get secret`. |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
 | `help` | Prints the same summary as this file (built into the script). |
 
@@ -34,6 +34,9 @@ bash hitt.sh -u "get secret ar-global-secret"
 # Export a ConfigMap (name, then optional namespace) — creates a directory in the current working directory
 bash hitt.sh -u "get configmap my-configmap helix-is"
 bash hitt.sh -u "get configmap my-configmap"
+
+# List ConfigMap keys only (no export) — use global -v before -u
+bash hitt.sh -v -u "get configmap my-configmap helix-is"
 
 # Generate DBID before deployment / license (mssql | oracle | postgres)
 bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
@@ -64,6 +67,8 @@ If **NAMESPACE** is omitted, HITT looks for the secret in **IS_NAMESPACE**, then
 Runs `kubectl get configmap CM_NAME -n NAMESPACE -o json`. If the ConfigMap is missing, the command fails with an error.
 
 Otherwise it creates a directory under the current working directory named **CM_NAME** (or **CM_NAME.1**, **CM_NAME.2**, … if that name already exists). Each key in `.data` is written as a UTF-8 text file named after the key; each key in `.binaryData` is base64-decoded and written as raw bytes to a file named after the key. Keys containing `/` or `..` are rejected. A short summary line is printed with counts and the directory path.
+
+Run with **`-v`** (verbose) to **list only** the names of keys under `.data` and `.binaryData`; no directory is created and nothing is written to disk.
 
 Optional **NAMESPACE** uses the same **IS_NAMESPACE** → **HP_NAMESPACE** → **CDE_NAMESPACE** discovery, interactive choice when ambiguous.
 

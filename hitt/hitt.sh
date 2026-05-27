@@ -4568,7 +4568,7 @@ showUtilHelp() { # utility mode help
   echo 'Usage: bash hitt.sh -u "<utilmode> [utilmode options]"'
   echo -e "
     \tget secret \t| Decode Kubernetes secret .data (binary keys saved as files). Args: SECRETNAME [NAMESPACE]
-    \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap). Args: CM_NAME [NAMESPACE]
+    \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap), or with -v list key names only. Args: CM_NAME [NAMESPACE]
     \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
@@ -4777,11 +4777,35 @@ exportK8sConfigMap() {
     logError "999" "ConfigMap '${CM_NAME}' not found in '${CM_NAMESPACE}' namespace." 1
   fi
   logMessage "Getting configMap '${CM_NAME}' from '${CM_NAMESPACE}' namespace..."
-  export_dir=$(getUniqueFilename "${CM_NAME}")
-  mkdir -p "${export_dir}"
 
   nd=$(echo "${CM_JSON}" | ${JQ_BIN} '(.data // {}) | keys | length')
   nb=$(echo "${CM_JSON}" | ${JQ_BIN} '(.binaryData // {}) | keys | length')
+
+  if [[ "${VERBOSITY}" -ge 1 ]]; then
+    logMessage "ConfigMap '${CM_NAME}' (${CM_NAMESPACE}): listing keys only (-v); not writing files." 1
+    if [[ "${nd}" -eq 0 ]] && [[ "${nb}" -eq 0 ]]; then
+      logMessage "  No .data or .binaryData keys." 1
+      return 0
+    fi
+    if [[ "${nd}" -gt 0 ]]; then
+      logMessage "  .data keys (${nd}):" 1
+      while IFS= read -r key; do
+        [[ -z "${key}" ]] && continue
+        logMessage "    ${key}" 1
+      done < <(echo "${CM_JSON}" | ${JQ_BIN} -r '.data // {} | keys[]' 2>/dev/null)
+    fi
+    if [[ "${nb}" -gt 0 ]]; then
+      logMessage "  .binaryData keys (${nb}):" 1
+      while IFS= read -r key; do
+        [[ -z "${key}" ]] && continue
+        logMessage "    ${key}" 1
+      done < <(echo "${CM_JSON}" | ${JQ_BIN} -r '.binaryData // {} | keys[]' 2>/dev/null)
+    fi
+    return 0
+  fi
+
+  export_dir=$(getUniqueFilename "${CM_NAME}")
+  mkdir -p "${export_dir}"
 
   while IFS= read -r key; do
     [[ -z "${key}" ]] && continue
