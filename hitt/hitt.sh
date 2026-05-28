@@ -4928,7 +4928,7 @@ parseUtilGet() {
         KEYWORD="${UTILARGS[*]:2}"   # or "${UTILARGS[@]:2}" with IFS=' '
       fi
       initISAdminREST
-      JSON=$(runARRESTSQL "select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%${KEYWORD}%'")
+      JSON=$(runARRESTSQL "select [name],[Schema ID],[schemaType],[nextId],[overlayProp] from [AR System Metadata: arschema] where [name] like '%${KEYWORD}%'")
       NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
       if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
         logError "999" "AR SQL query response did not include a row count." 1
@@ -4940,7 +4940,7 @@ parseUtilGet() {
       if [[ "${NUM_ROWS}" -gt 100 ]]; then
         # check for an exact match
         local EXACT_ROWS
-        JSON=$(runARRESTSQL "select [name],[Schema ID] from [AR System Metadata: arschema] where [name] = '${KEYWORD}'")
+        JSON=$(runARRESTSQL "select [name],[Schema ID],[schemaType],[nextId],[overlayProp] from [AR System Metadata: arschema] where [name] = '${KEYWORD}'")
         EXACT_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
         if [[ "${EXACT_ROWS}" -eq 1 ]]; then
           STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}' including one exact match. Please use a more specific keyword to see others."
@@ -4949,6 +4949,29 @@ parseUtilGet() {
         fi
       fi
       logStatus "${STATUS_MSG}"
+      echo "${JSON}" | ${JQ_BIN} -r '
+        ([.columns[].label] | map("\u001b[1m" + . + "\u001b[0m")),
+        (.rows[]
+          | .[2] |= (
+              if . == 1 then "regular"
+              elif . == 2 then "join"
+              elif . == 3 then "view"
+              elif . == 4 then "display-only"
+              elif . == 5 then "vendor"
+              elif . == 6 then "placeholder"
+              else "unknown" end
+            )
+          | .[4] |= (
+              if . == 0 then "unmodified"
+              elif . == 1 then "overlaid"
+              elif . == 2 then "overlay"
+              elif . == 4 then "custom"
+              else "unknown" end
+            )
+        )
+        | @tsv
+      ' | column -t -s $'\t'
+      exit
       echo "${JSON}" | ${JQ_BIN} -r '
         "\u001b[1mForm Name\tSchema ID\u001b[0m",
         (.rows[] | [.[]] | @tsv)
