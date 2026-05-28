@@ -4296,14 +4296,7 @@ generateISDbID() {
 }
 
 getISDbID() {
-  checkToolVersion kubectl
-  getVersions
-  getDomain
-  buildISAliasesArray
-  getISAdminCreds
-  if ! getISJWT; then
-    logError "999" "Failed to authenticate user '${IS_USER}' - can't get DB ID." 1
-  fi
+  initISAdminREST
   IS_DBID=$(getISServerInfo dbId)
   logMessage "DB ID for this system is '${IS_DBID}'."
 }
@@ -4359,14 +4352,7 @@ applyARLicense() {
     fi
   fi
   [[ ! -z "${INVALID_IS_LICENSE+x}" ]] && exit
-  checkToolVersion kubectl
-  getVersions
-  getDomain
-  buildISAliasesArray
-  getISAdminCreds
-  if ! getISJWT; then
-    logError "999" "Failed to authenticate user '${IS_USER}' - can't apply license." 1
-  fi
+  initISAdminREST
   IS_LICENSE_TYPE=$(getISServerInfo licensetype)
   logMessage "Current server license type is '${IS_LICENSE_TYPE}'."
   # is license already present?
@@ -4577,6 +4563,7 @@ showUtilHelp() { # utility mode help
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
     \tget forms \t| Search AR forms by keyword; prints form name and Schema ID. Args: KEYWORD (use quotes for multi-word, e.g. -u \"get forms AR System\")
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
+    \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
     \thelp \t\t| Show this list.
     "
@@ -4940,16 +4927,12 @@ parseUtilGet() {
       if ((${#UTILARGS[@]} > 3)); then
         KEYWORD="${UTILARGS[*]:2}"   # or "${UTILARGS[@]:2}" with IFS=' '
       fi
-      checkToolVersion kubectl
-      getVersions
-      getDomain
-      buildISAliasesArray
-      getISAdminCreds
-      if ! getISJWT; then
-        logError "999" "Failed to authenticate — cannot run query." 1
-      fi
+      initISAdminREST
       JSON=$(runARRESTSQL "select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%${KEYWORD}%'")
       NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
+      if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
+        logError "999" "AR SQL query response did not include a row count." 1
+      fi
       if [[ "${NUM_ROWS}" -eq 0 ]]; then
         logError "999" "No forms with '${KEYWORD}' in their name found." 1
       fi
@@ -4983,14 +4966,7 @@ parseUtilGet() {
       if ((${#UTILARGS[@]} > 4)); then
         KEYWORD="${UTILARGS[*]:3}"
       fi
-      checkToolVersion kubectl
-      getVersions
-      getDomain
-      buildISAliasesArray
-      getISAdminCreds
-      if ! getISJWT; then
-        logError "999" "Failed to authenticate — cannot run query." 1
-      fi
+      initISAdminREST
       if [ -z "${KEYWORD}" ]; then
         JSON=$(runARRESTSQL "select [fieldName],[fieldId] from [AR System Metadata: field] where [schemaId] = '${SCHEMAID}'")
         ERR_MSG="No fields found for form with schemaId ${SCHEMAID}."
@@ -4999,6 +4975,9 @@ parseUtilGet() {
         ERR_MSG="No fields found with '${KEYWORD}' in their name for schemaId ${SCHEMAID}."
       fi
       NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
+      if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
+        logError "999" "AR SQL query response did not include a row count." 1
+      fi
       if [[ "${NUM_ROWS}" -eq 0 ]]; then
         logError "999" "${ERR_MSG}" 1
       fi
@@ -5016,6 +4995,17 @@ parseUtilGet() {
      logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option."
      ;;
   esac
+}
+
+initISAdminREST() {
+  checkToolVersion kubectl
+  getVersions
+  getDomain
+  buildISAliasesArray
+  getISAdminCreds
+  if ! getISJWT; then
+    logError "999" "Failed to authenticate — cannot run query." 1
+  fi
 }
 
 genTctlConfig() {
@@ -5055,16 +5045,53 @@ genTctlConfig() {
 }
 
 runARRESTSQL() {
-  # calls via api/arsys/v1.0/sql/query
-  # returns JSON
-  local SQL
-  SQL="${1}"
-  ${JQ_BIN} -n --arg sql "${SQL}" '{sql: $sql}' | \
-    ${CURL_BIN} -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/sql/query" \
+  # POST api/arsys/v1.0/sql/query; prints JSON on success or logError+exit
+  local SQL="$1"
+  local RESP_FILE
+  local HTTP_CODE
+  local AR_DETAIL
+
+  RESP_FILE=$(mktemp)
+  HTTP_CODE=$(${JQ_BIN} -n --arg sql "${SQL}" '{sql: $sql}' | \
+    ${CURL_BIN} -sk -w "%{http_code}" -o "${RESP_FILE}" -X POST \
+      "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/sql/query" \
       -H "Authorization: AR-JWT ${ARJWT}" \
       -H "Content-Type: application/json" \
       -H "Accept: application/json" \
-      -d @-
+      -d @-)
+  if [[ "${HTTP_CODE}" -lt 200 ]] || [[ "${HTTP_CODE}" -ge 300 ]]; then
+    AR_DETAIL=$(head -c 300 "${RESP_FILE}" 2>/dev/null | tr '\n' ' ')
+    rm -f "${RESP_FILE}"
+    logError "999" "AR SQL query failed (HTTP ${HTTP_CODE}).${AR_DETAIL:+ ${AR_DETAIL}}" 1
+  fi
+  if [[ ! -s "${RESP_FILE}" ]]; then
+    rm -f "${RESP_FILE}"
+    logError "999" "AR SQL query returned an empty response." 1
+  fi
+  if ! ${JQ_BIN} -e . "${RESP_FILE}" &>/dev/null; then
+    AR_DETAIL=$(head -c 300 "${RESP_FILE}" 2>/dev/null | tr '\n' ' ')
+    rm -f "${RESP_FILE}"
+    logError "999" "AR SQL query did not return valid JSON.${AR_DETAIL:+ ${AR_DETAIL}}" 1
+  fi
+  if ! ${JQ_BIN} -e '(.rows | type) == "array"' "${RESP_FILE}" &>/dev/null; then
+    AR_DETAIL=$(${JQ_BIN} -r '
+      [.message, .error, .errorMessage, .statusReason, .status] |
+      map(select(. != null and (. | tostring) != "")) | first // empty
+    ' "${RESP_FILE}" 2>/dev/null)
+    [[ -z "${AR_DETAIL}" ]] && AR_DETAIL=$(head -c 300 "${RESP_FILE}" 2>/dev/null | tr '\n' ' ')
+    rm -f "${RESP_FILE}"
+    logError "999" "AR SQL query returned an unexpected response (no rows array).${AR_DETAIL:+ ${AR_DETAIL}}" 1
+  fi
+  cat "${RESP_FILE}"
+  rm -f "${RESP_FILE}"
+}
+
+parseUtilSQL() {
+  if [ ${#UTILARGS[@]} -eq 1 ]; then
+    logError "999" "Usage: bash $0 -u \"sql AR_SQL_QUERY\"" 1
+  fi
+  initISAdminREST
+  runARRESTSQL "${UTILARGS[*]:1}"
 }
 
 #End functions
@@ -5295,6 +5322,9 @@ if [ "${MODE}" == "utility" ]; then
       IS_DATABASE_HOST_NAME="${UTILARGS[2]}"
       IS_AR_DB_NAME="${UTILARGS[3]}"
       generateISDbID
+      ;;
+    sql)
+      parseUtilSQL
       ;;
     help)
       showUtilHelp
