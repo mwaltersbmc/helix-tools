@@ -1,6 +1,6 @@
 # HITT Utility Mode
 
-**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, secret decode, ConfigMap export, AR form and field lookup, generated DBID).
+**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, secret decode, ConfigMap export, AR queries, generated DBID).
 
 Utility commands are invoked with **`-u`**. When the command has spaces or multiple words, pass the whole thing in **double quotes**.
 
@@ -12,7 +12,7 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 | `get jwt` | Prints an AR-JWT for the IS REST API. Defaults to `hannah_admin` using credentials from the cluster; optional username/password. |
 | `get secret` | Decodes and displays Kubernetes secret `.data`. Binary keys are written to files; remaining keys are printed. Args: **SECRETNAME** [**NAMESPACE**]. If namespace is omitted, searches `IS_NAMESPACE`, then `HP_NAMESPACE`, then `CDE_NAMESPACE` from `hitt.conf`; prompts if more than one match (use explicit namespace with `-q` / automation). |
 | `get configmap` | Exports ConfigMap `.data` and `.binaryData` keys to files under a new directory (named after the ConfigMap, with a numeric suffix if that name already exists). With **`-v`**, lists key names only (no files). Args: **CM_NAME** [**NAMESPACE**]. Optional namespace uses the same search and prompt rules as `get secret`. |
-| `get forms` | Searches AR forms whose name contains your keyword; prints **Form name** and **Schema ID**. Args: **KEYWORD** (quote the whole `-u` string if the keyword has spaces). Requires `hitt.conf` and a reachable Helix IS. |
+| `get forms` | Searches AR forms whose name contains your keyword; prints **Form name** and **Schema ID**. Args: **KEYWORD**. |
 | `get fields` | Lists fields on one form using its **Schema ID** from `get forms`. Args: **SCHEMAID** [**KEYWORD**]. Omit the keyword to list all fields; add a keyword to filter by field name. |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
 | `help` | Prints the same summary as this file (built into the script). |

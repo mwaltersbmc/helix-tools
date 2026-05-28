@@ -4575,7 +4575,7 @@ showUtilHelp() { # utility mode help
     \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap), or with -v list key names only. Args: CM_NAME [NAMESPACE]
     \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
-    \tget forms \t| Search AR forms by keyword; prints form name and Schema ID (requires hitt.conf and IS REST). Args: KEYWORD (use quotes for multi-word, e.g. -u \"get forms Login Name\")
+    \tget forms \t| Search AR forms by keyword; prints form name and Schema ID. Args: KEYWORD (use quotes for multi-word, e.g. -u \"get forms AR System\")
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
     \thelp \t\t| Show this list.
