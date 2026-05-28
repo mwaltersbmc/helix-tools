@@ -8,6 +8,11 @@ window.HITT_USE_CASES = {
   },
   "topics": [
     {
+      "id": "querying-ar-forms",
+      "title": "Querying AR Forms",
+      "order": 5
+    },
+    {
       "id": "getting-started",
       "title": "Getting Started and Configuring HITT",
       "order": 10
@@ -54,6 +59,38 @@ window.HITT_USE_CASES = {
     }
   ],
   "useCases": [
+    {
+      "id": "ar-forms-find-form",
+      "topicId": "querying-ar-forms",
+      "order": 10,
+      "title": "I want to find the name or schemaId of a form",
+      "commands": [
+        "bash hitt.sh -u \"get forms KEYWORD\"",
+        "bash hitt.sh -u \"get forms Login Name\""
+      ],
+      "notes": [
+        "KEYWORD is any word or phrase that appears in the form name. For a name with spaces, put the whole command in double quotes as shown in the second example.",
+        "HITT connects to your Helix IS environment (you need a working hitt.conf file) and prints a table of matching forms with their Schema ID.",
+        "If you see too many results, try a more specific keyword. HITT may show a single exact match when your search text matches one form name exactly."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "ar-forms-find-fields",
+      "topicId": "querying-ar-forms",
+      "order": 20,
+      "title": "I want to find the names of fields on a form",
+      "commands": [
+        "bash hitt.sh -u \"get fields SCHEMAID\"",
+        "bash hitt.sh -u \"get fields SCHEMAID KEYWORD\""
+      ],
+      "notes": [
+        "SCHEMAID is the numeric ID from the form search (use get forms first if you do not know it).",
+        "With only SCHEMAID, HITT lists all fields on that form. Add KEYWORD to narrow the list to field names containing that text (use quotes for multi-word keywords).",
+        "Results are shown as a table of field name and field ID."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
     {
       "id": "download-hitt",
       "topicId": "getting-started",

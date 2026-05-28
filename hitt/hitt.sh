@@ -2411,7 +2411,7 @@ getISJWT() {
 getISServerInfo() {
   # $1 is key to return
   if [ -z "${IS_SERVER_INFO}" ]; then
-    IS_SERVER_INFO=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Administration%3A%20Server%20Information?q=%27configurationName%27%3D%22%25%22" -H "Authorization: AR-JWT $ARJWT")
+    IS_SERVER_INFO=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Administration%3A%20Server%20Information?q=%27configurationName%27%3D%22%25%22" -H "Authorization: AR-JWT ${ARJWT}")
   fi
   echo "${IS_SERVER_INFO}" | ${JQ_BIN} -r ".entries[0].values.${1}"
 }
@@ -4370,12 +4370,12 @@ applyARLicense() {
   IS_LICENSE_TYPE=$(getISServerInfo licensetype)
   logMessage "Current server license type is '${IS_LICENSE_TYPE}'."
   # is license already present?
-  NUM_LICS=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses?q=%27Key%27%3D%22${IS_LICENSE_KEY}%22&fields=values(Key)" -H "Authorization: AR-JWT $ARJWT" | ${JQ_BIN} -r '.entries |length')
+  NUM_LICS=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses?q=%27Key%27%3D%22${IS_LICENSE_KEY}%22&fields=values(Key)" -H "Authorization: AR-JWT ${ARJWT}" | ${JQ_BIN} -r '.entries |length')
   if [[ $NUM_LICS -ne 0 ]]; then
     logError "999" "License with key '${IS_LICENSE_KEY}' is already present." 1
   fi
   HTTP_RESPONSE=$(mktemp)
-  HTTP_CODE=$(${CURL_BIN} -o "${HTTP_RESPONSE}" -sk -w "%{http_code}" -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT $ARJWT" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null)
+  HTTP_CODE=$(${CURL_BIN} -o "${HTTP_RESPONSE}" -sk -w "%{http_code}" -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT ${ARJWT}" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null)
   case "${HTTP_CODE}" in
     200|201)
       logMessage "License applied - ${IS_LICENSE_JSON}"
@@ -4575,6 +4575,8 @@ showUtilHelp() { # utility mode help
     \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap), or with -v list key names only. Args: CM_NAME [NAMESPACE]
     \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
+    \tget forms \t| Search AR forms by keyword; prints form name and Schema ID (requires hitt.conf and IS REST). Args: KEYWORD (use quotes for multi-word, e.g. -u \"get forms Login Name\")
+    \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
     \thelp \t\t| Show this list.
     "
@@ -4704,7 +4706,6 @@ URLEncode() {
 		esac
 	done
 }
-
 
 getUniqueFilename() {
     local filepath="$1"
@@ -4931,6 +4932,86 @@ parseUtilGet() {
         esac
       fi
       ;;
+    forms)
+      if [ ${#UTILARGS[@]} -le 2 ] ; then
+        logError "999" "Usage: bash $0 -u \"get forms KEYWORD\"" 1
+      fi
+      KEYWORD="${UTILARGS[2]}"
+      if ((${#UTILARGS[@]} > 3)); then
+        KEYWORD="${UTILARGS[*]:2}"   # or "${UTILARGS[@]:2}" with IFS=' '
+      fi
+      checkToolVersion kubectl
+      getVersions
+      getDomain
+      buildISAliasesArray
+      getISAdminCreds
+      if ! getISJWT; then
+        logError "999" "Failed to authenticate — cannot run query." 1
+      fi
+      JSON=$(runARRESTSQL "select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%${KEYWORD}%'")
+      NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
+      if [[ "${NUM_ROWS}" -eq 0 ]]; then
+        logError "999" "No forms with '${KEYWORD}' in their name found." 1
+      fi
+      STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}':"
+      if [[ "${NUM_ROWS}" -gt 100 ]]; then
+        # check for an exact match
+        local EXACT_ROWS
+        JSON=$(runARRESTSQL "select [name],[Schema ID] from [AR System Metadata: arschema] where [name] = '${KEYWORD}'")
+        EXACT_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
+        if [[ "${EXACT_ROWS}" -eq 1 ]]; then
+          STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}' including one exact match. Please use a more specific keyword to see others."
+        else
+          logError "999" "${NUM_ROWS} forms found with '${KEYWORD}' in their name - please use a more specific keyword." 1
+        fi
+      fi
+      logStatus "${STATUS_MSG}"
+      echo "${JSON}" | ${JQ_BIN} -r '
+        "\u001b[1mForm Name\tSchema ID\u001b[0m",
+        (.rows[] | [.[]] | @tsv)
+      ' | column -t -s $'\t'
+      ;;
+    fields)
+      if [ ${#UTILARGS[@]} -lt 3 ] ; then
+        logError "999" "Usage: bash $0 -u \"get fields SCHEMAID [KEYWORD]\"" 1
+      fi
+      SCHEMAID=${UTILARGS[2]}
+      if [[ ! ${SCHEMAID} =~ ^[0-9]+$ ]]; then
+        logError "999" "Invalid schemaId '${SCHEMAID}' - must be a number. Use \"get forms\" to find schemaId." 1
+      fi
+      KEYWORD="${UTILARGS[3]}"
+      if ((${#UTILARGS[@]} > 4)); then
+        KEYWORD="${UTILARGS[*]:3}"
+      fi
+      checkToolVersion kubectl
+      getVersions
+      getDomain
+      buildISAliasesArray
+      getISAdminCreds
+      if ! getISJWT; then
+        logError "999" "Failed to authenticate — cannot run query." 1
+      fi
+      if [ -z "${KEYWORD}" ]; then
+        JSON=$(runARRESTSQL "select [fieldName],[fieldId] from [AR System Metadata: field] where [schemaId] = '${SCHEMAID}'")
+        ERR_MSG="No fields found for form with schemaId ${SCHEMAID}."
+      else
+        JSON=$(runARRESTSQL "select [fieldName],[fieldId] from [AR System Metadata: field] where [schemaId] = '${SCHEMAID}' and [fieldName] like '%${KEYWORD}%'")
+        ERR_MSG="No fields found with '${KEYWORD}' in their name for schemaId ${SCHEMAID}."
+      fi
+      NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
+      if [[ "${NUM_ROWS}" -eq 0 ]]; then
+        logError "999" "${ERR_MSG}" 1
+      fi
+      if [[ "${NUM_ROWS}" -gt 100 ]]; then
+        logError "999" "${NUM_ROWS} fields found - please add a keyword." 1
+      fi
+      logStatus "Found ${NUM_ROWS} fields:"
+      echo "${JSON}" | ${JQ_BIN} -r '
+        "\u001b[1mField Name\tField ID\u001b[0m",
+        (.rows[] | [.[]] | @tsv)
+      ' | column -t -s $'\t'
+
+      ;;
     *)
      logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option."
      ;;
@@ -4972,6 +5053,20 @@ genTctlConfig() {
   rssourl: ${RSSOURL}
   "
 }
+
+runARRESTSQL() {
+  # calls via api/arsys/v1.0/sql/query
+  # returns JSON
+  local SQL
+  SQL="${1}"
+  ${JQ_BIN} -n --arg sql "${SQL}" '{sql: $sql}' | \
+    ${CURL_BIN} -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/sql/query" \
+      -H "Authorization: AR-JWT ${ARJWT}" \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json" \
+      -d @-
+}
+
 #End functions
 
 # MAIN Start
