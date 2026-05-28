@@ -1,6 +1,6 @@
 # HITT Utility Mode
 
-**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, secret decode, ConfigMap export, AR queries, generated DBID).
+**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, secret decode, ConfigMap export, AR form/field search and custom SQL queries, generated DBID).
 
 Utility commands are invoked with **`-u`**. When the command has spaces or multiple words, pass the whole thing in **double quotes**.
 
@@ -14,6 +14,7 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 | `get configmap` | Exports ConfigMap `.data` and `.binaryData` keys to files under a new directory (named after the ConfigMap, with a numeric suffix if that name already exists). With **`-v`**, lists key names only (no files). Args: **CM_NAME** [**NAMESPACE**]. Optional namespace uses the same search and prompt rules as `get secret`. |
 | `get forms` | Searches AR forms whose name contains your keyword; prints **Form name** and **Schema ID**. Args: **KEYWORD**. |
 | `get fields` | Lists fields on one form using its **Schema ID** from `get forms`. Args: **SCHEMAID** [**KEYWORD**]. Omit the keyword to list all fields; add a keyword to filter by field name. |
+| `sql` | Runs a custom AR SQL query via the IS REST API and prints the full JSON response. Args: **SQL_QUERY** (put the entire query inside the quoted `-u` string). |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
 | `help` | Prints the same summary as this file (built into the script). |
 
@@ -39,6 +40,10 @@ bash hitt.sh -u "get configmap my-configmap"
 
 # List ConfigMap keys only (no export) — use global -v before -u
 bash hitt.sh -v -u "get configmap my-configmap helix-is"
+
+# Custom AR SQL (raw JSON on stdout)
+bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'"
+bash hitt.sh -u "sql select [Login Name],[Full Name] from [User] where [Login Name] = 'hannah_admin'"
 
 # Generate DBID before deployment / license (mssql | oracle | postgres)
 bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
@@ -104,6 +109,37 @@ Example:
 bash hitt.sh -u "get fields 163"
 bash hitt.sh -u "get fields 163 Login"
 ```
+
+### Running custom AR SQL (`sql SQL_QUERY`)
+
+Use **`get forms`** or **`get fields`** for everyday lookups. Use **`sql`** when you need your own query against AR metadata tables.
+
+1. Run from the directory that contains `hitt.sh` and `hitt.conf`.
+2. Put the **whole** command in double quotes, including the word `sql` and the full SQL text.
+3. Use **square brackets** around table and column names (AR style), for example `[name]` and `[AR System Metadata: arschema]`.
+4. HITT prints **JSON** on the screen (not a formatted table). To view rows as a table, pipe the output to `jq` (see example below).
+
+**NOTE** - field names must be the database field name rather than labels - use the **get forms** and **get fields** commands to verify them if in doubt.
+
+Example:
+
+```bash
+bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'"
+```
+Pipe results through jq:
+
+```bash
+bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'" | jq .
+```
+
+Save results to a file and show a simple table:
+
+```bash
+bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'" > /tmp/ar-query.json
+jq -r '"\(.columns[0].label)\t\(.columns[1].label)", (.rows[] | [.[]] | @tsv)' /tmp/ar-query.json | column -t -s $'\t'
+```
+
+If the query fails, HITT reports an error (for example bad HTTP status, invalid JSON, or an API error message).
 
 ### `gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME`
 

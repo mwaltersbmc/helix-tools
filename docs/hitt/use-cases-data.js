@@ -520,6 +520,35 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
     {
+      "id": "ar-sql-run-query",
+      "topicId": "querying-ar-forms",
+      "order": 30,
+      "title": "I want to run a custom SQL query against AR metadata",
+      "commands": [
+        "bash hitt.sh -u \"sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'\""
+      ],
+      "notes": [
+        "Put the entire command in double quotes: the word sql, then your full SQL query. Use square brackets around AR table and column names.",
+        "HITT connects to Helix IS the same way as get forms and get fields, then prints JSON on the screen.",
+        "Use \"get forms\" and \"get fields\" to verify field names."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "ar-sql-save-results",
+      "topicId": "querying-ar-forms",
+      "order": 40,
+      "title": "I want to save SQL query results to a file",
+      "commands": [
+        "bash hitt.sh -u \"sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'\" > /tmp/ar-query.json"
+      ],
+      "notes": [
+        "Use the same sql command as a custom query; add > filename to save the JSON response.",
+        "To view the saved file as a simple table, use jq and column on the JSON (see README-utility-mode.md for an example)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
       "id": "utility-secret",
       "topicId": "other-features",
       "order": 10,
