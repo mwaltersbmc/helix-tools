@@ -70,7 +70,7 @@ getEPjson() {
 
 getConfValues() {
   JENKINS_PROTOCOL_ARRAY=(http https)
-  if [ "${MODE}" == "pre-hp" ]; then
+  if [ "${MODE}" == "pre-hp" ] || [ "${MODE}" == "info" ]; then
     NS_ARRAY=("PENDING" "${NS_ARRAY[@]}")
   fi
   discoverHelixNamespaceCandidates
@@ -861,6 +861,25 @@ EOF
   else
     return 0
   fi
+}
+
+# Extract JSON body from sealtctl job pod logs (tctl prints a "Response: {...}" block for -o json).
+extractTctlJsonFromLogText() {
+  awk '
+      /Response: *\{/ {
+        json_started=1
+        depth=1
+        line = substr($0, index($0, "{"))
+        print line
+        next
+      }
+      json_started {
+        print
+        depth += gsub(/{/, "{")
+        depth -= gsub(/}/, "}")
+        if (depth == 0) exit
+      }
+    ' 2>/dev/null
 }
 
 debugTCTLJob() {
@@ -2438,6 +2457,7 @@ getISAdminCreds() {
 
 checkAssistTool() {
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get deployment assisttool-dep > /dev/null 2>&1 ; then
+    SAT_DEPLOYED=1
     logMessage "Support Assistant Tool found - checking for fpackager sidecar containers..." 1
     if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[*].name}' | grep -q fpackager ; then
       logError "177" "fpackager sidecar containers not found - Support Assistant will not be able to access application logs."
@@ -3453,12 +3473,19 @@ logMessageDetails() {
   # MSG_ID
   [[ "${1}" == "999" ]] && return # Don't log 999 messages
   # Suppress MSG_JSON parsing to reduce clutter
+  # 1. Capture the original state
+  if [[ $- =~ x ]]; then
+      xtrace_was_on=true
+  else
+      xtrace_was_on=false
+  fi
+  # 2. Turn off tracing safely
   set +x
   getMessageJSON "${1}"
   getMessageDetails
   # Re-enable debugging if set
-  if [ "${DEBUG}" == "1" ]; then
-    set -x
+  if [ "$xtrace_was_on" = true ]; then
+      set -x
   fi
   printMessageDetails >> "${HITT_MSG_FILE}"
 }
@@ -3768,21 +3795,7 @@ fixSSORealm() {
     getTCTLOutput full
     deleteTCTLJob
     # Get JSON from tctl pod output
-    TMP_JSON=$(awk  '
-      /Response: *{/ {
-        json_started=1
-        depth=1
-        line = substr($0, index($0, "{"))
-        print line
-        next
-      }
-      json_started {
-        print
-        depth += gsub(/{/, "{")
-        depth -= gsub(/}/, "}")
-        if (depth == 0) exit
-      }
-    ' <<< "${TCTL_OUTPUT}")
+    TMP_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}")
   fi
 
   buildRealmJSON
@@ -5131,6 +5144,7 @@ getK8sNodeDetails() {
   local pod_stats count_oom TABLE_DATA node
 
   K8S_NODE_DETAILS_TABLE=""
+  K8S_NODE_DETAILS_JSON=""
 
   nodes_json=$(${KUBECTL_BIN} get nodes -o json 2>>"${HITT_ERR_FILE}") || true
   if [[ -z "${nodes_json}" ]] || ! echo "${nodes_json}" | ${JQ_BIN} -e . >/dev/null 2>>"${HITT_ERR_FILE}"; then
@@ -5146,7 +5160,8 @@ getK8sNodeDetails() {
   fi
 
   TABLE_DATA=""
-  TABLE_DATA+="NODE_NAME|NODE_TYPE|ALLOCATABLE_(CPU/MEM)|ALLOCATED_REQ_(CPU/MEM)|ACTUAL_USAGE|NODE_STATUS/CONDITIONS|PODS_(RUN/BAD/CRASH)|OOM_KILLS|CONTAINER_RUNTIME\n"
+  # Use $'\n' — in bash, "\n" inside "..." is a literal backslash+n, not a newline (echo -e expands it for display; jq does not).
+  TABLE_DATA+=$'NODE_NAME|NODE_TYPE|ALLOCATABLE_(CPU/MEM)|ALLOCATED_REQ_(CPU/MEM)|ACTUAL_USAGE|NODE_STATUS/CONDITIONS|PODS_(RUN/BAD/CRASH)|OOM_KILLS|CONTAINER_RUNTIME\n'
 
   while read -r node; do
     [[ -z "${node}" ]] && continue
@@ -5207,10 +5222,26 @@ getK8sNodeDetails() {
 
     count_oom=$(echo "${pods_json}" | ${JQ_BIN} '[.items[].status.containerStatuses // [] | .[] | select(.lastState.terminated.reason == "OOMKilled")] | length')
 
-    TABLE_DATA+="${node_name}|${node_type}|${allocatable}|${allocated}|${actual_usage}|${node_status}|${pod_stats}|${count_oom}|${runtime}\n"
+    TABLE_DATA+="${node_name}|${node_type}|${allocatable}|${allocated}|${actual_usage}|${node_status}|${pod_stats}|${count_oom}|${runtime}"$'\n'
   done < <(echo "${nodes_json}" | ${JQ_BIN} -c '.items[]')
 
   K8S_NODE_DETAILS_TABLE="${TABLE_DATA}"
+  K8S_NODE_DETAILS_JSON=$(
+    printf '%s' "${TABLE_DATA}" | ${JQ_BIN} -Rs '
+      split("\n")
+      | map(select(length > 0 and contains("|")))
+      | if length < 2 then []
+        else
+          (.[0] | split("|") | map(gsub("^[[:space:]]+|[[:space:]]+$"; ""))) as $keys
+          | .[1:]
+          | map(
+              split("|") as $vals
+              | ($keys | length) as $n
+              | [range(0; $n) | . as $i | {($keys[$i]): (($vals[$i] // "") | gsub("^[[:space:]]+|[[:space:]]+$"; ""))}] | add
+            )
+        end
+    ' 2>>"${HITT_ERR_FILE}" | hittJsonApplyInfoKeyNormalization 2>>"${HITT_ERR_FILE}"
+  ) || K8S_NODE_DETAILS_JSON='[]'
   return 0
 }
 
@@ -5338,14 +5369,16 @@ gatherInfo() {
   fi
 
   QUIET=1
+  HP_TENANTS_JSON=''
+  HP_SERVICES_JSON=''
   logStatus "Gathering cluster information..." 1
   checkToolVersion kubectl
   getK8sNodeDetails
   getVersions
   if checkK8sAuth get ingressclasses; then
     INGRESS_CLASSES=$(${KUBECTL_BIN} get ingressclasses)
+    discoverIngressControllerDetails "${HP_INGRESS_CLASS}"
   fi
-  discoverIngressControllerDetails "${HP_INGRESS_CLASS}"
   logStatus "Gathering Helix Platform information..." 1
   setVarsFromPlatform
   checkHelixLoggingDeployed
@@ -5358,41 +5391,40 @@ gatherInfo() {
   getTCTLOutput full
   HP_TENANTS=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
   deleteTCTLJob
+  if deployTCTL "get tenant -o json"; then
+    getTCTLOutput full
+    HP_TENANTS_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '')
+  else
+    HP_TENANTS_JSON=''
+  fi
+  deleteTCTLJob
   deployTCTL "get service"
   getTCTLOutput full
   HP_SERVICES=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
   deleteTCTLJob
+  if deployTCTL "get service -o json"; then
+    getTCTLOutput full
+    HP_SERVICES_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '')
+  else
+    HP_SERVICES_JSON=''
+  fi
+  deleteTCTLJob
   logStatus "Gathering Helix Service Mananagement information..." 1
+  IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
   buildISAliasesArray
+  if isJenkinsInCluster ; then
+    CONTAINERIZED_JENKINS=true
+  else
+    CONTAINERIZED_JENKINS=false
+  fi
   checkJenkinsIsRunning
+  UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
   getISDetailsFromK8s
-  checkISDockerLogin
   checkISRESTReady
   checkISLicenseStatus
-
-  return
-
-if [ "${MODE}" == "pre-is" ]; then
-  logStatus "Checking Deployment Engine setup..."
-  checkDERequirements
-fi
-
-if [ "${SKIP_JENKINS}" == "0" ]; then
-  logStatus "Checking IS FTS Elastic settings..."
-  checkFTSElasticSettings
-  logStatus "Checking IS DB settings..."
-  checkISDBSettings
-  checkISDBLatency
-  generateISDbID
-fi
-
-if [ "${MODE}" == "post-is" ]; then
+  getISDbID
   logPlatformFTSStartTime
-  logStatus "Checking Helix IS platform-admin-ext service..."
-  checkPlatformAdminExtSvc
-  logStatus "Checking Support Assistant Tool..."
   checkAssistTool
-fi
 }
 
 printInfo() {
@@ -5431,19 +5463,293 @@ Services:
 ${HP_SERVICES}
 
 ${BOLD}Helix Logging:${NORMAL}
-Helix logging deployed: $( [ "$HELIX_LOGGING_DEPLOYED" = "1" ] && echo "yes" || echo "no" )
+Helix logging deployed: $( [ "$HELIX_LOGGING_DEPLOYED" = "1" ] && echo "true" || echo "false" )
 Helix logging namespace: ${HELIX_LOGGING_NAMESPACE:-n/a}
 
 ${BOLD}Deployment Engine:${NORMAL}
-Containerized DE:
-Jenkins URL:
-Jenkins version:
+Containerized DE: ${CONTAINERIZED_JENKINS}
+Jenkins URL: ${JENKINS_LOG_URL}
+Jenkins version: ${JENKINS_VERSION}
+HELIX_ONPREM_DEPLOYMENT pipeline version: ${UBER_VERSION}
 
 ${BOLD}Helix Service Management:${NORMAL}
-Namespace:
-Version:
-
+Namespace: ${IS_NAMESPACE}
+Version: ${IS_VERSION}
+IS Db ID: ${IS_DBID}
+IS License: ${IS_LICENSE_TYPE:-unknown}
+platform-fts-0 startup time: ${STARTUP_TIME}
+Support Assistant deployed: $( [ "$SAT_DEPLOYED" = "1" ] && echo "true" || echo "false" )
 "
+}
+
+# Normalize tctl get tenant|service -o json into a JSON array for info.json (response shape varies by tctl version).
+hittTctlListNormalizeForInfoJson() {
+  local raw="${1:-}" out
+  [[ -z "${raw}" ]] && echo '[]' && return 0
+  out=$(printf '%s' "${raw}" | ${JQ_BIN} -c '
+    if . == null then []
+    elif type == "array" then .
+    elif type == "object" and (.items | type) == "array" then .items
+    elif type == "object" and (.tenants | type) == "array" then .tenants
+    elif type == "object" and (.services | type) == "array" then .services
+    elif type == "object" and (.data | type) == "array" then .data
+    elif type == "object" then [.]
+    else []
+    end
+  ' 2>>"${HITT_ERR_FILE}") || out='[]'
+  printf '%s' "${out}" | hittJsonApplyInfoKeyNormalization 2>>"${HITT_ERR_FILE}" || echo '[]'
+}
+
+# Read JSON from stdin; write JSON with object keys normalized for info.json (strip "|", trim, camelCase kubectl/tctl style).
+hittJsonApplyInfoKeyNormalization() {
+  ${JQ_BIN} -c '
+    def hittStripPipeKey:
+      gsub("\\|"; "")
+      | gsub("^\\s+|\\s+$"; "");
+    def hittSanitizeSegment:
+      gsub("[^a-zA-Z0-9]"; "");
+    def hittSnakeToCamel:
+      split("_")
+      | map(hittSanitizeSegment | gsub("^\\s+|\\s+$"; ""))
+      | map(select(length > 0))
+      | if length == 0 then ""
+        elif length == 1 then
+          (.[0]
+           | if test("[a-z]") then (.[0:1] | ascii_downcase) + .[1:]
+             elif test("^[A-Z0-9]+$") then ascii_downcase
+             else (.[0:1] | ascii_downcase) + .[1:]
+             end)
+        else
+          (.[0] | ascii_downcase) + (
+            .[1:] | map(. as $seg
+              | ($seg[0:1] | ascii_upcase) + ($seg[1:] | ascii_downcase)) | join("")
+          )
+        end;
+    def hittNormalizeObjectKey:
+      hittStripPipeKey
+      | if . == "" then "_"
+        elif test("_") then hittSnakeToCamel
+        elif test("[a-z]") then (.[0:1] | ascii_downcase) + .[1:]
+        else ascii_downcase
+        end;
+    walk(if type == "object" then with_entries(.key |= hittNormalizeObjectKey) else . end)
+  ' 2>>"${HITT_ERR_FILE}"
+}
+
+# Convert a fixed-width or tab-separated table (header = column names) to a JSON array of objects.
+# Splits on tabs if the header line contains a tab; otherwise splits on runs of 2+ spaces (column -t / kubectl style).
+# Empty or whitespace-only input yields [].
+hittTableTextToJsonArray() {
+  local raw="${1:-}"
+  if [[ -z "${raw//[[:space:]]/}" ]]; then
+    echo '[]'
+    return 0
+  fi
+  printf '%s\n' "${raw}" | awk '
+    function trim(s) {
+      sub(/^[[:space:]]+/, "", s)
+      sub(/[[:space:]]+$/, "", s)
+      return s
+    }
+    function jesc(s,   i, c, o) {
+      o = ""
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (c == "\\") o = o "\\\\"
+        else if (c == "\"") o = o "\\\""
+        else if (c == "\r") { }
+        else if (c == "\n") o = o "\\n"
+        else if (c == "\t") o = o "\\t"
+        else o = o c
+      }
+      return o
+    }
+    function split_row(line, arr,   rest, nf) {
+      delete arr
+      nf = 0
+      if (index(line, "\t") > 0) {
+        nf = split(line, arr, "\t")
+        for (i = 1; i <= nf; i++) arr[i] = trim(arr[i])
+        return nf
+      }
+      rest = line
+      while (match(rest, /[[:space:]]{2,}/)) {
+        if (RSTART > 1) arr[++nf] = trim(substr(rest, 1, RSTART - 1))
+        rest = substr(rest, RSTART + RLENGTH)
+      }
+      if (length(trim(rest)) > 0) arr[++nf] = trim(rest)
+      return nf
+    }
+    BEGIN { hdr = 0 }
+    {
+      line = trim($0)
+      if (line == "") next
+      if (!hdr) {
+        n = split_row(line, keys)
+        hdr = 1
+        next
+      }
+      m = split_row(line, vals)
+      printf "{"
+      for (i = 1; i <= n && i <= m; i++) {
+        if (i > 1) printf ","
+        printf "\"%s\":\"%s\"", jesc(keys[i]), jesc(vals[i])
+      }
+      print "}"
+    }
+  ' | ${JQ_BIN} -s -c '.' 2>>"${HITT_ERR_FILE}" | hittJsonApplyInfoKeyNormalization 2>>"${HITT_ERR_FILE}" || echo '[]'
+}
+
+# writeInfoJson — emit the same facts as printInfo to a JSON file for support tooling.
+# Output path: INFO_JSON_FILE (default: info.json in the current working directory).
+writeInfoJson() {
+  local out tab env_live helix_log sat cj node_rows tenants_rows services_rows
+  out="${INFO_JSON_FILE:-info.json}"
+  tab=$(printK8sNodeDetails 2>/dev/null || true)
+
+  if [[ -n "${K8S_NODE_DETAILS_JSON:-}" ]] && echo "${K8S_NODE_DETAILS_JSON}" | ${JQ_BIN} -e 'type == "array"' >/dev/null 2>&1; then
+    node_rows=$(echo "${K8S_NODE_DETAILS_JSON}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '[]')
+  else
+    node_rows=$(hittTableTextToJsonArray "${tab}")
+  fi
+
+  if [[ -n "${HP_TENANTS_JSON:-}" ]] && echo "${HP_TENANTS_JSON}" | ${JQ_BIN} -e . >/dev/null 2>&1; then
+    tenants_rows=$(hittTctlListNormalizeForInfoJson "${HP_TENANTS_JSON}")
+  else
+    tenants_rows=$(hittTableTextToJsonArray "${HP_TENANTS:-}")
+  fi
+
+  if [[ -n "${HP_SERVICES_JSON:-}" ]] && echo "${HP_SERVICES_JSON}" | ${JQ_BIN} -e . >/dev/null 2>&1; then
+    services_rows=$(hittTctlListNormalizeForInfoJson "${HP_SERVICES_JSON}")
+  else
+    services_rows=$(hittTableTextToJsonArray "${HP_SERVICES:-}")
+  fi
+
+  [[ -z "${node_rows}" ]] && node_rows='[]'
+  [[ -z "${tenants_rows}" ]] && tenants_rows='[]'
+  [[ -z "${services_rows}" ]] && services_rows='[]'
+
+  if [[ "${ENV_LIVE}" == "true" ]]; then
+    env_live=true
+  else
+    env_live=false
+  fi
+  if [[ "${HELIX_LOGGING_DEPLOYED:-}" == "1" ]]; then
+    helix_log=true
+  else
+    helix_log=false
+  fi
+  if [[ "${SAT_DEPLOYED:-}" == "1" ]]; then
+    sat=true
+  else
+    sat=false
+  fi
+  if [[ "${CONTAINERIZED_JENKINS:-}" == "true" ]]; then
+    cj=true
+  else
+    cj=false
+  fi
+
+  if ! ${JQ_BIN} -n \
+    --arg schemaVersion "1.3" \
+    --arg reportCreated "${NOW}" \
+    --arg environmentType "${ENV_TYPE:-}" \
+    --argjson environmentLive "${env_live}" \
+    --arg clientOsName "${OS_NAME:-}" \
+    --arg clientOsVersion "${OS_VERSION:-}" \
+    --arg clientKubectl "${KUBECTL_VERSION:-}" \
+    --arg clientHelm "${HELM_VERSION:-}" \
+    --arg clusterKubernetesVersion "${K8S_VERSION:-}" \
+    --arg clusterOpenshiftVersion "${OPENSHIFT_VERSION:-}" \
+    --argjson nodeSummary "${node_rows}" \
+    --arg ingressHelixClass "${HP_INGRESS_CLASS:-}" \
+    --arg ingressResolvedClassName "${INGRESS_CLASS_NAME:-}" \
+    --arg ingressSpecController "${INGRESS_CLASS_SPEC_CONTROLLER:-}" \
+    --arg ingressWorkloadType "${INGRESS_CONTROLLER_TYPE:-}" \
+    --arg ingressControllerNamespace "${INGRESS_CONTROLLER_NAMESPACE:-}" \
+    --arg ingressControllerName "${INGRESS_CONTROLLER_NAME:-}" \
+    --arg ingressControllerImage "${INGRESS_CONTROLLER_IMAGE:-}" \
+    --arg ingressClassesKubectl "${INGRESS_CLASSES:-}" \
+    --arg helixPlatformNamespace "${HP_NAMESPACE:-}" \
+    --arg helixPlatformVersion "${HP_VERSION:-}" \
+    --arg helixPlatformDeploymentSize "${HP_DEPLOYMENT_SIZE:-}" \
+    --arg helixPlatformLbHost "${LB_HOST:-}" \
+    --arg helixPlatformPortalUrl "${PORTAL_HOSTNAME:-}" \
+    --argjson helixPlatformTenants "${tenants_rows}" \
+    --argjson helixPlatformServices "${services_rows}" \
+    --argjson helixLoggingDeployed "${helix_log}" \
+    --arg helixLoggingNamespace "${HELIX_LOGGING_NAMESPACE:-}" \
+    --argjson deploymentEngineContainerized "${cj}" \
+    --arg deploymentEngineJenkinsUrl "${JENKINS_LOG_URL:-}" \
+    --arg deploymentEngineJenkinsVersion "${JENKINS_VERSION:-}" \
+    --arg deploymentEnginePipelineHelmVersion "${UBER_VERSION:-}" \
+    --arg helixSmNamespace "${IS_NAMESPACE:-}" \
+    --arg helixSmVersion "${IS_VERSION:-}" \
+    --arg helixSmDbId "${IS_DBID:-}" \
+    --arg helixSmLicense "${IS_LICENSE_TYPE:-}" \
+    --arg helixSmPlatformFtsStartup "${STARTUP_TIME:-}" \
+    --argjson helixSmSupportAssistantDeployed "${sat}" \
+    '{
+      schemaVersion: $schemaVersion,
+      reportCreated: $reportCreated,
+      environment: {
+        type: $environmentType,
+        live: $environmentLive
+      },
+      client: {
+        osName: $clientOsName,
+        osVersion: $clientOsVersion,
+        kubectl: $clientKubectl,
+        helm: $clientHelm
+      },
+      cluster: {
+        kubernetesVersion: $clusterKubernetesVersion,
+        openshiftVersion: $clusterOpenshiftVersion
+      },
+      nodeSummary: $nodeSummary,
+      ingress: {
+        helixIngressClass: $ingressHelixClass,
+        resolvedIngressClassName: $ingressResolvedClassName,
+        ingressClassSpecController: $ingressSpecController,
+        controllerWorkloadType: $ingressWorkloadType,
+        controllerNamespace: $ingressControllerNamespace,
+        controllerName: $ingressControllerName,
+        controllerImage: $ingressControllerImage,
+        ingressClassesKubectlOutput: $ingressClassesKubectl
+      },
+      helixPlatform: {
+        namespace: $helixPlatformNamespace,
+        version: $helixPlatformVersion,
+        deploymentSize: $helixPlatformDeploymentSize,
+        lbHost: $helixPlatformLbHost,
+        portalUrl: $helixPlatformPortalUrl,
+        tenants: $helixPlatformTenants,
+        services: $helixPlatformServices
+      },
+      helixLogging: {
+        deployed: $helixLoggingDeployed,
+        namespace: $helixLoggingNamespace
+      },
+      deploymentEngine: {
+        containerizedJenkins: $deploymentEngineContainerized,
+        jenkinsUrl: $deploymentEngineJenkinsUrl,
+        jenkinsVersion: $deploymentEngineJenkinsVersion,
+        helixOnpremDeploymentPipelineHelmVersion: $deploymentEnginePipelineHelmVersion
+      },
+      helixServiceManagement: {
+        namespace: $helixSmNamespace,
+        version: $helixSmVersion,
+        isDbId: $helixSmDbId,
+        isLicense: $helixSmLicense,
+        platformFts0StartupTime: $helixSmPlatformFtsStartup,
+        supportAssistantDeployed: $helixSmSupportAssistantDeployed
+      }
+    }' > "${out}" 2>>"${HITT_ERR_FILE}"; then
+    logWarning "268" "Failed to write machine-readable environment summary to '${out}'."
+    return 1
+  fi
+  logStatus "Machine-readable environment summary written to '${out}'." 1
+  return 0
 }
 
 #End functions
@@ -5692,6 +5998,7 @@ if [ "${MODE}" == "info" ]; then
   logStatus "Running in info mode..."
   gatherInfo
   printInfo
+  writeInfoJson || true
   exit
 fi
 
