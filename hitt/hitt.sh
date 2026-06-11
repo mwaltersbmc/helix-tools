@@ -5341,14 +5341,35 @@ discoverIngressControllerDetails() {
   return 0
 }
 
-# printIngressControllerDetails [INGRESS_CLASS_NAME]
-#   Optional arg overrides label for the class (defaults to INGRESS_CLASS_NAME from discover).
+# Human-readable info summary only (-m info): section headers, aligned labels, tctl tables via column.
+hittInfoPrintSection() {
+  echo ""
+  echo "--------------------------------------------------------------------------------"
+  echo -e "${BOLD}${1}${NORMAL}"
+}
+
+hittInfoPrintKv() {
+  printf '%-32s %s\n' "${1}:" "${2}"
+}
+
+# Pretty-print tctl tables for the terminal. Prefer pipe-separated columns (-s '|') so
+# service names with internal spaces are not split; fall back to whitespace columns otherwise.
+hittFormatTctlTableForDisplay() {
+  local raw="${1:-}"
+  [[ -z "${raw//[[:space:]]/}" ]] && return 0
+  if [[ "${raw}" == *'|'* ]]; then
+    printf '%s\n' "${raw}" | column -s '|' -t 2>/dev/null || printf '%s\n' "${raw}"
+  else
+    printf '%s\n' "${raw}" | column -t 2>/dev/null || printf '%s\n' "${raw}"
+  fi
+}
+
+# printIngressControllerDetails — aligned lines for info summary (see hittInfoPrintKv).
 printIngressControllerDetails() {
-  local show_class="${1:-${INGRESS_CLASS_NAME:-}}"
-  echo "INGRESS_CLASS: ${HP_INGRESS_CLASS}"
-  echo "Workload type: ${INGRESS_CONTROLLER_TYPE:-unknown}"
-  echo "Namespace: ${INGRESS_CONTROLLER_NAMESPACE:-unknown}"
-  echo "Image: ${INGRESS_CONTROLLER_IMAGE:-unknown}"
+  hittInfoPrintKv "Ingress class (Helix config)" "${HP_INGRESS_CLASS}"
+  hittInfoPrintKv "Workload type" "${INGRESS_CONTROLLER_TYPE:-unknown}"
+  hittInfoPrintKv "Namespace" "${INGRESS_CONTROLLER_NAMESPACE:-unknown}"
+  hittInfoPrintKv "Image" "${INGRESS_CONTROLLER_IMAGE:-unknown}"
 }
 
 gatherInfo() {
@@ -5409,7 +5430,7 @@ gatherInfo() {
     HP_SERVICES_JSON=''
   fi
   deleteTCTLJob
-  logStatus "Gathering Helix Service Mananagement information..." 1
+  logStatus "Gathering Helix Service Management information..." 1
   IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
   buildISAliasesArray
   if isJenkinsInCluster ; then
@@ -5429,57 +5450,59 @@ gatherInfo() {
 
 printInfo() {
   logStatus "BMC Helix Environment Summary" 1
-  echo "
-Report created ${NOW}
+  echo ""
+  hittInfoPrintKv "Report created" "${NOW}"
+  hittInfoPrintKv "Environment type" "${ENV_TYPE}"
+  hittInfoPrintKv "Live environment" "${ENV_LIVE}"
 
-Environment Type: ${ENV_TYPE}
-Live environment? ${ENV_LIVE}
+  hittInfoPrintSection "Client information"
+  hittInfoPrintKv "OS" "${OS_NAME:-unknown}"
+  hittInfoPrintKv "OS version" "${OS_VERSION:-unknown}"
+  hittInfoPrintKv "kubectl" "${KUBECTL_VERSION:-unknown}"
+  hittInfoPrintKv "Helm" "${HELM_VERSION:-unknown}"
 
-${BOLD}Client Information:${NORMAL}
-OS: ${OS_NAME:-unknown}
-Version: ${OS_VERSION:-unknown}
-kubectl: ${KUBECTL_VERSION:-unknown}
-helm: ${HELM_VERSION:-unknown}
+  hittInfoPrintSection "Cluster information"
+  hittInfoPrintKv "Kubernetes version" "${K8S_VERSION:-unknown}"
+  hittInfoPrintKv "OpenShift version" "${OPENSHIFT_VERSION:-n/a}"
 
-${BOLD}Cluster Information:${NORMAL}
-Kubernetes version: ${K8S_VERSION:-unknown}
-Openshift version: ${OPENSHIFT_VERSION:-n/a}
+  hittInfoPrintSection "Node summary"
+  printK8sNodeDetails || true
 
-${BOLD}Node Summary:${NORMAL}
-$(printK8sNodeDetails)
+  hittInfoPrintSection "Ingress controller"
+  printIngressControllerDetails
 
-${BOLD}Ingress Controller:${NORMAL}
-$(printIngressControllerDetails)
+  hittInfoPrintSection "Helix Platform details"
+  hittInfoPrintKv "Namespace" "${HP_NAMESPACE}"
+  hittInfoPrintKv "Version" "${HP_VERSION}"
+  hittInfoPrintKv "Deployment size" "${HP_DEPLOYMENT_SIZE}"
+  hittInfoPrintKv "Load balancer host" "${LB_HOST}"
+  hittInfoPrintKv "Portal URL" "${PORTAL_HOSTNAME}"
+  echo ""
+  echo "Tenants:"
+  hittFormatTctlTableForDisplay "${HP_TENANTS}"
+  echo ""
+  echo "Services:"
+  hittFormatTctlTableForDisplay "${HP_SERVICES}"
 
-${BOLD}Helix Platform Details:${NORMAL}
-Namespace: ${HP_NAMESPACE}
-Version: ${HP_VERSION}
-DEPLOYMENT_SIZE: ${HP_DEPLOYMENT_SIZE}
-LB_HOST: ${LB_HOST}
-Portal URL: ${PORTAL_HOSTNAME}
-Tenant(s):
-${HP_TENANTS}
-Services:
-${HP_SERVICES}
+  hittInfoPrintSection "Helix Logging"
+  hittInfoPrintKv "Helix logging deployed" "$( [ "$HELIX_LOGGING_DEPLOYED" = "1" ] && echo "true" || echo "false" )"
+  hittInfoPrintKv "Helix logging namespace" "${HELIX_LOGGING_NAMESPACE:-n/a}"
 
-${BOLD}Helix Logging:${NORMAL}
-Helix logging deployed: $( [ "$HELIX_LOGGING_DEPLOYED" = "1" ] && echo "true" || echo "false" )
-Helix logging namespace: ${HELIX_LOGGING_NAMESPACE:-n/a}
+  hittInfoPrintSection "Deployment Engine"
+  hittInfoPrintKv "Containerized DE" "${CONTAINERIZED_JENKINS}"
+  hittInfoPrintKv "Jenkins URL" "${JENKINS_LOG_URL}"
+  hittInfoPrintKv "Jenkins version" "${JENKINS_VERSION}"
+  hittInfoPrintKv "HELIX_ONPREM_DEPLOYMENT pipeline version" "${UBER_VERSION}"
 
-${BOLD}Deployment Engine:${NORMAL}
-Containerized DE: ${CONTAINERIZED_JENKINS}
-Jenkins URL: ${JENKINS_LOG_URL}
-Jenkins version: ${JENKINS_VERSION}
-HELIX_ONPREM_DEPLOYMENT pipeline version: ${UBER_VERSION}
-
-${BOLD}Helix Service Management:${NORMAL}
-Namespace: ${IS_NAMESPACE}
-Version: ${IS_VERSION}
-IS Db ID: ${IS_DBID}
-IS License: ${IS_LICENSE_TYPE:-unknown}
-platform-fts-0 startup time: ${STARTUP_TIME}
-Support Assistant deployed: $( [ "$SAT_DEPLOYED" = "1" ] && echo "true" || echo "false" )
-"
+  hittInfoPrintSection "Helix Service Management"
+  hittInfoPrintKv "Namespace" "${IS_NAMESPACE}"
+  hittInfoPrintKv "Version" "${IS_VERSION}"
+  hittInfoPrintKv "IS db type:" "${IS_DB_TYPE}"
+  hittInfoPrintKv "IS db ID" "${IS_DBID}"
+  hittInfoPrintKv "IS license" "${IS_LICENSE_TYPE:-unknown}"
+  hittInfoPrintKv "platform-fts-0 startup time" "${STARTUP_TIME}"
+  hittInfoPrintKv "Support Assistant deployed" "$( [ "$SAT_DEPLOYED" = "1" ] && echo "true" || echo "false" )"
+  echo ""
 }
 
 # Normalize tctl get tenant|service -o json into a JSON array for info.json (response shape varies by tctl version).
@@ -5500,7 +5523,7 @@ hittTctlListNormalizeForInfoJson() {
   printf '%s' "${out}" | hittJsonApplyInfoKeyNormalization 2>>"${HITT_ERR_FILE}" || echo '[]'
 }
 
-# Read JSON from stdin; write JSON with object keys normalized for info.json (strip "|", trim, camelCase kubectl/tctl style).
+# Read JSON from stdin; write JSON with object keys normalized (strip "|", camelCase) and tctl pipe artifacts removed from string values.
 hittJsonApplyInfoKeyNormalization() {
   ${JQ_BIN} -c '
     def hittStripPipeKey:
@@ -5532,12 +5555,21 @@ hittJsonApplyInfoKeyNormalization() {
         elif test("[a-z]") then (.[0:1] | ascii_downcase) + .[1:]
         else ascii_downcase
         end;
-    walk(if type == "object" then with_entries(.key |= hittNormalizeObjectKey) else . end)
+    walk(
+      if type == "string" then
+        gsub("^\\|+"; "")
+        | gsub("\\|+$"; "")
+        | gsub("^\\s+|\\s+$"; "")
+        | gsub("\\s*\\|\\s*"; " ")
+      elif type == "object" then
+        with_entries(.key |= hittNormalizeObjectKey)
+      else .
+      end
+    )
   ' 2>>"${HITT_ERR_FILE}"
 }
 
-# Convert a fixed-width or tab-separated table (header = column names) to a JSON array of objects.
-# Splits on tabs if the header line contains a tab; otherwise splits on runs of 2+ spaces (column -t / kubectl style).
+# Convert a fixed-width, tab-, or pipe-separated table (header = column names) to a JSON array of objects.
 # Empty or whitespace-only input yields [].
 hittTableTextToJsonArray() {
   local raw="${1:-}"
@@ -5569,6 +5601,12 @@ hittTableTextToJsonArray() {
       nf = 0
       if (index(line, "\t") > 0) {
         nf = split(line, arr, "\t")
+        for (i = 1; i <= nf; i++) arr[i] = trim(arr[i])
+        return nf
+      }
+      # tctl get tenant|service tables often use | between columns
+      if (index(line, "|") > 0) {
+        nf = split(line, arr, "|")
         for (i = 1; i <= nf; i++) arr[i] = trim(arr[i])
         return nf
       }
@@ -5651,7 +5689,7 @@ writeInfoJson() {
   fi
 
   if ! ${JQ_BIN} -n \
-    --arg schemaVersion "1.3" \
+    --arg schemaVersion "1.4" \
     --arg reportCreated "${NOW}" \
     --arg environmentType "${ENV_TYPE:-}" \
     --argjson environmentLive "${env_live}" \
@@ -5685,6 +5723,7 @@ writeInfoJson() {
     --arg deploymentEnginePipelineHelmVersion "${UBER_VERSION:-}" \
     --arg helixSmNamespace "${IS_NAMESPACE:-}" \
     --arg helixSmVersion "${IS_VERSION:-}" \
+    --arg helixSmDbType "${IS_DB_TYPE:-}" \
     --arg helixSmDbId "${IS_DBID:-}" \
     --arg helixSmLicense "${IS_LICENSE_TYPE:-}" \
     --arg helixSmPlatformFtsStartup "${STARTUP_TIME:-}" \
@@ -5739,6 +5778,7 @@ writeInfoJson() {
       helixServiceManagement: {
         namespace: $helixSmNamespace,
         version: $helixSmVersion,
+        isDbType: $helixSmDbType,
         isDbId: $helixSmDbId,
         isLicense: $helixSmLicense,
         platformFts0StartupTime: $helixSmPlatformFtsStartup,
