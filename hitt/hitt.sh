@@ -277,8 +277,8 @@ checkRequiredTools() {
     BINARY="${i^^}_BIN"
     checkBinary "${!BINARY}" "${i}"
   done
-  if [ $FAIL -gt 0 ] ; then
-    exit 1
+  if [ -n "${MISSING}" ] ; then
+    logError "999" "One or more required tools not found - cannot continue." 1
   fi
 }
 
@@ -293,7 +293,7 @@ checkToolVersion() {
       INSTALLED_VERSION=$(${JQ_BIN} --version | tr -d 'jq-')
       if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
         logError "101" "jq version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed.  Please upgrade from https://jqlang.github.io/jq/download"
-        FAIL=1
+        MISSING=1
       fi
       ;;
     java)
@@ -302,7 +302,7 @@ checkToolVersion() {
       JAVA_VERSION="${INSTALLED_VERSION}"
       if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
         logError "101" "java version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
-        FAIL=1
+        MISSING=1
       fi
       ;;
     kubectl)
@@ -313,7 +313,7 @@ checkToolVersion() {
       K8S_VERSION=$(echo "${KUBECTL_JSON}" | ${JQ_BIN} -r '.serverVersion.gitVersion')
       if compare "${INSTALLED_VERSION} < ${REQUIRED_VERSION}"; then
         logError "101" "kubectl version ${REQUIRED_VERSION} or later required - version ${INSTALLED_VERSION} installed."
-        FAIL=1
+        MISSING=1
       fi
       ;;
     *)
@@ -428,6 +428,7 @@ logDescribePod() {
 }
 
 getVersions() {
+  isOpenShift
   logMessage "Kubernetes version '${K8S_VERSION}'."
   logMessage "kubectl version '${KUBECTL_VERSION}'."
   if [ "${OPENSHIFT_VERSION}" != "" ]; then
@@ -445,6 +446,7 @@ getVersions() {
     logError "999" "Unable to read the 'helix-on-prem-config' configMap from the Helix Platform namespace - cannot continue until the Platform is installed." 1
   fi
   HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
+  HP_INGRESS_CLASS=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.infra_config' | grep ^INGRESS_CLASS | cut -d '=' -f2)
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
   logMessage "Helix Platform version '${HP_VERSION}' with DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}'."
   if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
@@ -2625,6 +2627,7 @@ checkKubeconfig() {
     logError "184" "'kubectl version' command returned an error - unable to continue." 1
   fi
   if [ ! -z "${KUBECONFIG}" ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
+    if [ "${MODE}" == "info" ]; then return; fi
     logError "185" "KUBECONFIG environment variable is set '${KUBECONFIG}' but is not the default of '${HOME}/.kube/config' required by Jenkins."
     KUBECONFIG_ERROR=1
   fi
@@ -5117,6 +5120,332 @@ parseUtilSQL() {
   runARRESTSQL "${UTILARGS[*]:1}"
 }
 
+# getK8sNodeDetails  — fills global K8S_NODE_DETAILS_TABLE (pipe rows, \\n-separated);
+#                      returns 0 on success, 1 on failure (does not exit).
+# printK8sNodeDetails — formats K8S_NODE_DETAILS_TABLE to stdout; returns 1 if empty.
+# =============================================================================
+getK8sNodeDetails() {
+  local nodes_json top_nodes_text node_name node_type runtime alloc_cpu alloc_mem allocatable
+  local node_top pct_cpu pct_mem actual_usage conditions is_ready node_status pods_json
+  local req_cpu req_cpu_milli req_mem req_mem_mi allocated count_running count_bad count_crash
+  local pod_stats count_oom TABLE_DATA node
+
+  K8S_NODE_DETAILS_TABLE=""
+
+  nodes_json=$(${KUBECTL_BIN} get nodes -o json 2>>"${HITT_ERR_FILE}") || true
+  if [[ -z "${nodes_json}" ]] || ! echo "${nodes_json}" | ${JQ_BIN} -e . >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    # Do not pass exit flag to logError — caller may continue; check return value.
+    logError "265" "Unable to read Kubernetes nodes as JSON - check kubeconfig, cluster reachability, and '${KUBECTL_BIN}'."
+    return 1
+  fi
+
+  # Text-only top (no -o); older kubectl rejects "top nodes -o json".
+  top_nodes_text=$(${KUBECTL_BIN} top nodes --no-headers 2>>"${HITT_ERR_FILE}") || top_nodes_text=""
+  if [[ -z "${top_nodes_text}" ]] && [[ "${VERBOSITY}" -ge 1 ]] && [[ "${QUIET}" == "0" ]]; then
+    logMessage "Could not read 'kubectl top nodes' snapshot; will try per-node top or show Metrics N/A." 1
+  fi
+
+  TABLE_DATA=""
+  TABLE_DATA+="NODE_NAME|NODE_TYPE|ALLOCATABLE_(CPU/MEM)|ALLOCATED_REQ_(CPU/MEM)|ACTUAL_USAGE|NODE_STATUS/CONDITIONS|PODS_(RUN/BAD/CRASH)|OOM_KILLS|CONTAINER_RUNTIME\n"
+
+  while read -r node; do
+    [[ -z "${node}" ]] && continue
+
+    node_name=$(echo "${node}" | ${JQ_BIN} -r '.metadata.name')
+    node_type=$(echo "${node}" | ${JQ_BIN} -r '[.metadata.labels | to_entries[] | select(.key | startswith("node-role.kubernetes.io/")) | .key | split("/")[1]] | join(",")')
+    [[ -z "${node_type}" ]] && node_type="worker"
+
+    runtime=$(echo "${node}" | ${JQ_BIN} -r '.status.nodeInfo.containerRuntimeVersion')
+
+    alloc_cpu=$(echo "${node}" | ${JQ_BIN} -r '.status.allocatable.cpu')
+    alloc_mem=$(echo "${node}" | ${JQ_BIN} -r '.status.allocatable.memory')
+    allocatable="${alloc_cpu}_/_${alloc_mem}"
+
+    node_top=""
+    if [[ -n "${top_nodes_text}" ]]; then
+      node_top=$(printf '%s\n' "${top_nodes_text}" | awk -v n="${node_name}" '{ gsub(/\r/, ""); if ($1 == n) { print; exit } }')
+    fi
+    if [[ -z "${node_top}" ]]; then
+      node_top=$(${KUBECTL_BIN} top node "${node_name}" --no-headers 2>>"${HITT_ERR_FILE}") || node_top=""
+    fi
+    # Typical: NAME  CPU(cores)  CPU%  MEMORY(bytes)  MEMORY%  → % columns $3 and $5
+    if [[ -n "${node_top}" ]]; then
+      pct_cpu=$(echo "${node_top}" | awk '{ gsub(/\r/, ""); print $3 }')
+      pct_mem=$(echo "${node_top}" | awk '{ gsub(/\r/, ""); print $5 }')
+      [[ -z "${pct_cpu}" ]] && pct_cpu="0%"
+      [[ -z "${pct_mem}" ]] && pct_mem="0%"
+      actual_usage="${pct_cpu}_/_${pct_mem}"
+    else
+      actual_usage="Metrics_N/A"
+    fi
+
+    conditions=$(echo "${node}" | ${JQ_BIN} -r '.status.conditions[] | select(.status == "True" and .type != "Ready") | .type' | tr '\n' ',' | sed 's/,$//')
+    is_ready=$(echo "${node}" | ${JQ_BIN} -r '.status.conditions[] | select(.type == "Ready") | .status')
+
+    if [[ "${is_ready}" != "True" ]]; then
+      node_status="NotReady"
+    elif [[ -z "${conditions}" ]]; then
+      node_status="Healthy"
+    else
+      node_status="Pressure:${conditions}"
+    fi
+
+    pods_json=$(${KUBECTL_BIN} get pods --all-namespaces --field-selector "spec.nodeName=${node_name}" -o json 2>>"${HITT_ERR_FILE}") || pods_json='{"items":[]}'
+
+    req_cpu=$(echo "${pods_json}" | ${JQ_BIN} -r '[.items[].spec.containers[].resources.requests.cpu // "0"] | map(if endswith("m") then (sub("m$"; "") | tonumber) else (tonumber * 1000) end) | add' 2>>"${HITT_ERR_FILE}")
+    req_cpu_milli="${req_cpu:-0}m"
+
+    req_mem=$(echo "${pods_json}" | ${JQ_BIN} -r '[.items[].spec.containers[].resources.requests.memory // "0"] | map(if endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024) elif endswith("G") then (sub("G$"; "") | tonumber * 953) elif endswith("Mi") then (sub("Mi$"; "") | tonumber) elif endswith("M") then (sub("M$"; "") | tonumber * 0.953) elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024) else (tonumber / 1024 / 1024) end) | add | round' 2>>"${HITT_ERR_FILE}")
+    req_mem_mi="${req_mem:-0}Mi"
+
+    allocated="${req_cpu_milli}_/_${req_mem_mi}"
+
+    count_running=$(echo "${pods_json}" | ${JQ_BIN} '[.items[] | select(.status.phase == "Running")] | length')
+    count_bad=$(echo "${pods_json}" | ${JQ_BIN} '[.items[] | select(.status.phase as $p | ["Failed", "Unknown"] | any(. == $p))] | length')
+    count_crash=$(echo "${pods_json}" | ${JQ_BIN} '[.items[].status.containerStatuses // [] | .[] | select(.state.waiting.reason == "CrashLoopBackOff")] | length')
+    pod_stats="${count_running}/${count_bad}/${count_crash}"
+
+    count_oom=$(echo "${pods_json}" | ${JQ_BIN} '[.items[].status.containerStatuses // [] | .[] | select(.lastState.terminated.reason == "OOMKilled")] | length')
+
+    TABLE_DATA+="${node_name}|${node_type}|${allocatable}|${allocated}|${actual_usage}|${node_status}|${pod_stats}|${count_oom}|${runtime}\n"
+  done < <(echo "${nodes_json}" | ${JQ_BIN} -c '.items[]')
+
+  K8S_NODE_DETAILS_TABLE="${TABLE_DATA}"
+  return 0
+}
+
+printK8sNodeDetails() {
+  if [[ -z "${K8S_NODE_DETAILS_TABLE}" ]]; then
+    echo "Not available. Check kubeconfig, cluster reachability and permissions."
+    return 1
+  fi
+  echo -e "${K8S_NODE_DETAILS_TABLE}" | column -s '|' -t | sed 's/_/ /g'
+  return 0
+}
+
+# =============================================================================
+# Ingress controller discovery
+# discoverIngressControllerDetails [INGRESS_CLASS_NAME]
+#   Resolves the controller workload for that IngressClass (cluster-wide deploy/ds list).
+#   Class name: first arg, else INGRESS_CLASS_NAME, else HP_INGRESS_CLASS (Helix config mirror), else "nginx".
+# Workloads are listed cluster-wide (-A); controller is not assumed to live in the app/Helix namespace.
+# Matching: IngressClass name / spec.controller in container args, --class=, INGRESS_CLASS env,
+#           deprecated pod-template annotation kubernetes.io/ingress.class.
+# Sets globals: INGRESS_CLASS_NAME, INGRESS_CLASS_SPEC_CONTROLLER, INGRESS_CONTROLLER_TYPE (deployment|daemonset|unknown),
+#               INGRESS_CONTROLLER_NAMESPACE, INGRESS_CONTROLLER_NAME, INGRESS_CONTROLLER_IMAGE
+# =============================================================================
+discoverIngressControllerDetails() {
+  local ic_json controller workload_json match_json ic_name
+
+  ic_name="${1:-}"
+  [[ -z "${ic_name}" ]] && ic_name="nginx"
+  INGRESS_CLASS_NAME="${ic_name}"
+
+  INGRESS_CLASS_SPEC_CONTROLLER=""
+  INGRESS_CONTROLLER_TYPE="unknown"
+  INGRESS_CONTROLLER_NAMESPACE=""
+  INGRESS_CONTROLLER_NAME=""
+  INGRESS_CONTROLLER_IMAGE=""
+
+  ic_json=$(${KUBECTL_BIN} get "ingressclass/${INGRESS_CLASS_NAME}" -o json 2>>"${HITT_ERR_FILE}") || ic_json=""
+  if [[ -z "${ic_json}" ]] || ! echo "${ic_json}" | ${JQ_BIN} -e . >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    logError "266" "IngressClass '${INGRESS_CLASS_NAME}' not found or not readable as JSON."
+    return 1
+  fi
+
+  controller=$(echo "${ic_json}" | ${JQ_BIN} -r '.spec.controller // ""')
+  INGRESS_CLASS_SPEC_CONTROLLER="${controller}"
+
+  workload_json=$(${KUBECTL_BIN} get deploy,daemonset -A -o json 2>>"${HITT_ERR_FILE}") || workload_json=""
+  if [[ -z "${workload_json}" ]] || ! echo "${workload_json}" | ${JQ_BIN} -e '.items' >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    logError "267" "Unable to list Deployments and DaemonSets for ingress controller discovery."
+    return 1
+  fi
+
+  match_json=$(echo "${workload_json}" | ${JQ_BIN} -c --arg ic "${INGRESS_CLASS_NAME}" --arg ctrl "${controller}" '
+    [.items[] | select(.kind == "Deployment" or .kind == "DaemonSet")
+     | select(
+         (.spec.template.metadata.annotations["kubernetes.io/ingress.class"]? == $ic)
+         or (any(.spec.template.spec.containers[]?;
+             (((.args // []) | join(" ")) | test("--ingress-class=" + $ic + "( |$)"))
+             or (((.args // []) | join(" ")) | test("--class=" + $ic + "( |$)"))
+             or (if ($ctrl | length) == 0 then false else (((.args // []) | join(" ")) | index($ctrl)) != null end)
+             or any((.env // [])[]?;
+                 ((.name == "INGRESS_CLASS" or .name == "INGRESS_CLASS_NAME") and (.value == $ic))
+               )
+           ))
+       )
+    ] | .[0]
+  ')
+
+  if [[ -z "${match_json}" || "${match_json}" == "null" ]]; then
+    [[ "${VERBOSITY}" -ge 1 ]] && [[ "${QUIET}" == "0" ]] && logMessage "No Deployment/DaemonSet matched IngressClass '${INGRESS_CLASS_NAME}' or controller '${controller}' (args, env, or pod template annotation)." 1
+    return 1
+  fi
+
+  INGRESS_CONTROLLER_NAMESPACE=$(echo "${match_json}" | ${JQ_BIN} -r '.metadata.namespace // ""')
+  INGRESS_CONTROLLER_NAME=$(echo "${match_json}" | ${JQ_BIN} -r '.metadata.name // ""')
+
+  case $(echo "${match_json}" | ${JQ_BIN} -r '.kind // ""') in
+    Deployment) INGRESS_CONTROLLER_TYPE="deployment" ;;
+    DaemonSet) INGRESS_CONTROLLER_TYPE="daemonset" ;;
+    *) INGRESS_CONTROLLER_TYPE="unknown" ;;
+  esac
+
+  INGRESS_CONTROLLER_IMAGE=$(echo "${match_json}" | ${JQ_BIN} -r --arg ic "${INGRESS_CLASS_NAME}" --arg ctrl "${controller}" '
+    . as $w
+    | ([$w.spec.template.spec.containers[]?
+        | select(
+            (((.args // []) | join(" ")) | test("--ingress-class=" + $ic + "( |$)"))
+            or (((.args // []) | join(" ")) | test("--class=" + $ic + "( |$)"))
+            or (if ($ctrl | length) == 0 then false else (((.args // []) | join(" ")) | index($ctrl)) != null end)
+            or any((.env // [])[]?;
+                ((.name == "INGRESS_CLASS" or .name == "INGRESS_CLASS_NAME") and (.value == $ic))
+              )
+          )
+        | .image
+      ] | .[0]) // ($w.spec.template.spec.containers[0].image // "")
+  ')
+
+  return 0
+}
+
+# printIngressControllerDetails [INGRESS_CLASS_NAME]
+#   Optional arg overrides label for the class (defaults to INGRESS_CLASS_NAME from discover).
+printIngressControllerDetails() {
+  local show_class="${1:-${INGRESS_CLASS_NAME:-}}"
+  echo "INGRESS_CLASS: ${HP_INGRESS_CLASS}"
+  echo "Workload type: ${INGRESS_CONTROLLER_TYPE:-unknown}"
+  echo "Namespace: ${INGRESS_CONTROLLER_NAMESPACE:-unknown}"
+  echo "Image: ${INGRESS_CONTROLLER_IMAGE:-unknown}"
+}
+
+gatherInfo() {
+  # Main function to collect data for info mode
+  ENV_ARRAY=("Dev" "QA" "Pre-prod" "Prod" "Other")
+  echo ""
+  echo "Please select your environment type:"
+  ENV_TYPE=$(selectFromArray ENV_ARRAY)
+  if [ "${ENV_TYPE}" == "Other" ]; then
+    while [[ -z "${ENV_OTHER}" ]]; do read -p "Please enter your environment type : " ENV_OTHER; done
+    ENV_TYPE="${ENV_OTHER}"
+  fi
+  echo ""
+  if askYesNo "Is the system live?" ; then
+    ENV_LIVE=true
+  else
+    ENV_LIVE=false
+  fi
+
+  QUIET=1
+  logStatus "Gathering cluster information..." 1
+  checkToolVersion kubectl
+  getK8sNodeDetails
+  getVersions
+  if checkK8sAuth get ingressclasses; then
+    INGRESS_CLASSES=$(${KUBECTL_BIN} get ingressclasses)
+  fi
+  discoverIngressControllerDetails "${HP_INGRESS_CLASS}"
+  logStatus "Gathering Helix Platform information..." 1
+  setVarsFromPlatform
+  checkHelixLoggingDeployed
+  checkHPRegistryDetails
+  getRSSODetails
+  getDomain
+  getTenantDetails
+  deleteTCTLJob
+  deployTCTL "get tenant"
+  getTCTLOutput full
+  HP_TENANTS=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
+  deleteTCTLJob
+  deployTCTL "get service"
+  getTCTLOutput full
+  HP_SERVICES=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
+  deleteTCTLJob
+  logStatus "Gathering Helix Service Mananagement information..." 1
+  buildISAliasesArray
+  checkJenkinsIsRunning
+  getISDetailsFromK8s
+  checkISDockerLogin
+  checkISRESTReady
+  checkISLicenseStatus
+
+  return
+
+if [ "${MODE}" == "pre-is" ]; then
+  logStatus "Checking Deployment Engine setup..."
+  checkDERequirements
+fi
+
+if [ "${SKIP_JENKINS}" == "0" ]; then
+  logStatus "Checking IS FTS Elastic settings..."
+  checkFTSElasticSettings
+  logStatus "Checking IS DB settings..."
+  checkISDBSettings
+  checkISDBLatency
+  generateISDbID
+fi
+
+if [ "${MODE}" == "post-is" ]; then
+  logPlatformFTSStartTime
+  logStatus "Checking Helix IS platform-admin-ext service..."
+  checkPlatformAdminExtSvc
+  logStatus "Checking Support Assistant Tool..."
+  checkAssistTool
+fi
+}
+
+printInfo() {
+  logStatus "BMC Helix Environment Summary" 1
+  echo "
+Report created ${NOW}
+
+Environment Type: ${ENV_TYPE}
+Live environment? ${ENV_LIVE}
+
+${BOLD}Client Information:${NORMAL}
+OS: ${OS_NAME:-unknown}
+Version: ${OS_VERSION:-unknown}
+kubectl: ${KUBECTL_VERSION:-unknown}
+helm: ${HELM_VERSION:-unknown}
+
+${BOLD}Cluster Information:${NORMAL}
+Kubernetes version: ${K8S_VERSION:-unknown}
+Openshift version: ${OPENSHIFT_VERSION:-n/a}
+
+${BOLD}Node Summary:${NORMAL}
+$(printK8sNodeDetails)
+
+${BOLD}Ingress Controller:${NORMAL}
+$(printIngressControllerDetails)
+
+${BOLD}Helix Platform Details:${NORMAL}
+Namespace: ${HP_NAMESPACE}
+Version: ${HP_VERSION}
+DEPLOYMENT_SIZE: ${HP_DEPLOYMENT_SIZE}
+LB_HOST: ${LB_HOST}
+Portal URL: ${PORTAL_HOSTNAME}
+Tenant(s):
+${HP_TENANTS}
+Services:
+${HP_SERVICES}
+
+${BOLD}Helix Logging:${NORMAL}
+Helix logging deployed: $( [ "$HELIX_LOGGING_DEPLOYED" = "1" ] && echo "yes" || echo "no" )
+Helix logging namespace: ${HELIX_LOGGING_NAMESPACE:-n/a}
+
+${BOLD}Deployment Engine:${NORMAL}
+Containerized DE:
+Jenkins URL:
+Jenkins version:
+
+${BOLD}Helix Service Management:${NORMAL}
+Namespace:
+Version:
+
+"
+}
+
 #End functions
 
 # MAIN Start
@@ -5359,6 +5688,13 @@ if [ "${MODE}" == "utility" ]; then
   exit
 fi
 
+if [ "${MODE}" == "info" ]; then
+  logStatus "Running in info mode..."
+  gatherInfo
+  printInfo
+  exit
+fi
+
 # Validate action
 [[ "${MODE}" =~ ^pre-hp|^post-hp$|^pre-is$|^post-is$ ]] || usage
 
@@ -5399,7 +5735,6 @@ if [ "${MODE}" != "post-hp" ]; then
   logEvents ${IS_NAMESPACE}
 fi
 logStatus "Getting versions..."
-isOpenShift
 getVersions
 setVarsFromPlatform
 checkHelixLoggingDeployed
@@ -5477,8 +5812,8 @@ tidyUp
 SCRIPT_VERSION=1
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
-SHORT_HOSTNAME=$(hostname --short)
-LONG_HOSTNAME=$(hostname --long)
+SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
+LONG_HOSTNAME=$(hostname --long 2>/dev/null || hostname)
 GIT_USER=$(whoami)
 : "${DEBUG=0}"
 FAIL=0
@@ -5502,9 +5837,9 @@ JENKINS_CREDS=(git github ansible_host ansible kubeconfig TOKENS password_vault_
 IS_ALIAS_ARRAY=()
 ADE_ALIAS_ARRAY=()
 VERBOSITY=0
-QUIET=0
-SKIP_UPDATE_CHECK=0
-DISABLE_PROXY=0
+: "${QUIET=0}"
+: "${SKIP_UPDATE_CHECK=0}"
+: "${DISABLE_PROXY=0}"
 BOLD=$'\e[1m'
 NORMAL=$'\e[0m'
 RED=$'\e[31m'
