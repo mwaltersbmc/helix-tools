@@ -1443,6 +1443,17 @@ getPipelineValues() {
     IS_PIPELINE_MODE="${IS_DEPLOYMENT_MODE}"
     IS_PIPELINE_MODE_LABEL="DEPLOYMENT_MODE"
   fi
+  if [ "${IS_VERSION}" -ge 2026201 ]; then
+    IS_CONTAINERIZED_DE="true"
+    IS_CUSTOM_BINARY_PATH="false"
+    #IS_AGENT="jenkins-agent"
+    IS_CHECKOUT_USING_USER="github"
+    #IS_KUBECONFIG_CREDENTIAL="kubeconfig"
+    IS_GIT_USER_HOME_DIR="/home/jenkins"
+    #IS_GIT_REPO_DIR="http://gitea:3000/ciadmin"
+    IS_HELM_NODE="jenkins-agent"
+  fi
+
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
   ISP_ENVIRONMENT=$(parseJenkinsParam ENVIRONMENT)
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
@@ -2835,13 +2846,13 @@ dumpVARs() {
 
 checkJenkinsConfig() {
   [[ "${SKIP_JENKINS}" == 1 ]] && return
-  logMessage "Checking plugins..."
-  checkJenkinsPlugins
-  logMessage "Checking approved scripts..."
-  checkJenkinsScriptApprovals
   if isJenkinsInCluster ; then
     logMessage "Jenkins running in cluster - skipping remaining checks..."
   else
+    logMessage "Checking plugins..."
+    checkJenkinsPlugins
+    logMessage "Checking approved scripts..."
+    checkJenkinsScriptApprovals
     logMessage "Checking nodes..."
     checkJenkinsNodes
     logMessage "Checking credentials..."
