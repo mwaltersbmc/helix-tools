@@ -523,9 +523,10 @@ window.HITT_USE_CASES = {
       "id": "ar-sql-run-query",
       "topicId": "querying-ar-forms",
       "order": 30,
-      "title": "I want to run a custom SQL query against AR metadata",
+      "title": "I want to run a SQL query against AR forms",
       "commands": [
-        "bash hitt.sh -u \"sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'\""
+        "bash hitt.sh -u \"sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'\"",
+        "bash hitt.sh -u \"sql select [Login Name] from [User]\""
       ],
       "notes": [
         "Put the entire command in double quotes: the word sql, then your full SQL query. Use square brackets around AR table and column names.",
