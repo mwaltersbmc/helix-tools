@@ -5811,6 +5811,7 @@ validateDockerIOPat() {
 
   if [ -n "${DOCKER_IO_USERNAME}" ] && [ -z "${DOCKER_IO_PAT}" ]; then
     read -r -s -p "Enter your PAT : " DOCKER_IO_PAT
+    echo ""
   fi
   echo "Checking docker.io token scope for user '${DOCKER_IO_USERNAME}'..."
 
