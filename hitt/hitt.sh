@@ -5803,6 +5803,51 @@ writeInfoJson() {
   return 0
 }
 
+validateDockerIOPat() {
+  local DOCKER_IO_USERNAME DOCKER_IO_PAT RESPONSE REGISTRY_JWT PAYLOAD_BASE64 REM DECODED_PAYLOAD ACTIONS
+  DOCKER_IO_USERNAME="${1}"
+  DOCKER_IO_PAT="${2}"
+
+  if [ -n "${DOCKER_IO_USERNAME}" ] && [ -z "${DOCKER_IO_PAT}" ]; then
+    read -r -s -p "Enter your PAT : " DOCKER_IO_PAT
+  fi
+  echo "Checking docker.io token scope for user '${USERNAME}'..."
+
+  # 1. Request a registry token specifically for a private repository pull action
+
+  RESPONSE=$(${CURL_BIN} -s -u "${DOCKER_IO_USERNAME}:${DOCKER_IO_PAT}" \
+  "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${DOCKER_IO_USERNAME}/bmchelix:pull" 2>/dev/null)
+
+  REGISTRY_JWT=$(echo "${RESPONSE}" | ${JQ_BIN} -r .token)
+
+  if [ "${REGISTRY_JWT}" == "null" ] || [ -z "${REGISTRY_JWT}" ]; then
+      logError "999" "Could not obtain a registry token. Check your username and PAT." 1
+  fi
+
+  # 2. Extract and decode the JWT payload (the second segment)
+  PAYLOAD_BASE64=$(echo "${REGISTRY_JWT}" | cut -d'.' -f2)
+
+  # Fix Base64 padding if necessary
+  REM=$(( ${#PAYLOAD_BASE64} % 4 ))
+  if [ ${REM} -eq 2 ]; then
+      PAYLOAD_BASE64="${PAYLOAD_BASE64}=="
+  elif [ ${REM} -eq 3 ]; then
+      PAYLOAD_BASE64="${PAYLOAD_BASE64}="
+  fi
+
+  DECODED_PAYLOAD=$(echo "${PAYLOAD_BASE64}" | ${BASE64_BIN} --decode 2>/dev/null)
+
+  # 3. Parse the access actions array
+  ACTIONS=$(echo "${DECODED_PAYLOAD}" | ${JQ_BIN} -r ".access[0].actions[]?" 2>/dev/null || true)
+
+  # 4. Final Verdict
+  if echo "${ACTIONS}" | grep -q "pull"; then
+      logMessage "Success: token has scope 'Read-Only'."
+  else
+      logError "999" "Failed: Token has scope 'Public Repo Read-Only'.  Please login to Docker Hub via the EPD and update the token."
+  fi
+}
+
 #End functions
 
 # MAIN Start
@@ -6034,6 +6079,12 @@ if [ "${MODE}" == "utility" ]; then
       ;;
     sql)
       parseUtilSQL
+      ;;
+    checkpat)
+      if [ ${#UTILARGS[@]} -lt 2 ]; then
+        logError "999" "Usage: bash $0 -u \"checkpat USERNAME PERSONAL_ACCESS_TOKEN\"" 1
+      fi
+      validateDockerIOPat "${UTILARGS[1]}" "${UTILARGS[2]}"
       ;;
     help)
       showUtilHelp
