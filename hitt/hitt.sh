@@ -4592,6 +4592,7 @@ showUtilHelp() { # utility mode help
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
+    \tcheckpat \t| Validate Docker Hub username & PAT. Args: USERNAME [PAT] (PAT prompted if omitted).
     \thelp \t\t| Show this list.
     "
 }
@@ -5811,7 +5812,7 @@ validateDockerIOPat() {
   if [ -n "${DOCKER_IO_USERNAME}" ] && [ -z "${DOCKER_IO_PAT}" ]; then
     read -r -s -p "Enter your PAT : " DOCKER_IO_PAT
   fi
-  echo "Checking docker.io token scope for user '${USERNAME}'..."
+  echo "Checking docker.io token scope for user '${DOCKER_IO_USERNAME}'..."
 
   # 1. Request a registry token specifically for a private repository pull action
 
@@ -6082,9 +6083,9 @@ if [ "${MODE}" == "utility" ]; then
       ;;
     checkpat)
       if [ ${#UTILARGS[@]} -lt 2 ]; then
-        logError "999" "Usage: bash $0 -u \"checkpat USERNAME PERSONAL_ACCESS_TOKEN\"" 1
+        logError "999" "Usage: bash $0 -u \"checkpat USERNAME [PERSONAL_ACCESS_TOKEN]\"" 1
       fi
-      validateDockerIOPat "${UTILARGS[1]}" "${UTILARGS[2]}"
+      validateDockerIOPat "${UTILARGS[1]}" "${UTILARGS[2]:-}"
       ;;
     help)
       showUtilHelp

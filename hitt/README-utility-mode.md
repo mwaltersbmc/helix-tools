@@ -1,6 +1,6 @@
 # HITT Utility Mode
 
-**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, secret decode, ConfigMap export, AR form/field search and custom SQL queries, generated DBID).
+**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, secret decode, ConfigMap export, AR form/field search and custom SQL queries, generated DBID, Docker Hub PAT check).
 
 Utility commands are invoked with **`-u`**. When the command has spaces or multiple words, pass the whole thing in **double quotes**.
 
@@ -16,6 +16,7 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 | `get fields` | Lists fields on one form using its **Schema ID** from `get forms`. Args: **SCHEMAID** [**KEYWORD**]. Omit the keyword to list all fields; add a keyword to filter by field name. |
 | `sql` | Runs a custom AR SQL query via the IS REST API and prints the full JSON response. Args: **SQL_QUERY** (put the entire query inside the quoted `-u` string). |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
+| `checkpat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit **PAT** to be prompted (hidden). |
 | `help` | Prints the same summary as this file (built into the script). |
 
 ## Usage
@@ -47,6 +48,10 @@ bash hitt.sh -u "sql select [Login Name],[Full Name] from [User] where [Login Na
 
 # Generate DBID before deployment / license (mssql | oracle | postgres)
 bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
+
+# Validate Docker Hub PAT (optional PAT on CLI — otherwise prompted)
+bash hitt.sh -u "checkpat mydockerhubuser"
+bash hitt.sh -u "checkpat mydockerhubuser dckr_pat_xxxxxxxx"
 
 bash hitt.sh -u help
 ```
@@ -144,5 +149,11 @@ If the query fails, HITT reports an error (for example bad HTTP status, invalid 
 ### `gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME`
 
 Generates a DBID string from the values provided. **DB_TYPE** is one of `mssql`, `oracle`, or `postgres`.
+
+### `checkpat USERNAME [PAT]`
+
+Calls Docker Hub’s token service with **USERNAME** and **PAT** to verify the permissions for the **`bmchelix`** repository. On success you see a confirmation; on failure, HITT explains that the token may be limited to public-repo read-only and should be recreated with the correct access (see Docker Hub / EPD documentation).
+
+If **PAT** is omitted, it is read from a hidden prompt (same pattern as other password prompts).
 
 See also: [README-fix-mode.md](README-fix-mode.md) for **`-f` fix mode** (cacerts, Jenkins, license apply, etc.).
