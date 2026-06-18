@@ -6233,7 +6233,7 @@ tidyUp
 # Set vars and process command line
 SCRIPT_VERSION=1
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260618-02"
+HITT_BUILD_VERSION="20260618-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -7102,7 +7102,7 @@ ALL_MSGS_JSON="[
     \"id\": \"176\",
     \"cause\": \"An attempt to login to the Helix Service Management apps via the RESTAPI failed.\",
     \"impact\": \"Some IS configuration checks will be skipped.\",
-    \"remediation\": \"Check that the hannah_admin user is enabled and that the correct password is stored in the atriumwebsvc secret. If the password contains %, &, +, or other reserved form characters, use a current HITT build that URL-encodes the login request (curl --data-urlencode).\""
+    \"remediation\": \"Check that the hannah_admin user is enabled and that the correct password is stored in the atriumwebsvc secret. If the password contains %, &, +, or other reserved form characters, use a current HITT build that URL-encodes the login request (curl --data-urlencode).\"
   },
   {
     \"id\": \"177\",
