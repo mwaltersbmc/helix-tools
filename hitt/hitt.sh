@@ -5867,7 +5867,7 @@ validateDockerIOPat() {
 main() {
 
 NOW=$(date)
-logStatus "Welcome to the Helix IS Triage Tool - ${NOW}."
+logStatus "Welcome to the Helix IS Triage Tool (build ${HITT_BUILD_VERSION}) - ${NOW}."
 logStatus "Using config file '${HITT_CONFIG_FILE}'."
 logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
@@ -6232,6 +6232,8 @@ tidyUp
 # START
 # Set vars and process command line
 SCRIPT_VERSION=1
+# UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
+HITT_BUILD_VERSION="20260618-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

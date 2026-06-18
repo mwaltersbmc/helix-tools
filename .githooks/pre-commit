@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Bump HITT_BUILD_VERSION in hitt/hitt.sh (UTC YYYYMMDD-NN). Requires: bash, date -u, git.
+# Disable for one commit: SKIP_HITT_VERSION_HOOK=1 git commit ...
+set -euo pipefail
+[[ "${SKIP_HITT_VERSION_HOOK:-0}" == "1" ]] && exit 0
+
+ROOT=$(git rev-parse --show-toplevel)
+FILE="${ROOT}/hitt/hitt.sh"
+[[ -f "${FILE}" ]] || exit 0
+
+line=$(grep -m1 -E '^HITT_BUILD_VERSION=' "${FILE}" || true)
+[[ -n "${line}" ]] || {
+  echo "pre-commit: missing HITT_BUILD_VERSION= line in hitt/hitt.sh" >&2
+  exit 1
+}
+
+val=${line#HITT_BUILD_VERSION=}
+val=${val#\"}
+val=${val%\"}
+val=${val#\'}
+val=${val%\'}
+if [[ ! "${val}" =~ ^[0-9]{8}-[0-9]{1,2}$ ]]; then
+  echo "pre-commit: could not parse HITT_BUILD_VERSION from: ${line}" >&2
+  exit 1
+fi
+
+prev_d="${val%-*}"
+prev_n="${val#*-}"
+today=$(date -u +%Y%m%d)
+
+if [[ "${prev_d}" < "${today}" ]]; then
+  n=1
+elif [[ "${prev_d}" == "${today}" ]]; then
+  n=$((10#${prev_n} + 1))
+else
+  n=1
+fi
+
+if (( n < 1 || n > 99 )); then
+  echo "pre-commit: HITT_BUILD_VERSION daily counter out of range 01-99 (got ${n})" >&2
+  exit 1
+fi
+
+newv=$(printf '%s-%02d' "${today}" "${n}")
+tmp="${FILE}.precommit.$$"
+while IFS= read -r l || [[ -n "${l}" ]]; do
+  if [[ "${l}" =~ ^HITT_BUILD_VERSION= ]]; then
+    printf '%s\n' "HITT_BUILD_VERSION=\"${newv}\""
+  else
+    printf '%s\n' "${l}"
+  fi
+done < "${FILE}" > "${tmp}"
+mv -f "${tmp}" "${FILE}"
+
+git add "${FILE}"
+exit 0

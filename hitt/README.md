@@ -25,10 +25,25 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [tctl Mode](#tctl-mode)
 - [Bundle Deployment Status](#get-is-bundle-deployment-status)
 - [Advanced CLI Options](#advanced-cli-options)
+- [Build version (developers)](#build-version-developers-git-clone-only)
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, Jenkins, license, …)
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `gendbid`)
 
 Built-in summaries: `bash hitt.sh -f help` and `bash hitt.sh -u help`.
+
+### Build version (developers, git clone only)
+
+`hitt.sh` defines **`HITT_BUILD_VERSION`** (`YYYYMMDD-NN` in **UTC**, `NN` zero-padded **01–99**). It is shown in the welcome line when you run the script.
+
+If you work from a **git clone** of this repo, enable the hook so the counter advances on **each commit**:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+To make one commit without bumping: `SKIP_HITT_VERSION_HOOK=1 git commit ...`
+
+`curl` installs of `hitt.sh` alone keep the version baked into the file at publish time (no hook).
 
 ## Features & Modes
 
