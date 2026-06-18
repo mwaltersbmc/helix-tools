@@ -61,8 +61,9 @@ if [[ -f "${README}" ]]; then
     second_line=""
     IFS= read -r second_line <&3 || true
     # README after title: one line **Latest build `YYYYMMDD-NN`** (strip legacy ## Build and duplicate banners).
-    readme_latest_re='^\*\*Latest[[:space:]]+build[[:space:]]+\`[0-9]{8}-[0-9]{1,2}\`\*\*[[:space:]]*$'
-    readme_hash_re='^##[[:space:]]+Build[[:space:]]+\`[0-9]{8}-[0-9]{1,2}\`[[:space:]]*$'
+    # Use $'..' so backticks are literal in the ERE; escaped \` does not match a backtick under bash [[ =~ ]].
+    readme_latest_re=$'^\*\*Latest[[:space:]]+build[[:space:]]+`[0-9]{8}-[0-9]{1,2}`\*\*[[:space:]]*$'
+    readme_hash_re=$'^##[[:space:]]+Build[[:space:]]+`[0-9]{8}-[0-9]{1,2}`[[:space:]]*$'
     readme_build_out="**Latest build \`${newv}\`**"
     {
       printf '%s\n' "${title_line}"
