@@ -58,26 +58,24 @@ if [[ -f "${README}" ]]; then
   rtmp="${README}.precommit.$$"
   exec 3< "${README}"
   if IFS= read -r title_line <&3; then
+    second_line=""
+    IFS= read -r second_line <&3 || true
+    # README after title: one line **Latest build `YYYYMMDD-NN`** (strip legacy ## Build and duplicate banners).
+    readme_latest_re='^\*\*Latest[[:space:]]+build[[:space:]]+\`[0-9]{8}-[0-9]{1,2}\`\*\*[[:space:]]*$'
+    readme_hash_re='^##[[:space:]]+Build[[:space:]]+\`[0-9]{8}-[0-9]{1,2}\`[[:space:]]*$'
+    readme_build_out="**Latest build \`${newv}\`**"
     {
       printf '%s\n' "${title_line}"
-      second_line=""
-      IFS= read -r second_line <&3 || true
-      # README line 2: **Latest build `YYYYMMDD-NN`** (legacy: ## Build `...`)
-      readme_latest_re='^\*\*Latest[[:space:]]+build[[:space:]]+\`[0-9]{8}-[0-9]{1,2}\`\*\*[[:space:]]*$'
-      readme_hash_re='^##[[:space:]]+Build[[:space:]]+\`[0-9]{8}-[0-9]{1,2}\`[[:space:]]*$'
-      readme_build_out="**Latest build \`${newv}\`**"
-      if [[ "${second_line}" =~ ${readme_latest_re} ]] || [[ "${second_line}" =~ ${readme_hash_re} ]]; then
-        printf '%s\n' "${readme_build_out}"
-        while IFS= read -r rest <&3 || [[ -n "${rest}" ]]; do
-          printf '%s\n' "${rest}"
-        done
-      else
-        printf '%s\n' "${readme_build_out}"
-        [[ -n "${second_line}" ]] && printf '%s\n' "${second_line}"
-        while IFS= read -r rest <&3 || [[ -n "${rest}" ]]; do
-          printf '%s\n' "${rest}"
-        done
+      printf '%s\n' "${readme_build_out}"
+      if [[ -n "${second_line}" ]] && [[ ! "${second_line}" =~ ${readme_latest_re} ]] && [[ ! "${second_line}" =~ ${readme_hash_re} ]]; then
+        printf '%s\n' "${second_line}"
       fi
+      while IFS= read -r rest <&3 || [[ -n "${rest}" ]]; do
+        if [[ "${rest}" =~ ${readme_latest_re} ]] || [[ "${rest}" =~ ${readme_hash_re} ]]; then
+          continue
+        fi
+        printf '%s\n' "${rest}"
+      done
     } > "${rtmp}"
     mv -f "${rtmp}" "${README}"
     git add "${README}"
