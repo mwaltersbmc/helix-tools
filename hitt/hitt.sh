@@ -642,7 +642,10 @@ getRSSODetails() {
   RSSO_USERNAME=$(echo "$RSSO_ADMIN_TAS_CM" | ${JQ_BIN} -r '.data.username')
   logMessage "RSSO username is '${RSSO_USERNAME}'." 1
   RSSO_PASSWORD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret rsso-admin-tas -o jsonpath='{.data.password}' | ${BASE64_BIN} -d)
-  RSSO_TOKEN_JSON=$(${CURL_BIN} -sk -X POST "${RSSO_URL}"/api/v1.1/admin/login -H 'Content-Type: application/json' -d '{"username":"'"${RSSO_USERNAME}"'","password":"'"${RSSO_PASSWORD}"'"}')
+  RSSO_TOKEN_JSON=$(${JQ_BIN} -n --arg u "${RSSO_USERNAME}" --arg p "${RSSO_PASSWORD}" '{username: $u, password: $p}' | \
+    ${CURL_BIN} -sk -X POST "${RSSO_URL}/api/v1.1/admin/login" \
+      -H 'Content-Type: application/json' \
+      --data-binary @-)
   if [[ "${RSSO_TOKEN_JSON}" =~ "admin_token" ]]; then
     RSSO_TOKEN=$(echo "${RSSO_TOKEN_JSON}" | ${JQ_BIN} -r .admin_token)
     logMessage "RSSO login OK - got admin token." 1
@@ -2391,7 +2394,7 @@ checkISRESTReady() {
   fi
   getISAdminCreds
   if ! getISJWT; then
-    logError "176" "Failed to authenticate user' ${IS_USER}' - skipping checks."
+    logError "176" "Failed to authenticate user '${IS_USER}' - skipping checks."
     return
   fi
   IS_REST_READY=1
@@ -2432,7 +2435,11 @@ getISTenant() {
 }
 
 getISJWT() {
-  ARJWT=$(${CURL_BIN} -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/jwt/login" -H "content-type/x-www-form" -d "username=${IS_USER}&password=${IS_PASSWD}")
+  # Use --data-urlencode so passwords with %, &, +, etc. are not mangled by curl's -d percent-decoding.
+  ARJWT=$(${CURL_BIN} -sk -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/jwt/login" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    --data-urlencode "username=${IS_USER}" \
+    --data-urlencode "password=${IS_PASSWD}")
   if echo "${ARJWT}" | grep -q "ERROR"; then
     return 1
   else
@@ -4592,7 +4599,7 @@ showUtilHelp() { # utility mode help
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
-    \tcheckpat \t| Validate Docker Hub username & PAT. Args: USERNAME [PAT] (PAT prompted if omitted).
+    \tcheckpat \t| Validate Docker Hub username and PAT. Args: USERNAME [PAT] (PAT prompted if omitted).
     \thelp \t\t| Show this list.
     "
 }
@@ -5806,47 +5813,51 @@ writeInfoJson() {
 
 validateDockerIOPat() {
   local DOCKER_IO_USERNAME DOCKER_IO_PAT RESPONSE REGISTRY_JWT PAYLOAD_BASE64 REM DECODED_PAYLOAD ACTIONS
-  DOCKER_IO_USERNAME="${1}"
-  DOCKER_IO_PAT="${2}"
+  DOCKER_IO_USERNAME="${1:-}"
+  DOCKER_IO_PAT="${2:-}"
 
-  if [ -n "${DOCKER_IO_USERNAME}" ] && [ -z "${DOCKER_IO_PAT}" ]; then
+  if [ -z "${DOCKER_IO_USERNAME}" ]; then
+    logError "999" "Docker Hub username is required." 1
+  fi
+
+  if [ -z "${DOCKER_IO_PAT}" ]; then
     read -r -s -p "Enter your PAT : " DOCKER_IO_PAT
     echo ""
   fi
+
+  if [ -z "${DOCKER_IO_PAT}" ]; then
+    logError "999" "Docker Hub PAT is required (pass on the command line or enter when prompted)." 1
+  fi
+
   echo "Checking docker.io token scope for user '${DOCKER_IO_USERNAME}'..."
 
-  # 1. Request a registry token specifically for a private repository pull action
-
+  # Request a registry token for private repository pull (bmchelix under this user)
   RESPONSE=$(${CURL_BIN} -s -u "${DOCKER_IO_USERNAME}:${DOCKER_IO_PAT}" \
-  "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${DOCKER_IO_USERNAME}/bmchelix:pull" 2>/dev/null)
+    "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${DOCKER_IO_USERNAME}/bmchelix:pull" 2>/dev/null)
 
   REGISTRY_JWT=$(echo "${RESPONSE}" | ${JQ_BIN} -r .token)
 
   if [ "${REGISTRY_JWT}" == "null" ] || [ -z "${REGISTRY_JWT}" ]; then
-      logError "999" "Could not obtain a registry token. Check your username and PAT." 1
+    logError "999" "Could not obtain a registry token. Check your username and PAT." 1
   fi
 
-  # 2. Extract and decode the JWT payload (the second segment)
   PAYLOAD_BASE64=$(echo "${REGISTRY_JWT}" | cut -d'.' -f2)
 
-  # Fix Base64 padding if necessary
   REM=$(( ${#PAYLOAD_BASE64} % 4 ))
   if [ ${REM} -eq 2 ]; then
-      PAYLOAD_BASE64="${PAYLOAD_BASE64}=="
+    PAYLOAD_BASE64="${PAYLOAD_BASE64}=="
   elif [ ${REM} -eq 3 ]; then
-      PAYLOAD_BASE64="${PAYLOAD_BASE64}="
+    PAYLOAD_BASE64="${PAYLOAD_BASE64}="
   fi
 
   DECODED_PAYLOAD=$(echo "${PAYLOAD_BASE64}" | ${BASE64_BIN} --decode 2>/dev/null)
 
-  # 3. Parse the access actions array
   ACTIONS=$(echo "${DECODED_PAYLOAD}" | ${JQ_BIN} -r ".access[0].actions[]?" 2>/dev/null || true)
 
-  # 4. Final Verdict
   if echo "${ACTIONS}" | grep -q "pull"; then
-      logMessage "Success: token has scope 'Read-Only'."
+    logMessage "Success: token grants pull scope for private repository '${DOCKER_IO_USERNAME}/bmchelix'."
   else
-      logError "999" "Failed: Token has scope 'Public Repo Read-Only'.  Please login to Docker Hub via the EPD and update the token."
+    logError "999" "Failed: token does not grant pull for private repository '${DOCKER_IO_USERNAME}/bmchelix' (often public-repo read-only). Update the PAT in Docker Hub / EPD." 1
   fi
 }
 
@@ -6031,8 +6042,8 @@ if [ "${MODE}" == "fix" ]; then
       showFixHelp
       ;;
     *)
-    logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
-    ;;
+      logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
+      ;;
   esac
   exit
 fi
@@ -6084,7 +6095,7 @@ if [ "${MODE}" == "utility" ]; then
       ;;
     checkpat)
       if [ ${#UTILARGS[@]} -lt 2 ]; then
-        logError "999" "Usage: bash $0 -u \"checkpat USERNAME [PERSONAL_ACCESS_TOKEN]\"" 1
+        logError "999" "Usage: bash $0 -u \"checkpat USERNAME [PAT]\"" 1
       fi
       validateDockerIOPat "${UTILARGS[1]}" "${UTILARGS[2]:-}"
       ;;
@@ -6092,8 +6103,8 @@ if [ "${MODE}" == "utility" ]; then
       showUtilHelp
       ;;
     *)
-    logError "999" "'${UTILARGS[0]}' is not a valid utility mode option." 1
-    ;;
+      logError "999" "'${UTILARGS[0]}' is not a valid utility mode option." 1
+      ;;
   esac
   exit
 fi
@@ -7089,7 +7100,7 @@ ALL_MSGS_JSON="[
     \"id\": \"176\",
     \"cause\": \"An attempt to login to the Helix Service Management apps via the RESTAPI failed.\",
     \"impact\": \"Some IS configuration checks will be skipped.\",
-    \"remediation\": \"Check that the hannah_admin user is enabled and that the correct password is stored in the atriumwebsvc secret.\"
+    \"remediation\": \"Check that the hannah_admin user is enabled and that the correct password is stored in the atriumwebsvc secret. If the password contains %, &, +, or other reserved form characters, use a current HITT build that URL-encodes the login request (curl --data-urlencode).\""
   },
   {
     \"id\": \"177\",
