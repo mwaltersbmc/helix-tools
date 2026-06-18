@@ -2999,15 +2999,38 @@ checkJenkinsCredentials() {
 
 checkForNewHITT() {
   [[ "${SKIP_UPDATE_CHECK}" == "1" ]] && return
-  if [  $(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' --connect-timeout 10 "${HITT_URL}") == "200" ]; then
-    REMOTE_MD5=$(${CURL_BIN} -sL "${HITT_URL}" | md5sum | awk '{print $1}')
-    LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
-    if [ "$REMOTE_MD5" != "$LOCAL_MD5" ]; then
-      logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -skO ${HITT_URL}${NORMAL}"
-      echo
-      read -r -s -n1 -t3 -p"Press any key to continue or Ctrl+C to cancel..."
-      echo
+  if [ "$(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' --connect-timeout 10 "${HITT_URL}")" != "200" ]; then
+    return
+  fi
+  REMOTE_TMP=$(mktemp) || return
+  if ! ${CURL_BIN} -sL "${HITT_URL}" --connect-timeout 10 -o "${REMOTE_TMP}"; then
+    rm -f "${REMOTE_TMP}"
+    return
+  fi
+  REMOTE_MD5=$(md5sum "${REMOTE_TMP}" | awk '{print $1}')
+  remote_line=$(grep -m1 -E '^HITT_BUILD_VERSION=' "${REMOTE_TMP}" || true)
+  rm -f "${REMOTE_TMP}"
+  REMOTE_HITT_BUILD_VERSION=""
+  if [[ -n "${remote_line}" ]]; then
+    val=${remote_line#HITT_BUILD_VERSION=}
+    val=${val#\"}
+    val=${val%\"}
+    val=${val#\'}
+    val=${val%\'}
+    if [[ "${val}" =~ ^[0-9]{8}-[0-9]{1,2}$ ]]; then
+      REMOTE_HITT_BUILD_VERSION="${val}"
     fi
+  fi
+  LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
+  if [ "${REMOTE_MD5}" != "${LOCAL_MD5}" ]; then
+    if [[ -n "${REMOTE_HITT_BUILD_VERSION}" ]]; then
+      logStatus "${GREEN}An updated version of HITT is available (${REMOTE_HITT_BUILD_VERSION}) - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -skO ${HITT_URL}${NORMAL}"
+    else
+      logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -skO ${HITT_URL}${NORMAL}"
+    fi
+    echo
+    read -r -s -n1 -t3 -p"Press any key to continue or Ctrl+C to cancel..."
+    echo
   fi
 }
 
@@ -6231,9 +6254,8 @@ tidyUp
 
 # START
 # Set vars and process command line
-SCRIPT_VERSION=1
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260618-03"
+HITT_BUILD_VERSION="20260618-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

@@ -1,4 +1,7 @@
 # Helix IS Triage Tool (HITT)
+**Latest build `20260618-04`**
+
+**Latest build `20260618-03`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -33,7 +36,7 @@ Built-in summaries: `bash hitt.sh -f help` and `bash hitt.sh -u help`.
 
 ### Build version (developers, git clone only)
 
-`hitt.sh` defines **`HITT_BUILD_VERSION`** (`YYYYMMDD-NN` in **UTC**, `NN` zero-padded **01–99**). It is shown in the welcome line when you run the script.
+`hitt.sh` defines **`HITT_BUILD_VERSION`** (`YYYYMMDD-NN` in **UTC**, `NN` zero-padded **01–99**). It is shown in the welcome line when you run the script, and the second line of this README (bold **Latest build** with the version in backticks) is updated to match on each commit when the hook runs.
 
 If you work from a **git clone** of this repo, enable the hook so the counter advances on **each commit**:
 
