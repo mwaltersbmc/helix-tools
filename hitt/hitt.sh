@@ -489,7 +489,7 @@ setISDBVersion() {
       ;;
     26)
       [[ "${1}" == "26.1.01" ]] && IS_DB_VERSION=236
-      [[ "${1}" == "26.2.01" ]] && IS_DB_VERSION=236
+      [[ "${1}" == "26.2.01" ]] && IS_DB_VERSION=237
       ;;
     *)
       logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
@@ -6255,7 +6255,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260618-06"
+HITT_BUILD_VERSION="20260623-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
