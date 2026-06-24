@@ -664,7 +664,7 @@ checkHelixLoggingDeployed() {
   HELIX_LOGGING_DEPLOYED=0
   HELIX_LOGGING_NAMESPACES=($(${KUBECTL_BIN} get deployment -A | grep efk-elasticsearch-kibana | awk '{print $1}' 2>/dev/null))
   if [ "${#HELIX_LOGGING_NAMESPACES[@]}" -gt 1 ]; then
-    logMessage "Multiple Helix Logging instances found - please select the namespace you wish to use:"
+    echo "Multiple Helix Logging instances found - please select the namespace you wish to use:"
     HELIX_LOGGING_NAMESPACE=$(selectFromArray HELIX_LOGGING_NAMESPACES)
   else
     HELIX_LOGGING_NAMESPACE="${HELIX_LOGGING_NAMESPACES[0]}"
@@ -6261,7 +6261,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260624-01"
+HITT_BUILD_VERSION="20260624-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
