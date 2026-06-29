@@ -671,11 +671,13 @@ checkHelixLoggingDeployed() {
   fi
   if [ -n "${HELIX_LOGGING_NAMESPACE}" ]; then
     HELIX_LOGGING_DEPLOYED=1
-    logMessage "Helix Logging found in the '${HELIX_LOGGING_NAMESPACE}' namespace."
     HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get secret efk-elasticsearch-kibana -o json  | ${JQ_BIN} -r '.data["kibana-password"] | @base64d')
     HELIX_LOGGING_PASSWORD_URI=$(printf %s "${HELIX_LOGGING_PASSWORD}" | ${JQ_BIN} -sRr @uri)
+    HELIX_LOGGING_VERSION=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get ds efk-fluent-bit -o json | ${JQ_BIN} -r '.spec.template.spec.containers[0].image | split(":")[1] | split("-")[0]') || HELIX_LOGGING_VERSION="unknown"
+    logMessage "Helix Logging version '${HELIX_LOGGING_VERSION}' found in the '${HELIX_LOGGING_NAMESPACE}' namespace."
     checkEFKClusterHealth
   else
+    HELIX_LOGGING_NAMESPACE="not found"
     logMessage "Helix Logging not found."
     if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o jsonpath='{.data.bmc_helix_logging_config}' | grep -q 'ENABLE_LOG_SHIPPER_IN_PODS=true'; then
       logWarning "003" "ENABLE_LOG_SHIPPER_IN_PODS=true - consider installing Helix Logging to reduce error messages in Helix Platform pod logs."
@@ -5479,21 +5481,25 @@ gatherInfo() {
   fi
   deleteTCTLJob
   logStatus "Gathering Helix Service Management information..." 1
-  IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -f2 -d '-')
-  buildISAliasesArray
-  if isJenkinsInCluster ; then
-    CONTAINERIZED_JENKINS=true
+  IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' 2>/dev/null| cut -f2 -d '-')
+  if [ -z "${IS_VERSION}" ]; then
+    IS_VERSION="not found"
   else
-    CONTAINERIZED_JENKINS=false
+    buildISAliasesArray
+    if isJenkinsInCluster ; then
+      CONTAINERIZED_JENKINS=true
+    else
+      CONTAINERIZED_JENKINS=false
+    fi
+    checkJenkinsIsRunning
+    UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
+    getISDetailsFromK8s
+    checkISRESTReady
+    checkISLicenseStatus
+    getISDbID
+    logPlatformFTSStartTime
+    checkAssistTool
   fi
-  checkJenkinsIsRunning
-  UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
-  getISDetailsFromK8s
-  checkISRESTReady
-  checkISLicenseStatus
-  getISDbID
-  logPlatformFTSStartTime
-  checkAssistTool
 }
 
 printInfo() {
@@ -5533,8 +5539,9 @@ printInfo() {
   hittFormatTctlTableForDisplay "${HP_SERVICES}"
 
   hittInfoPrintSection "Helix Logging"
-  hittInfoPrintKv "Helix logging deployed" "$( [ "$HELIX_LOGGING_DEPLOYED" = "1" ] && echo "true" || echo "false" )"
+  #hittInfoPrintKv "Helix logging deployed" "$( [ "$HELIX_LOGGING_DEPLOYED" = "1" ] && echo "true" || echo "false" )"
   hittInfoPrintKv "Helix logging namespace" "${HELIX_LOGGING_NAMESPACE:-n/a}"
+  hittInfoPrintKv "Version" "${HELIX_LOGGING_VERSION:-n/a}"
 
   hittInfoPrintSection "Deployment Engine"
   hittInfoPrintKv "Containerized DE" "${CONTAINERIZED_JENKINS}"
@@ -5765,6 +5772,7 @@ writeInfoJson() {
     --argjson helixPlatformServices "${services_rows}" \
     --argjson helixLoggingDeployed "${helix_log}" \
     --arg helixLoggingNamespace "${HELIX_LOGGING_NAMESPACE:-}" \
+    --arg helixLoggingVersion "${HELIX_LOGGING_VERSION:-}" \
     --argjson deploymentEngineContainerized "${cj}" \
     --arg deploymentEngineJenkinsUrl "${JENKINS_LOG_URL:-}" \
     --arg deploymentEngineJenkinsVersion "${JENKINS_VERSION:-}" \
@@ -5814,8 +5822,8 @@ writeInfoJson() {
         services: $helixPlatformServices
       },
       helixLogging: {
-        deployed: $helixLoggingDeployed,
-        namespace: $helixLoggingNamespace
+        namespace: $helixLoggingNamespace,
+        version: $helixLoggingVersion
       },
       deploymentEngine: {
         containerizedJenkins: $deploymentEngineContainerized,
@@ -6261,7 +6269,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260624-02"
+HITT_BUILD_VERSION="20260629-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
