@@ -2862,7 +2862,7 @@ dumpVARs() {
 checkJenkinsConfig() {
   [[ "${SKIP_JENKINS}" == 1 ]] && return
   if isJenkinsInCluster ; then
-    logMessage "Jenkins running in cluster - skipping remaining checks..."
+    logMessage "Jenkins is running in cluster - skipping remaining checks..."
   else
     logMessage "Checking plugins..."
     checkJenkinsPlugins
@@ -3568,7 +3568,6 @@ versionFmt() {
 
 checkDERequirements() {
   if isJenkinsInCluster ; then
-    logMessage "Jenkins is running in cluster skipping checks."
     return
   fi
   logMessage "Checking OS binaries..."
@@ -6269,7 +6268,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260629-01"
+HITT_BUILD_VERSION="20260630-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
