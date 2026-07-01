@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Bump HITT_BUILD_VERSION in hitt/hitt.sh (UTC YYYYMMDD-NN) and sync the README build line under the title.
+# Runs only when hitt/hitt.sh is staged for this commit.
 # Disable for one commit: SKIP_HITT_VERSION_HOOK=1 git commit ...
 set -euo pipefail
 [[ "${SKIP_HITT_VERSION_HOOK:-0}" == "1" ]] && exit 0
@@ -9,18 +10,24 @@ FILE="${ROOT}/hitt/hitt.sh"
 README="${ROOT}/hitt/README.md"
 [[ -f "${FILE}" ]] || exit 0
 
+if git diff --cached --quiet -- hitt/hitt.sh; then
+  exit 0
+fi
+
 line=$(grep -m1 -E '^HITT_BUILD_VERSION=' "${FILE}" || true)
+line=${line//$'\r'/}
 [[ -n "${line}" ]] || {
   echo "pre-commit: missing HITT_BUILD_VERSION= line in hitt/hitt.sh" >&2
   exit 1
 }
 
-val=${line#HITT_BUILD_VERSION=}
-val=${val#\"}
-val=${val%\"}
-val=${val#\'}
-val=${val%\'}
-if [[ ! "${val}" =~ ^[0-9]{8}-[0-9]{1,2}$ ]]; then
+val=""
+if [[ "${line}" =~ ^HITT_BUILD_VERSION=\"([0-9]{8}-[0-9]{1,2})\"$ ]]; then
+  val="${BASH_REMATCH[1]}"
+elif [[ "${line}" =~ ^HITT_BUILD_VERSION=\'([0-9]{8}-[0-9]{1,2})\'$ ]]; then
+  val="${BASH_REMATCH[1]}"
+fi
+if [[ -z "${val}" ]]; then
   echo "pre-commit: could not parse HITT_BUILD_VERSION from: ${line}" >&2
   exit 1
 fi
@@ -45,6 +52,7 @@ fi
 newv=$(printf '%s-%02d' "${today}" "${n}")
 tmp="${FILE}.precommit.$$"
 while IFS= read -r l || [[ -n "${l}" ]]; do
+  l=${l//$'\r'/}
   if [[ "${l}" =~ ^HITT_BUILD_VERSION= ]]; then
     printf '%s\n' "HITT_BUILD_VERSION=\"${newv}\""
   else
