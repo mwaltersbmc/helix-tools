@@ -4634,6 +4634,19 @@ showUtilHelp() { # utility mode help
     "
 }
 
+showInfoHelp() { # info mode help
+  echo "HITT info mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
+  echo .
+  echo 'Usage: bash hitt.sh -m "info <subcommand>"'
+  echo -e "
+    \tcluster \t| Kubernetes/OpenShift version and node resource summary table (allocatable, requested, usage, status).
+    \tfull \t\t| Full BMC Helix Environment Summary on the console and info.json.
+    \thelp \t\t| Show this list.
+    "
+  echo "Default sub-command when omitted: full"
+  echo "Note: info mode is under development; sub-commands and output may change."
+}
+
 getJenkinsPipelineValues() {
   if [ ${#PIPELINEARGS[@]} -lt 2 ]; then
     logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N> [filename]\"" 1
@@ -6166,7 +6179,7 @@ if [ "${MODE}" == "info" ]; then
       showInfoHelp
       ;;
     *)
-      logError "999" "'${UTILARGS[0]}' is not a valid utility info option." 1
+      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, full, help)." 1
       ;;
   esac
   exit
@@ -6287,7 +6300,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260701-02"
+HITT_BUILD_VERSION="20260701-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

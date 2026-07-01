@@ -33,6 +33,11 @@ window.HITT_USE_CASES = {
       "order": 50
     },
     {
+      "id": "helix-system-info",
+      "title": "Displaying information about a Helix system",
+      "order": 55
+    },
+    {
       "id": "tctl-options",
       "title": "tctl Options",
       "order": 60
@@ -454,6 +459,20 @@ window.HITT_USE_CASES = {
         "Creates assisttool-rl and assisttool-rlb in the Helix IS namespace when SAT was deployed without SUPPORT_ASSISTANT_CREATE_ROLE."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
+    },
+    {
+      "id": "info-cluster-status",
+      "topicId": "helix-system-info",
+      "order": 10,
+      "title": "I want to see information about my cluster resources",
+      "commands": [
+        "bash hitt.sh -m \"info cluster\""
+      ],
+      "notes": [
+        "Prints Kubernetes/OpenShift version and a node summary table: allocatable CPU/memory, allocated pod resource requests, actual usage percentages (when metrics-server is available), node health/conditions, pod run/bad/crash counts, OOM kills, and container runtime.",
+        "Info mode is under development; use bash hitt.sh -m \"info help\" or README-info-mode.md for full environment summary (info full) and other options."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
     },
     {
       "id": "tctl",
