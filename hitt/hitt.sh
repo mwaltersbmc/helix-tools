@@ -6144,10 +6144,31 @@ if [ "${MODE}" == "utility" ]; then
 fi
 
 if [ "${MODE}" == "info" ]; then
+  checkToolVersion kubectl
   logStatus "Running in info mode..."
-  gatherInfo
-  printInfo
-  writeInfoJson || true
+  case "${MODEARGS[1]}" in
+    cluster)
+      QUIET=1
+      logStatus "Gathering cluster information..." 1
+      getVersions
+      getK8sNodeDetails
+      hittInfoPrintKv "Kubernetes version" "${K8S_VERSION:-unknown}"
+      hittInfoPrintKv "OpenShift version" "${OPENSHIFT_VERSION:-n/a}"
+      hittInfoPrintSection "Node summary"
+      printK8sNodeDetails
+      ;;
+    full)
+      gatherInfo
+      printInfo
+      writeInfoJson || true
+      ;;
+    help)
+      showInfoHelp
+      ;;
+    *)
+      logError "999" "'${UTILARGS[0]}' is not a valid utility info option." 1
+      ;;
+  esac
   exit
 fi
 
@@ -6266,7 +6287,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260701-01"
+HITT_BUILD_VERSION="20260701-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -7732,7 +7753,12 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
       CREATE_LOGS=0
       ;;
     m)
-      MODE="${OPTARG}"
+      # Parse UTILOPTS to array
+      read -r -a MODEARGS <<< "${OPTARG}"
+      MODE="${MODEARGS[0]}"
+      if [ "${#MODEARGS[@]}" -eq 1 ]; then
+        MODEARGS+=("full")
+      fi
       ;;
     n)
       CONF_OVERRIDE=1
