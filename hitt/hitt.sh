@@ -1115,7 +1115,7 @@ checkFTSElasticStatus() {
 }
 
 getISDetailsFromK8s() {
-  [[ "${MODE}" != "post-is" ]] && return
+  [[ "${MODE}" != "post-is" && "${MODE}" != "info" ]] && return
   logMessage "Getting data from IS namespace..."
   IS_PLATFORM_STS=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[?(@.name=="platform")]}')
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret > /dev/null 2>&1; then
@@ -5322,8 +5322,8 @@ printK8sNodeDetails() {
 #   Resolves the controller workload for that IngressClass (cluster-wide deploy/ds list).
 #   Class name: first arg, else INGRESS_CLASS_NAME, else HP_INGRESS_CLASS (Helix config mirror), else "nginx".
 # Workloads are listed cluster-wide (-A); controller is not assumed to live in the app/Helix namespace.
-# Matching: IngressClass name / spec.controller in container args, --class=, INGRESS_CLASS env,
-#           deprecated pod-template annotation kubernetes.io/ingress.class.
+# Matching: score Deployments/DaemonSets cluster-wide; prefer ingress/nginx image/name, args, and
+#           annotations over INGRESS_CLASS env alone (avoids false positives from app workloads).
 # Sets globals: INGRESS_CLASS_NAME, INGRESS_CLASS_SPEC_CONTROLLER, INGRESS_CONTROLLER_TYPE (deployment|daemonset|unknown),
 #               INGRESS_CONTROLLER_NAMESPACE, INGRESS_CONTROLLER_NAME, INGRESS_CONTROLLER_IMAGE
 # =============================================================================
@@ -5356,19 +5356,26 @@ discoverIngressControllerDetails() {
   fi
 
   match_json=$(echo "${workload_json}" | ${JQ_BIN} -c --arg ic "${INGRESS_CLASS_NAME}" --arg ctrl "${controller}" '
+    def args_text($c): (($c.args // []) | join(" "));
+    def container_has_ingress_args($c):
+      (args_text($c) | test("--ingress-class=" + $ic + "( |$)"))
+      or (args_text($c) | test("--class=" + $ic + "( |$)"))
+      or (($ctrl | length) > 0 and (args_text($c) | index($ctrl)) != null);
+    def workload_score($w):
+      (if ($w.metadata.name | test("ingress"; "i")) then 100 else 0 end)
+      + (if ($w.metadata.name | test("nginx|traefik|haproxy"; "i")) then 80 else 0 end)
+      + (if ($w.spec.template.metadata.annotations["kubernetes.io/ingress.class"]? // "") == $ic then 90 else 0 end)
+      + (if any($w.spec.template.spec.containers[]?; container_has_ingress_args(.)) then 85 else 0 end)
+      + (if any($w.spec.template.spec.containers[]?; .image | test("ingress-nginx|nginx-ingress|traefik|haproxy|ingress-controller"; "i")) then 75 else 0 end)
+      + (if any($w.spec.template.spec.containers[]? | (.env // [])[]?;
+            (.name == "INGRESS_CLASS" or .name == "INGRESS_CLASS_NAME") and .value == $ic
+          ) then 15 else 0 end)
+      - (if ($w.metadata.name | test("smart-graph|midtier|platform-fts|rsso|elastic|kafka|zookeeper"; "i")) then 80 else 0 end)
+      - (if any($w.spec.template.spec.containers[]?; .image | test("smart-graph|midtier-user|platform-fts"; "i")) then 100 else 0 end);
     [.items[] | select(.kind == "Deployment" or .kind == "DaemonSet")
-     | select(
-         (.spec.template.metadata.annotations["kubernetes.io/ingress.class"]? == $ic)
-         or (any(.spec.template.spec.containers[]?;
-             (((.args // []) | join(" ")) | test("--ingress-class=" + $ic + "( |$)"))
-             or (((.args // []) | join(" ")) | test("--class=" + $ic + "( |$)"))
-             or (if ($ctrl | length) == 0 then false else (((.args // []) | join(" ")) | index($ctrl)) != null end)
-             or any((.env // [])[]?;
-                 ((.name == "INGRESS_CLASS" or .name == "INGRESS_CLASS_NAME") and (.value == $ic))
-               )
-           ))
-       )
-    ] | .[0]
+     | { score: workload_score(.), item: . }
+     | select(.score > 0)
+    ] | sort_by(-.score) | .[0].item // empty
   ')
 
   if [[ -z "${match_json}" || "${match_json}" == "null" ]]; then
@@ -5386,18 +5393,19 @@ discoverIngressControllerDetails() {
   esac
 
   INGRESS_CONTROLLER_IMAGE=$(echo "${match_json}" | ${JQ_BIN} -r --arg ic "${INGRESS_CLASS_NAME}" --arg ctrl "${controller}" '
-    . as $w
-    | ([$w.spec.template.spec.containers[]?
-        | select(
-            (((.args // []) | join(" ")) | test("--ingress-class=" + $ic + "( |$)"))
-            or (((.args // []) | join(" ")) | test("--class=" + $ic + "( |$)"))
-            or (if ($ctrl | length) == 0 then false else (((.args // []) | join(" ")) | index($ctrl)) != null end)
-            or any((.env // [])[]?;
-                ((.name == "INGRESS_CLASS" or .name == "INGRESS_CLASS_NAME") and (.value == $ic))
-              )
-          )
-        | .image
-      ] | .[0]) // ($w.spec.template.spec.containers[0].image // "")
+    def args_text($c): (($c.args // []) | join(" "));
+    def container_score($c):
+      (if ($c.name | test("controller"; "i")) then 50 else 0 end)
+      + (if ($c.image | test("ingress-nginx|nginx-ingress|traefik|haproxy|ingress-controller"; "i")) then 90 else 0 end)
+      + (if (args_text($c) | test("--ingress-class=" + $ic + "( |$)")) then 70 else 0 end)
+      + (if (args_text($c) | test("--class=" + $ic + "( |$)")) then 65 else 0 end)
+      + (if (($ctrl | length) > 0) and (args_text($c) | index($ctrl)) != null then 60 else 0 end)
+      + (if any(($c.env // [])[]?; (.name == "INGRESS_CLASS" or .name == "INGRESS_CLASS_NAME") and .value == $ic) then 10 else 0 end)
+      - (if ($c.image | test("smart-graph|midtier|sidecar|exporter"; "i")) then 120 else 0 end);
+    ([.spec.template.spec.containers[]?
+      | { score: container_score(.), image: (.image // "") }
+      | select(.image != "")
+    ] | sort_by(-.score) | .[0].image) // (.spec.template.spec.containers[0].image // "")
   ')
 
   return 0
@@ -5431,6 +5439,7 @@ printIngressControllerDetails() {
   hittInfoPrintKv "Ingress class (Helix config)" "${HP_INGRESS_CLASS}"
   hittInfoPrintKv "Workload type" "${INGRESS_CONTROLLER_TYPE:-unknown}"
   hittInfoPrintKv "Namespace" "${INGRESS_CONTROLLER_NAMESPACE:-unknown}"
+  hittInfoPrintKv "Workload" "${INGRESS_CONTROLLER_NAME:-unknown}"
   hittInfoPrintKv "Image" "${INGRESS_CONTROLLER_IMAGE:-unknown}"
 }
 
@@ -5458,12 +5467,12 @@ gatherInfo() {
   checkToolVersion kubectl
   getK8sNodeDetails
   getVersions
+  logStatus "Gathering Helix Platform information..." 1
+  setVarsFromPlatform
   if checkK8sAuth get ingressclasses; then
     INGRESS_CLASSES=$(${KUBECTL_BIN} get ingressclasses)
     discoverIngressControllerDetails "${HP_INGRESS_CLASS}"
   fi
-  logStatus "Gathering Helix Platform information..." 1
-  setVarsFromPlatform
   checkHelixLoggingDeployed
   checkHPRegistryDetails
   getRSSODetails
@@ -5551,7 +5560,7 @@ printInfo() {
   hittFormatTctlTableForDisplay "${HP_SERVICES}"
 
   hittInfoPrintSection "Helix Logging"
-  hittInfoPrintKv "Helix logging namespace" "${HELIX_LOGGING_NAMESPACE:-n/a}"
+  hittInfoPrintKv "Namespace" "${HELIX_LOGGING_NAMESPACE:-n/a}"
   hittInfoPrintKv "Version" "${HELIX_LOGGING_VERSION:-n/a}"
 
   hittInfoPrintSection "Deployment Engine"
@@ -6300,7 +6309,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260701-03"
+HITT_BUILD_VERSION="20260701-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
