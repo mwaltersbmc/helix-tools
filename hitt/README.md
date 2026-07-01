@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260701-06`**
+**Latest build `20260701-07`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -29,9 +29,13 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [Build version (developers)](#build-version-developers-git-clone-only)
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, Jenkins, license, …)
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `gendbid`)
-- [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**)
+- [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info ingress`, `info full`
 
-Built-in summaries: `bash hitt.sh -f help`, `bash hitt.sh -u help`, and `bash hitt.sh -m info help`.
+Built-in summaries: `bash hitt.sh -f help`, `bash hitt.sh -u help`, and `bash hitt.sh -m "info help"`.
+
+**Info ingress** (`bash hitt.sh -m "info ingress"`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires `hitt.conf` and Platform namespace access. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
+
+**Quoting:** HITT options whose values contain spaces must be double-quoted (e.g. `-m "info ingress"`, `-f "jenkins kubeconfig"`, `-u "get jwt"`). See [README-info-mode.md](README-info-mode.md) for info mode examples.
 
 ### Build version (developers, git clone only)
 

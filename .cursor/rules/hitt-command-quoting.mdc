@@ -1,0 +1,29 @@
+---
+description: HITT CLI options with multiple words must be double-quoted
+alwaysApply: true
+---
+
+# HITT command quoting
+
+When documenting, suggesting, or generating **HITT** (`hitt.sh`) command examples, any option whose value is **more than one word** must be enclosed in **double quotes**.
+
+Applies to (among others): `-m`, `-f`, `-k`, `-u`, `-t`.
+
+```bash
+# ✅ GOOD
+bash hitt.sh -m "info ingress"
+bash hitt.sh -m "info full"
+bash hitt.sh -f "jenkins kubeconfig"
+bash hitt.sh -k "get lastsuccessful"
+bash hitt.sh -u "get secret my-secret helix-is"
+bash hitt.sh -t "get tenant"
+
+# ❌ BAD — shell splits the value; info sub-commands silently default to full
+bash hitt.sh -m info ingress
+bash hitt.sh -f jenkins kubeconfig
+bash hitt.sh -u get secret my-secret
+```
+
+Single-word values do not require quotes: `-m post-hp`, `-f sat`, `-m info` (defaults sub-command to `full`).
+
+When editing `docs/hitt/use-cases.json`, `README*.md`, help text in `hitt.sh`, or error messages, follow this convention consistently.

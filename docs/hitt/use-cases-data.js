@@ -470,7 +470,25 @@ window.HITT_USE_CASES = {
       ],
       "notes": [
         "Prints Kubernetes/OpenShift version and a node summary table: allocatable CPU/memory, allocated pod resource requests, actual usage percentages (when metrics-server is available), node health/conditions, pod run/bad/crash counts, OOM kills, and container runtime.",
+        "Use double quotes when -m has multiple words: bash hitt.sh -m \"info cluster\" (not bash hitt.sh -m info cluster).",
         "Info mode is under development; use bash hitt.sh -m \"info help\" or README-info-mode.md for full environment summary (info full) and other options."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
+    },
+    {
+      "id": "info-helix-environment",
+      "topicId": "helix-system-info",
+      "order": 20,
+      "title": "I want to display information about my Helix environment",
+      "commands": [
+        "bash hitt.sh -m \"info full\"",
+        "bash hitt.sh -m info"
+      ],
+      "notes": [
+        "Prints a BMC Helix Environment Summary: client/cluster versions, node table, ingress controller, Helix Platform (tenants and services), Helix Logging, Deployment Engine (Jenkins), and Helix Service Management when IS is deployed.",
+        "Also writes info.json in the current directory. Expect interactive prompts (environment type, live system, tenant, logging namespace when multiple exist).",
+        "Use double quotes when -m has multiple words (e.g. bash hitt.sh -m \"info full\"). Single-word bash hitt.sh -m info is equivalent and does not require quotes.",
+        "Info mode is under development — see README-info-mode.md."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
     },

@@ -4638,8 +4638,10 @@ showInfoHelp() { # info mode help
   echo "HITT info mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
   echo .
   echo 'Usage: bash hitt.sh -m "info <subcommand>"'
+  echo "Multi-word -m values must be double-quoted (e.g. bash hitt.sh -m \"info ingress\")."
   echo -e "
     \tcluster \t| Kubernetes/OpenShift version and node resource summary table (allocatable, requested, usage, status).
+    \tingress \t| Ingress controller for Helix INGRESS_CLASS: workload type, namespace, name, and image.
     \tfull \t\t| Full BMC Helix Environment Summary on the console and info.json.
     \thelp \t\t| Show this list.
     "
@@ -6179,6 +6181,18 @@ if [ "${MODE}" == "info" ]; then
       hittInfoPrintSection "Node summary"
       printK8sNodeDetails
       ;;
+    ingress)
+      QUIET=1
+      logStatus "Gathering ingress information..." 1
+      getVersions
+      setVarsFromPlatform
+      if checkK8sAuth get ingressclasses; then
+        INGRESS_CLASSES=$(${KUBECTL_BIN} get ingressclasses)
+        discoverIngressControllerDetails "${HP_INGRESS_CLASS}"
+      fi
+      hittInfoPrintSection "Ingress controller"
+      printIngressControllerDetails
+      ;;
     full)
       gatherInfo
       printInfo
@@ -6188,7 +6202,7 @@ if [ "${MODE}" == "info" ]; then
       showInfoHelp
       ;;
     *)
-      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, full, help)." 1
+      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, ingress, full, help)." 1
       ;;
   esac
   exit
@@ -6309,7 +6323,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260701-06"
+HITT_BUILD_VERSION="20260701-07"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -7775,6 +7789,10 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
       CREATE_LOGS=0
       ;;
     m)
+      NEXT_VAL="${!OPTIND}"
+      if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
+        logError "999" "When using mode (-m) commands with multiple words you must enclose them in double quotes - eg: bash $0 -m \"info ingress\"" 1
+      fi
       # Parse UTILOPTS to array
       read -r -a MODEARGS <<< "${OPTARG}"
       MODE="${MODEARGS[0]}"
