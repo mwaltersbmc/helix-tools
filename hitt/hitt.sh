@@ -677,7 +677,7 @@ checkHelixLoggingDeployed() {
     logMessage "Helix Logging version '${HELIX_LOGGING_VERSION}' found in the '${HELIX_LOGGING_NAMESPACE}' namespace."
     checkEFKClusterHealth
   else
-    HELIX_LOGGING_NAMESPACE="not found"
+    HELIX_LOGGING_NAMESPACE=""
     logMessage "Helix Logging not found."
     if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o jsonpath='{.data.bmc_helix_logging_config}' | grep -q 'ENABLE_LOG_SHIPPER_IN_PODS=true'; then
       logWarning "003" "ENABLE_LOG_SHIPPER_IN_PODS=true - consider installing Helix Logging to reduce error messages in Helix Platform pod logs."
@@ -5480,7 +5480,7 @@ gatherInfo() {
   fi
   deleteTCTLJob
   logStatus "Gathering Helix Service Management information..." 1
-  IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' 2>/dev/null| cut -f2 -d '-')
+  IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' 2>/dev/null | cut -f2 -d '-')
   if [ -z "${IS_VERSION}" ]; then
     IS_VERSION="not found"
   else
@@ -5510,7 +5510,7 @@ printInfo() {
 
   hittInfoPrintSection "Client information"
   hittInfoPrintKv "OS" "${OS_NAME:-unknown}"
-  hittInfoPrintKv "OS version" "${OS_VERSION:-unknown}"
+  hittInfoPrintKv "Version" "${OS_VERSION:-unknown}"
   hittInfoPrintKv "kubectl" "${KUBECTL_VERSION:-unknown}"
   hittInfoPrintKv "Helm" "${HELM_VERSION:-unknown}"
 
@@ -5538,7 +5538,6 @@ printInfo() {
   hittFormatTctlTableForDisplay "${HP_SERVICES}"
 
   hittInfoPrintSection "Helix Logging"
-  #hittInfoPrintKv "Helix logging deployed" "$( [ "$HELIX_LOGGING_DEPLOYED" = "1" ] && echo "true" || echo "false" )"
   hittInfoPrintKv "Helix logging namespace" "${HELIX_LOGGING_NAMESPACE:-n/a}"
   hittInfoPrintKv "Version" "${HELIX_LOGGING_VERSION:-n/a}"
 
@@ -5769,7 +5768,6 @@ writeInfoJson() {
     --arg helixPlatformPortalUrl "${PORTAL_HOSTNAME:-}" \
     --argjson helixPlatformTenants "${tenants_rows}" \
     --argjson helixPlatformServices "${services_rows}" \
-    --argjson helixLoggingDeployed "${helix_log}" \
     --arg helixLoggingNamespace "${HELIX_LOGGING_NAMESPACE:-}" \
     --arg helixLoggingVersion "${HELIX_LOGGING_VERSION:-}" \
     --argjson deploymentEngineContainerized "${cj}" \
@@ -6268,7 +6266,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260630-01"
+HITT_BUILD_VERSION="20260701-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
