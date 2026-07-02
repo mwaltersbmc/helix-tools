@@ -454,6 +454,7 @@ getVersions() {
   HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
   HP_INGRESS_CLASS=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.infra_config' | grep ^INGRESS_CLASS | cut -d '=' -f2)
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
+  HP_REGISTRY_PROJECT=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^IMAGE_REGISTRY_PROJECT | cut -d '=' -f2)
   logMessage "Helix Platform version '${HP_VERSION}' with DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}'."
   if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
     logWarning "002" "Helix Platform DEPLOYMENT_SIZE is '${HP_DEPLOYMENT_SIZE}' - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products are/will be installed."
@@ -6034,6 +6035,7 @@ kickstartBuildPipelineInputJson() {
     APPLICATION_PARENT_DOMAIN
     SIDECAR_FLUENTBIT
     HARBOR_REGISTRY_HOST
+    HARBOR_REGISTRY_ORG
     IMAGE_REGISTRY_USERNAME
     IMAGE_REGISTRY_PASSWORD
     IMAGESECRET_NAME
@@ -6047,6 +6049,7 @@ kickstartBuildPipelineInputJson() {
     RSSO_ADMIN_PASSWORD
     TENANT_DOMAIN
     HELIX_PLATFORM_NAMESPACE
+    HELIX_PLATFORM_DOMAIN
     HELIX_PLATFORM_CUSTOMER_NAME
   )
 
@@ -6077,6 +6080,7 @@ kickStartUberPipeline() {
   CLUSTER_DOMAIN="${CLUSTER_DOMAIN}"
   APPLICATION_PARENT_DOMAIN="${CLUSTER_DOMAIN}"
   HARBOR_REGISTRY_HOST="${HP_REGISTRY_SERVER}"
+  HARBOR_REGISTRY_ORG="${HP_REGISTRY_PROJECT}"
   IMAGE_REGISTRY_USERNAME="${HP_REGISTRY_USERNAME}"
   IMAGE_REGISTRY_PASSWORD="${HP_REGISTRY_PASSWORD}"
   FTS_ELASTICSEARCH_USERNAME="${LOG_ELASTICSEARCH_USERNAME}"
@@ -6087,6 +6091,7 @@ kickStartUberPipeline() {
   TENANT_DOMAIN="${HP_TENANT}"
   HELIX_PLATFORM_NAMESPACE="${HP_NAMESPACE}"
   HELIX_PLATFORM_CUSTOMER_NAME="${HP_COMPANY_NAME}"
+  HELIX_PLATFORM_DOMAIN="${CLUSTER_DOMAIN}"
 
   kickstartBuildPipelineInputJson
   triggerHelixOnpremPipelineBuild "kickstart discovery"
@@ -6512,7 +6517,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260702-05"
+HITT_BUILD_VERSION="20260702-06"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
