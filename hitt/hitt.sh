@@ -4702,19 +4702,19 @@ getJenkinsPipelineValues() {
   fi
 }
 
-buildJenkinsPipelineFromFile() {
-  if [ ${#PIPELINEARGS[@]} -ne 2 ]; then
-    logError "999" "Usage: bash $0 -k \"build json_values_file\"" 1
+triggerHelixOnpremPipelineBuild() {
+  # Expects PIPELINE_INPUT_JSON (object). Optional $1 = source label for log messages.
+  local source_label="${1:-pipeline values}"
+  local job_name="HELIX_ONPREM_DEPLOYMENT"
+  local pipeline_defaults_json input_version defaults_version http_code override_count
+
+  if [ -z "${PIPELINE_INPUT_JSON}" ]; then
+    logError "999" "No pipeline parameter JSON supplied." 1
   fi
-  JOB_NAME=HELIX_ONPREM_DEPLOYMENT
-  PIPELINE_JSON_FILE="${PIPELINEARGS[1]}"
-  if [ ! -f "${PIPELINE_JSON_FILE}" ]; then
-    logError "999" "HELIX_ONPREM_DEPLOYMENT pipeline values file '${PIPELINE_JSON_FILE}' not found." 1
+  if ! echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} . &>/dev/null; then
+    logError "999" "Pipeline values JSON is not valid." 1
   fi
-  if ! ${JQ_BIN} . "${PIPELINE_JSON_FILE}" &>/dev/null ; then
-    logError "999" "Pipeline values file '${PIPELINE_JSON_FILE}' is not a valid JSON file." 1
-  fi
-  # Load and clean up input JSON
+
   PIPELINE_INPUT_JSON=$(${JQ_BIN} -c '
     del(.CACERTS_FILE, .CUSTOM_CERTIFICATE, .DB_SSL_CERT, .INPUT_CONFIG_FILE) |
     . + {
@@ -4731,37 +4731,57 @@ buildJenkinsPipelineFromFile() {
       "SCALE_DOWN": "false",
       "HELIX_RESTART": "false"
     }
-    ' "${PIPELINE_JSON_FILE}"
+    ' <<< "${PIPELINE_INPUT_JSON}"
   )
-  # Get the defaults for the current pipeline from Jenkins
-  PIPELINE_DEFAULTS_JSON=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
 
-  # Different pipeline version?
-  INPUT_VERSION=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} -r '.PLATFORM_HELM_VERSION')
-  DEFAULTS_VERSION=$(echo "${PIPELINE_DEFAULTS_JSON}" | ${JQ_BIN} -r '.PLATFORM_HELM_VERSION')
-  if [ "${INPUT_VERSION}" != "${DEFAULTS_VERSION}" ]; then
-    PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} --arg inputVersion "${INPUT_VERSION}" -c '
+  pipeline_defaults_json=$(getPipelineDefaults "${job_name}")
+
+  input_version=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} -r '.PLATFORM_HELM_VERSION // empty')
+  defaults_version=$(echo "${pipeline_defaults_json}" | ${JQ_BIN} -r '.PLATFORM_HELM_VERSION // empty')
+  if [ -n "${input_version}" ] && [ "${input_version}" != "${defaults_version}" ]; then
+    PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} --arg inputVersion "${input_version}" -c '
       del(.AGENT, .HELM_NODE, .PLATFORM_HELM_VERSION, .SMARTAPPS_HELM_VERSION) |
       . + {
         "SOURCE_VERSION": $inputVersion
         }')
   fi
 
-  # if target is containerized Jenkins, remove additional params
   if isJenkinsInCluster; then
     PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} -c 'del(.AGENT, .HELM_NODE, .GIT_REPO_DIR, .GIT_USER_HOME_DIR)')
   fi
 
-  # Remove parameters not present in the new pipeline from the input JSON
-  PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} --argjson defaults "${PIPELINE_DEFAULTS_JSON}" -c '
+  PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} --argjson defaults "${pipeline_defaults_json}" -c '
     with_entries(
       select(.key as $k | $defaults | has($k))
     )')
 
-  # Format JSON for Jenkins
+  override_count=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} 'length')
   PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} '. | to_entries | map({name: .key, value: .value}) | {parameter: .}')
-  logMessage "Building HELIX_ONPREM_DEPLOYMENT pipeline with values from '${PIPELINE_JSON_FILE}'."
-  ${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_INPUT_JSON}" -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${JOB_NAME}/build" 2>>${HITT_ERR_FILE}
+  logMessage "Building ${job_name} pipeline with ${override_count} parameter override(s) from ${source_label}."
+  http_code=$(${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_INPUT_JSON}" -b .cookies -sk -w "%{http_code}" -o /dev/null -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${job_name}/build" 2>>${HITT_ERR_FILE})
+  case "${http_code}" in
+    200|201|302)
+      logMessage "Pipeline build queued (HTTP ${http_code}). Open ${JENKINS_LOG_URL:-${JENKINS_URL}}/job/${job_name}/, rebuild the last job, and complete any missing parameter values."
+      ;;
+    *)
+      logError "999" "Failed to queue ${job_name} pipeline build (HTTP ${http_code})." 1
+      ;;
+  esac
+}
+
+buildJenkinsPipelineFromFile() {
+  if [ ${#PIPELINEARGS[@]} -ne 2 ]; then
+    logError "999" "Usage: bash $0 -k \"build json_values_file\"" 1
+  fi
+  PIPELINE_JSON_FILE="${PIPELINEARGS[1]}"
+  if [ ! -f "${PIPELINE_JSON_FILE}" ]; then
+    logError "999" "HELIX_ONPREM_DEPLOYMENT pipeline values file '${PIPELINE_JSON_FILE}' not found." 1
+  fi
+  if ! ${JQ_BIN} . "${PIPELINE_JSON_FILE}" &>/dev/null ; then
+    logError "999" "Pipeline values file '${PIPELINE_JSON_FILE}' is not a valid JSON file." 1
+  fi
+  PIPELINE_INPUT_JSON=$(${JQ_BIN} -c . "${PIPELINE_JSON_FILE}")
+  triggerHelixOnpremPipelineBuild "'${PIPELINE_JSON_FILE}'"
 }
 
 URLEncode() {
@@ -6385,7 +6405,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260702-02"
+HITT_BUILD_VERSION="20260702-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
