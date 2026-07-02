@@ -3311,6 +3311,64 @@ getPipelineDefaults() {
     runJenkinsCurl "${SCRIPT}"
   }
 
+getPipelineSectionParams() {
+  # $1 = Jenkins job name. Returns JSON array of parameter names in the PIPELINES UI section.
+  local job_name="${1:-HELIX_ONPREM_DEPLOYMENT}"
+  SCRIPT="import groovy.json.JsonOutput
+    import jenkins.model.Jenkins
+    import hudson.model.ParametersDefinitionProperty
+    def jobName = '${job_name}'
+    def job = Jenkins.instance.getItemByFullName(jobName)
+    def prop = job.getProperty(ParametersDefinitionProperty)
+    def params = []
+    def inPipelinesSection = false
+    def sectionDone = false
+    if (prop) {
+        prop.parameterDefinitions.each { param ->
+            if (sectionDone) {
+                return
+            }
+            def className = param.getClass().simpleName
+            if (className.contains('ParameterSeparator')) {
+                if (inPipelinesSection) {
+                    sectionDone = true
+                    return
+                }
+                def sectionHeader = param.metaClass.hasProperty(param, 'sectionHeader') ? param.sectionHeader : null
+                if (param.name == 'SEPARATOR_PIPELINES' || sectionHeader == 'PIPELINES') {
+                    inPipelinesSection = true
+                }
+            } else if (inPipelinesSection) {
+                params.add(param.name)
+            }
+        }
+    }
+    println JsonOutput.toJson(params)"
+  runJenkinsCurl "${SCRIPT}"
+}
+
+getPipelineFileParams() {
+  # $1 = Jenkins job name. Returns JSON array of FileParameterDefinition names.
+  local job_name="${1:-HELIX_ONPREM_DEPLOYMENT}"
+  SCRIPT="import groovy.json.JsonOutput
+    import jenkins.model.Jenkins
+    import hudson.model.FileParameterDefinition
+    import hudson.model.ParametersDefinitionProperty
+    def jobName = '${job_name}'
+    def job = Jenkins.instance.getItemByFullName(jobName)
+    def prop = job.getProperty(ParametersDefinitionProperty)
+    def params = []
+    if (prop) {
+        prop.parameterDefinitions.each { param ->
+            if (param instanceof FileParameterDefinition) {
+                params.add(param.name)
+            }
+        }
+    }
+    println JsonOutput.toJson(params)"
+  runJenkinsCurl "${SCRIPT}"
+}
+
 # Old version
 xgetPipelineDefaults() {
   SCRIPT="import groovy.json.JsonOutput
@@ -4706,7 +4764,7 @@ triggerHelixOnpremPipelineBuild() {
   # Expects PIPELINE_INPUT_JSON (object). Optional $1 = source label for log messages.
   local source_label="${1:-pipeline values}"
   local job_name="HELIX_ONPREM_DEPLOYMENT"
-  local pipeline_defaults_json input_version defaults_version http_code override_count
+  local pipeline_defaults_json pipeline_section_params_json pipeline_file_params_json input_version defaults_version http_code override_count
 
   if [ -z "${PIPELINE_INPUT_JSON}" ]; then
     logError "999" "No pipeline parameter JSON supplied." 1
@@ -4715,23 +4773,25 @@ triggerHelixOnpremPipelineBuild() {
     logError "999" "Pipeline values JSON is not valid." 1
   fi
 
-  PIPELINE_INPUT_JSON=$(${JQ_BIN} -c '
-    del(.CACERTS_FILE, .CUSTOM_CERTIFICATE, .DB_SSL_CERT, .INPUT_CONFIG_FILE) |
-    . + {
-      "HELIX_GENERATE_CONFIG": "false",
-      "HELIX_PLATFORM_DEPLOY": "false",
-      "HELIX_NONPLATFORM_DEPLOY": "false",
-      "HELIX_CONFIGURE_ITSM": "false",
-      "HELIX_SMARTAPPS_DEPLOY": "false",
-      "SUPPORT_ASSISTANT_TOOL": "false",
-      "HELIX_INTEROPS_DEPLOY": "false",
-      "HELIX_FULL_STACK_UPGRADE": "false",
-      "HELIX_POST_DEPLOY_CONFIG": "false",
-      "HELIX_DR": "false",
-      "SCALE_DOWN": "false",
-      "HELIX_RESTART": "false"
-    }
-    ' <<< "${PIPELINE_INPUT_JSON}"
+  pipeline_file_params_json=$(getPipelineFileParams "${job_name}")
+  if ! echo "${pipeline_file_params_json}" | ${JQ_BIN} -e 'type == "array"' &>/dev/null; then
+    logError "999" "Unable to discover file parameters from Jenkins job '${job_name}'." 1
+  fi
+  logMessage "Discovered $(echo "${pipeline_file_params_json}" | ${JQ_BIN} 'length') file parameter(s) to exclude from build request." 1
+
+  pipeline_section_params_json=$(getPipelineSectionParams "${job_name}")
+  if ! echo "${pipeline_section_params_json}" | ${JQ_BIN} -e 'type == "array"' &>/dev/null; then
+    logError "999" "Unable to discover PIPELINES section parameters from Jenkins job '${job_name}'." 1
+  fi
+  logMessage "Discovered $(echo "${pipeline_section_params_json}" | ${JQ_BIN} 'length') PIPELINES section parameter(s) from Jenkins." 1
+
+  PIPELINE_INPUT_JSON=$(${JQ_BIN} -c \
+    --argjson file_params "${pipeline_file_params_json}" \
+    --argjson pipeline_params "${pipeline_section_params_json}" \
+    'reduce $file_params[] as $name (.; del(.[$name])) |
+    reduce $pipeline_params[] as $name (.;
+      if has($name) then . else . + {($name): "false"} end
+    )' <<< "${PIPELINE_INPUT_JSON}"
   )
 
   pipeline_defaults_json=$(getPipelineDefaults "${job_name}")
@@ -5945,48 +6005,76 @@ validateDockerIOPat() {
   fi
 }
 
-kickStartUberPipeline() {
-  set -x
-  # Start by setting values we already know
-  [ "${OPENSHIFT}" = "1" ] && KS_OS_RESTRICTED_SCC=true || KS_OS_RESTRICTED_SCC=false
-  KS_CLUSTER_CONTEXT=$(${KUBECTL_BIN} config current-context 2>/dev/null)
-  KS_IS_NAMESPACE="${IS_NAMESPACE}"
-  KS_CUSTOMER_SERVICE="${IS_CUSTOMER_SERVICE}"
-  KS_ENVIRONMENT="${IS_ENVIRONMENT}"
-  KS_INGRESS_CLASS="${HP_INGRESS_CLASS}"
-  KS_APPLICATION_PARENT_DOMAIN="${CLUSTER_DOMAIN}"
-  [ "${HELIX_LOGGING_DEPLOYED}" = "1" ] && KS_SIDECAR_FLUENTBIT=true || KS_SIDECAR_FLUENTBIT=false
-  KS_HARBOR_REGISTRY_HOST="${HP_REGISTRY_SERVER}"
-  KS_HARBOR_REGISTRY_ORG="bmchelix"
-  KS_IMAGE_REGISTRY_USERNAME="${HP_REGISTRY_USERNAME}"
-  KS_IMAGE_REGISTRY_PASSWORD="${HP_REGISTRY_PASSWORD}"
-  KS_IMAGESECRET_NAME="helixregsecret"
-  KS_FTS_ELASTICSEARCH_HOSTNAME="${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
-  KS_FTS_ELASTICSEARCH_PORT=9200
-  KS_FTS_ELASTICSEARCH_USERNAME="${LOG_ELASTICSEARCH_USERNAME}"
-  KS_FTS_ELASTICSEARCH_USER_PASSWORD="${LOG_ELASTICSEARCH_PASSWORD}"
-  KS_FTS_ELASTICSEARCH_SECURE=true
-  KS_RSSO_URL="${RSSO_URL}"
-  KS_RSSO_ADMIN_USER="${RSSO_USERNAME}"
-  KS_RSSO_ADMIN_PASSWORD="${RSSO_PASSWORD}"
-  KS_TENANT_DOMAIN="${HP_TENANT}"
-  KS_HELIX_PLATFORM_DOMAIN="${CLUSTER_DOMAIN}"
-  KS_HELIX_PLATFORM_NAMESPACE="${HP_NAMESPACE}"
-  KS_HELIX_PLATFORM_CUSTOMER_NAME="${HP_COMPANY_NAME}"
-  KS_HELIX_GENERATE_CONFIG=false
-  KS_HELIX_PRE_CHECKER=false
-  KS_HELIX_PLATFORM_DEPLOY=false
-  KS_HELIX_NONPLATFORM_DEPLOY=false
-  KS_HELIX_CONFIGURE_ITSM=false
-  KS_HELIX_SMARTAPPS_DEPLOY=false
-  KS_SUPPORT_ASSISTANT_TOOL=false
-  KS_HELIX_INTEROPS_DEPLOY=false
-  KS_HELIX_FULL_STACK_UPGRADE=false
-  KS_HELIX_POST_DEPLOY_CONFIG=false
-  KS_HELIX_DR=false
-  KS_SCALE_DOWN=false
-  KS_HELIX_RESTART=false
+kickstartBuildPipelineInputJson() {
+  # Build PIPELINE_INPUT_JSON from kickstart vars (name = Jenkins parameter name).
+  local param val
+  local -a kickstart_pipeline_params=(
+    OS_RESTRICTED_SCC
+    CLUSTER_CONTEXT
+    IS_NAMESPACE
+    CUSTOMER_SERVICE
+    ENVIRONMENT
+    INGRESS_CLASS
+    CLUSTER_DOMAIN
+    APPLICATION_PARENT_DOMAIN
+    SIDECAR_FLUENTBIT
+    HARBOR_REGISTRY_HOST
+    IMAGE_REGISTRY_USERNAME
+    IMAGE_REGISTRY_PASSWORD
+    IMAGESECRET_NAME
+    FTS_ELASTICSEARCH_HOSTNAME
+    FTS_ELASTICSEARCH_PORT
+    FTS_ELASTICSEARCH_USERNAME
+    FTS_ELASTICSEARCH_USER_PASSWORD
+    FTS_ELASTICSEARCH_SECURE
+    RSSO_URL
+    RSSO_ADMIN_USER
+    RSSO_ADMIN_PASSWORD
+    TENANT_DOMAIN
+    HELIX_PLATFORM_NAMESPACE
+    HELIX_PLATFORM_CUSTOMER_NAME
+  )
 
+  PIPELINE_INPUT_JSON='{}'
+  for param in "${kickstart_pipeline_params[@]}"; do
+    val="${!param}"
+    if [ -n "${val}" ]; then
+      PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} -c --arg k "${param}" --arg v "${val}" '. + {($k): $v}')
+    fi
+  done
+}
+
+kickStartUberPipeline() {
+  # Values derived from cluster / platform discovery (pre-processing required).
+  [ "${OPENSHIFT}" = "1" ] && OS_RESTRICTED_SCC=true || OS_RESTRICTED_SCC=false
+  CLUSTER_CONTEXT=$(${KUBECTL_BIN} config current-context 2>/dev/null)
+  [ "${HELIX_LOGGING_DEPLOYED}" = "1" ] && SIDECAR_FLUENTBIT=true || SIDECAR_FLUENTBIT=false
+  FTS_ELASTICSEARCH_HOSTNAME="${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
+  FTS_ELASTICSEARCH_PORT=9200
+  FTS_ELASTICSEARCH_SECURE=true
+  IMAGESECRET_NAME="helixregsecret"
+
+  # Pipeline parameter names match Jenkins (from hitt.conf and discovery).
+  IS_NAMESPACE="${IS_NAMESPACE}"
+  CUSTOMER_SERVICE="${IS_CUSTOMER_SERVICE}"
+  ENVIRONMENT="${IS_ENVIRONMENT}"
+  INGRESS_CLASS="${HP_INGRESS_CLASS}"
+  CLUSTER_DOMAIN="${CLUSTER_DOMAIN}"
+  APPLICATION_PARENT_DOMAIN="${CLUSTER_DOMAIN}"
+  HARBOR_REGISTRY_HOST="${HP_REGISTRY_SERVER}"
+  IMAGE_REGISTRY_USERNAME="${HP_REGISTRY_USERNAME}"
+  IMAGE_REGISTRY_PASSWORD="${HP_REGISTRY_PASSWORD}"
+  FTS_ELASTICSEARCH_USERNAME="${LOG_ELASTICSEARCH_USERNAME}"
+  FTS_ELASTICSEARCH_USER_PASSWORD="${LOG_ELASTICSEARCH_PASSWORD}"
+  RSSO_URL="${RSSO_URL}"
+  RSSO_ADMIN_USER="${RSSO_USERNAME}"
+  RSSO_ADMIN_PASSWORD="${RSSO_PASSWORD}"
+  TENANT_DOMAIN="${HP_TENANT}"
+  HELIX_PLATFORM_NAMESPACE="${HP_NAMESPACE}"
+  HELIX_PLATFORM_CUSTOMER_NAME="${HP_COMPANY_NAME}"
+
+  kickstartBuildPipelineInputJson
+  triggerHelixOnpremPipelineBuild "kickstart discovery"
 }
 
 
@@ -6405,7 +6493,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260702-03"
+HITT_BUILD_VERSION="20260702-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
