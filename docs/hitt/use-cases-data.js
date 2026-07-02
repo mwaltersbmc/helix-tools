@@ -349,7 +349,7 @@ window.HITT_USE_CASES = {
         "Outputs JSON to the console unless you pass a filename as the last argument.",
         "Requires Jenkins in hitt.conf and working credentials."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#pipeline-mode"
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
     {
       "id": "pipeline-build",
@@ -361,9 +361,9 @@ window.HITT_USE_CASES = {
       ],
       "notes": [
         "After this, open HELIX_ONPREM_DEPLOYMENT in Jenkins, rebuild the last job, and review parameters (README warns the generated build is expected to fail until you adjust values).",
-        "PRODUCT sub-pipelines are forced off so a full deploy does not start from this step alone."
+        "PIPELINES section booleans are forced off unless already in your JSON; file upload parameters are stripped automatically."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#pipeline-mode"
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
     {
       "id": "pipeline-console",
@@ -376,7 +376,7 @@ window.HITT_USE_CASES = {
       "notes": [
         "PIPELINE_NAME is the Jenkins job name as shown in the URL (underscores)."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#display-jenkins-pipeline-console-output"
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
     {
       "id": "utility-dbid",
@@ -470,7 +470,6 @@ window.HITT_USE_CASES = {
       ],
       "notes": [
         "Prints Kubernetes/OpenShift version and a node summary table: allocatable CPU/memory, allocated pod resource requests, actual usage percentages (when metrics-server is available), node health/conditions, pod run/bad/crash counts, OOM kills, and container runtime.",
-        "Use double quotes when -m has multiple words: bash hitt.sh -m \"info cluster\" (not bash hitt.sh -m info cluster).",
         "Info mode is under development; use bash hitt.sh -m \"info help\" or README-info-mode.md for full environment summary (info full) and other options."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"

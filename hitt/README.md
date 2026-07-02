@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260702-04`**
+**Latest build `20260702-05`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -22,16 +22,17 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [Proxy Support](#proxy-support)
 - [Running HITT](#running-hitt)
 - [Log Files](#log-files)
-- [Pipeline Mode](#pipeline-mode)
+- [Pipeline Mode](README-pipeline-mode.md)
 - [tctl Mode](#tctl-mode)
 - [Bundle Deployment Status](#get-is-bundle-deployment-status)
 - [Advanced CLI Options](#advanced-cli-options)
 - [Build version (developers)](#build-version-developers-git-clone-only)
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, Jenkins, license, …)
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `gendbid`)
+- [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` for **HELIX_ONPREM_DEPLOYMENT**
 - [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info ingress`, `info full`
 
-Built-in summaries: `bash hitt.sh -f help`, `bash hitt.sh -u help`, and `bash hitt.sh -m "info help"`.
+Built-in summaries: `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, and `bash hitt.sh -m "info help"`.
 
 **Info ingress** (`bash hitt.sh -m "info ingress"`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires `hitt.conf` and Platform namespace access. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
 
@@ -166,37 +167,17 @@ Quiet mode `-q` only prints the summary messages.
 
 ### Pipeline Mode ###
 
-There are two pipeline mode options - `get` and `build` - which are intended to help migrate pipeline values between different Jenkins systems, such as switching from a local server to the container based Jenkins that was introduced in the 26.1.01 release.
+Pipeline mode (`-k`) exports and submits **`HELIX_ONPREM_DEPLOYMENT`** parameters on the Jenkins in **`hitt.conf`**: **`get`** (export JSON), **`build`** (queue from file), and **`kickstart`** (prefill from Helix Platform / cluster discovery).
 
-`get` - Fetches and displays the HELIX_ONPREM_DEPLOYMENT pipeline values from different builds:
-
-| Option       | Output
-|------------|-----------------------------------------------------------------------------|
-| `get defaults `  | The default values of the pipeline.                     |
-| `get last`  | Values from the last build of the pipeline regardless of whether it succeeded or not.              |
-| `get lastsuccessful`   | Values from the last successful build of the pipeline. |
-| `get N`  | Values from numbered build.               |
-
-The values are output to the console in JSON format unless you provide a filename to save them to.
+See **[README-pipeline-mode.md](README-pipeline-mode.md)** for requirements, quoting, the rebuild-in-Jenkins workflow, and what the build trigger applies automatically.
 
 ```bash
-bash hitt.sh -k "get <defaults|last|lastsuccessful|N> [filename]"
-# Examples:
-bash hitt.sh -k "get defaults"
-bash hitt.sh -k "get 7 values.json"
-```
-
-You can use the saved values file to populate the pipeline on another Jenkins system.  You will need to create a new hitt configuration file for the target Jenkins - either by using the `-c` option or by copying the hitt script and saved values file to a new directory.  Run hitt and provide the new Jenkins details and then use the `build` option to use the values to start a new build of the HELIX_ONPREM_DEPLOYMENT pipeline.
-
-`build` - Starts a new build of the HELIX_ONPREM_DEPLOYMENT pipeline using the values from a file created with the `get` option. The build is expected to fail as only non-default values are included in the input file.  Also, all the PRODUCT sub-pipeline selection options are set to `false` to prevent a deployment from starting.  This is to allow you to rebuild the failed job and update values.
-
-> **After using the `build` option, select the HELIX_ONPREM_DEPLOYMENT pipeline in the target Jenkins and rebuild the last job.  Review the values carefully and update them as required.**
-
-```bash
-bash hitt.sh -k "build json_values_file"
-# Example:
+bash hitt.sh -k "get lastsuccessful values.json"
 bash hitt.sh -k "build values.json"
+bash hitt.sh -k kickstart
 ```
+
+Use **`-o PIPELINE_NAME`** for the latest Jenkins console log (documented in [README-pipeline-mode.md](README-pipeline-mode.md#commands)).
 
 ### tctl Mode ###
 

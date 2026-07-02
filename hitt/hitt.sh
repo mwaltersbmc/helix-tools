@@ -4698,6 +4698,21 @@ showUtilHelp() { # utility mode help
     "
 }
 
+showPipelineHelp() { # pipeline mode help
+  echo "HITT pipeline mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
+  echo .
+  echo 'Usage: bash hitt.sh -k "<command> [options]"'
+  echo "Multi-word -k values must be double-quoted (e.g. bash hitt.sh -k \"get lastsuccessful\")."
+  echo -e "
+    \tget \t\t| Save HELIX_ONPREM_DEPLOYMENT parameter values (defaults, last, lastsuccessful, or build number). Optional filename to save to.
+    \tbuild \t\t| Start a new pipeline run from a settings file created with get.
+    \tkickstart \t| Fill parameters from Helix Platform / cluster and start a new run (fresh deployment).
+    \thelp \t\t| Show this list.
+    "
+  echo "After build or kickstart, rebuild the job in the Deployment Engine and complete any missing values."
+  echo "Console log for a job: bash hitt.sh -o PIPELINE_NAME (e.g. helix_onprem_deployment)."
+}
+
 showInfoHelp() { # info mode help
   echo "HITT info mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
   echo .
@@ -6274,6 +6289,10 @@ fi
 
 if [ "${MODE}" == "pipeline" ]; then
   read -r -a PIPELINEARGS <<< "${PIPELINEOPTS}"
+  if [ "${PIPELINEARGS[0]}" == "help" ]; then
+    showPipelineHelp
+    exit
+  fi
   logStatus "Running HITT in pipeline mode '${PIPELINEARGS[0]}'..."
   checkJenkinsIsRunning 1
   case "${PIPELINEARGS[0]}" in
@@ -6295,7 +6314,7 @@ if [ "${MODE}" == "pipeline" ]; then
       kickStartUberPipeline
       ;;
     *)
-    logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option." 1
+    logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option (try: get, build, kickstart, help)." 1
     ;;
   esac
   exit
@@ -6493,7 +6512,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260702-04"
+HITT_BUILD_VERSION="20260702-05"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

@@ -348,7 +348,7 @@
         "Outputs JSON to the console unless you pass a filename as the last argument.",
         "Requires Jenkins in hitt.conf and working credentials."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#pipeline-mode"
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
     {
       "id": "pipeline-build",
@@ -360,9 +360,9 @@
       ],
       "notes": [
         "After this, open HELIX_ONPREM_DEPLOYMENT in Jenkins, rebuild the last job, and review parameters (README warns the generated build is expected to fail until you adjust values).",
-        "PRODUCT sub-pipelines are forced off so a full deploy does not start from this step alone."
+        "PIPELINES section booleans are forced off unless already in your JSON; file upload parameters are stripped automatically."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#pipeline-mode"
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
     {
       "id": "pipeline-console",
@@ -375,7 +375,7 @@
       "notes": [
         "PIPELINE_NAME is the Jenkins job name as shown in the URL (underscores)."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#display-jenkins-pipeline-console-output"
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
     {
       "id": "utility-dbid",

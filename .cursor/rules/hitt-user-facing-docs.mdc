@@ -1,0 +1,59 @@
+---
+description: Write HITT READMEs and use cases in plain language for non-technical users
+globs: hitt/README*.md,docs/hitt/use-cases.json
+alwaysApply: false
+---
+
+# HITT user-facing documentation
+
+Applies when editing **README files** under `hitt/` and **`docs/hitt/use-cases.json`**.
+
+Audience: Helix administrators and operators with **minimal technical skills**. Write for someone who runs commands from a guide but does not read shell scripts or source code.
+
+## Language
+
+- Use **plain, direct English**. Short sentences. Active voice.
+- Explain **what to do**, **what happens**, and **what to do next** — not how HITT implements it.
+- Prefer product terms users see in Jenkins and the UI: **HELIX_ONPREM_DEPLOYMENT**, **Helix Platform**, **Deployment Engine**, **rebuild the job**, **parameter values**.
+- Avoid jargon where a simpler phrase works: say “saved settings file” before “JSON values file” if both are clear; define acronyms on first use.
+
+## Do not include (unless explicitly developer docs)
+
+- **Function or symbol names** from `hitt.sh` (e.g. `triggerHelixOnpremPipelineBuild`, `getPipelineSectionParams`, `PIPELINE_INPUT_JSON`).
+- **Implementation details**: Groovy script console, jq filters, HTTP status codes, crumb/cookie handling, internal variable names.
+- **Source file paths** (`hitt/hitt.sh`, `.cursor/`, `.githooks/`) except **`hitt.conf`** when the user must create or edit it.
+- **“Under the hood”** lists of automatic steps — summarize the **user-visible outcome** in one or two sentences instead.
+
+## OK to include
+
+- **Commands** the user must run (`bash hitt.sh -k "get lastsuccessful"`).
+- **`hitt.conf`** and **kubeconfig** when setup requires them.
+- **Jenkins job names** and **pipeline parameter names** when the user must fill or review them in Jenkins.
+- **Links** to other README mode docs or https://bit.ly/hitthelp when pointing to more help.
+- **`seeAlso` URLs** in use cases (required for the help site).
+
+## Use case notes (`use-cases.json`)
+
+- **Title**: “I want to …” in everyday language.
+- **Notes**: 1–3 bullets — prerequisites, expected result, next step in Jenkins or HITT. No code architecture.
+- **Commands**: exact quoted CLI only; no explanation of internal functions.
+
+## Examples
+
+```markdown
+# ❌ BAD
+`build` calls `triggerHelixOnpremPipelineBuild`, which runs `getPipelineFileParams` and strips keys from `PIPELINE_INPUT_JSON`.
+
+# ✅ GOOD
+When you use **build**, HITT sends your saved settings to Jenkins but leaves out file uploads (those must be added in Jenkins). All **Pipelines** checkboxes are turned off so a full deployment does not start until you review the job.
+```
+
+```markdown
+# ❌ BAD
+Requires `checkJenkinsIsRunning` and a valid `Jenkins-Crumb`.
+
+# ✅ GOOD
+Requires Jenkins details in **hitt.conf** and a working login to the Deployment Engine.
+```
+
+When updating existing docs, rewrite technical passages to match this style; do not add new internal references.
