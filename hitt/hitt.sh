@@ -6021,79 +6021,152 @@ validateDockerIOPat() {
   fi
 }
 
-kickstartBuildPipelineInputJson() {
-  # Build PIPELINE_INPUT_JSON from kickstart vars (name = Jenkins parameter name).
-  local param val
-  local -a kickstart_pipeline_params=(
-    OS_RESTRICTED_SCC
-    CLUSTER_CONTEXT
-    IS_NAMESPACE
-    CUSTOMER_SERVICE
-    ENVIRONMENT
-    INGRESS_CLASS
-    CLUSTER_DOMAIN
-    APPLICATION_PARENT_DOMAIN
-    SIDECAR_FLUENTBIT
-    HARBOR_REGISTRY_HOST
-    HARBOR_REGISTRY_ORG
-    IMAGE_REGISTRY_USERNAME
-    IMAGE_REGISTRY_PASSWORD
-    IMAGESECRET_NAME
-    FTS_ELASTICSEARCH_HOSTNAME
-    FTS_ELASTICSEARCH_PORT
-    FTS_ELASTICSEARCH_USERNAME
-    FTS_ELASTICSEARCH_USER_PASSWORD
-    FTS_ELASTICSEARCH_SECURE
-    RSSO_URL
-    RSSO_ADMIN_USER
-    RSSO_ADMIN_PASSWORD
-    TENANT_DOMAIN
-    HELIX_PLATFORM_NAMESPACE
-    HELIX_PLATFORM_DOMAIN
-    HELIX_PLATFORM_CUSTOMER_NAME
-  )
+kickstartManifestIdFromPlatformVersion() {
+  # $1 = PLATFORM_HELM_VERSION from Jenkins (e.g. 2026201.1.00.00) -> manifest id (e.g. 26201)
+  local platform_helm_version="$1"
+  local major="${platform_helm_version%%.*}"
+  case "${major}" in
+    2026201)
+      echo 26201
+      ;;
+    *)
+      logError "999" "No kickstart manifest for PLATFORM_HELM_VERSION '${platform_helm_version}'. Add a KICKSTART_MANIFEST_<id> block in hitt.sh for this release." 1
+      ;;
+  esac
+}
 
-  PIPELINE_INPUT_JSON='{}'
-  for param in "${kickstart_pipeline_params[@]}"; do
-    val="${!param}"
-    if [ -n "${val}" ]; then
-      PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} -c --arg k "${param}" --arg v "${val}" '. + {($k): $v}')
+kickstartGetManifestJson() {
+  # $1 = manifest id (e.g. 26201). Prints manifest JSON array to stdout.
+  case "${1}" in
+    26201)
+      kickstartManifestJson26201
+      ;;
+    *)
+      logError "999" "Unknown kickstart manifest id '${1}'." 1
+      ;;
+  esac
+}
+
+kickstartManifestJson26201() {
+  cat <<'EOF'
+[
+  { "param": "OS_RESTRICTED_SCC", "source": { "type": "handler", "name": "openshift_scc" } },
+  { "param": "CLUSTER_CONTEXT", "source": { "type": "handler", "name": "cluster_context" } },
+  { "param": "IS_NAMESPACE", "source": { "type": "var", "key": "IS_NAMESPACE" } },
+  { "param": "CUSTOMER_SERVICE", "source": { "type": "var", "key": "IS_CUSTOMER_SERVICE" } },
+  { "param": "ENVIRONMENT", "source": { "type": "var", "key": "IS_ENVIRONMENT" } },
+  { "param": "INGRESS_CLASS", "source": { "type": "var", "key": "HP_INGRESS_CLASS" } },
+  { "param": "CLUSTER_DOMAIN", "source": { "type": "var", "key": "CLUSTER_DOMAIN" } },
+  { "param": "APPLICATION_PARENT_DOMAIN", "source": { "type": "var", "key": "CLUSTER_DOMAIN" } },
+  { "param": "SIDECAR_FLUENTBIT", "source": { "type": "handler", "name": "sidecar_fluentbit" } },
+  { "param": "HARBOR_REGISTRY_HOST", "source": { "type": "var", "key": "HP_REGISTRY_SERVER" } },
+  { "param": "HARBOR_REGISTRY_ORG", "source": { "type": "var", "key": "HP_REGISTRY_PROJECT" } },
+  { "param": "IMAGE_REGISTRY_USERNAME", "source": { "type": "var", "key": "HP_REGISTRY_USERNAME" } },
+  { "param": "IMAGE_REGISTRY_PASSWORD", "source": { "type": "var", "key": "HP_REGISTRY_PASSWORD" } },
+  { "param": "IMAGESECRET_NAME", "source": { "type": "literal", "value": "helixregsecret" } },
+  { "param": "FTS_ELASTICSEARCH_HOSTNAME", "source": { "type": "handler", "name": "fts_hostname" } },
+  { "param": "FTS_ELASTICSEARCH_PORT", "source": { "type": "literal", "value": "9200" } },
+  { "param": "FTS_ELASTICSEARCH_USERNAME", "source": { "type": "var", "key": "LOG_ELASTICSEARCH_USERNAME" } },
+  { "param": "FTS_ELASTICSEARCH_USER_PASSWORD", "source": { "type": "var", "key": "LOG_ELASTICSEARCH_PASSWORD" } },
+  { "param": "FTS_ELASTICSEARCH_SECURE", "source": { "type": "literal", "value": "true" } },
+  { "param": "RSSO_URL", "source": { "type": "var", "key": "RSSO_URL" } },
+  { "param": "RSSO_ADMIN_USER", "source": { "type": "var", "key": "RSSO_USERNAME" } },
+  { "param": "RSSO_ADMIN_PASSWORD", "source": { "type": "var", "key": "RSSO_PASSWORD" } },
+  { "param": "TENANT_DOMAIN", "source": { "type": "var", "key": "HP_TENANT" } },
+  { "param": "HELIX_PLATFORM_NAMESPACE", "source": { "type": "var", "key": "HP_NAMESPACE" } },
+  { "param": "HELIX_PLATFORM_DOMAIN", "source": { "type": "var", "key": "CLUSTER_DOMAIN" } },
+  { "param": "HELIX_PLATFORM_CUSTOMER_NAME", "source": { "type": "var", "key": "HP_COMPANY_NAME" } }
+]
+EOF
+}
+
+kickstartResolveHandler() {
+  case "${1}" in
+    openshift_scc)
+      [ "${OPENSHIFT}" = "1" ] && echo true || echo false
+      ;;
+    cluster_context)
+      ${KUBECTL_BIN} config current-context 2>/dev/null
+      ;;
+    sidecar_fluentbit)
+      [ "${HELIX_LOGGING_DEPLOYED}" = "1" ] && echo true || echo false
+      ;;
+    fts_hostname)
+      echo "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
+      ;;
+    *)
+      logError "999" "Unknown kickstart handler '${1}'." 1
+      ;;
+  esac
+}
+
+kickstartResolveSource() {
+  # $1 = source object JSON from manifest row
+  local source_type source_key handler_name
+  source_type=$(${JQ_BIN} -r '.type' <<< "${1}")
+  case "${source_type}" in
+    var)
+      source_key=$(${JQ_BIN} -r '.key' <<< "${1}")
+      echo "${!source_key}"
+      ;;
+    literal)
+      ${JQ_BIN} -r '.value' <<< "${1}"
+      ;;
+    handler)
+      handler_name=$(${JQ_BIN} -r '.name' <<< "${1}")
+      kickstartResolveHandler "${handler_name}"
+      ;;
+    *)
+      logError "999" "Unknown kickstart source type '${source_type}'." 1
+      ;;
+  esac
+}
+
+kickstartAddOverride() {
+  # $1 = Jenkins param name, $2 = value. Updates KICKSTART_OVERRIDES_JSON.
+  [ -z "${2}" ] && return 0
+  KICKSTART_OVERRIDES_JSON=$(${JQ_BIN} -c --arg k "${1}" --arg v "${2}" '. + {($k): $v}' <<< "${KICKSTART_OVERRIDES_JSON}")
+}
+
+kickstartResolveManifest() {
+  local manifest_id manifest_json manifest_row param source_json value pipeline_defaults_json platform_helm_version resolved_count skipped_count
+  pipeline_defaults_json=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
+  platform_helm_version=$(${JQ_BIN} -r '.PLATFORM_HELM_VERSION // empty' <<< "${pipeline_defaults_json}")
+  if [ -z "${platform_helm_version}" ]; then
+    logError "999" "Unable to read PLATFORM_HELM_VERSION from HELIX_ONPREM_DEPLOYMENT pipeline defaults." 1
+  fi
+  if [ -n "${HITT_KICKSTART_MANIFEST_ID}" ]; then
+    manifest_id="${HITT_KICKSTART_MANIFEST_ID}"
+    logMessage "Using kickstart manifest id '${manifest_id}' (HITT_KICKSTART_MANIFEST_ID override)." 1
+  else
+    manifest_id=$(kickstartManifestIdFromPlatformVersion "${platform_helm_version}")
+  fi
+  manifest_json=$(kickstartGetManifestJson "${manifest_id}")
+  if ! ${JQ_BIN} -e 'type == "array"' <<< "${manifest_json}" &>/dev/null; then
+    logError "999" "Kickstart manifest '${manifest_id}' must be a JSON array." 1
+  fi
+  KICKSTART_OVERRIDES_JSON='{}'
+  resolved_count=0
+  skipped_count=0
+  while IFS= read -r manifest_row; do
+    param=$(${JQ_BIN} -r '.param' <<< "${manifest_row}")
+    if ! ${JQ_BIN} -e --arg p "${param}" 'has($p)' <<< "${pipeline_defaults_json}" &>/dev/null; then
+      skipped_count=$((skipped_count + 1))
+      continue
     fi
-  done
+    source_json=$(${JQ_BIN} -c '.source' <<< "${manifest_row}")
+    value=$(kickstartResolveSource "${source_json}")
+    if [ -n "${value}" ]; then
+      kickstartAddOverride "${param}" "${value}"
+      resolved_count=$((resolved_count + 1))
+    fi
+  done < <(${JQ_BIN} -c '.[]' <<< "${manifest_json}")
+  logMessage "Kickstart manifest ${manifest_id} (pipeline ${platform_helm_version}): ${resolved_count} parameter override(s) (${skipped_count} skipped — not on this job)." 1
 }
 
 kickStartUberPipeline() {
-  # Values derived from cluster / platform discovery (pre-processing required).
-  [ "${OPENSHIFT}" = "1" ] && OS_RESTRICTED_SCC=true || OS_RESTRICTED_SCC=false
-  CLUSTER_CONTEXT=$(${KUBECTL_BIN} config current-context 2>/dev/null)
-  [ "${HELIX_LOGGING_DEPLOYED}" = "1" ] && SIDECAR_FLUENTBIT=true || SIDECAR_FLUENTBIT=false
-  FTS_ELASTICSEARCH_HOSTNAME="${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
-  FTS_ELASTICSEARCH_PORT=9200
-  FTS_ELASTICSEARCH_SECURE=true
-  IMAGESECRET_NAME="helixregsecret"
-
-  # Pipeline parameter names match Jenkins (from hitt.conf and discovery).
-  IS_NAMESPACE="${IS_NAMESPACE}"
-  CUSTOMER_SERVICE="${IS_CUSTOMER_SERVICE}"
-  ENVIRONMENT="${IS_ENVIRONMENT}"
-  INGRESS_CLASS="${HP_INGRESS_CLASS}"
-  CLUSTER_DOMAIN="${CLUSTER_DOMAIN}"
-  APPLICATION_PARENT_DOMAIN="${CLUSTER_DOMAIN}"
-  HARBOR_REGISTRY_HOST="${HP_REGISTRY_SERVER}"
-  HARBOR_REGISTRY_ORG="${HP_REGISTRY_PROJECT}"
-  IMAGE_REGISTRY_USERNAME="${HP_REGISTRY_USERNAME}"
-  IMAGE_REGISTRY_PASSWORD="${HP_REGISTRY_PASSWORD}"
-  FTS_ELASTICSEARCH_USERNAME="${LOG_ELASTICSEARCH_USERNAME}"
-  FTS_ELASTICSEARCH_USER_PASSWORD="${LOG_ELASTICSEARCH_PASSWORD}"
-  RSSO_URL="${RSSO_URL}"
-  RSSO_ADMIN_USER="${RSSO_USERNAME}"
-  RSSO_ADMIN_PASSWORD="${RSSO_PASSWORD}"
-  TENANT_DOMAIN="${HP_TENANT}"
-  HELIX_PLATFORM_NAMESPACE="${HP_NAMESPACE}"
-  HELIX_PLATFORM_CUSTOMER_NAME="${HP_COMPANY_NAME}"
-  HELIX_PLATFORM_DOMAIN="${CLUSTER_DOMAIN}"
-
-  kickstartBuildPipelineInputJson
+  kickstartResolveManifest
+  PIPELINE_INPUT_JSON="${KICKSTART_OVERRIDES_JSON}"
   triggerHelixOnpremPipelineBuild "kickstart discovery"
 }
 
@@ -6517,7 +6590,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260702-06"
+HITT_BUILD_VERSION="20260702-07"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
