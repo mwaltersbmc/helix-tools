@@ -5919,6 +5919,51 @@ validateDockerIOPat() {
   fi
 }
 
+kickStartUberPipeline() {
+  set -x
+  # Start by setting values we already know
+  [ "${OPENSHIFT}" = "1" ] && KS_OS_RESTRICTED_SCC=true || KS_OS_RESTRICTED_SCC=false
+  KS_CLUSTER_CONTEXT=$(${KUBECTL_BIN} config current-context 2>/dev/null)
+  KS_IS_NAMESPACE="${IS_NAMESPACE}"
+  KS_CUSTOMER_SERVICE="${IS_CUSTOMER_SERVICE}"
+  KS_ENVIRONMENT="${IS_ENVIRONMENT}"
+  KS_INGRESS_CLASS="${HP_INGRESS_CLASS}"
+  KS_APPLICATION_PARENT_DOMAIN="${CLUSTER_DOMAIN}"
+  [ "${HELIX_LOGGING_DEPLOYED}" = "1" ] && KS_SIDECAR_FLUENTBIT=true || KS_SIDECAR_FLUENTBIT=false
+  KS_HARBOR_REGISTRY_HOST="${HP_REGISTRY_SERVER}"
+  KS_HARBOR_REGISTRY_ORG="bmchelix"
+  KS_IMAGE_REGISTRY_USERNAME="${HP_REGISTRY_USERNAME}"
+  KS_IMAGE_REGISTRY_PASSWORD="${HP_REGISTRY_PASSWORD}"
+  KS_IMAGESECRET_NAME="helixregsecret"
+  KS_FTS_ELASTICSEARCH_HOSTNAME="${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
+  KS_FTS_ELASTICSEARCH_PORT=9200
+  KS_FTS_ELASTICSEARCH_USERNAME="${LOG_ELASTICSEARCH_USERNAME}"
+  KS_FTS_ELASTICSEARCH_USER_PASSWORD="${LOG_ELASTICSEARCH_PASSWORD}"
+  KS_FTS_ELASTICSEARCH_SECURE=true
+  KS_RSSO_URL="${RSSO_URL}"
+  KS_RSSO_ADMIN_USER="${RSSO_USERNAME}"
+  KS_RSSO_ADMIN_PASSWORD="${RSSO_PASSWORD}"
+  KS_TENANT_DOMAIN="${HP_TENANT}"
+  KS_HELIX_PLATFORM_DOMAIN="${CLUSTER_DOMAIN}"
+  KS_HELIX_PLATFORM_NAMESPACE="${HP_NAMESPACE}"
+  KS_HELIX_PLATFORM_CUSTOMER_NAME="${HP_COMPANY_NAME}"
+  KS_HELIX_GENERATE_CONFIG=false
+  KS_HELIX_PRE_CHECKER=false
+  KS_HELIX_PLATFORM_DEPLOY=false
+  KS_HELIX_NONPLATFORM_DEPLOY=false
+  KS_HELIX_CONFIGURE_ITSM=false
+  KS_HELIX_SMARTAPPS_DEPLOY=false
+  KS_SUPPORT_ASSISTANT_TOOL=false
+  KS_HELIX_INTEROPS_DEPLOY=false
+  KS_HELIX_FULL_STACK_UPGRADE=false
+  KS_HELIX_POST_DEPLOY_CONFIG=false
+  KS_HELIX_DR=false
+  KS_SCALE_DOWN=false
+  KS_HELIX_RESTART=false
+
+}
+
+
 #End functions
 
 # MAIN Start
@@ -6124,6 +6169,17 @@ if [ "${MODE}" == "pipeline" ]; then
     build)
       buildJenkinsPipelineFromFile
       ;;
+    kickstart)
+      checkToolVersion kubectl
+      getVersions
+      setVarsFromPlatform
+      getDomain
+      getRSSODetails
+      getTenantDetails
+      checkHelixLoggingDeployed
+      getRegistryDetailsFromHP
+      kickStartUberPipeline
+      ;;
     *)
     logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option." 1
     ;;
@@ -6323,7 +6379,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260701-07"
+HITT_BUILD_VERSION="20260702-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
