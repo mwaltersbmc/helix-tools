@@ -151,10 +151,16 @@ getConfValues() {
   fi
   logMessage "Jenkins server - ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
 
-  logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
-  read -p "Username : " JENKINS_USERNAME
-  read -r -s -p "Password : " JENKINS_PASSWORD
-
+  if isJenkinsInCluster ; then
+    JENKINS_CREDS_JSON=$(${KUBECTL_BIN} -n "${CDE_NAMESPACE}" get secret jenkins-master-admin -o jsonpath='{.data}')
+    JENKINS_USERNAME=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} '.username | @base64d')
+    JENKINS_PASSWORD=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} '.password | @base64d')
+    logMessage "Auto configured Jenkins credentials."
+  else
+    logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
+    read -p "Username : " JENKINS_USERNAME
+    read -r -s -p "Password : " JENKINS_PASSWORD
+  fi
 }
 
 createHITTconf() {
@@ -6379,7 +6385,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260702-01"
+HITT_BUILD_VERSION="20260702-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
