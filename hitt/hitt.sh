@@ -125,6 +125,7 @@ getConfValues() {
     JENKINS_CDE_VERSION=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[0].version')
     echo
     logStatus "Jenkins CDE version: ${JENKINS_CDE_VERSION}"
+    K8S_JENKINS=1
     mapfile -t JENKINS_EP_ARRAY < <(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[] | "\(.host) on port \(.port) (via \(.type))"')
     if [ ${#JENKINS_EP_ARRAY[@]} -eq 1 ]; then
       JENKINS_HOSTNAME=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[0].host')
@@ -153,8 +154,8 @@ getConfValues() {
 
   if isJenkinsInCluster ; then
     JENKINS_CREDS_JSON=$(${KUBECTL_BIN} -n "${CDE_NAMESPACE}" get secret jenkins-master-admin -o jsonpath='{.data}')
-    JENKINS_USERNAME=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} '.username | @base64d')
-    JENKINS_PASSWORD=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} '.password | @base64d')
+    JENKINS_USERNAME=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} -r '.username | @base64d')
+    JENKINS_PASSWORD=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} -r '.password | @base64d')
     logMessage "Auto configured Jenkins credentials."
   else
     logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
@@ -6588,7 +6589,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260703-01"
+HITT_BUILD_VERSION="20260703-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -6625,7 +6626,9 @@ RED=$'\e[31m'
 YELLOW=$'\e[33m'
 GREEN=$'\e[32m'
 SEALTCTL=sealtctl
+# tmp set as used before processing config on initial setup
 KUBECTL_BIN=kubectl
+CURL_BIN=curl
 JQ_BIN=jq
 ERROR_ARRAY=()
 WARN_ARRAY=()
