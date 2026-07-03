@@ -6441,7 +6441,6 @@ if [ "${MODE}" == "info" ]; then
     cluster)
       QUIET=1
       logStatus "Gathering cluster information..." 1
-      getVersions
       getK8sNodeDetails
       hittInfoPrintKv "Kubernetes version" "${K8S_VERSION:-unknown}"
       hittInfoPrintKv "OpenShift version" "${OPENSHIFT_VERSION:-n/a}"
@@ -6451,10 +6450,9 @@ if [ "${MODE}" == "info" ]; then
     ingress)
       QUIET=1
       logStatus "Gathering ingress information..." 1
-      getVersions
-      setVarsFromPlatform
       if checkK8sAuth get ingressclasses; then
         INGRESS_CLASSES=$(${KUBECTL_BIN} get ingressclasses)
+        HP_INGRESS_CLASS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helixingress-master -o jsonpath='{.spec.ingressClassName}')
         discoverIngressControllerDetails "${HP_INGRESS_CLASS}"
       fi
       hittInfoPrintSection "Ingress controller"
@@ -6590,7 +6588,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260702-07"
+HITT_BUILD_VERSION="20260703-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
