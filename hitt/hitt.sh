@@ -1471,6 +1471,7 @@ getPipelineValues() {
     IS_GIT_USER_HOME_DIR="/home/jenkins"
     #IS_GIT_REPO_DIR="http://gitea:3000/ciadmin"
     IS_HELM_NODE="jenkins-agent"
+    IS_REGISTRY_TYPE="DTR"
   fi
 
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
@@ -1578,14 +1579,14 @@ cloneGitRepos() {
       SKIP_REPO=1
       return
     fi
-    if ! ${GIT_BIN} clone "${GITEA_URL}/${GITEA_ADMIN_USER}/onprem-remedyserver-config" configsrepo > /dev/null 2>&1 ; then
+    if ! ${GIT_BIN} -c http.sslVerify=false clone "${GITEA_URL}/${GITEA_ADMIN_USER}/onprem-remedyserver-config" configsrepo > /dev/null 2>&1 ; then
       logError "129" "Failed to clone CUSTOMER_CONFIGS from GITEA."
       SKIP_REPO=1
       return
     else
       logMessage "Cloned CUSTOMER_CONFIGS to configsrepo directory." 1
     fi
-    if ! ${GIT_BIN} clone "${GITEA_URL}/${GITEA_ADMIN_USER}/itsm-on-premise-installer" itsmrepo > /dev/null 2>&1 ; then
+    if ! ${GIT_BIN} -c http.sslVerify=false clone "${GITEA_URL}/${GITEA_ADMIN_USER}/itsm-on-premise-installer" itsmrepo > /dev/null 2>&1 ; then
       logError "129" "Failed to clone ITSM_REPO from GITEA."
       SKIP_REPO=1
       return
@@ -1648,7 +1649,7 @@ cloneCustomerConfigsRepo() {
       SKIP_REPO=1
       return
     fi
-    if ! ${GIT_BIN} clone "${GITEA_URL}/${GITEA_ADMIN_USER}/onprem-remedyserver-config" configsrepo > /dev/null 2>&1 ; then
+    if ! ${GIT_BIN} -c http.sslVerify=false clone "${GITEA_URL}/${GITEA_ADMIN_USER}/onprem-remedyserver-config" configsrepo > /dev/null 2>&1 ; then
       logError "129" "Failed to clone CUSTOMER_CONFIGS from GITEA."
       SKIP_REPO=1
       return
@@ -6702,7 +6703,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260706-04"
+HITT_BUILD_VERSION="20260706-05"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
