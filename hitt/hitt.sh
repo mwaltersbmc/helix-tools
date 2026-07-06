@@ -613,6 +613,7 @@ setVarsFromPlatform() {
   if compare "${HP_VERSION%.*} >= 24.2" ; then
     HP_COMPANY_NAME_LABEL="TENANT_NAME"
   fi
+  HP_COMPANY_NAME=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.infra_config' | grep "^${HP_COMPANY_NAME_LABEL}" | cut -d '=' -f2)
 
   if [ "${HP_VERSION}" == "24.2.00" ] ; then
     ADE_CS_OK=0
@@ -6703,7 +6704,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260706-05"
+HITT_BUILD_VERSION="20260706-06"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
