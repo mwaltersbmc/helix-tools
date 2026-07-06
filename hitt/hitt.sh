@@ -5302,17 +5302,20 @@ parseUtilSQL() {
 }
 
 # getK8sNodeDetails  — fills global K8S_NODE_DETAILS_TABLE (pipe rows, \\n-separated);
+#                      and K8S_OOM_PODS_TABLE (POD_NAME|NAMESPACE|NODE_NAME rows);
 #                      returns 0 on success, 1 on failure (does not exit).
 # printK8sNodeDetails — formats K8S_NODE_DETAILS_TABLE to stdout; returns 1 if empty.
+# printK8sOomPods     — formats K8S_OOM_PODS_TABLE to stdout; returns 1 if no OOM pods.
 # =============================================================================
 getK8sNodeDetails() {
   local nodes_json top_nodes_text node_name node_type runtime alloc_cpu alloc_mem allocatable
   local node_top pct_cpu pct_mem actual_usage conditions is_ready node_status pods_json
   local req_cpu req_cpu_milli req_mem req_mem_mi allocated count_running count_bad count_crash
-  local pod_stats count_oom TABLE_DATA node
+  local pod_stats count_oom TABLE_DATA OOM_PODS_DATA oom_row node
 
   K8S_NODE_DETAILS_TABLE=""
   K8S_NODE_DETAILS_JSON=""
+  K8S_OOM_PODS_TABLE=""
 
   nodes_json=$(${KUBECTL_BIN} get nodes -o json 2>>"${HITT_ERR_FILE}") || true
   if [[ -z "${nodes_json}" ]] || ! echo "${nodes_json}" | ${JQ_BIN} -e . >/dev/null 2>>"${HITT_ERR_FILE}"; then
@@ -5328,8 +5331,10 @@ getK8sNodeDetails() {
   fi
 
   TABLE_DATA=""
+  OOM_PODS_DATA=""
   # Use $'\n' — in bash, "\n" inside "..." is a literal backslash+n, not a newline (echo -e expands it for display; jq does not).
   TABLE_DATA+=$'NODE_NAME|NODE_TYPE|ALLOCATABLE_(CPU/MEM)|ALLOCATED_REQ_(CPU/MEM)|ACTUAL_USAGE|NODE_STATUS/CONDITIONS|PODS_(RUN/BAD/CRASH)|OOM_KILLS|CONTAINER_RUNTIME\n'
+  OOM_PODS_DATA+=$'POD_NAME|NAMESPACE|NODE_NAME\n'
 
   while read -r node; do
     [[ -z "${node}" ]] && continue
@@ -5390,10 +5395,21 @@ getK8sNodeDetails() {
 
     count_oom=$(echo "${pods_json}" | ${JQ_BIN} '[.items[].status.containerStatuses // [] | .[] | select(.lastState.terminated.reason == "OOMKilled")] | length')
 
+    while IFS= read -r oom_row; do
+      [[ -z "${oom_row}" ]] && continue
+      OOM_PODS_DATA+="${oom_row}"$'\n'
+    done < <(echo "${pods_json}" | ${JQ_BIN} -r '
+      [.items[]
+       | select([.status.containerStatuses // [] | .[] | select(.lastState.terminated.reason == "OOMKilled")] | length > 0)
+       | "\(.metadata.name)|\(.metadata.namespace)|\(.spec.nodeName)"
+      ] | .[]
+    ' 2>>"${HITT_ERR_FILE}")
+
     TABLE_DATA+="${node_name}|${node_type}|${allocatable}|${allocated}|${actual_usage}|${node_status}|${pod_stats}|${count_oom}|${runtime}"$'\n'
   done < <(echo "${nodes_json}" | ${JQ_BIN} -c '.items[]')
 
   K8S_NODE_DETAILS_TABLE="${TABLE_DATA}"
+  K8S_OOM_PODS_TABLE="${OOM_PODS_DATA}"
   K8S_NODE_DETAILS_JSON=$(
     printf '%s' "${TABLE_DATA}" | ${JQ_BIN} -Rs '
       split("\n")
@@ -5419,6 +5435,14 @@ printK8sNodeDetails() {
     return 1
   fi
   echo -e "${K8S_NODE_DETAILS_TABLE}" | column -s '|' -t | sed 's/_/ /g'
+  return 0
+}
+
+printK8sOomPods() {
+  if [[ -z "${K8S_OOM_PODS_TABLE}" ]] || [[ $(printf '%s' "${K8S_OOM_PODS_TABLE}" | awk 'NF' | wc -l) -lt 2 ]]; then
+    return 1
+  fi
+  echo -e "${K8S_OOM_PODS_TABLE}" | column -s '|' -t
   return 0
 }
 
@@ -6450,6 +6474,11 @@ if [ "${MODE}" == "info" ]; then
       hittInfoPrintKv "OpenShift version" "${OPENSHIFT_VERSION:-n/a}"
       hittInfoPrintSection "Node summary"
       printK8sNodeDetails
+      if [[ -n "${K8S_OOM_PODS_TABLE}" ]] && [[ $(printf '%s' "${K8S_OOM_PODS_TABLE}" | awk 'NF' | wc -l) -ge 2 ]]; then
+        echo ""
+        hittInfoPrintSection "OOM-killed pods"
+        printK8sOomPods
+      fi
       ;;
     ingress)
       QUIET=1
@@ -6592,7 +6621,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260706-01"
+HITT_BUILD_VERSION="20260706-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
