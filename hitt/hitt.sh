@@ -4731,6 +4731,81 @@ showInfoHelp() { # info mode help
   echo "Note: info mode is under development; sub-commands and output may change."
 }
 
+showOverrideHelp() { # config override options help
+  echo "HITT config override options"
+  echo .
+  echo "Override values from hitt.conf without editing the file:"
+  echo -e "
+    \t-C VALUE \t| IS_CUSTOMER_SERVICE
+    \t-D VALUE \t| CDE_NAMESPACE (Jenkins namespace)
+    \t-E VALUE \t| IS_ENVIRONMENT
+    \t-H VALUE \t| HP_NAMESPACE
+    \t-I VALUE \t| IS_NAMESPACE
+    \t-J VALUE \t| JENKINS_URL (full URL)
+    \t-P VALUE \t| JENKINS_PASSWORD
+    \t-U VALUE \t| JENKINS_USERNAME
+    "
+  echo "Example: bash hitt.sh -m pre-is -H my-hp-ns -I my-is-ns -C myservice -E prod"
+}
+
+showGeneralHelp() {
+  echo ""
+  echo -e "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
+  echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is|jenkins>${NORMAL}"
+  echo ""
+  echo "Examples:"
+  echo "bash $0 -m post-hp  - run post HP installation only checks"
+  echo "OR"
+  echo "bash $0 -m pre-is   - run pre-installation checks"
+  echo "OR"
+  echo "bash $0 -m post-is  - run post-installation checks"
+  echo "OR"
+  echo "bash $0 -m jenkins  - run Jenkins configuration checks"
+  echo ""
+  echo -e "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
+  echo -e "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
+  echo -e "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
+  echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
+  echo
+  echo "Mode-specific help:"
+  echo "  bash $0 -h fix       - fix mode options"
+  echo "  bash $0 -h info      - info mode options"
+  echo "  bash $0 -h utility   - utility mode options"
+  echo "  bash $0 -h pipeline  - pipeline mode options"
+  echo "  bash $0 -h override  - config override options"
+  echo
+  echo -e "${BOLD}Interactive help page with HITT use-cases available at https://bit.ly/hitthelp${NORMAL}"
+  echo
+}
+
+showHittHelp() {
+  case "${1}" in
+    ""|help|general)
+      showGeneralHelp
+      ;;
+    fix)
+      showFixHelp
+      ;;
+    info)
+      showInfoHelp
+      ;;
+    utility)
+      showUtilHelp
+      ;;
+    pipeline)
+      showPipelineHelp
+      ;;
+    override)
+      showOverrideHelp
+      ;;
+    *)
+      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, override)."
+      showGeneralHelp
+      exit 1
+      ;;
+  esac
+}
+
 getJenkinsPipelineValues() {
   if [ ${#PIPELINEARGS[@]} -lt 2 ]; then
     logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N> [filename]\"" 1
@@ -5445,7 +5520,7 @@ printK8sOomPods() {
   if [[ -z "${K8S_OOM_PODS_TABLE}" ]] || [[ $(printf '%s' "${K8S_OOM_PODS_TABLE}" | awk 'NF' | wc -l) -lt 2 ]]; then
     return 1
   fi
-  echo -e "${K8S_OOM_PODS_TABLE}" | column -s '|' -t
+  echo -e "${K8S_OOM_PODS_TABLE}" | column -s '|' -t  | sed 's/_/ /g'
   return 0
 }
 
@@ -6233,7 +6308,7 @@ source "./${HITT_CONFIG_FILE}"
 
 # Conf overrides
 if [ "${CONF_OVERRIDE}" == "1" ]; then
-  for opt in HP_NAMESPACE IS_NAMESPACE IS_ENVIRONMENT IS_CUSTOMER_SERVICE JENKINS_USERNAME JENKINS_PASSWORD; do
+  for opt in HP_NAMESPACE IS_NAMESPACE CDE_NAMESPACE IS_ENVIRONMENT IS_CUSTOMER_SERVICE JENKINS_USERNAME JENKINS_PASSWORD; do
     var="${opt}_OVERRIDE"
     if [ "${!var}" != "" ]; then
       eval "${opt}=${!var}"
@@ -6287,6 +6362,9 @@ JENKINS_URL="${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${J
 if [ "${JENKINS_PROTOCOL}" == "https" ] && [ "${JENKINS_PORT}" == "443" ]; then
   JENKINS_URL="${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}"
   JENKINS_LOG_URL="${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}"
+fi
+if [ -n "${JENKINS_URL_OVERRIDE}" ]; then
+  JENKINS_URL="${JENKINS_URL_OVERRIDE}"
 fi
 
 # Remove old files
@@ -6624,7 +6702,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260706-03"
+HITT_BUILD_VERSION="20260706-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8031,7 +8109,7 @@ if [ ! -t 1 ]; then
   REDIRECT=1
 fi
 
-while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
+while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
   case "${options}" in
     b)
       BUNDLE_ID="${OPTARG}"
@@ -8040,8 +8118,16 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
     c)
       HITT_CONFIG_FILE="${OPTARG}"
       ;;
+    C)
+      CONF_OVERRIDE=1
+      IS_CUSTOMER_SERVICE_OVERRIDE="${OPTARG}"
+      ;;
     d)
       DEBUG=1
+      ;;
+    D)
+      CONF_OVERRIDE=1
+      CDE_NAMESPACE_OVERRIDE="${OPTARG}"
       ;;
     e)
       STOP_ON_ERROR="${OPTARG}"
@@ -8051,6 +8137,10 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
         printMessageDetails | tail -n +1
         exit
       fi
+      ;;
+    E)
+      CONF_OVERRIDE=1
+      IS_ENVIRONMENT_OVERRIDE="${OPTARG}"
       ;;
     f)
       SKIP_UPDATE_CHECK=1
@@ -8067,16 +8157,31 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
       IGNORE_ERRORS=1
       ;;
     h)
+      SKIP_UPDATE_CHECK=1
+      HELP_TOPIC=""
+      NEXT_VAL="${!OPTIND}"
+      if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
+        HELP_TOPIC="${NEXT_VAL}"
+        ((OPTIND++))
+      fi
+      showHittHelp "${HELP_TOPIC}"
+      exit 0
+      ;;
+    H)
       CONF_OVERRIDE=1
       HP_NAMESPACE_OVERRIDE="${OPTARG}"
       ;;
-    i)
+    I)
       CONF_OVERRIDE=1
       IS_NAMESPACE_OVERRIDE="${OPTARG}"
       ;;
     j)
       DUMP_JCREDS=1
       SKIP_UPDATE_CHECK=1
+      ;;
+    J)
+      CONF_OVERRIDE=1
+      JENKINS_URL_OVERRIDE="${OPTARG}"
       ;;
     k)
       SKIP_UPDATE_CHECK=1
@@ -8103,10 +8208,6 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
         MODEARGS+=("full")
       fi
       ;;
-    n)
-      CONF_OVERRIDE=1
-      IS_ENVIRONMENT_OVERRIDE="${OPTARG}"
-      ;;
     o)
       QUIET=1
       SKIP_UPDATE_CHECK=1
@@ -8119,17 +8220,13 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
     p)
       LOG_PASSWDS=1
       ;;
+    P)
+      CONF_OVERRIDE=1
+      JENKINS_PASSWORD_OVERRIDE="${OPTARG}"
+      ;;
     q)
       QUIET=1
       SKIP_UPDATE_CHECK=1
-      ;;
-    r)
-      CONF_OVERRIDE=1
-      JENKINS_USERNAME_OVERRIDE="${OPTARG}"
-      ;;
-    s)
-      CONF_OVERRIDE=1
-      IS_CUSTOMER_SERVICE_OVERRIDE="${OPTARG}"
       ;;
     t)
       TCTL_CMD="${OPTARG}"
@@ -8152,12 +8249,12 @@ while getopts "b:c:de:f:gh:i:jk:lm:n:o:pqs:t:u:vw:xz" options; do
       MODE=utility
       UTILOPTS="${OPTARG}"
       ;;
+    U)
+      CONF_OVERRIDE=1
+      JENKINS_USERNAME_OVERRIDE="${OPTARG}"
+      ;;
     v)
       VERBOSITY=1
-      ;;
-    w)
-      CONF_OVERRIDE=1
-      JENKINS_PASSWORD_OVERRIDE="${OPTARG}"
       ;;
     x)
       DISABLE_PROXY=1
