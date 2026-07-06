@@ -108,6 +108,23 @@
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#configuration"
     },
     {
+      "id": "config-override",
+      "topicId": "getting-started",
+      "order": 35,
+      "title": "I want to override values from hitt.conf for a single run",
+      "commands": [
+        "bash hitt.sh -h override",
+        "bash hitt.sh -m pre-is -H my-hp-ns -I my-is-ns -C myservice -E prod",
+        "bash hitt.sh -m jenkins -J https://jenkins.example.com:8443 -U myuser -P mypassword"
+      ],
+      "notes": [
+        "Uppercase switches replace one setting from hitt.conf without editing the file: -H HP namespace, -I IS namespace, -C CUSTOMER_SERVICE, -E ENVIRONMENT, -D Jenkins namespace, -J full Jenkins URL, -U username, -P password.",
+        "Combine override switches with any mode or feature that reads hitt.conf (examples above use pre-is and jenkins).",
+        "Run bash hitt.sh -h override for the full list on the console."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#config-overrides"
+    },
+    {
       "id": "update-hitt-latest",
       "topicId": "getting-started",
       "order": 40,
@@ -716,6 +733,26 @@
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#log-files"
     },
     {
+      "id": "cli-help",
+      "topicId": "hitt-help",
+      "order": 5,
+      "title": "I want help with the HITT command line",
+      "commands": [
+        "bash hitt.sh -h",
+        "bash hitt.sh -h fix",
+        "bash hitt.sh -h utility",
+        "bash hitt.sh -h pipeline",
+        "bash hitt.sh -h info",
+        "bash hitt.sh -h override"
+      ],
+      "notes": [
+        "bash hitt.sh -h prints general usage and lists topic-specific help commands.",
+        "Each bash hitt.sh -h topic command shows the same summary as that mode’s built-in help (see “I want help with HITT's different modes”).",
+        "Use bash hitt.sh -h override for config override switches without opening hitt.conf."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#help"
+    },
+    {
       "id": "verbose-logging",
       "topicId": "hitt-help",
       "order": 10,
@@ -730,30 +767,22 @@
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options"
     },
     {
-      "id": "utility-help",
+      "id": "modes-help",
       "topicId": "hitt-help",
       "order": 20,
-      "title": "I want a list of utility mode commands",
+      "title": "I want help with HITT's different modes",
       "commands": [
-        "bash hitt.sh -u help"
+        "bash hitt.sh -f help",
+        "bash hitt.sh -u help",
+        "bash hitt.sh -k help",
+        "bash hitt.sh -m \"info help\""
       ],
       "notes": [
-        "Same summary content as README-utility-mode.md."
+        "Each command prints the built-in summary for that mode: fix (-f), utility (-u), pipeline (-k), and info (-m info).",
+        "Fix mode covers targeted changes such as cacerts, Jenkins credentials, and licensing. Utility mode covers helpers such as get secret, get jwt, and get dbid.",
+        "The same summaries are available with bash hitt.sh -h fix, -h utility, -h pipeline, and -h info."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
-    },
-    {
-      "id": "fix-help",
-      "topicId": "hitt-help",
-      "order": 30,
-      "title": "I want a list of fix mode commands",
-      "commands": [
-        "bash hitt.sh -f help"
-      ],
-      "notes": [
-        "Prints the same categories as README-fix-mode.md tables."
-      ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#help"
     },
     {
       "id": "debug-trace",

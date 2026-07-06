@@ -26,13 +26,15 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [tctl Mode](#tctl-mode)
 - [Bundle Deployment Status](#get-is-bundle-deployment-status)
 - [Advanced CLI Options](#advanced-cli-options)
+- [Help](#help)
+- [Config overrides](#config-overrides)
 - [Build version (developers)](#build-version-developers-git-clone-only)
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, Jenkins, license, …)
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `gendbid`)
 - [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` for **HELIX_ONPREM_DEPLOYMENT**
 - [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info ingress`, `info full`
 
-Built-in summaries: `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, and `bash hitt.sh -m "info help"`.
+Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h info`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, or `bash hitt.sh -m "info help"` from within each mode.
 
 **Info ingress** (`bash hitt.sh -m "info ingress"`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires `hitt.conf` and Platform namespace access. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
 
@@ -79,6 +81,8 @@ If you need to change any of the values, either edit the file or delete it so th
 
 You can use a different config file by using the `-c filename` command line option.  This may be useful when using the pipeline mode option to migrate pipeline values between Jenkins systems.
 
+You can override individual settings from **hitt.conf** on the command line without editing the file — for example when testing against a different namespace or Jenkins login. See [Config overrides](#config-overrides) or run `bash hitt.sh -h override`.
+
 The `hitt.conf` file:
 
 ```
@@ -88,6 +92,7 @@ HP_NAMESPACE=
 IS_NAMESPACE=
 IS_CUSTOMER_SERVICE=
 IS_ENVIRONMENT=
+CDE_NAMESPACE=
 
 # OPTIONAL SETTINGS
 # Set JENKINS credentials and hostname/port if required
@@ -115,7 +120,7 @@ chmod a+x hitt.sh
 ./hitt.sh
 ```
 
-HITT requires one command line option (`-m`) to specify the operating mode, unless being used for tctl commands, and will print a usage message if this is not provided.
+HITT requires one command line option (`-m`) to specify the operating mode, unless being used for tctl commands, and will print a usage message if this is not provided. Run `bash hitt.sh -h` for general help and a list of mode-specific help topics.
 
 ```bash
 bash hitt.sh
@@ -288,8 +293,46 @@ There are several extra command line switches which may be helpful for troublesh
 `-p`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output pipeline passwords in the `values.log` file when running in pre-is mode.\
 `-q`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\
 `-v`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging.\
-`-x`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ignore proxy environment variables.
-`-z`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not delete temporary files after execution.\
+`-x`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ignore proxy environment variables.\
+`-z`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not delete temporary files after execution.
+
+See also [Help](#help) and [Config overrides](#config-overrides).
+
+### Help ###
+
+Run `bash hitt.sh -h` for general usage and a list of topics. Each topic prints the same summary you get from the mode’s built-in `help` command:
+
+| Command | Shows |
+|---------|--------|
+| `bash hitt.sh -h` | General usage and links to topic help |
+| `bash hitt.sh -h fix` | Fix mode options ([README-fix-mode.md](README-fix-mode.md)) |
+| `bash hitt.sh -h utility` | Utility mode options ([README-utility-mode.md](README-utility-mode.md)) |
+| `bash hitt.sh -h pipeline` | Pipeline mode options ([README-pipeline-mode.md](README-pipeline-mode.md)) |
+| `bash hitt.sh -h info` | Info mode options ([README-info-mode.md](README-info-mode.md)) |
+| `bash hitt.sh -h override` | Config override switches (see below) |
+
+### Config overrides ###
+
+These uppercase switches replace the matching value from **hitt.conf** for a single run. Combine them with any mode (for example `-m pre-is`):
+
+| Switch | Setting in hitt.conf |
+|--------|----------------------|
+| `-C VALUE` | `IS_CUSTOMER_SERVICE` |
+| `-D VALUE` | `CDE_NAMESPACE` (Jenkins namespace when Jenkins runs in the cluster) |
+| `-E VALUE` | `IS_ENVIRONMENT` |
+| `-H VALUE` | `HP_NAMESPACE` |
+| `-I VALUE` | `IS_NAMESPACE` |
+| `-J VALUE` | Full Jenkins URL (overrides hostname, port, and protocol) |
+| `-P VALUE` | `JENKINS_PASSWORD` |
+| `-U VALUE` | `JENKINS_USERNAME` |
+
+Example — run pre-is checks against specific namespaces and pipeline values without editing the config file:
+
+```bash
+bash hitt.sh -m pre-is -H my-hp-ns -I my-is-ns -C myservice -E prod
+```
+
+Run `bash hitt.sh -h override` for the same list on the console.
 
 ### Checks Summary ###
 
