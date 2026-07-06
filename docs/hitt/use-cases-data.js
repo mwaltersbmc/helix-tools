@@ -383,6 +383,21 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
     {
+      "id": "pipeline-kickstart",
+      "topicId": "pipeline-mgmt",
+      "order": 25,
+      "title": "I want to start a new deployment with pipeline values filled from Helix Platform",
+      "commands": [
+        "bash hitt.sh -k kickstart"
+      ],
+      "notes": [
+        "Use when Helix Platform is already in the cluster and you are starting a new Helix IS deployment. Requires hitt.conf, cluster access, and a working Deployment Engine login.",
+        "HITT reads your environment (namespaces, domain, sign-on, registry, logging, and related settings), queues a HELIX_ONPREM_DEPLOYMENT run, then you open the job in Jenkins, rebuild the last run, and complete anything still missing — database details, passwords, file uploads, and which pipelines to run.",
+        "Same safeguards as build: Pipelines checkboxes are turned off by default and file attachments are not sent from HITT."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#kickstart--fill-values-from-helix-platform"
+    },
+    {
       "id": "pipeline-console",
       "topicId": "pipeline-mgmt",
       "order": 30,
