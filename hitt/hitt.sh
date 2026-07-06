@@ -1197,7 +1197,7 @@ checkJenkinsIsRunning() {
     200)
       JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_URL}")
       JENKINS_VERSION=$(echo "${JENKINS_RESPONSE}" | grep -i 'X-Jenkins:' | awk '{print $2}' | tr -d '\r')
-      logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_LOG_URL}."
+      logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_LOG_URL:-$JENKINS_URL}."
       getJenkinsCrumb
       ;;
     401|403)
@@ -3638,7 +3638,7 @@ checkDERequirements() {
   fi
   logMessage "Checking OS binaries..."
   MISSING_BINS=()
-  for i in ansible dos2unix git jq python xmlstarlet yq; do
+  for i in ansible dos2unix python xmlstarlet yq; do
     if ! which "${i}" > /dev/null 2>&1; then
       MISSING_BINS+=("${i}")
     fi
@@ -4313,6 +4313,7 @@ triggerHelixDryRun() {
 
 isJenkinsInCluster() {
   if [ -n "${K8S_JENKINS}" ]; then return 0; fi
+  # -g needed to allow [] in url
   JENKINS_AGENTS=($(${CURL_BIN} -gks "${JENKINS_URL}/computer/api/json?tree=computer[displayName]" | ${JQ_BIN} -r '.computer[].displayName'))
   if printf '%s\0' "${JENKINS_AGENTS[@]}" | grep -Fqz -- 'jenkins-agent'; then
     K8S_JENKINS=1
@@ -6298,6 +6299,8 @@ fi
 if [ "${MODE}" == "jenkins" ]; then
   logStatus "Running Jenkins config checks only..."
   checkJenkinsIsRunning 1
+  UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
+  logMessage "HELIX_ONPREM_DEPLOYMENT pipeline version '${UBER_VERSION}'."
   checkJenkinsConfig
   checkDERequirements
   tidyUp
@@ -6589,7 +6592,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260703-02"
+HITT_BUILD_VERSION="20260706-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
