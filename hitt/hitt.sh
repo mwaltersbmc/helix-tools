@@ -5302,7 +5302,7 @@ parseUtilSQL() {
 }
 
 # getK8sNodeDetails  — fills global K8S_NODE_DETAILS_TABLE (pipe rows, \\n-separated);
-#                      and K8S_OOM_PODS_TABLE (POD_NAME|NAMESPACE|NODE_NAME rows);
+#                      and K8S_OOM_PODS_TABLE (POD_NAME|CONTAINER_NAME|NAMESPACE|NODE_NAME rows);
 #                      returns 0 on success, 1 on failure (does not exit).
 # printK8sNodeDetails — formats K8S_NODE_DETAILS_TABLE to stdout; returns 1 if empty.
 # printK8sOomPods     — formats K8S_OOM_PODS_TABLE to stdout; returns 1 if no OOM pods.
@@ -5334,7 +5334,7 @@ getK8sNodeDetails() {
   OOM_PODS_DATA=""
   # Use $'\n' — in bash, "\n" inside "..." is a literal backslash+n, not a newline (echo -e expands it for display; jq does not).
   TABLE_DATA+=$'NODE_NAME|NODE_TYPE|ALLOCATABLE_(CPU/MEM)|ALLOCATED_REQ_(CPU/MEM)|ACTUAL_USAGE|NODE_STATUS/CONDITIONS|PODS_(RUN/BAD/CRASH)|OOM_KILLS|CONTAINER_RUNTIME\n'
-  OOM_PODS_DATA+=$'POD_NAME|NAMESPACE|NODE_NAME\n'
+  OOM_PODS_DATA+=$'POD_NAME|CONTAINER_NAME|NAMESPACE|NODE_NAME\n'
 
   while read -r node; do
     [[ -z "${node}" ]] && continue
@@ -5400,8 +5400,11 @@ getK8sNodeDetails() {
       OOM_PODS_DATA+="${oom_row}"$'\n'
     done < <(echo "${pods_json}" | ${JQ_BIN} -r '
       [.items[]
-       | select([.status.containerStatuses // [] | .[] | select(.lastState.terminated.reason == "OOMKilled")] | length > 0)
-       | "\(.metadata.name)|\(.metadata.namespace)|\(.spec.nodeName)"
+       | . as $pod
+       | (.status.containerStatuses // [])
+       | .[]
+       | select(.lastState.terminated.reason == "OOMKilled")
+       | "\($pod.metadata.name)|\(.name)|\($pod.metadata.namespace)|\($pod.spec.nodeName)"
       ] | .[]
     ' 2>>"${HITT_ERR_FILE}")
 
@@ -6621,7 +6624,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260706-02"
+HITT_BUILD_VERSION="20260706-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
