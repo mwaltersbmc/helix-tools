@@ -243,6 +243,11 @@ logStatus() {
   fi
 }
 
+hittTerminalLink() {
+  # OSC 8 hyperlink for supported terminals (Windows Terminal, iTerm2, etc.); $1 = URL, $2 = label.
+  printf '\033]8;;%s\033\\%s\033]8;;\033\\' "${1}" "${2}"
+}
+
 stopOnError() {
   if [ "${STOP_ON_ERROR}" == "${1}" ] || [ "${STOP_ON_ERROR}" == "0" ]; then
     exit
@@ -4915,6 +4920,7 @@ triggerHelixOnpremPipelineBuild() {
   local source_label="${1:-pipeline values}"
   local job_name="HELIX_ONPREM_DEPLOYMENT"
   local pipeline_defaults_json pipeline_section_params_json pipeline_file_params_json input_version defaults_version http_code override_count
+  local jenkins_base rebuild_url rebuild_link
 
   if [ -z "${PIPELINE_INPUT_JSON}" ]; then
     logError "999" "No pipeline parameter JSON supplied." 1
@@ -4971,7 +4977,11 @@ triggerHelixOnpremPipelineBuild() {
   http_code=$(${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_INPUT_JSON}" -b .cookies -sk -w "%{http_code}" -o /dev/null -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${job_name}/build" 2>>${HITT_ERR_FILE})
   case "${http_code}" in
     200|201|302)
-      logMessage "Pipeline build queued (HTTP ${http_code}). Open ${JENKINS_LOG_URL:-${JENKINS_URL}}/job/${job_name}/, rebuild the last job, and complete any missing parameter values."
+      jenkins_base="${JENKINS_LOG_URL:-${JENKINS_URL}}"
+      rebuild_url="${jenkins_base}/job/${job_name}/lastBuild/rebuild/parameterized"
+      rebuild_link=$(hittTerminalLink "${rebuild_url}" "HERE")
+      logMessage "Pipeline build queued.  Click ${rebuild_link} to rebuild the last job and complete any missing parameter values."
+      logMessage "Use ${BOLD}bash hitt.sh -k \"get last\"${NORMAL} to review values."
       ;;
     *)
       logError "999" "Failed to queue ${job_name} pipeline build (HTTP ${http_code})." 1
@@ -6777,7 +6787,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260707-03"
+HITT_BUILD_VERSION="20260707-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
