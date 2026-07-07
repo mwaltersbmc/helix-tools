@@ -1726,7 +1726,7 @@ validateISDetails() {
 
   # PRE mode only
   if [ "${MODE}" == "pre-is" ]; then
-    logMessage "ITSM pipeline version is '${IS_PLATFORM_HELM_VERSION}'."
+    logMessage "HELIX_ONPREM_DEPLOYMENT pipeline version is '${IS_PLATFORM_HELM_VERSION}'."
     logMessage "${IS_CUSTOMER_SIZE_LABEL} is '${IS_CUSTOMER_SIZE}'."
     logMessage "${IS_PIPELINE_MODE_LABEL} is '${IS_PIPELINE_MODE}'."
     if [ "${IS_VERSION}" -ge 2025301 ]; then
@@ -3567,23 +3567,44 @@ logEvents() {
 }
 
 getMessageJSON() {
-  # msg id
-  MSG_JSON=$(echo "${ALL_MSGS_JSON}" | ${JQ_BIN} '.[] | select(.id=="'"${1}"'")')
+  # $1 = message id (e.g. 127, 001)
+  MSG_JSON=$(${JQ_BIN} -c --arg id "${1}" '
+    [.[] | select(.id == $id)][0] // empty
+  ' <<< "${ALL_MSGS_JSON}")
   if [ -z "${MSG_JSON}" ]; then
-    MSG_JSON="{\"id\": \"$1\",\"cause\": \"Message details not found for id $1.\", \"impact\": \"Message details cannot be displayed.\", \"remediation\": \"Please report to 'mark_walters@bmc.com'\"}"
+    MSG_JSON=$(${JQ_BIN} -cn --arg id "${1}" '{
+      id: $id,
+      cause: "Message details not found for id \($id).",
+      impact: "Message details cannot be displayed.",
+      remediation: "Please report to mark.walters@helixops.ai"
+    }')
   fi
 }
 
-getMessageDetails() {
-  eval "export $(printf "%s\n" "${MSG_JSON}" | ${JQ_BIN} -r 'to_entries | map("\(.key)=\(.value)") | @sh')"
+loadMessageFields() {
+  HITT_MSG_CAUSE=$(${JQ_BIN} -r '.cause // empty' <<< "${MSG_JSON}")
+  HITT_MSG_IMPACT=$(${JQ_BIN} -r '.impact // empty' <<< "${MSG_JSON}")
+  HITT_MSG_REMEDIATION=$(${JQ_BIN} -r '.remediation // empty' <<< "${MSG_JSON}")
 }
 
 printMessageDetails() {
   printf "\n"
   [[ -n "${MSG}" ]] && printf "${BOLD}Message:${NORMAL} ${MSG}\n"
-  printf "${BOLD}${YELLOW}Cause:${NORMAL} ${cause}\n"
-  printf "${BOLD}${RED}Impact:${NORMAL} ${impact}\n"
-  printf "${BOLD}${GREEN}Remediation:${NORMAL} ${remediation}\n"
+  printf "${BOLD}${YELLOW}Cause:${NORMAL} %s\n" "${HITT_MSG_CAUSE}"
+  printf "${BOLD}${RED}Impact:${NORMAL} %s\n" "${HITT_MSG_IMPACT}"
+  printf "${BOLD}${GREEN}Remediation:${NORMAL} %s\n" "${HITT_MSG_REMEDIATION}"
+}
+
+showMessageById() {
+  getMessageJSON "${1}"
+  loadMessageFields
+  MSG="(${1}) ${HITT_MSG_CAUSE}"
+  printMessageDetails
+}
+
+isHittActionRun() {
+  [[ -n "${MODE}" || -n "${FIXOPTS}" || -n "${UTILOPTS}" || -n "${PIPELINEOPTS}" \
+     || -n "${TCTL_CMD}" || -n "${BUNDLE_ID}" || -n "${PIPELINE_NAME}" || -n "${DUMP_JCREDS}" ]]
 }
 
 logMessageDetails() {
@@ -3599,7 +3620,7 @@ logMessageDetails() {
   # 2. Turn off tracing safely
   set +x
   getMessageJSON "${1}"
-  getMessageDetails
+  loadMessageFields
   # Re-enable debugging if set
   if [ "$xtrace_was_on" = true ]; then
       set -x
@@ -6407,7 +6428,13 @@ if [ "${MODE}" == "jenkins" ]; then
   logStatus "Running Jenkins config checks only..."
   checkJenkinsIsRunning 1
   UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
-  logMessage "HELIX_ONPREM_DEPLOYMENT pipeline version '${UBER_VERSION}'."
+
+  if isJenkinsInCluster && [[ "${UBER_VERSION}" =~ ^2021 ]]; then
+      logError "999" "Unexpected HELIX_ONPREM_DEPLOYMENT pipeline version '${UBER_VERSION}' - check pipeline console output for errors during dry run build."
+  else
+    logMessage "HELIX_ONPREM_DEPLOYMENT pipeline version '${UBER_VERSION}'."
+  fi
+
   checkJenkinsConfig
   checkDERequirements
   tidyUp
@@ -6704,7 +6731,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260706-06"
+HITT_BUILD_VERSION="20260707-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8101,7 +8128,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"264\",
-    \"cause\": \"RSSO_URL value does not start with 'https//'.\",
+    \"cause\": \"RSSO_URL value does not start with 'https://'.\",
     \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
     \"remediation\": \"Update the value and add the missing prefix.\"
   }
@@ -8133,12 +8160,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
       ;;
     e)
       STOP_ON_ERROR="${OPTARG}"
-      if [ $# -eq 2 ]; then
-        getMessageJSON "${2}"
-        getMessageDetails
-        printMessageDetails | tail -n +1
-        exit
-      fi
+      MSG_LOOKUP_CANDIDATE=1
       ;;
     E)
       CONF_OVERRIDE=1
@@ -8273,6 +8295,11 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
       ;;
   esac
 done
+
+if [[ "${MSG_LOOKUP_CANDIDATE}" == "1" ]] && ! isHittActionRun; then
+  showMessageById "${STOP_ON_ERROR}"
+  exit 0
+fi
 
 # Call main()
 if [ ${CREATE_LOGS} -eq 1 ]; then

@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260706-06`**
+**Latest build `20260707-01`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -288,7 +288,7 @@ There are several extra command line switches which may be helpful for troublesh
 
 `-c filename`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Use alternative config file.\
 `-d`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enables `set -x` debugging output.\
-`-e #`&nbsp;&nbsp;&nbsp;Exit script on the specified error number `#`.  Use `-e 0` to stop on the first error.\
+`-e #`&nbsp;&nbsp;&nbsp;During a mode run, exit when message `#` is raised. Use `-e 0` to stop on the first error or warning. With no mode (e.g. `bash hitt.sh -e 127`), print long help for message `#` and exit.\
 `-j`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
 `-p`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output pipeline passwords in the `values.log` file when running in pre-is mode.\
 `-q`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\

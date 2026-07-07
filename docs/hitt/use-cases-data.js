@@ -716,7 +716,7 @@ window.HITT_USE_CASES = {
       ],
       "notes": [
         "Use the numeric ID shown in parentheses after ERROR or WARNING, e.g. (127).",
-        "The command must be exactly two script arguments after the shell name (e.g. hitt.sh -e 127) so the built-in lookup runs and then exits."
+        "Run by itself with no `-m`, `-f`, `-k`, or other action flag — e.g. `bash hitt.sh -e 127` prints cause, impact, and remediation, then exits."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options"
     },
