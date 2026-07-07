@@ -454,6 +454,7 @@ getVersions() {
   fi
   HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
   HP_INGRESS_CLASS=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.infra_config' | grep ^INGRESS_CLASS | cut -d '=' -f2)
+  HP_CUSTOM_CERT=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.infra_config' | grep ^CUSTOM_CA_SIGNED_CERT_IN_USE | cut -d '=' -f2)
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
   HP_REGISTRY_PROJECT=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^IMAGE_REGISTRY_PROJECT | cut -d '=' -f2)
   logMessage "Helix Platform version '${HP_VERSION}' with DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}'."
@@ -3123,7 +3124,7 @@ validateJenkinsKubeconfig() {
 #    KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} use-context "${SELECTED_CONTEXT}" &> /dev/null
 #  fi
 
-  if ! KUBECONFIG=./kubeconfig.jenkins ${KUBECTL_BIN} -n "${HP_NAMESPACE}" cluster-info > /dev/null 2>>${HITT_ERR_FILE}; then
+  if ! timeout 5s ${KUBECTL_BIN} --kubeconfig=./kubeconfig.jenkins -n "${HP_NAMESPACE}" cluster-info > /dev/null 2>>${HITT_ERR_FILE}; then
     logError "197" "Unable to verify kubeconfig file from Jenkins KUBECONFIG credential."
     SKIP_CLEANUP=1
   else
@@ -4028,7 +4029,7 @@ checkValidKubeconfig() {
   if [ ! -f "${1}" ]; then
     logError "999" "kubeconfig file '${1}' not found." 1
   fi
-  if ! KUBECONFIG="${1}" ${KUBECTL_BIN} version > /dev/null 2>&1; then
+  if ! ${KUBECTL_BIN} --kubeconfig="${1}" version > /dev/null 2>&1; then
     logError "999" "'kubectl version' command returned an error - is '${1}' a valid kubeconfig file?" 1
   fi
 }
@@ -6330,6 +6331,20 @@ kickStartUberPipeline() {
   triggerHelixOnpremPipelineBuild "kickstart discovery"
 }
 
+checkCDE() {
+  if isJenkinsInCluster && [[ "${UBER_VERSION}" =~ ^2021 ]]; then
+      logError "999" "Unexpected HELIX_ONPREM_DEPLOYMENT pipeline version '${UBER_VERSION}' - check pipeline console output for errors during dry run build."
+  else
+    logMessage "HELIX_ONPREM_DEPLOYMENT pipeline version '${UBER_VERSION}'."
+  fi
+
+  if [ "${HP_CUSTOM_CERT}" == "true" ] && [[ "${UBER_VERSION}" =~ "2026201" ]]; then
+    if ! ${KUBECTL_BIN} -n "${CDE_NAMESPACE}" get secret jenkins-custom-ca >/dev/null 2>&1 ; then
+      logError "999" "Custom CA certificate in use but Jenkins was deployed with CUSTOM_CA=false in deployment-engine-config.env"
+    fi
+  fi
+
+}
 
 #End functions
 
@@ -6459,15 +6474,11 @@ fi
 
 if [ "${MODE}" == "jenkins" ]; then
   logStatus "Running Jenkins config checks only..."
+  checkToolVersion kubectl
+  getVersions
   checkJenkinsIsRunning 1
   UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
-
-  if isJenkinsInCluster && [[ "${UBER_VERSION}" =~ ^2021 ]]; then
-      logError "999" "Unexpected HELIX_ONPREM_DEPLOYMENT pipeline version '${UBER_VERSION}' - check pipeline console output for errors during dry run build."
-  else
-    logMessage "HELIX_ONPREM_DEPLOYMENT pipeline version '${UBER_VERSION}'."
-  fi
-
+  checkCDE
   checkJenkinsConfig
   checkDERequirements
   tidyUp
@@ -6716,6 +6727,8 @@ if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking Jenkins is accessible..."
   checkJenkinsIsRunning
   logStatus "Checking Jenkins configuration..."
+  UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
+  checkCDE
   checkJenkinsConfig
   logStatus "Getting IS details..."
   getISDetailsFromK8s
@@ -6764,7 +6777,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260707-02"
+HITT_BUILD_VERSION="20260707-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
