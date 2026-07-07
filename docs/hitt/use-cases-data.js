@@ -90,6 +90,7 @@ window.HITT_USE_CASES = {
       ],
       "notes": [
         "Or delete the file and re-run HITT to be prompted again — use the second command above. The cluster must be reachable for namespace discovery when recreating hitt.conf interactively.",
+        "Namespace menus list discovered candidates first, with an Other option to pick any cluster namespace (for example an empty namespace on a cluster that already has deployments elsewhere).",
         "hitt.conf holds HP_NAMESPACE, IS_NAMESPACE, IS_CUSTOMER_SERVICE, IS_ENVIRONMENT, Jenkins host/credentials, and tool paths.",
         "For a second config file without renaming the default, keep multiple files and pass -c /path/to/other.conf when you run HITT."
       ],

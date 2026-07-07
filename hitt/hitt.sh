@@ -27,10 +27,28 @@ discoverHelixNamespaceCandidates() {
   done
 }
 
+NAMESPACE_OTHER_OPTION="Other"
+
+# $1 = candidates array name; prints chosen namespace on stdout
+selectFromCandidatesOrOther() {
+  local candidates_name="${1}"
+  local candidates_ref="${candidates_name}[@]"
+  local candidates=("${!candidates_ref}")
+  local menu_options=("${candidates[@]}" "${NAMESPACE_OTHER_OPTION}")
+  local choice
+
+  choice=$(selectFromArray menu_options)
+  if [[ "${choice}" == "${NAMESPACE_OTHER_OPTION}" ]]; then
+    selectFromArray NS_ARRAY
+  else
+    echo "${choice}"
+  fi
+}
+
 # $1 = variable name to assign (e.g. HP_NAMESPACE)
 # $2 = candidates array name (e.g. HP_NS_CANDIDATES)
 # $3 = label for prompts (e.g. "Helix Platform")
-# $4 = optional: when the sole candidate equals this value, skip y/n and prompt from all namespaces
+# $4 = optional: when the sole candidate equals this value, skip y/n and show candidate menu with Other
 confirmOrSelectNamespace() {
   local result_var="${1}"
   local candidates_name="${2}"
@@ -50,16 +68,12 @@ confirmOrSelectNamespace() {
         logStatus "Selected ${label} namespace: ${!result_var}" 1
         return
       fi
-      logStatus "Please select your ${label} namespace..." 1
-      selected=$(selectFromArray NS_ARRAY)
-      printf -v "${result_var}" '%s' "${selected}"
-      return
     fi
   fi
 
-  if [ ${#candidates[@]} -gt 1 ]; then
+  if [ ${#candidates[@]} -ge 1 ]; then
     logStatus "Please select your ${label} namespace..." 1
-    selected=$(selectFromArray "${candidates_name}")
+    selected=$(selectFromCandidatesOrOther "${candidates_name}")
     printf -v "${result_var}" '%s' "${selected}"
     return
   fi
@@ -6810,7 +6824,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260707-07"
+HITT_BUILD_VERSION="20260707-08"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
