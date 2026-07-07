@@ -175,11 +175,12 @@ window.HITT_USE_CASES = {
       "title": "I want to display Jenkins credentials and pipeline passwords",
       "commands": [
         "bash hitt.sh -j",
-        "bash hitt.sh -p -m pre-is"
+        "bash hitt.sh -p -m pre-is",
+        "bash hitt.sh -p -k \"get last\""
       ],
       "notes": [
         "-j prints Jenkins credential usernames/passwords and can write kubeconfig.jenkins from the Jenkins kubeconfig credential.",
-        "-p (with pre-is) writes pipeline parameter passwords into values.log during pre-is checks—use only on a trusted host and protect the output."
+        "-p includes plain pipeline password values in -k get output and in values.log during pre-is—use only on a trusted host and protect the output."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options"
     },
@@ -360,10 +361,13 @@ window.HITT_USE_CASES = {
         "bash hitt.sh -k \"get last\"",
         "bash hitt.sh -k \"get lastsuccessful\"",
         "bash hitt.sh -k \"get 42\"",
-        "bash hitt.sh -k \"get lastsuccessful values.json\""
+        "bash hitt.sh -k \"get lastsuccessful values.json\"",
+        "bash hitt.sh -p -k \"get lastsuccessful values.json\""
       ],
       "notes": [
         "Outputs JSON to the console unless you pass a filename as the last argument.",
+        "Password parameters (names containing PASSWORD) are redacted as ***REDACTED*** unless you use -p.",
+        "Use -p when saving a file for build or migration; protect output on trusted hosts only.",
         "Requires Jenkins in hitt.conf and working credentials."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
@@ -378,6 +382,7 @@ window.HITT_USE_CASES = {
       ],
       "notes": [
         "After this, open HELIX_ONPREM_DEPLOYMENT in Jenkins, rebuild the last job, and review parameters (README warns the generated build is expected to fail until you adjust values).",
+        "Export settings with bash hitt.sh -p -k \"get ... values.json\" if password parameters must be included; get without -p writes ***REDACTED*** placeholders.",
         "PIPELINES section booleans are forced off unless already in your JSON; file upload parameters are stripped automatically."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"

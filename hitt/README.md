@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260707-04`**
+**Latest build `20260707-06`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -168,7 +168,7 @@ All of the files are added to `hittlogs.zip` which can be sent to BMC Support if
 There are some additional messages which are not logged by default but can be enabled with the `-v` switch.\
 Quiet mode `-q` only prints the summary messages.
 
-**NOTE** - passwords are not logged unless the `-p` switch is used.
+**NOTE** - pipeline passwords are redacted in `-k get` output unless `-p` is used; in pre-is mode, passwords are omitted from `values.log` unless `-p` is used.
 
 ### Pipeline Mode ###
 
@@ -176,8 +176,11 @@ Pipeline mode (`-k`) exports and submits **`HELIX_ONPREM_DEPLOYMENT`** parameter
 
 See **[README-pipeline-mode.md](README-pipeline-mode.md)** for requirements, quoting, the rebuild-in-Jenkins workflow, and what the build trigger applies automatically.
 
+Password parameters in **get** output are redacted unless **`-p`** is used (see [get — save parameter values](README-pipeline-mode.md#get--save-parameter-values)).
+
 ```bash
 bash hitt.sh -k "get lastsuccessful values.json"
+bash hitt.sh -p -k "get lastsuccessful values.json"   # include plain passwords for build/migration
 bash hitt.sh -k "build values.json"
 bash hitt.sh -k kickstart
 ```
@@ -290,7 +293,7 @@ There are several extra command line switches which may be helpful for troublesh
 `-d`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enables `set -x` debugging output.\
 `-e #`&nbsp;&nbsp;&nbsp;During a mode run, exit when message `#` is raised. Use `-e 0` to stop on the first error or warning. With no mode (e.g. `bash hitt.sh -e 127`), print long help for message `#` and exit.\
 `-j`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
-`-p`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output pipeline passwords in the `values.log` file when running in pre-is mode.\
+`-p`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Include plain pipeline password values in `-k get` output and in `values.log` during pre-is mode.
 `-q`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\
 `-v`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging.\
 `-x`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ignore proxy environment variables.\

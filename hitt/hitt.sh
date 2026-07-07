@@ -4775,6 +4775,7 @@ showPipelineHelp() { # pipeline mode help
     \thelp \t\t| Show this list.
     "
   echo "After build or kickstart, rebuild the job in the Deployment Engine and complete any missing values."
+  echo "Password parameters in get output are redacted unless -p is used."
   echo "Console log for a job: bash hitt.sh -o PIPELINE_NAME (e.g. helix_onprem_deployment)."
 }
 
@@ -4897,12 +4898,19 @@ getJenkinsPipelineValues() {
       logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N> [filename]\"" 1
       ;;
   esac
-  echo "${PIPELINE_VALUES_JSON}" | ${JQ_BIN} -r 'walk(
+  local redact_passwords="true"
+  if [ "${LOG_PASSWDS}" == "1" ]; then
+    redact_passwords="false"
+  fi
+  echo "${PIPELINE_VALUES_JSON}" | ${JQ_BIN} --argjson redact_passwords "${redact_passwords}" -r 'walk(
     if type == "object" then
       with_entries(
-        select(
-          (.value != "" and (.key | startswith("SEPARATOR") | not))
-        )
+        . as $e
+        | if ($e.key | startswith("SEPARATOR")) then empty
+          elif ($e.value == "") then empty
+          elif $redact_passwords and ($e.key | test("PASSWORD")) then {key: $e.key, value: "***REDACTED***"}
+          else $e
+          end
       )
     elif type == "array" then
       map(select(. != ""))
@@ -4912,6 +4920,9 @@ getJenkinsPipelineValues() {
   )' > "${PIPELINE_JSON_FILE}"
   if [ "${PIPELINE_JSON_FILE}" != "/dev/stdout" ]; then
     logMessage "Pipeline values saved to '${PIPELINE_JSON_FILE}'"
+    if [ "${redact_passwords}" == "true" ]; then
+      logMessage "Password parameters were redacted. Use -p to include plain values in the saved file." 1
+    fi
   fi
 }
 
@@ -6787,7 +6798,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260707-04"
+HITT_BUILD_VERSION="20260707-06"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

@@ -61,6 +61,17 @@ If you do not give a file name, the settings appear on screen. If you add a file
 
 Blank fields and layout-only entries are left out of the saved file.
 
+### Password parameters
+
+By default, any parameter whose name contains **PASSWORD** is shown as **`***REDACTED***`** in **get** output (on screen and in saved files). Use **`-p`** to include plain values:
+
+```bash
+bash hitt.sh -k "get lastsuccessful"                    # passwords redacted
+bash hitt.sh -p -k "get lastsuccessful values.json"     # plain passwords (for build)
+```
+
+Use **`-p`** only on a trusted host and protect saved files. If you save with redacted passwords and run **build**, those placeholders are sent to Jenkins — export with **`-p`** when the file is meant for **build** or another Deployment Engine.
+
 **Examples:**
 
 ```bash
@@ -145,7 +156,7 @@ Checkboxes under **Pipelines** are left off by HITT so you choose when to run ea
 
 Example: you used a standalone Deployment Engine and now use the in-cluster Jenkins from a newer release.
 
-1. On the **old** system: `bash hitt.sh -k "get lastsuccessful values.json"`
+1. On the **old** system: `bash hitt.sh -p -k "get lastsuccessful values.json"`
 2. Copy **values.json** to the new system. Set up **hitt.conf** for the new Deployment Engine (or use **`-c`** to point at another config file).
 3. On the **new** system: `bash hitt.sh -k "build values.json"`
 4. Rebuild **HELIX_ONPREM_DEPLOYMENT** in the web UI and update any values that differ on the new environment.
