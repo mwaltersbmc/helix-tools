@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260707-06`**
+**Latest build `20260707-07`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -75,7 +75,7 @@ There are some optional tests that will attempt to validate the Helix IS databas
 
 HITT is configured by a file called `hitt.conf` which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.
 
-When the config file is created interactively, HITT probes the cluster for the Helix Platform `rsso` deployment and the Helix IS `midtier-user` deployment. If exactly one namespace matches each role (and the IS namespace is not the same as the Platform namespace), those values are filled in automatically. If several namespaces match a role, the menu lists only those candidates. If none match, you choose from all cluster namespaces as before.
+When the config file is created interactively, HITT probes the cluster for the Helix Platform `rsso` deployment, the Helix IS `midtier-user` deployment, and (for in-cluster Jenkins) the `jenkins-master` deployment. If exactly one namespace matches a role, HITT asks **y/n** to confirm that namespace; answer **n** to choose from all cluster namespaces instead. If several namespaces match a role, the menu lists only those candidates. If none match, you choose from all cluster namespaces. For Helix IS, when the sole candidate is the same as the Platform namespace already chosen, HITT skips the confirmation and prompts from the full list.
 
 If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used.
 

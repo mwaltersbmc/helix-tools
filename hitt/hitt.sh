@@ -27,6 +27,48 @@ discoverHelixNamespaceCandidates() {
   done
 }
 
+# $1 = variable name to assign (e.g. HP_NAMESPACE)
+# $2 = candidates array name (e.g. HP_NS_CANDIDATES)
+# $3 = label for prompts (e.g. "Helix Platform")
+# $4 = optional: when the sole candidate equals this value, skip y/n and prompt from all namespaces
+confirmOrSelectNamespace() {
+  local result_var="${1}"
+  local candidates_name="${2}"
+  local label="${3}"
+  local skip_if_equals="${4:-}"
+  local candidates_ref="${candidates_name}[@]"
+  local candidates=("${!candidates_ref}")
+  local selected=""
+
+  if [ ${#candidates[@]} -eq 1 ]; then
+    if [[ -n "${skip_if_equals}" && "${candidates[0]}" == "${skip_if_equals}" ]]; then
+      :
+    else
+      logStatus "Found one ${label} namespace candidate: ${candidates[0]}" 1
+      if askYesNo "Use namespace '${candidates[0]}'?"; then
+        printf -v "${result_var}" '%s' "${candidates[0]}"
+        logStatus "Selected ${label} namespace: ${!result_var}" 1
+        return
+      fi
+      logStatus "Please select your ${label} namespace..." 1
+      selected=$(selectFromArray NS_ARRAY)
+      printf -v "${result_var}" '%s' "${selected}"
+      return
+    fi
+  fi
+
+  if [ ${#candidates[@]} -gt 1 ]; then
+    logStatus "Please select your ${label} namespace..." 1
+    selected=$(selectFromArray "${candidates_name}")
+    printf -v "${result_var}" '%s' "${selected}"
+    return
+  fi
+
+  logStatus "Please select your ${label} namespace..." 1
+  selected=$(selectFromArray NS_ARRAY)
+  printf -v "${result_var}" '%s' "${selected}"
+}
+
 getEPjson() {
   # getxxx svc/ing namespace
   if ${KUBECTL_BIN} auth can-i get nodes --quiet &>/dev/null; then
@@ -75,29 +117,9 @@ getConfValues() {
   fi
   discoverHelixNamespaceCandidates
 
-  if [ ${#HP_NS_CANDIDATES[@]} -eq 1 ]; then
-    HP_NAMESPACE="${HP_NS_CANDIDATES[0]}"
-    logStatus "Auto-selected Helix Platform namespace: ${HP_NAMESPACE}" 1
-  else
-    logStatus "Please select your Helix Platform namespace..." 1
-    if [ ${#HP_NS_CANDIDATES[@]} -gt 1 ]; then
-      HP_NAMESPACE=$(selectFromArray HP_NS_CANDIDATES)
-    else
-      HP_NAMESPACE=$(selectFromArray NS_ARRAY)
-    fi
-  fi
+  confirmOrSelectNamespace HP_NAMESPACE HP_NS_CANDIDATES "Helix Platform"
+  confirmOrSelectNamespace IS_NAMESPACE IS_NS_CANDIDATES "Helix IS" "${HP_NAMESPACE}"
 
-  if [ ${#IS_NS_CANDIDATES[@]} -eq 1 ] && [[ "${IS_NS_CANDIDATES[0]}" != "${HP_NAMESPACE}" ]]; then
-    IS_NAMESPACE="${IS_NS_CANDIDATES[0]}"
-    logStatus "Auto-selected Helix IS namespace: ${IS_NAMESPACE}" 1
-  else
-    logStatus "Please select your Helix IS namespace..." 1
-    if [ ${#IS_NS_CANDIDATES[@]} -gt 1 ]; then
-      IS_NAMESPACE=$(selectFromArray IS_NS_CANDIDATES)
-    else
-      IS_NAMESPACE=$(selectFromArray NS_ARRAY)
-    fi
-  fi
   logStatus "Please enter your HELIX_ONPREM_DEPLOYMENT pipeline CUSTOMER_SERVICE and ENVIRONMENT values:" 1
   #read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE
   while [[ -z "${IS_CUSTOMER_SERVICE}" ]]; do read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE; done
@@ -109,17 +131,7 @@ getConfValues() {
   selectFromArray JENKINS_LOCATION_ARRAY
   if [ "${REPLY}" != "1" ]; then
 
-    if [ ${#CDE_NS_CANDIDATES[@]} -eq 1 ]; then
-      CDE_NAMESPACE="${CDE_NS_CANDIDATES[0]}"
-      logStatus "Auto-selected Jenkins namespace: ${CDE_NAMESPACE}" 1
-    else
-      logStatus "Please select your Jenkins namespace..." 1
-      if [ ${#CDE_NS_CANDIDATES[@]} -gt 1 ]; then
-        CDE_NAMESPACE=$(selectFromArray CDE_NS_CANDIDATES)
-      else
-        CDE_NAMESPACE=$(selectFromArray NS_ARRAY)
-      fi
-    fi
+    confirmOrSelectNamespace CDE_NAMESPACE CDE_NS_CANDIDATES "Jenkins"
     # CDE - check for end points
     JENKINS_EP_JSON=$(getEPjson jenkins-master "${CDE_NAMESPACE}")
     JENKINS_CDE_VERSION=$(echo "${JENKINS_EP_JSON}" | ${JQ_BIN} -r '.[0].version')
@@ -6798,7 +6810,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260707-06"
+HITT_BUILD_VERSION="20260707-07"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
