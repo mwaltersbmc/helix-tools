@@ -1434,15 +1434,16 @@ setVarsFromPipelineJSON() {
 for key in $(echo "$json" | ${JQ_BIN} -r 'keys[]'); do
     value=$(echo "$json" | ${JQ_BIN} -r --arg key "$key" '.[$key]')
     varname="IS_$key"
-    export "$varname=$value"
-    echo "$varname=$value"
+    printf -v "${varname}" '%s' "${value}"
+    export "${varname}"
+    echo "${varname}=${value}"
 done
 }
 
 getPipelineValues() {
   createPipelineVarsArray
   for i in "${PIPELINE_VARS[@]}"; do
-    eval "IS_$i"='$(parseJenkinsParam ${i})'
+    printf -v "IS_${i}" '%s' "$(parseJenkinsParam "${i}")"
   done
   IS_PIPELINE_VERSION="${IS_PLATFORM_HELM_VERSION:2:2}.${IS_PLATFORM_HELM_VERSION:4:1}.${IS_PLATFORM_HELM_VERSION:5:2}"
   IS_VERSION="${IS_PLATFORM_HELM_VERSION:0:7}"
@@ -1517,7 +1518,7 @@ getInputFileValues() {
   sed -i 's/'\''/"/g' "${INPUT_CONFIG_FILE}"
   createInputFileVarsArray
   for i in "${INPUT_FILE_VARS[@]}"; do
-    eval "IS_$i"='$(grepInputFile $i)'
+    printf -v "IS_${i}" '%s' "$(grepInputFile "${i}")"
   done
   IS_DATABASE_ADMIN_PASSWORD="${IS_DB_ADMIN_PASSWORD}"
   IS_FTS_ELASTICSEARCH_USER_PASSWORD="${IS_PLATFORM_COMMON_FTS_ELASTIC_SEARCH_USER_PASSWORD}"
@@ -3173,6 +3174,38 @@ getJenkinsGlobalLibs() {
   runJenkinsCurl "${SCRIPT}"
 }
 
+expandLeadingTilde() {
+  # Expand leading ~ or ~user in a path (replaces eval echo for Jenkins library remoteUrl paths).
+  local path="$1"
+  case "${path}" in
+    "~")
+      printf '%s\n' "${HOME}"
+      ;;
+    "~/"*)
+      printf '%s/%s\n' "${HOME}" "${path:2}"
+      ;;
+    "~"*)
+      local without="${path#\~}"
+      local user="${without%%/*}"
+      local suffix=""
+      local homedir
+      if [[ "${without}" == */* ]]; then
+        suffix="${without#*/}"
+      fi
+      homedir=$(getent passwd "${user}" 2>/dev/null | cut -d: -f6)
+      [ -z "${homedir}" ] && homedir="${HOME}"
+      if [ -n "${suffix}" ]; then
+        printf '%s/%s\n' "${homedir}" "${suffix}"
+      else
+        printf '%s\n' "${homedir}"
+      fi
+      ;;
+    *)
+      printf '%s\n' "${path}"
+      ;;
+  esac
+}
+
 checkJenkinsGlobalLibs() {
   JLIBS_JSON=$(getJenkinsGlobalLibs trusted)
   UNTRUSTED_JSON=$(getJenkinsGlobalLibs untrusted)
@@ -3190,7 +3223,7 @@ checkJenkinsGlobalLibs() {
       LIB_PATH=$(echo "${LIB_URL#*://}")
       REPO_PATH=$(echo "${LIB_PATH#*/}")
       if [[ "${REPO_PATH}" =~ ^~ ]] ; then
-        REPO_PATH=$(eval echo "${REPO_PATH}")
+        REPO_PATH=$(expandLeadingTilde "${REPO_PATH}")
       else
         REPO_PATH="/${REPO_PATH}"
       fi
@@ -6334,7 +6367,7 @@ if [ "${CONF_OVERRIDE}" == "1" ]; then
   for opt in HP_NAMESPACE IS_NAMESPACE CDE_NAMESPACE IS_ENVIRONMENT IS_CUSTOMER_SERVICE JENKINS_USERNAME JENKINS_PASSWORD; do
     var="${opt}_OVERRIDE"
     if [ "${!var}" != "" ]; then
-      eval "${opt}=${!var}"
+      printf -v "${opt}" '%s' "${!var}"
     fi
   done
 fi
@@ -6731,7 +6764,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260707-01"
+HITT_BUILD_VERSION="20260707-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
