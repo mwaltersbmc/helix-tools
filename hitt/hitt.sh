@@ -5525,7 +5525,19 @@ getK8sNodeDetails() {
     runtime=$(echo "${node}" | ${JQ_BIN} -r '.status.nodeInfo.containerRuntimeVersion')
 
     alloc_cpu=$(echo "${node}" | ${JQ_BIN} -r '.status.allocatable.cpu')
-    alloc_mem=$(echo "${node}" | ${JQ_BIN} -r '.status.allocatable.memory')
+    alloc_mem=$(echo "${node}" | ${JQ_BIN} -r '
+      .status.allocatable.memory
+      | if endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024)
+        elif endswith("G") then (sub("G$"; "") | tonumber * 953)
+        elif endswith("Mi") then (sub("Mi$"; "") | tonumber)
+        elif endswith("M") then (sub("M$"; "") | tonumber * 0.953)
+        elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024)
+        else (tonumber / 1024 / 1024)
+        end
+      | round
+      | tostring + "Mi"
+    ' 2>>"${HITT_ERR_FILE}")
+    alloc_mem="${alloc_mem:-0Mi}"
     allocatable="${alloc_cpu}_/_${alloc_mem}"
 
     node_top=""
@@ -6824,7 +6836,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260707-08"
+HITT_BUILD_VERSION="20260708-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
