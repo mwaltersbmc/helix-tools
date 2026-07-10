@@ -27,8 +27,6 @@ discoverHelixNamespaceCandidates() {
   done
 }
 
-NAMESPACE_OTHER_OPTION="Other"
-
 # $1 = candidates array name; prints chosen namespace on stdout
 selectFromCandidatesOrOther() {
   local candidates_name="${1}"
@@ -317,6 +315,23 @@ checkRequiredTools() {
   done
   if [ -n "${MISSING}" ] ; then
     logError "999" "One or more required tools not found - cannot continue." 1
+  fi
+}
+
+checkCLITools() {
+  local MISSING_CLI M1 M2
+  MISSING_CLI=()
+  CLI_BINS=("awk" "sed" "grep" "cut" "tr" "head" "tail" "wc" "column" "find" "file" "getent" "date" "hostname" "timeout" "mktemp" "md5sum" "chmod" "mkdir" "cp" "touch" "stat" "rm" "dirname" "basename" "xargs" "whoami" "ssh")
+  for i in "${CLI_BINS[@]}"; do
+    if ! which "${i}" >/dev/null 2>&1; then
+      MISSING_CLI+=("${i}")
+    fi
+  done
+  if [[ "${#MISSING_CLI[@]}" -gt 0 ]]; then
+    M1="tools"
+    M2="they are"
+    [[ "${#MISSING_CLI[@]}" -eq 1 ]] && M1="tool" && M2="this is"
+    logError "999" "Missing command line ${M1} '${MISSING_CLI[*]}' - HITT commands and results are likely to be unreliable unless ${M2} installed."
   fi
 }
 
@@ -1652,8 +1667,6 @@ cloneGitRepos() {
     #getInputFileValues
   fi
 }
-
-
 
 cloneCustomerConfigsRepo() {
   SKIP_REPO=0
@@ -5409,8 +5422,8 @@ genTctlConfig() {
   logMessage "Getting data from TMS..."
   # If tms-realm-admin secret exists (v23 onwards) we should use it otherwise use the tms-superuser-job
   if ${KUBECTL_BIN} get secret -n "${HP_NAMESPACE}" tms-realm-admin &>/dev/null; then
-    TMS_USER=$(${KUBECTL_BIN} get secret -n "${HP_NAMESPACE}" tms-realm-admin -o jsonpath='{.data.local_username}' | base64 -d)
-    TMS_PASSWD=$(${KUBECTL_BIN} get secret -n "${HP_NAMESPACE}" tms-realm-admin -o jsonpath='{.data.local_password}' | base64 -d)
+    TMS_USER=$(${KUBECTL_BIN} get secret -n "${HP_NAMESPACE}" tms-realm-admin -o jsonpath='{.data.local_username}' | ${BASE64_BIN} -d)
+    TMS_PASSWD=$(${KUBECTL_BIN} get secret -n "${HP_NAMESPACE}" tms-realm-admin -o jsonpath='{.data.local_password}' | ${BASE64_BIN} -d)
   else
     TMS_USER=$(${KUBECTL_BIN} get job -n "${HP_NAMESPACE}" tms-superuser-job -o=jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="LOCAL_USER_NAME")].value}')
     TMS_PASSWD=$(${KUBECTL_BIN} get job -n "${HP_NAMESPACE}" tms-superuser-job -o=jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="LOCAL_USER_PASSWORD")].value}')
@@ -5419,8 +5432,8 @@ genTctlConfig() {
   # Get the config file values
   TMS_URL=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o=jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="ADE_PLATFORM_BASE_URL")].value}')
   APPURL="${TMS_URL%/*}"
-  CLIENTSECRET=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret tms-auth-proxy-secret -o jsonpath='{.data.clientsecret}' | base64 -d -w 0)
-  CLIENTID=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret tms-auth-proxy-secret -o jsonpath='{.data.clientid}' | base64 -d -w 0)
+  CLIENTSECRET=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret tms-auth-proxy-secret -o jsonpath='{.data.clientsecret}' | ${BASE64_BIN} -d -w 0)
+  CLIENTID=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret tms-auth-proxy-secret -o jsonpath='{.data.clientid}' | ${BASE64_BIN} -d -w 0)
   RSSOURL=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm rsso-admin-tas -o jsonpath='{.data.rssourl}{"/rsso\n"}')
 
   echo
@@ -6530,6 +6543,7 @@ else
 fi
 
 checkForNewHITT
+checkCLITools
 
 # Make Jenkins credentials URL safe
 if [ "${JENKINS_USERNAME}" == "" ] && [ "${JENKINS_PASSWORD}" != "" ]; then
@@ -6882,7 +6896,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260710-02"
+HITT_BUILD_VERSION="20260710-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -6909,6 +6923,7 @@ IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int repo
 JENKINS_CREDS=(git github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
 IS_ALIAS_ARRAY=()
 ADE_ALIAS_ARRAY=()
+NAMESPACE_OTHER_OPTION="Other"
 VERBOSITY=0
 : "${QUIET=0}"
 : "${SKIP_UPDATE_CHECK=0}"
