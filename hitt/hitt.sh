@@ -4982,7 +4982,7 @@ triggerHelixOnpremPipelineBuild() {
   local source_label="${1:-pipeline values}"
   local job_name="HELIX_ONPREM_DEPLOYMENT"
   local pipeline_defaults_json pipeline_section_params_json pipeline_file_params_json input_version defaults_version http_code override_count
-  local jenkins_base rebuild_url rebuild_link
+  local jenkins_base rebuild_url rebuild_link pipeline_build_response_file=jenkins-pipeline-build-response.log
 
   if [ -z "${PIPELINE_INPUT_JSON}" ]; then
     logError "999" "No pipeline parameter JSON supplied." 1
@@ -5036,9 +5036,10 @@ triggerHelixOnpremPipelineBuild() {
   override_count=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} 'length')
   PIPELINE_INPUT_JSON=$(echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} '. | to_entries | map({name: .key, value: .value}) | {parameter: .}')
   logMessage "Building ${job_name} pipeline with ${override_count} parameter override(s) from ${source_label}."
-  http_code=$(${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_INPUT_JSON}" -b .cookies -sk -w "%{http_code}" -o /dev/null -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${job_name}/build" 2>>${HITT_ERR_FILE})
+  http_code=$(${CURL_BIN} -X POST --data-urlencode json="${PIPELINE_INPUT_JSON}" -b .cookies -sk -w "%{http_code}" -o "${pipeline_build_response_file}" -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/job/${job_name}/build" 2>>${HITT_ERR_FILE})
   case "${http_code}" in
     200|201|302)
+      rm -f "${pipeline_build_response_file}"
       jenkins_base="${JENKINS_LOG_URL:-${JENKINS_URL}}"
       rebuild_url="${jenkins_base}/job/${job_name}/lastBuild/rebuild/parameterized"
       rebuild_link=$(hittTerminalLink "${rebuild_url}" "HERE")
@@ -5046,7 +5047,7 @@ triggerHelixOnpremPipelineBuild() {
       logMessage "Use ${BOLD}bash hitt.sh -k \"get last\"${NORMAL} to review values."
       ;;
     *)
-      logError "999" "Failed to queue ${job_name} pipeline build (HTTP ${http_code})." 1
+      logError "999" "Failed to queue ${job_name} pipeline build. See '${pipeline_build_response_file}' for details." 1
       ;;
   esac
 }
@@ -7170,7 +7171,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260710-05"
+HITT_BUILD_VERSION="20260710-06"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -7190,7 +7191,7 @@ VALUES_LOG_FILE=values.log
 VALUES_JSON_FILE=values.json
 CLEANUP_DIRS=(configsrepo itsmrepo)
 CLEANUP_FILES=(is-sealcacerts hp-sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cookies)
-CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}")
+CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}" "jenkins-pipeline-build-response.log")
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int reporting)
