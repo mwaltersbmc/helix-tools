@@ -6732,6 +6732,39 @@ validateHittK8sPermissions() {
   return 0
 }
 
+getJenkinsSystemLog() {
+  SCRIPT='import java.util.logging.LogManager
+    import java.util.logging.LogRecord
+    import hudson.util.RingBufferLogHandler
+    import java.text.SimpleDateFormat
+
+    def formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+
+    def rootLogger = LogManager.getLogManager().getLogger("")
+    def handler = rootLogger.getHandlers().find { it instanceof RingBufferLogHandler }
+
+    if (handler == null) {
+        println "No RingBufferLogHandler found on root logger."
+        return
+    }
+
+    List<LogRecord> records = handler.getView()
+
+    records.reverse().each { LogRecord r ->
+        def time = formatter.format(new Date(r.millis))
+        def level = r.level.getName()
+        def logger = r.loggerName
+        def msg = r.message
+        println "[$time][$level][$logger] $msg"
+        if (r.thrown != null) {
+            def sw = new StringWriter()
+            r.thrown.printStackTrace(new PrintWriter(sw))
+            println sw.toString()
+        }
+    }'
+runJenkinsCurl "${SCRIPT}"
+}
+
 #End functions
 
 # MAIN Start
@@ -6927,11 +6960,16 @@ if [ "${MODE}" == "fix" ]; then
   exit
 fi
 
-if [ -n "${PIPELINE_NAME}" ]; then
+if [ "${MODE}" == "getlog" ]; then
   if [ "${PIPELINE_NAME}" == "msgs" ]; then echo "${ALL_MSGS_JSON}"; exit; fi
   checkJenkinsIsRunning 1
-  getPipelineConsoleOutput "${PIPELINE_NAME}"
-  exit
+  if [ "${PIPELINE_NAME}" == "jenkins" ]; then
+    getJenkinsSystemLog
+    exit
+  else
+    getPipelineConsoleOutput "${PIPELINE_NAME}"
+    exit
+  fi
 fi
 
 if [ "${MODE}" == "pipeline" ]; then
@@ -7171,7 +7209,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260710-06"
+HITT_BUILD_VERSION="20260710-07"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8675,10 +8713,11 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
       ;;
     o)
       QUIET=1
+      MODE=getlog
       SKIP_UPDATE_CHECK=1
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "Usage: bash $0 -o PIPELINE_NAME" 1
+        logError "999" "Usage: bash $0 -o [PIPELINE_NAME|jenkins]" 1
       fi
       PIPELINE_NAME="${OPTARG}"
       ;;
