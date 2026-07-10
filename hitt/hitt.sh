@@ -3360,6 +3360,7 @@ getPipelineDefaults() {
   SCRIPT="import groovy.json.JsonOutput
     import jenkins.model.Jenkins
     import hudson.model.*
+    import hudson.plugins.validating_string_parameter.ValidatingStringParameterDefinition
     def jobName = '${1}'
     def job = Jenkins.instance.getItemByFullName(jobName)
     def prop = job.getProperty(ParametersDefinitionProperty)
@@ -3381,9 +3382,15 @@ getPipelineDefaults() {
                     break
                 case StringParameterDefinition:
                 case TextParameterDefinition:
+                case ValidatingStringParameterDefinition:
                     value = param.defaultValue ?: ''
                     break
                 default:
+                    if (param.metaClass.hasProperty(param, 'defaultValue') && param.defaultValue != null) {
+                        value = param.defaultValue.toString()
+                    } else if (param.metaClass.respondsTo(param, 'getDefaultParameterValue')) {
+                        value = param.getDefaultParameterValue()?.value?.toString() ?: ''
+                    }
                     break
             }
             result[param.name] = value
@@ -7163,7 +7170,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260710-04"
+HITT_BUILD_VERSION="20260710-05"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
