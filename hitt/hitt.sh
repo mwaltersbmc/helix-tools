@@ -4798,6 +4798,7 @@ showUtilHelp() { # utility mode help
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
     \tcheckpat \t| Validate Docker Hub username and PAT. Args: USERNAME [PAT] (PAT prompted if omitted).
+    \tcheckrbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Legacy alias: authcheck (= checkrbac hitt).
     \thelp \t\t| Show this list.
     "
 }
@@ -6471,6 +6472,258 @@ checkCDE() {
 
 }
 
+# Catalog columns: profile|severity|scope|verb|resource|description
+# profile: all (shared reads), hitt (triage/fix), deploy (install/upgrade/pipelines)
+_hittK8sProfileMatches() {
+  local row_profile=$1
+  local active_profile=$2
+  case "${active_profile}" in
+    all) return 0 ;;
+    hitt) [[ "${row_profile}" == "all" || "${row_profile}" == "hitt" ]] ;;
+    deploy) [[ "${row_profile}" == "all" || "${row_profile}" == "deploy" ]] ;;
+    *) return 1 ;;
+  esac
+}
+
+_hittK8sEmitDeployCatalogRows() {
+  local resource verb
+  local -a deploy_resources=(
+    deployments services secrets configmaps persistentvolumeclaims
+    ingresses jobs serviceaccounts roles rolebindings
+    statefulsets daemonsets cronjobs
+  )
+  local -a deploy_verbs=(create update patch get list delete)
+  for resource in "${deploy_resources[@]}"; do
+    for verb in "${deploy_verbs[@]}"; do
+      printf 'deploy|required|helix-ns|%s|%s|Helix deploy — %s %s (DE / pipeline / deployment-manager)\n' \
+        "${verb}" "${resource}" "${verb}" "${resource}"
+    done
+  done
+  for verb in get list watch; do
+    printf 'deploy|required|helix-ns|%s|pods|Helix deploy — pods %s (SAT / rollout checks)\n' "${verb}" "${verb}"
+  done
+  printf 'deploy|required|helix-ns|get|pods/log|Helix deploy — read pod logs during install\n'
+  for verb in get list patch update create delete; do
+    printf 'deploy|optional|helix-ns|%s|horizontalpodautoscalers|Helix deploy — HPA %s (scale / sizing)\n' \
+      "${verb}" "${verb}"
+  done
+}
+
+_hittK8sHelixNamespaces() {
+  local -a helix_ns=()
+  local n existing seen
+  for n in "${HP_NAMESPACE}" "${IS_NAMESPACE}" "${CDE_NAMESPACE}" "${HELIX_LOGGING_NAMESPACE}"; do
+    [[ -z "${n}" ]] && continue
+    seen=0
+    for existing in "${helix_ns[@]}"; do
+      [[ "${existing}" == "${n}" ]] && seen=1 && break
+    done
+    (( seen )) || helix_ns+=("${n}")
+  done
+  ((${#helix_ns[@]})) && printf '%s\n' "${helix_ns[@]}"
+}
+
+hittK8sPermissionsCatalog() {
+  cat <<'EOF'
+all|required|cluster|get|nodes|Read node status (info cluster, health checks)
+all|required|cluster|list|nodes|List nodes
+all|required|cluster|get|namespaces|Validate and discover namespaces
+all|required|cluster|list|namespaces|List namespaces (config bootstrap)
+all|required|cluster|get|ingressclasses|Read IngressClass objects
+all|required|cluster|list|ingressclasses|List IngressClasses
+all|required|all-ns|get|pods|Read pods cluster-wide (node summary, health checks)
+all|required|all-ns|list|pods|List pods in all namespaces
+all|required|all-ns|get|deployments|Read Deployments (namespace validation, ingress discovery)
+all|required|all-ns|list|deployments|List Deployments cluster-wide
+all|required|all-ns|get|daemonsets|Read DaemonSets (ingress controller discovery)
+all|required|all-ns|list|daemonsets|List DaemonSets cluster-wide
+all|required|all-ns|get|statefulsets|Read StatefulSets (IS platform checks)
+all|required|all-ns|list|statefulsets|List StatefulSets
+all|required|all-ns|get|jobs|Read Jobs (tctl / sealtctl)
+all|required|all-ns|list|jobs|List Jobs
+all|required|all-ns|get|secrets|Read Secrets (credentials, cacerts, registry)
+all|required|all-ns|list|secrets|List Secrets
+all|required|all-ns|get|configmaps|Read ConfigMaps (Helix config, utility export)
+all|required|all-ns|list|configmaps|List ConfigMaps
+all|required|all-ns|get|ingresses|Read Ingress hostnames and routing
+all|required|all-ns|list|ingresses|List Ingresses
+all|required|all-ns|get|services|Read Services (LB hosts, connectivity checks)
+all|required|all-ns|list|services|List Services
+all|required|all-ns|get|resourcequotas|Read namespace ResourceQuotas
+all|required|all-ns|list|resourcequotas|List ResourceQuotas
+all|required|all-ns|get|roles|Read Roles (Support Assistant Tool check)
+all|required|all-ns|list|roles|List Roles
+all|required|all-ns|get|rolebindings|Read RoleBindings
+all|required|all-ns|list|rolebindings|List RoleBindings
+all|required|all-ns|get|events|Read namespace Events (diagnostic logs)
+all|required|all-ns|list|events|List Events
+all|required|all-ns|get|pods/log|Read pod and job logs
+hitt|optional|metrics|get|nodes.metrics.k8s.io|Node CPU/memory via kubectl top nodes
+hitt|optional|metrics|list|nodes.metrics.k8s.io|List node metrics
+hitt|optional|openshift|get|clusteroperators|Detect OpenShift clusters
+hitt|optional|openshift|list|clusteroperators|List OpenShift cluster operators
+hitt|optional|openshift|get|clusterversions|Read OpenShift cluster version
+hitt|optional|openshift|list|clusterversions|List OpenShift cluster versions
+hitt|optional|all-ns|create|pods/exec|Exec into pods (DB/ES health checks, ping utility)
+hitt|required|helix-ns|delete|jobs|Delete tctl/sealtctl jobs after use
+hitt|required|helix-ns|create|jobs|Create tctl/sealtctl jobs
+hitt|required|helix-ns|patch|jobs|Apply/update tctl jobs (kubectl apply)
+hitt|required|helix-ns|delete|secrets|Replace IS cacerts secret (fix cacerts)
+hitt|required|helix-ns|create|secrets|Create IS cacerts secret (fix cacerts)
+hitt|required|helix-ns|patch|secrets|Apply updated secrets (fix cacerts)
+hitt|required|helix-ns|create|roles|Create assisttool-rl role (fix sat)
+hitt|required|helix-ns|create|rolebindings|Create assisttool-rlb binding (fix sat)
+EOF
+  _hittK8sEmitDeployCatalogRows
+}
+
+_hittK8sCanI() {
+  local verb=$1
+  local resource=$2
+  shift 2
+  ${KUBECTL_BIN} auth can-i "${verb}" "${resource}" "$@" --quiet 2>>"${HITT_ERR_FILE}"
+}
+
+validateHittK8sPermissions() {
+  local active_profile="${1:-hitt}"
+  local required denied optional_denied skipped checked
+  local profile req scope verb resource desc granted ns
+  local -a helix_ns=()
+  local -a missing_required=()
+  local -a missing_optional=()
+  local -a skipped_checks=()
+
+  case "${active_profile}" in
+    hitt|deploy|all) ;;
+    *)
+      logError "999" "Unknown RBAC profile '${active_profile}' — use hitt, deploy, or all." 1
+      ;;
+  esac
+
+  if ! ${KUBECTL_BIN} version --request-timeout=5s >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    logError "999" "Unable to reach the Kubernetes API with '${KUBECTL_BIN}' — check kubeconfig and cluster connectivity."
+    return 1
+  fi
+  mapfile -t helix_ns < <(_hittK8sHelixNamespaces)
+
+  logStatus "Kubernetes RBAC audit (profile: ${active_profile})..."
+  logMessage  "User: $(${KUBECTL_BIN} config view --minify -o jsonpath='{.contexts[0].context.user}' 2>/dev/null || echo unknown)"
+  logMessage  "Context: $(${KUBECTL_BIN} config current-context 2>/dev/null || echo unknown)"
+  if ((${#helix_ns[@]} > 0)); then
+    logMessage "Helix namespaces: ${helix_ns[*]}"
+  else
+    logWarning "999" "Helix namespaces: (none — set HP_NAMESPACE / IS_NAMESPACE / CDE_NAMESPACE in hitt.conf to validate namespace-scoped permissions)"
+  fi
+  echo ""
+
+  required=0
+  denied=0
+  optional_denied=0
+  skipped=0
+  checked=0
+
+  while IFS='|' read -r profile req scope verb resource desc; do
+    [[ -z "${profile}" ]] && continue
+    _hittK8sProfileMatches "${profile}" "${active_profile}" || continue
+    granted="yes"
+    checked=$((checked + 1))
+
+    case "${scope}" in
+      cluster|metrics|openshift)
+        if ! _hittK8sCanI "${verb}" "${resource}"; then
+          granted="no"
+        fi
+        ;;
+      all-ns)
+        if ! _hittK8sCanI "${verb}" "${resource}" --all-namespaces; then
+          granted="no"
+        fi
+        ;;
+      helix-ns)
+        if ((${#helix_ns[@]} == 0)); then
+          granted="skip"
+          skipped=$((skipped + 1))
+          skipped_checks+=("${verb}|${resource}|helix-ns|no namespaces configured|${desc}")
+        else
+          for ns in "${helix_ns[@]}"; do
+            if ! _hittK8sCanI "${verb}" "${resource}" -n "${ns}"; then
+              granted="no (${ns})"
+              break
+            fi
+          done
+        fi
+        ;;
+      *)
+        granted="skip"
+        skipped=$((skipped + 1))
+        ;;
+    esac
+
+    if [[ "${granted}" == "skip" ]]; then
+      continue
+    fi
+
+    if [[ "${req}" == "required" ]]; then
+      required=$((required + 1))
+      if [[ "${granted}" != "yes" ]]; then
+        denied=$((denied + 1))
+        missing_required+=("${verb}|${resource}|${scope}|${granted}|${desc}")
+      fi
+    else
+      if [[ "${granted}" != "yes" ]]; then
+        optional_denied=$((optional_denied + 1))
+        missing_optional+=("${verb}|${resource}|${scope}|${granted}|${desc}")
+      fi
+    fi
+  done < <(hittK8sPermissionsCatalog)
+
+  if ((checked == 0)); then
+    logError "999" "No RBAC checks matched profile '${active_profile}'."
+    return 1
+  fi
+
+  if ((${#missing_required[@]} > 0)); then
+    echo "Missing required permissions (${#missing_required[@]}):"
+    echo ""
+    {
+      printf '%s\n' 'VERB|RESOURCE|SCOPE|STATUS|DESCRIPTION'
+      printf '%s\n' "${missing_required[@]}"
+    } | column -s '|' -t
+    echo ""
+  fi
+
+  if ((${#missing_optional[@]} > 0)); then
+    echo "Missing optional permissions (${#missing_optional[@]} — some features may be degraded):"
+    echo ""
+    {
+      printf '%s\n' 'VERB|RESOURCE|SCOPE|STATUS|DESCRIPTION'
+      printf '%s\n' "${missing_optional[@]}"
+    } | column -s '|' -t
+    echo ""
+  fi
+
+  if ((${#skipped_checks[@]} > 0)); then
+    echo "Not checked (${#skipped_checks[@]} — configure Helix namespaces in hitt.conf to include namespace-scoped rules):"
+    echo ""
+    {
+      printf '%s\n' 'VERB|RESOURCE|SCOPE|STATUS|DESCRIPTION'
+      printf '%s\n' "${skipped_checks[@]}"
+    } | column -s '|' -t
+    echo ""
+  fi
+
+  if ((${denied} > 0)); then
+    logError "999" "${denied} required Kubernetes permission(s) are not granted for profile '${active_profile}'."
+    return 1
+  fi
+  if ((${#skipped_checks[@]} > 0)); then
+    logStatus "Kubernetes RBAC audit (${active_profile}) complete — ${checked} check(s) run; all required permissions granted; ${#skipped_checks[@]} namespace-scoped check(s) skipped." 0
+  else
+    logStatus "Kubernetes RBAC audit (${active_profile}) complete — ${checked} check(s) run; all required permissions granted." 0
+  fi
+  return 0
+}
+
 #End functions
 
 # MAIN Start
@@ -6704,6 +6957,20 @@ if [ "${MODE}" == "utility" ]; then
   read -r -a UTILARGS <<< "${UTILOPTS}"
   logStatus "Running HITT in utility mode '${UTILARGS[0]}'..."
   case "${UTILARGS[0]}" in
+    checkrbac|authcheck)
+      if [[ "${UTILARGS[0]}" == "authcheck" ]]; then
+        logMessage "Note: 'authcheck' is deprecated — use 'checkrbac hitt'." 1
+      fi
+      profile="${UTILARGS[1]:-hitt}"
+      case "${profile}" in
+        hitt|deploy|all)
+          validateHittK8sPermissions "${profile}"
+          ;;
+        *)
+          logError "999" "Usage: bash $0 -u \"checkrbac [hitt|deploy|all]\" (default: hitt)." 1
+          ;;
+      esac
+      ;;
     get)
       parseUtilGet
       ;;
@@ -6896,7 +7163,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260710-03"
+HITT_BUILD_VERSION="20260710-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

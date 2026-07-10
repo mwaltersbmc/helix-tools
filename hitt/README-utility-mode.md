@@ -17,6 +17,7 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 | `sql` | Runs a custom AR SQL query via the IS REST API and prints the full JSON response. Args: **SQL_QUERY** (put the entire query inside the quoted `-u` string). |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
 | `checkpat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit **PAT** to be prompted (hidden). |
+| `checkrbac [hitt\|deploy\|all]` | Validates Kubernetes RBAC for the current kubeconfig user. **hitt** (default): triage/read checks plus fix-mode writes (tctl, cacerts, SAT). **deploy**: shared reads plus install/upgrade permissions (Helix Platform, IS, logging, DE namespaces from `hitt.conf`). **all**: union of both. |
 | `help` | Prints the same summary as this file (built into the script). |
 
 ## Usage
@@ -52,6 +53,12 @@ bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
 # Validate Docker Hub PAT (optional PAT on CLI — otherwise prompted)
 bash hitt.sh -u "checkpat mydockerhubuser"
 bash hitt.sh -u "checkpat mydockerhubuser dckr_pat_xxxxxxxx"
+
+# Kubernetes RBAC audit (requires hitt.conf namespaces for namespace-scoped checks)
+bash hitt.sh -u checkrbac
+bash hitt.sh -u "checkrbac hitt"
+bash hitt.sh -u "checkrbac deploy"
+bash hitt.sh -u "checkrbac all"
 
 bash hitt.sh -u help
 ```
@@ -155,5 +162,17 @@ Generates a DBID string from the values provided. **DB_TYPE** is one of `mssql`,
 Calls Docker Hub’s token service with **USERNAME** and **PAT** to verify the permissions for the **`bmchelix`** repository. On success you see a confirmation; on failure, HITT explains that the token may be limited to public-repo read-only and should be recreated with the correct access (see Docker Hub / EPD documentation).
 
 If **PAT** is omitted, it is read from a hidden prompt (same pattern as other password prompts).
+
+### `checkrbac [hitt|deploy|all]`
+
+Runs `kubectl auth can-i` against a catalog of permissions HITT and Helix deployment need. Requires a working kubeconfig (same as other HITT modes) and **`hitt.conf`** namespace values for namespace-scoped checks.
+
+| Profile | Checks |
+|--------|--------|
+| **hitt** (default) | Cluster/all-namespace **read** access plus HITT-specific writes (tctl jobs, cacerts fix, Support Assistant role). Optional: metrics API, OpenShift cluster operators, pod exec. |
+| **deploy** | Shared reads plus **create/update/patch/delete** on workloads in Helix namespaces (deployments, services, secrets, configmaps, PVCs, **ingresses**, jobs, statefulsets, daemonsets, cronjobs, serviceaccounts, roles, rolebindings). Optional: HPAs. Based on [Deployment Engine RBAC](https://docs.helixops.ai/bin/Service-Management/On-Premises-Deployment/BMC-Helix-Service-Management-Deployment/brid26201/Installing/Preparing-for-installation/Setting-up-the-BMC-Deployment-Engine/) and pipeline install paths. |
+| **all** | Every catalog row (hitt + deploy). |
+
+Namespaces tested for `helix-ns` rules: **HP_NAMESPACE**, **IS_NAMESPACE**, **CDE_NAMESPACE**, and **HELIX_LOGGING_NAMESPACE** when set (duplicates skipped).
 
 See also: [README-fix-mode.md](README-fix-mode.md) for **`-f` fix mode** (cacerts, Jenkins, license apply, etc.).
