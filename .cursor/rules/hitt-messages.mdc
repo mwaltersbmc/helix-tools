@@ -1,0 +1,85 @@
+---
+description: Add user-facing messages in HITT with existing logging helpers and plain language
+globs: hitt/hitt.sh,hitt/**/*.sh
+alwaysApply: false
+---
+
+# HITT user-facing messages
+
+Applies when adding or editing **messages shown to the operator** in `hitt/hitt.sh` and other HITT shell scripts.
+
+Audience: Helix administrators with **minimal technical skills** — same as `hitt/README*.md` and `docs/hitt/use-cases.json`.
+
+## Use existing logging helpers
+
+Pick the helper that matches intent. Do **not** add new `echo` for user-facing text.
+
+| Helper | Use for |
+|--------|---------|
+| `logStatus` | Section headings, prompts, major step labels (bold). Pass `1` as 2nd arg to show when `QUIET=1`. |
+| `logMessage` | Detail lines under a status (indented). Use 2nd arg for verbosity level when needed. |
+| `logWarning` | Recoverable issues. Requires a numeric message ID and plain explanation. |
+| `logError` | Failures. Requires message ID; pass `1` as 3rd arg to exit. |
+
+```bash
+# ✅ GOOD
+logStatus "Checking Jenkins connection..."
+logMessage "Pipeline build queued. Use ${BOLD}bash hitt.sh -k \"get last\"${NORMAL} to review values."
+
+# ❌ BAD — bypasses QUIET, verbosity, and error accounting
+echo "Checking Jenkins connection..."
+echo ""
+echo "Pipeline build queued."
+```
+
+**Do not add new `echo ""` for spacing or blank lines.** Existing helpers already format output. If a blank line is genuinely required, **ask the user** before adding raw `echo`.
+
+Raw `echo` is only acceptable for non-message output already used in the codebase (help templates, interactive prompts, piping data to `jq`/files). Never use it for new status, progress, warning, or error text.
+
+## Message content
+
+Follow the same style as HITT READMEs and use cases:
+
+- **Plain, direct English.** Short sentences. Active voice.
+- Say **what happened**, **what it means**, and **what to do next** — not how HITT implements it.
+- Prefer product terms: **HELIX_ONPREM_DEPLOYMENT**, **Helix Platform**, **Deployment Engine**, **parameter values**, **rebuild the job**.
+- Avoid jargon, internal symbols, Groovy/jq/HTTP details, and function or variable names (`PIPELINE_INPUT_JSON`, `triggerHelixOnpremPipelineBuild`, etc.).
+
+## File and config references
+
+- **Do not** mention `hitt.conf`, `hitt.sh`, log file paths, or other internal files unless the user **must** open or fix that specific thing.
+- When a config file *is* salient, name it plainly and say why: e.g. “Add Jenkins details in **hitt.conf**” — not “set `JENKINS_URL` in `${HITT_CONFIG_FILE}`”.
+
+## Commands in messages
+
+When suggesting a HITT command, follow **hitt-command-quoting**: multi-word option values in **double quotes**.
+
+```bash
+# ✅ GOOD
+logMessage "Use ${BOLD}bash hitt.sh -k \"get last\"${NORMAL} to review values."
+
+# ❌ BAD
+logMessage "Run bash hitt.sh -k get last to review values."
+```
+
+## Examples
+
+```bash
+# ❌ BAD
+logError "999" "triggerHelixOnpremPipelineBuild failed (HTTP ${http_code}). See jenkins-pipeline-build-response.log." 1
+
+# ✅ GOOD
+logError "999" "Could not start the HELIX_ONPREM_DEPLOYMENT job in Jenkins. Check your Jenkins login in hitt.conf and try again." 1
+```
+
+```bash
+# ❌ BAD
+logStatus "Running getPipelineDefaults..."
+logMessage "ValidatingStringParameterDefinition returned null for AR_SERVER_ALIAS."
+
+# ✅ GOOD
+logStatus "Reading pipeline default values from Jenkins..."
+logMessage "Loaded default parameter values from the HELIX_ONPREM_DEPLOYMENT job."
+```
+
+When rewriting existing messages, replace internal references with user-visible outcomes; do not introduce new technical ones.
