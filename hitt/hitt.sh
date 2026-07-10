@@ -4795,7 +4795,7 @@ showPipelineHelp() { # pipeline mode help
   echo 'Usage: bash hitt.sh -k "<command> [options]"'
   echo "Multi-word -k values must be double-quoted (e.g. bash hitt.sh -k \"get lastsuccessful\")."
   echo -e "
-    \tget \t\t| Save HELIX_ONPREM_DEPLOYMENT parameter values (defaults, last, lastsuccessful, or build number). Optional filename to save to.
+    \tget \t\t| Save HELIX_ONPREM_DEPLOYMENT parameter values (defaults, last, lastsuccessful, kickstart, or build number). Optional filename; kickstart output may be edited and used with build.
     \tbuild \t\t| Start a new pipeline run from a settings file created with get.
     \tkickstart \t| Fill parameters from Helix Platform / cluster and start a new run (fresh deployment).
     \thelp \t\t| Show this list.
@@ -4897,7 +4897,7 @@ showHittHelp() {
 
 getJenkinsPipelineValues() {
   if [ ${#PIPELINEARGS[@]} -lt 2 ]; then
-    logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N> [filename]\"" 1
+    logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|kickstart|N> [filename]\"" 1
   fi
 
   local PIPELINE_NAME=HELIX_ONPREM_DEPLOYMENT
@@ -4912,7 +4912,8 @@ getJenkinsPipelineValues() {
       PIPELINE_VALUES_JSON=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
       ;;
     kickstart)
-      PIPELINE_VALUES_JSON=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
+      kickstartGatherPlatformContext
+      PIPELINE_VALUES_JSON=$(kickstartMergedPipelineJson)
       ;;
     last)
       PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getLastBuild)
@@ -4924,7 +4925,7 @@ getJenkinsPipelineValues() {
       PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getBuildByNumber ${PIPELINE_BUILD})
       ;;
     *)
-      logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|N> [filename]\"" 1
+      logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|kickstart|N> [filename]\"" 1
       ;;
   esac
   local redact_passwords="true"
@@ -6385,6 +6386,55 @@ kickstartResolveManifest() {
     fi
   done < <(${JQ_BIN} -c '.[]' <<< "${manifest_json}")
   logMessage "Kickstart manifest ${manifest_id} (pipeline ${platform_helm_version}): ${resolved_count} parameter override(s) (${skipped_count} skipped — not on this job)." 1
+  KICKSTART_PIPELINE_DEFAULTS_JSON="${pipeline_defaults_json}"
+}
+
+kickstartGatherPlatformContext() {
+  checkToolVersion kubectl
+  getVersions
+  setVarsFromPlatform
+  getDomain
+  getRSSODetails
+  getTenantDetails
+  checkHelixLoggingDeployed
+  getRegistryDetailsFromHP
+}
+
+# hittPipelineJsonForKickstartExport job_name json_object
+#   Removes file upload parameters and INPUT_CONFIG_METHOD; sets every PIPELINES-section
+#   boolean parameter to "false" (same intent as build/kickstart queue prep).
+hittPipelineJsonForKickstartExport() {
+  local job_name="${1:-HELIX_ONPREM_DEPLOYMENT}"
+  local input_json="$2"
+  local pipeline_file_params_json pipeline_section_params_json
+
+  pipeline_file_params_json=$(getPipelineFileParams "${job_name}")
+  if ! echo "${pipeline_file_params_json}" | ${JQ_BIN} -e 'type == "array"' &>/dev/null; then
+    logError "999" "Unable to discover file parameters from Jenkins job '${job_name}'." 1
+  fi
+  pipeline_section_params_json=$(getPipelineSectionParams "${job_name}")
+  if ! echo "${pipeline_section_params_json}" | ${JQ_BIN} -e 'type == "array"' &>/dev/null; then
+    logError "999" "Unable to discover PIPELINES section parameters from Jenkins job '${job_name}'." 1
+  fi
+
+  ${JQ_BIN} -n \
+    --argjson file_params "${pipeline_file_params_json}" \
+    --argjson pipeline_params "${pipeline_section_params_json}" \
+    --arg input "${input_json}" \
+    '($input | fromjson)
+     | reduce $file_params[] as $name (.; del(.[$name]))
+     | del(.INPUT_CONFIG_METHOD)
+     | reduce $pipeline_params[] as $name (. ; . + {($name): "false"})'
+}
+
+kickstartMergedPipelineJson() {
+  local merged_json
+  kickstartResolveManifest
+  merged_json=$(${JQ_BIN} -n \
+    --arg defaults "${KICKSTART_PIPELINE_DEFAULTS_JSON}" \
+    --arg overrides "${KICKSTART_OVERRIDES_JSON}" \
+    '($defaults | fromjson) * ($overrides | fromjson)')
+  hittPipelineJsonForKickstartExport HELIX_ONPREM_DEPLOYMENT "${merged_json}"
 }
 
 kickStartUberPipeline() {
@@ -6625,14 +6675,7 @@ if [ "${MODE}" == "pipeline" ]; then
       buildJenkinsPipelineFromFile
       ;;
     kickstart)
-      checkToolVersion kubectl
-      getVersions
-      setVarsFromPlatform
-      getDomain
-      getRSSODetails
-      getTenantDetails
-      checkHelixLoggingDeployed
-      getRegistryDetailsFromHP
+      kickstartGatherPlatformContext
       kickStartUberPipeline
       ;;
     *)
@@ -6839,7 +6882,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260710-01"
+HITT_BUILD_VERSION="20260710-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

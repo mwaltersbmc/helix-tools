@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260710-01`**
+**Latest build `20260710-02`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -172,7 +172,7 @@ Quiet mode `-q` only prints the summary messages.
 
 ### Pipeline Mode ###
 
-Pipeline mode (`-k`) exports and submits **`HELIX_ONPREM_DEPLOYMENT`** parameters on the Jenkins in **`hitt.conf`**: **`get`** (export JSON), **`build`** (queue from file), and **`kickstart`** (prefill from Helix Platform / cluster discovery).
+Pipeline mode (`-k`) exports and submits **`HELIX_ONPREM_DEPLOYMENT`** parameters on the Jenkins in **`hitt.conf`**: **`get`** (export JSON, including **`get kickstart`** from Platform discovery), **`build`** (queue from file), and **`kickstart`** (prefill and queue in one step).
 
 See **[README-pipeline-mode.md](README-pipeline-mode.md)** for requirements, quoting, the rebuild-in-Jenkins workflow, and what the build trigger applies automatically.
 
@@ -181,7 +181,8 @@ Password parameters in **get** output are redacted unless **`-p`** is used (see 
 ```bash
 bash hitt.sh -k "get lastsuccessful values.json"
 bash hitt.sh -p -k "get lastsuccessful values.json"   # include plain passwords for build/migration
-bash hitt.sh -k "build values.json"
+bash hitt.sh -p -k "get kickstart deploy-params.json"   # save known values; edit, then build
+bash hitt.sh -k "build deploy-params.json"
 bash hitt.sh -k kickstart
 ```
 

@@ -23,7 +23,7 @@ bash hitt.sh -k help
 |---------|----------------|
 | **get** | **hitt.conf** with Deployment Engine URL and login. |
 | **build** | The same as **get**, plus a settings file from **get** (or one you edited by hand). |
-| **kickstart** | **hitt.conf**, access to the cluster, and Helix Platform already deployed so HITT can read namespace, domain, registry, and sign-on settings. |
+| **kickstart** | **hitt.conf**, access to the cluster, and Helix Platform already deployed so HITT can read namespace, domain, registry, and sign-on settings. Same for **get kickstart**. |
 
 HITT must be able to log in to the Deployment Engine for all three commands.
 
@@ -31,7 +31,7 @@ HITT must be able to log in to the Deployment Engine for all three commands.
 
 | Command | What it does |
 |---------|----------------|
-| **get** | Shows or saves the job’s parameter values. |
+| **get** | Shows or saves the job’s parameter values (including **get kickstart** to preview kickstart fills). |
 | **build** | Starts a new **HELIX_ONPREM_DEPLOYMENT** run using your saved settings file. |
 | **kickstart** | Looks up values from your environment, then starts a new run with those values filled in. |
 | **help** | Shows a short summary of pipeline mode (same as this guide, built into the script). |
@@ -47,7 +47,7 @@ bash hitt.sh -o helix_onprem_deployment
 ## get — save parameter values
 
 ```bash
-bash hitt.sh -k "get <defaults|last|lastsuccessful|N> [filename]"
+bash hitt.sh -k "get <defaults|last|lastsuccessful|kickstart|N> [filename]"
 ```
 
 | You ask for | You get |
@@ -55,6 +55,7 @@ bash hitt.sh -k "get <defaults|last|lastsuccessful|N> [filename]"
 | **defaults** | The job’s default values on the Deployment Engine. |
 | **last** | Values from the most recent run (pass or fail). |
 | **lastsuccessful** | Values from the last run that completed successfully. |
+| **kickstart** | Job defaults with kickstart-discovered values filled in (see below). Requires **hitt.conf**, cluster access, and Helix Platform deployed — same as **kickstart** build. |
 | **N** | Values from run number **N** (for example **7**). |
 
 If you do not give a file name, the settings appear on screen. If you add a file name, they are saved to that file (for example **values.json**).
@@ -77,8 +78,35 @@ Use **`-p`** only on a trusted host and protect saved files. If you save with re
 ```bash
 bash hitt.sh -k "get defaults"
 bash hitt.sh -k "get lastsuccessful"
+bash hitt.sh -k "get kickstart"
+bash hitt.sh -k "get kickstart kickstart-preview.json"
 bash hitt.sh -k "get 7 values.json"
 ```
+
+### get kickstart — preview values without starting a run
+
+```bash
+bash hitt.sh -k "get kickstart"
+bash hitt.sh -p -k "get kickstart kickstart-preview.json"
+```
+
+Use this to see what **kickstart** would fill in before you queue a run. HITT loads the job’s default parameters from the Deployment Engine, reads Helix Platform and cluster settings (same discovery as **kickstart**), and overwrites matching fields in the output.
+
+File upload parameters, **INPUT_CONFIG_METHOD**, and layout-only entries are omitted. Every checkbox under **Pipelines** is set to **false**, matching what **build** and **kickstart** apply when queuing a run.
+
+### Save, edit, and build
+
+You can save **get kickstart** output to a file, add any values HITT does not discover (database connection, extra passwords, which **Pipelines** stages to run, and so on), then start a Jenkins run with **build**:
+
+```bash
+bash hitt.sh -p -k "get kickstart deploy-params.json"   # -p so passwords are usable in build
+# Edit deploy-params.json — add DB settings, set pipeline checkboxes to true where needed, etc.
+bash hitt.sh -k "build deploy-params.json"
+```
+
+Then open **HELIX_ONPREM_DEPLOYMENT** on the Deployment Engine, **Rebuild** the last run, attach any **file** parameters (certificates, config uploads), and confirm the form before a real deployment.
+
+This workflow gives you the same pre-fill as **kickstart**, but you control the JSON on disk before anything is queued. Use **`-p`** when saving the file if you intend to run **build** with it; redacted `***REDACTED***` placeholders are not valid for Jenkins.
 
 ---
 
@@ -88,7 +116,14 @@ bash hitt.sh -k "get 7 values.json"
 bash hitt.sh -k "build values.json"
 ```
 
-Use a settings file you created with **get** (or edited yourself). HITT sends those values to **HELIX_ONPREM_DEPLOYMENT** and starts a new run.
+Use a settings file you created with **get** (including **get kickstart**), or edited yourself. HITT sends those values to **HELIX_ONPREM_DEPLOYMENT** and starts a new run.
+
+A typical path for a new deployment when Helix Platform is already installed:
+
+1. **`bash hitt.sh -p -k "get kickstart deploy-params.json"`** — known values from Platform and **hitt.conf** (use **`-p`** if the file will be used with **build**).
+2. **Edit** `deploy-params.json` — database details, enable the **Pipelines** checkboxes you need, and any other missing fields.
+3. **`bash hitt.sh -k "build deploy-params.json"`** — queue the run.
+4. **Rebuild** in the Deployment Engine and attach file uploads that HITT cannot send.
 
 ### What to expect
 
@@ -115,6 +150,8 @@ bash hitt.sh -k kickstart
 ```
 
 Use this for a **new** deployment when Helix Platform is already in the cluster. HITT reads **hitt.conf** and the cluster, fills in every value it can find, and starts a **HELIX_ONPREM_DEPLOYMENT** run — the same follow-up steps as **build** above.
+
+To preview those fills without starting a run, use **`bash hitt.sh -k "get kickstart"`** (see [get kickstart](#get-kickstart--preview-values-without-starting-a-run) above). To save, edit, and then queue a run, use **get kickstart** → edit JSON → **build** (documented in the same section).
 
 HITT will **not** fill in everything. Database settings, some passwords, file uploads, and deployment choices are still yours to complete in the Deployment Engine after you rebuild.
 

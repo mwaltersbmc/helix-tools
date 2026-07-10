@@ -361,17 +361,57 @@ window.HITT_USE_CASES = {
         "bash hitt.sh -k \"get defaults\"",
         "bash hitt.sh -k \"get last\"",
         "bash hitt.sh -k \"get lastsuccessful\"",
+        "bash hitt.sh -k \"get kickstart\"",
         "bash hitt.sh -k \"get 42\"",
+        "bash hitt.sh -k \"get kickstart kickstart-preview.json\"",
         "bash hitt.sh -k \"get lastsuccessful values.json\"",
-        "bash hitt.sh -p -k \"get lastsuccessful values.json\""
+        "bash hitt.sh -p -k \"get lastsuccessful values.json\"",
+        "bash hitt.sh -p -k \"get kickstart kickstart-preview.json\""
       ],
       "notes": [
         "Outputs JSON to the console unless you pass a filename as the last argument.",
+        "get kickstart merges Jenkins defaults with values discovered from Helix Platform (same sources as kickstart build) without queuing a run.",
+        "get kickstart omits file upload parameters and INPUT_CONFIG_METHOD, and sets all Pipelines section checkboxes to false.",
         "Password parameters (names containing PASSWORD) are redacted as ***REDACTED*** unless you use -p.",
         "Use -p when saving a file for build or migration; protect output on trusted hosts only.",
+        "For a full edit-then-build workflow, see pipeline-kickstart-build-file under Pipeline Management.",
         "Requires Jenkins in hitt.conf and working credentials."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
+    },
+    {
+      "id": "pipeline-kickstart-preview",
+      "topicId": "pipeline-mgmt",
+      "order": 12,
+      "title": "I want to preview kickstart pipeline values without starting a Jenkins run",
+      "commands": [
+        "bash hitt.sh -k \"get kickstart\"",
+        "bash hitt.sh -k \"get kickstart kickstart-preview.json\""
+      ],
+      "notes": [
+        "Requires hitt.conf, Deployment Engine login, cluster access, and Helix Platform already deployed — same discovery as kickstart build.",
+        "Shows merged Jenkins defaults plus values HITT can read from your environment; file parameters and INPUT_CONFIG_METHOD are omitted; Pipelines checkboxes are false.",
+        "Use before kickstart or before saving a file for build, to confirm namespaces, domain, registry, sign-on, and related fields look correct.",
+        "Passwords are redacted unless you add -p (needed if you will save the file for build)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#get-kickstart--preview-values-without-starting-a-run"
+    },
+    {
+      "id": "pipeline-kickstart-build-file",
+      "topicId": "pipeline-mgmt",
+      "order": 15,
+      "title": "I want a pipeline build file with all known values already filled in",
+      "commands": [
+        "bash hitt.sh -p -k \"get kickstart deploy-params.json\"",
+        "bash hitt.sh -k \"build deploy-params.json\""
+      ],
+      "notes": [
+        "Step 1: save JSON with every value HITT can discover from Helix Platform and hitt.conf. Use -p so password fields are real values, not ***REDACTED***.",
+        "Step 2: edit deploy-params.json — add database settings, turn on the Pipelines checkboxes you need, and any other required fields kickstart does not set.",
+        "Step 3: build queues HELIX_ONPREM_DEPLOYMENT; then open Jenkins, Rebuild the last run, attach file uploads (certificates, configs), and review before a full deploy.",
+        "Alternative to bash hitt.sh -k kickstart when you want to review or change the JSON on disk before anything is queued."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#get-kickstart--preview-values-without-starting-a-run"
     },
     {
       "id": "pipeline-build",
@@ -383,8 +423,9 @@ window.HITT_USE_CASES = {
       ],
       "notes": [
         "After this, open HELIX_ONPREM_DEPLOYMENT in Jenkins, rebuild the last job, and review parameters (README warns the generated build is expected to fail until you adjust values).",
+        "Works with any JSON from get (defaults, last, lastsuccessful, kickstart, or a build number) or a hand-edited copy — commonly deploy-params.json from get kickstart after you add DB and pipeline choices.",
         "Export settings with bash hitt.sh -p -k \"get ... values.json\" if password parameters must be included; get without -p writes ***REDACTED*** placeholders.",
-        "PIPELINES section booleans are forced off unless already in your JSON; file upload parameters are stripped automatically."
+        "PIPELINES section booleans are forced off unless already in your JSON; file upload parameters are stripped automatically when the build is submitted."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
@@ -399,7 +440,8 @@ window.HITT_USE_CASES = {
       "notes": [
         "Use when Helix Platform is already in the cluster and you are starting a new Helix IS deployment. Requires hitt.conf, cluster access, and a working Deployment Engine login.",
         "HITT reads your environment (namespaces, domain, sign-on, registry, logging, and related settings), queues a HELIX_ONPREM_DEPLOYMENT run, then you open the job in Jenkins, rebuild the last run, and complete anything still missing — database details, passwords, file uploads, and which pipelines to run.",
-        "Same safeguards as build: Pipelines checkboxes are turned off by default and file attachments are not sent from HITT."
+        "Same safeguards as build: Pipelines checkboxes are turned off by default and file attachments are not sent from HITT.",
+        "If you want to review or edit values before queuing, use get kickstart → edit JSON → build instead (see pipeline-kickstart-build-file use case)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#kickstart--fill-values-from-helix-platform"
     },
