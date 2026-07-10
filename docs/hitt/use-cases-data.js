@@ -467,7 +467,8 @@ window.HITT_USE_CASES = {
         "bash hitt.sh -f \"arlicense LTD-761066 28-Apr-27\""
       ],
       "notes": [
-        "Optional expiry uses DD-Mon-YY format when required for temporary keys."
+        "Optional expiry uses DD-Mon-YY format when required for temporary keys.",
+        "Connects to the server and applies the license using the AR REST API."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
     },

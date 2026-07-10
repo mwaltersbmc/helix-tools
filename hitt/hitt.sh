@@ -4755,7 +4755,7 @@ showFixHelp() { # fix mode help
     \trealm \t\t| Create/update the Helix Service Management realm in SSO.
     \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
     \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
-    \tarlicense \t| Apply an Innovation Suite/AR server license to the system.
+    \tarlicense \t| Apply an Innovation Suite/AR server license to the system via the REST API.
     \tresetssopwd \t| Resets the Helix SSO admin user password to the BMC default value.
     \tjenkins \t| Jenkins specific fixes - see below.
     \thelp \t\t| Show this list.
@@ -4909,6 +4909,9 @@ getJenkinsPipelineValues() {
   JQ_FILTER='.actions[] | select(._class == "hudson.model.ParametersAction") | .parameters[] | "\(.name)=\(.value)"'
   case "${PIPELINE_BUILD}" in
     defaults)
+      PIPELINE_VALUES_JSON=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
+      ;;
+    kickstart)
       PIPELINE_VALUES_JSON=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
       ;;
     last)
@@ -6836,7 +6839,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260708-01"
+HITT_BUILD_VERSION="20260710-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
