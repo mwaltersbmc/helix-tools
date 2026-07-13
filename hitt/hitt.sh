@@ -648,8 +648,8 @@ setVarsFromPlatform() {
       ADE_INFRA_CLIENT_IMAGE_TAG=26100-v1-ade-infra-clients-alpine
       ;;
     26.2.01)
-      TCTL_REST_VER=1677
-      ADE_INFRA_CLIENT_IMAGE_TAG=26200-v533-ade-infra-clients-alpine
+      TCTL_REST_VER=1695
+      ADE_INFRA_CLIENT_IMAGE_TAG=26201-v692-ade-infra-clients-alpine
       ;;
     *)
       ;;
@@ -6240,12 +6240,25 @@ writeInfoJson() {
 }
 
 validateDockerIOPat() {
-  local DOCKER_IO_USERNAME DOCKER_IO_PAT RESPONSE REGISTRY_JWT PAYLOAD_BASE64 REM DECODED_PAYLOAD ACTIONS
+  local DOCKER_IO_USERNAME DOCKER_IO_PAT RESPONSE REGISTRY_JWT PAYLOAD_BASE64 REM DECODED_PAYLOAD ACTIONS DOCKER_IO_JSON
   DOCKER_IO_USERNAME="${1:-}"
   DOCKER_IO_PAT="${2:-}"
 
-  if [ -z "${DOCKER_IO_USERNAME}" ]; then
-    logError "999" "Docker Hub username is required." 1
+  if [ -z "${DOCKER_IO_USERNAME}" ] && [ -z "${DOCKER_IO_PAT}" ]; then
+    DOCKER_IO_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret bmc-dtrhub -o jsonpath='{.data.\.dockerconfigjson}' 2>/dev/null | ${BASE64_BIN} -d | ${JQ_BIN} '.auths["docker.io"]')
+    if [ -n "${DOCKER_IO_JSON}" ]; then
+      DOCKER_IO_USERNAME=$(echo "${DOCKER_IO_JSON}" | ${JQ_BIN} -r .username)
+      DOCKER_IO_PAT=$(echo "${DOCKER_IO_JSON}" | ${JQ_BIN} -r .password)
+      if ! askYesNo "Use docker.io credentials from the Helix Platform namespace (username: ${DOCKER_IO_USERNAME})?" ; then
+        DOCKER_IO_USERNAME=""
+        DOCKER_IO_PAT=""
+        read -r -p "Enter your docker.io username : " DOCKER_IO_USERNAME
+        echo ""
+        if [ -z "${DOCKER_IO_USERNAME}" ]; then
+          logError "999" "Docker Hub username is required (pass on the command line or enter when prompted)." 1
+        fi
+      fi
+    fi
   fi
 
   if [ -z "${DOCKER_IO_PAT}" ]; then
@@ -7077,9 +7090,9 @@ if [ "${MODE}" == "utility" ]; then
       parseUtilSQL
       ;;
     checkpat)
-      if [ ${#UTILARGS[@]} -lt 2 ]; then
-        logError "999" "Usage: bash $0 -u \"checkpat USERNAME [PAT]\"" 1
-      fi
+#      if [ ${#UTILARGS[@]} -lt 2 ]; then
+#        logError "999" "Usage: bash $0 -u \"checkpat USERNAME [PAT]\"" 1
+#      fi
       validateDockerIOPat "${UTILARGS[1]}" "${UTILARGS[2]:-}"
       ;;
     help)
@@ -7253,7 +7266,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-05"
+HITT_BUILD_VERSION="20260713-06"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
