@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260713-08`**
+**Latest build `20260713-09`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -31,7 +31,7 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [Build version (developers)](#build-version-developers-git-clone-only)
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, Jenkins, license, …)
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `gendbid`)
-- [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` for **HELIX_ONPREM_DEPLOYMENT**
+- [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` / `delete` for **HELIX_ONPREM_DEPLOYMENT**
 - [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info ingress`, `info full`
 
 Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h consolelog`, `bash hitt.sh -h info`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, `bash hitt.sh -o help`, or `bash hitt.sh -m "info help"` from within each mode.
@@ -172,7 +172,7 @@ Quiet mode `-q` only prints the summary messages.
 
 ### Pipeline Mode ###
 
-Pipeline mode (`-k`) exports and submits **`HELIX_ONPREM_DEPLOYMENT`** parameters on the Jenkins in **`hitt.conf`**: **`get`** (export JSON, including **`get kickstart`** from Platform discovery), **`build`** (queue from file), and **`kickstart`** (prefill and queue in one step).
+Pipeline mode (`-k`) exports and submits **`HELIX_ONPREM_DEPLOYMENT`** parameters on the Jenkins in **`hitt.conf`**: **`get`** (export JSON, including **`get kickstart`** from Platform discovery), **`build`** (queue from file), **`kickstart`** (prefill and queue in one step), and **`delete`** (remove builds from job history).
 
 See **[README-pipeline-mode.md](README-pipeline-mode.md)** for requirements, quoting, the rebuild-in-Jenkins workflow, and what the build trigger applies automatically.
 

@@ -454,9 +454,43 @@ window.HITT_USE_CASES = {
         "bash hitt.sh -o helix_onprem_deployment"
       ],
       "notes": [
-        "PIPELINE_NAME is the Jenkins job name as shown in the URL (underscores)."
+        "PIPELINE_NAME is the Jenkins job name as shown in the URL (underscores).",
+        "For Jenkins system log or jenkins-agent node log, use -o jenkins or -o agent (see pipeline-jenkins-logs use case)."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o"
+    },
+    {
+      "id": "pipeline-jenkins-logs",
+      "topicId": "pipeline-mgmt",
+      "order": 32,
+      "title": "I want to view the Jenkins system and agent logs",
+      "commands": [
+        "bash hitt.sh -o jenkins",
+        "bash hitt.sh -o agent"
+      ],
+      "notes": [
+        "Requires Jenkins details in hitt.conf and a working login to the Deployment Engine.",
+        "-o jenkins shows recent messages from the Jenkins controller system log.",
+        "-o agent shows the jenkins-agent node log where pipeline steps run.",
+        "For the console log from a pipeline job run, use -o with the job name (for example helix_onprem_deployment) — see pipeline-console use case."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o"
+    },
+    {
+      "id": "pipeline-delete-builds",
+      "topicId": "pipeline-mgmt",
+      "order": 35,
+      "title": "I want to delete jobs from the HELIX_ONPREM_DEPLOYMENT pipeline build history",
+      "commands": [
+        "bash hitt.sh -k \"delete 42\"",
+        "bash hitt.sh -k \"delete 1-50\""
+      ],
+      "notes": [
+        "Requires Jenkins login in hitt.conf and script-console permission on the Deployment Engine.",
+        "Deletes one build number (42) or a range (1-50) from HELIX_ONPREM_DEPLOYMENT history. Optional third argument is another Jenkins job name.",
+        "Build numbers that do not exist are skipped. This cannot be undone — check build numbers in Jenkins before running delete."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#delete--remove-builds-from-job-history"
     },
     {
       "id": "utility-dbid",

@@ -7,6 +7,7 @@ You can:
 - **Save** parameter values from an existing job run (**get**)
 - **Send** saved values to start a new job run (**build**) — useful when moving to a different Deployment Engine
 - **Fill in** many values automatically from Helix Platform (**kickstart**) — useful for a new deployment when Platform is already installed
+- **Delete** old builds from the job history (**delete**) — useful when cleaning up failed or test runs
 
 When a command has more than one word after **`-k`**, put the whole thing in **double quotes**:
 
@@ -24,8 +25,9 @@ bash hitt.sh -k help
 | **get** | **hitt.conf** with Deployment Engine URL and login. |
 | **build** | The same as **get**, plus a settings file from **get** (or one you edited by hand). |
 | **kickstart** | **hitt.conf**, access to the cluster, and Helix Platform already deployed so HITT can read namespace, domain, registry, and sign-on settings. Same for **get kickstart**. |
+| **delete** | **hitt.conf** with Deployment Engine URL and login (same as **get**). |
 
-HITT must be able to log in to the Deployment Engine for all three commands.
+HITT must be able to log in to the Deployment Engine for all pipeline mode commands.
 
 ## Commands at a glance
 
@@ -34,6 +36,7 @@ HITT must be able to log in to the Deployment Engine for all three commands.
 | **get** | Shows or saves the job’s parameter values (including **get kickstart** to preview kickstart fills). |
 | **build** | Starts a new **HELIX_ONPREM_DEPLOYMENT** run using your saved settings file. |
 | **kickstart** | Looks up values from your environment, then starts a new run with those values filled in. |
+| **delete** | Removes one or more builds from a job’s build history (default job: **HELIX_ONPREM_DEPLOYMENT**). |
 | **help** | Shows a short summary of pipeline mode (same as this guide, built into the script). |
 
 ## View logs from the Deployment Engine (`-o`)
@@ -150,6 +153,34 @@ The first run often **fails on purpose** if required fields are still empty. Tha
 - Values that do not apply to your Deployment Engine version are adjusted or removed automatically.
 
 When the request succeeds, HITT tells you to open the job and rebuild so you can review and complete the parameters.
+
+---
+
+## delete — remove builds from job history
+
+```bash
+bash hitt.sh -k "delete BUILD_NUM"
+bash hitt.sh -k "delete START-END"
+bash hitt.sh -k "delete START-END JOB_NAME"
+```
+
+Removes completed builds from the Deployment Engine job history. By default the job is **HELIX_ONPREM_DEPLOYMENT**; add an optional job name as a third argument to target another pipeline.
+
+| You specify | What is deleted |
+|-------------|-----------------|
+| **BUILD_NUM** | A single build (for example **42**). |
+| **START-END** | Every build number from **START** through **END** inclusive (for example **1-50**). |
+
+Build numbers that do not exist are skipped. **This cannot be undone** — confirm the build numbers before you run **delete**.
+
+Requires the same Jenkins login as **get** / **build**, and script-console permission on the Deployment Engine (same as other HITT Jenkins script actions).
+
+**Examples:**
+
+```bash
+bash hitt.sh -k "delete 42"
+bash hitt.sh -k "delete 1-50"
+```
 
 ---
 

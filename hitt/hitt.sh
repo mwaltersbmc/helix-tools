@@ -1245,7 +1245,7 @@ checkJenkinsIsRunning() {
     200)
       JENKINS_RESPONSE=$(${CURL_BIN} -skI "${JENKINS_URL}")
       JENKINS_VERSION=$(echo "${JENKINS_RESPONSE}" | grep -i 'X-Jenkins:' | awk '{print $2}' | tr -d '\r')
-      logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_LOG_URL:-$JENKINS_URL}."
+      logMessage "Jenkins version ${JENKINS_VERSION} found on ${JENKINS_LOG_URL:-$JENKINS_URL}"
       getJenkinsCrumb
       ;;
     401|403)
@@ -4832,6 +4832,7 @@ showPipelineHelp() { # pipeline mode help
     \tget \t\t| Save HELIX_ONPREM_DEPLOYMENT parameter values (defaults, last, lastsuccessful, kickstart, or build number). Optional filename; kickstart output may be edited and used with build.
     \tbuild \t\t| Start a new pipeline run from a settings file created with get.
     \tkickstart \t| Fill parameters from Helix Platform / cluster and start a new run (fresh deployment).
+    \tdelete \t\t| Delete build(s) from a pipeline job history. Args: BUILD_NUM or START-END [JOB_NAME] (default: HELIX_ONPREM_DEPLOYMENT).
     \thelp \t\t| Show this list.
     "
   echo "After build or kickstart, rebuild the job in the Deployment Engine and complete any missing values."
@@ -5079,6 +5080,41 @@ buildJenkinsPipelineFromFile() {
   fi
   PIPELINE_INPUT_JSON=$(${JQ_BIN} -c . "${PIPELINE_JSON_FILE}")
   triggerHelixOnpremPipelineBuild "'${PIPELINE_JSON_FILE}'"
+}
+
+deleteJenkinsJobs() {
+  local PIPELINE_NAME JOBS_RANGE num MSG int1 int2
+  JOBS_RANGE="${1}"
+  PIPELINE_NAME="${2:-HELIX_ONPREM_DEPLOYMENT}"
+
+  if [[ "${JOBS_RANGE}" =~ ^([0-9]+)$ ]]; then
+      num="${BASH_REMATCH[1]}"
+      JOBS_RANGE="${num}..${num}"
+      MSG="build"
+  elif [[ "${JOBS_RANGE}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+      int1="${BASH_REMATCH[1]}"
+      int2="${BASH_REMATCH[2]}"
+      JOBS_RANGE="${int1}..${int2}"
+      MSG="builds"
+  else
+      logError "999" "Invalid build range. Use a single build number or START-END (for example 42 or 1-50)." 1
+  fi
+
+  SCRIPT="
+    def job = Jenkins.instance.getItemByFullName('${PIPELINE_NAME}')
+    if (job == null) {
+        println \"Job not found: ${PIPELINE_NAME}\"
+        return
+    }
+    (${JOBS_RANGE}).each { buildNum ->
+    def build = job.getBuildByNumber(buildNum)
+    if (build != null) {
+        build.delete()
+    }
+  }"
+  logMessage "Deleting ${MSG} ${1} from '${PIPELINE_NAME}'..."
+  runJenkinsScript "${SCRIPT}" >/dev/null
+  logMessage "Finished deleting ${MSG} ${1} from '${PIPELINE_NAME}' (build numbers that did not exist were skipped)."
 }
 
 URLEncode() {
@@ -7070,18 +7106,24 @@ if [ "${MODE}" == "pipeline" ]; then
   logStatus "Running HITT in pipeline mode '${PIPELINEARGS[0]}'..."
   checkJenkinsIsRunning 1
   case "${PIPELINEARGS[0]}" in
-    get)
-      getJenkinsPipelineValues
-      ;;
     build)
       buildJenkinsPipelineFromFile
+      ;;
+    delete)
+      if [ ${#PIPELINEARGS[@]} -lt 2 ]; then
+        logError "999" "Usage: bash $0 -k \"delete BUILD_NUM|START-END [JOB_NAME]\"" 1
+      fi
+      deleteJenkinsJobs "${PIPELINEARGS[1]}" "${PIPELINEARGS[2]:-}"
+      ;;
+    get)
+      getJenkinsPipelineValues
       ;;
     kickstart)
       kickstartGatherPlatformContext
       kickStartUberPipeline
       ;;
     *)
-    logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option (try: get, build, kickstart, help)." 1
+    logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option (try: get, build, kickstart, delete, help)." 1
     ;;
   esac
   exit
@@ -7296,7 +7338,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-08"
+HITT_BUILD_VERSION="20260713-09"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

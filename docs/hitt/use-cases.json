@@ -476,6 +476,22 @@
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o"
     },
     {
+      "id": "pipeline-delete-builds",
+      "topicId": "pipeline-mgmt",
+      "order": 35,
+      "title": "I want to delete jobs from the HELIX_ONPREM_DEPLOYMENT pipeline build history",
+      "commands": [
+        "bash hitt.sh -k \"delete 42\"",
+        "bash hitt.sh -k \"delete 1-50\""
+      ],
+      "notes": [
+        "Requires Jenkins login in hitt.conf and script-console permission on the Deployment Engine.",
+        "Deletes one build number (42) or a range (1-50) from HELIX_ONPREM_DEPLOYMENT history. Optional third argument is another Jenkins job name.",
+        "Build numbers that do not exist are skipped. This cannot be undone — check build numbers in Jenkins before running delete."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#delete--remove-builds-from-job-history"
+    },
+    {
       "id": "utility-dbid",
       "topicId": "helix-is-mgmt",
       "order": 10,
