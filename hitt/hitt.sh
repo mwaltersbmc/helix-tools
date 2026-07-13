@@ -4761,8 +4761,8 @@ logPlatformFTSStartTime() {
     return
   fi
   logMessage "platform-fts-0 pod startup time: ${STARTUP_TIME}"
-  if [ "${STARTUP_SECS}" -gt 720 ]; then
-    logWarning "044"  "platform-fts-0 pod took more than 12 minutes to start - possible db latency or performance issue."
+  if [ "${STARTUP_SECS}" -gt 900 ]; then
+    logWarning "044"  "platform-fts-0 pod took more than 15 minutes to start - possible db latency or performance issue."
   fi
 }
 
@@ -5831,29 +5831,35 @@ gatherInfo() {
   getRSSODetails
   getDomain
   getTenantDetails
-  deleteTCTLJob
-  deployTCTL "get tenant"
-  getTCTLOutput full
-  HP_TENANTS=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
-  deleteTCTLJob
-  if deployTCTL "get tenant -o json"; then
+  if [ "${HP_SM_PLATFORM_CORE}" == "no" ]; then
+    deleteTCTLJob
+    deployTCTL "get tenant"
     getTCTLOutput full
-    HP_TENANTS_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '')
-  else
-    HP_TENANTS_JSON=''
-  fi
-  deleteTCTLJob
-  deployTCTL "get service"
-  getTCTLOutput full
-  HP_SERVICES=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
-  deleteTCTLJob
-  if deployTCTL "get service -o json"; then
+    HP_TENANTS=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
+    deleteTCTLJob
+    if deployTCTL "get tenant -o json"; then
+      getTCTLOutput full
+      HP_TENANTS_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '')
+    else
+      HP_TENANTS_JSON=''
+    fi
+    deleteTCTLJob
+    deployTCTL "get service"
     getTCTLOutput full
-    HP_SERVICES_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '')
+    HP_SERVICES=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
+    deleteTCTLJob
+    if deployTCTL "get service -o json"; then
+      getTCTLOutput full
+      HP_SERVICES_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '')
+    else
+      HP_SERVICES_JSON=''
+      HP_TENANTS_JSON=''
+    fi
+    deleteTCTLJob
   else
-    HP_SERVICES_JSON=''
+      HP_SERVICES_JSON=''
+      HP_TENANTS_JSON=''
   fi
-  deleteTCTLJob
   logStatus "Gathering Helix Service Management information..." 1
   IS_VERSION=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' 2>/dev/null | cut -f2 -d '-')
   if [ -z "${IS_VERSION}" ]; then
@@ -5869,8 +5875,10 @@ gatherInfo() {
     UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
     getISDetailsFromK8s
     checkISRESTReady
-    checkISLicenseStatus
-    getISDbID
+    if [ "${IS_REST_READY}" == "1" ]; then
+      checkISLicenseStatus
+      getISDbID
+    fi
     logPlatformFTSStartTime
     checkAssistTool
   fi
@@ -7230,7 +7238,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-03"
+HITT_BUILD_VERSION="20260713-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
