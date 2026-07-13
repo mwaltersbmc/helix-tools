@@ -36,9 +36,19 @@ HITT must be able to log in to the Deployment Engine for all three commands.
 | **kickstart** | Looks up values from your environment, then starts a new run with those values filled in. |
 | **help** | Shows a short summary of pipeline mode (same as this guide, built into the script). |
 
-**Related:** To read the log from the latest run of a job, use **`-o`** (not pipeline mode):
+## View logs from the Deployment Engine (`-o`)
+
+Use **`-o`** (not pipeline mode **`-k`**) to print logs on screen. Requires **hitt.conf** and a working login to the Deployment Engine.
+
+| Command | What you get |
+|---------|----------------|
+| `bash hitt.sh -o jenkins` | Recent Jenkins **system** log (controller messages). |
+| `bash hitt.sh -o agent` | **jenkins-agent** node log (where pipeline steps run on the Deployment Engine). |
+| `bash hitt.sh -o helix_onprem_deployment` | Console output from the **latest build** of that job (job name as in the Jenkins URL, usually lowercase with underscores). |
 
 ```bash
+bash hitt.sh -o jenkins
+bash hitt.sh -o agent
 bash hitt.sh -o helix_onprem_deployment
 ```
 

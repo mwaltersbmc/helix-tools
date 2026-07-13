@@ -186,7 +186,7 @@ bash hitt.sh -k "build deploy-params.json"
 bash hitt.sh -k kickstart
 ```
 
-Use **`-o PIPELINE_NAME`** for the latest Jenkins console log (documented in [README-pipeline-mode.md](README-pipeline-mode.md#commands)).
+Use **`-o`** to print Deployment Engine logs on screen: **`-o jenkins`** (system log), **`-o agent`** (jenkins-agent node log), or **`-o PIPELINE_NAME`** for the latest console log from a job (documented in [README-pipeline-mode.md](README-pipeline-mode.md#view-logs-from-the-deployment-engine--o)).
 
 ### tctl Mode ###
 
@@ -256,9 +256,17 @@ Running IS deployment status check for bundle ID IDGIUNLUI5ENUASTJV8FSTJV8FT3JQ.
 }
 ```
 
-### Display Jenkins Pipeline Console Output ###
+### Display Jenkins logs ###
 
-Use the `-o PIPELINE_NAME` option to display the console output from the latest build of the named Jenkins pipeline:
+Use **`-o`** to print logs from the Deployment Engine on screen. Requires **hitt.conf** and a working Jenkins login.
+
+| Command | What you get |
+|---------|----------------|
+| `bash hitt.sh -o jenkins` | Recent Jenkins **system** log (controller messages). |
+| `bash hitt.sh -o agent` | **jenkins-agent** node log (pipeline worker). |
+| `bash hitt.sh -o helix_onprem_deployment` | Console output from the **latest build** of that job. |
+
+**Pipeline console example** — job name as shown in the Jenkins URL (underscores, usually lowercase):
 
 ```bash
 $ bash hitt.sh -o helix_onprem_deployment
