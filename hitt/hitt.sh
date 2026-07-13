@@ -3854,7 +3854,7 @@ getJenkinsCrumb() {
 
 runJenkinsScript() {
   #1 groovy script
-  ${CURL_BIN} --max-time 3 -b .cookies --data-urlencode "script=${1}" -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/scriptText" 2>>${HITT_ERR_FILE}
+  ${CURL_BIN} --max-time 10 -b .cookies --data-urlencode "script=${1}" -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/scriptText" 2>>${HITT_ERR_FILE}
 }
 
 isOpenShift() {
@@ -6570,8 +6570,8 @@ hitt|optional|metrics|get|nodes.metrics.k8s.io|Node CPU/memory via kubectl top n
 hitt|optional|metrics|list|nodes.metrics.k8s.io|List node metrics
 hitt|optional|openshift|get|clusteroperators|Detect OpenShift clusters
 hitt|optional|openshift|list|clusteroperators|List OpenShift cluster operators
-hitt|optional|openshift|get|clusterversions|Read OpenShift cluster version
-hitt|optional|openshift|list|clusterversions|List OpenShift cluster versions
+hitt|optional|openshift|get|clusterversion|Read OpenShift cluster version
+hitt|optional|openshift|list|clusterversion|List OpenShift cluster versions
 hitt|optional|all-ns|create|pods/exec|Exec into pods (DB/ES health checks, ping utility)
 hitt|required|helix-ns|delete|jobs|Delete tctl/sealtctl jobs after use
 hitt|required|helix-ns|create|jobs|Create tctl/sealtctl jobs
@@ -6733,7 +6733,7 @@ validateHittK8sPermissions() {
 }
 
 getJenkinsAgentLog() {
-  "${CURL_BIN}" --max-time 3 -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/computer/jenkins-agent/logText/progressiveText?start=0"
+  "${CURL_BIN}" --max-time 10 -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/computer/jenkins-agent/logText/progressiveText?start=0"
 }
 
 getJenkinsSystemLog() {
@@ -7223,7 +7223,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-01"
+HITT_BUILD_VERSION="20260713-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
