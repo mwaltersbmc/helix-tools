@@ -1454,7 +1454,7 @@ getPipelinePasswords() {
     }
     def jsonOutput = new groovy.json.JsonBuilder(paramMap).toPrettyString()
     println(jsonOutput)'
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 checkSSHSetup() {
@@ -1473,7 +1473,7 @@ checkJenkinsSSH() {
 runJenkinsSSH() {
   SCRIPT="def output=['bash', '-c', 'ssh -o StrictHostKeyChecking=accept-new ${USER}@${LONG_HOSTNAME} whoami'].execute().text.trim()
     println output"
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 setVarsFromPipelineJSON() {
@@ -1591,7 +1591,7 @@ getGITEACredentials() {
     ]
     def json = new JsonBuilder(result)
     println json.toPrettyString()'
-    runJenkinsCurl "${SCRIPT}"
+    runJenkinsScript "${SCRIPT}"
 }
 
 cloneGitRepos() {
@@ -3145,7 +3145,7 @@ getKubeconfigFromJenkins() {
         println ""
       }'
 
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 validateJenkinsKubeconfig() {
@@ -3216,7 +3216,7 @@ getJenkinsGlobalLibs() {
     def jsonOutput = JsonOutput.toJson(libraryDetails)
     println(JsonOutput.prettyPrint(jsonOutput))"
 
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 expandLeadingTilde() {
@@ -3352,7 +3352,7 @@ getPipelineValuesJSON() {
     }
     def json = JsonOutput.prettyPrint(JsonOutput.toJson(paramMap))
     println json"
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 
@@ -3397,7 +3397,7 @@ getPipelineDefaults() {
         }
     }
     println JsonOutput.prettyPrint(JsonOutput.toJson(result))"
-    runJenkinsCurl "${SCRIPT}"
+    runJenkinsScript "${SCRIPT}"
   }
 
 getPipelineSectionParams() {
@@ -3433,7 +3433,7 @@ getPipelineSectionParams() {
         }
     }
     println JsonOutput.toJson(params)"
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 getPipelineFileParams() {
@@ -3455,7 +3455,7 @@ getPipelineFileParams() {
         }
     }
     println JsonOutput.toJson(params)"
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 # Old version
@@ -3485,7 +3485,7 @@ xgetPipelineDefaults() {
         }
     }
     println JsonOutput.prettyPrint(JsonOutput.toJson(result))"
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 getJenkinsCredentials() {
@@ -3516,7 +3516,7 @@ getJenkinsCredentials() {
         }
     }
     println groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(credentialsList))'
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 checkSSHknown_hosts() {
@@ -3601,7 +3601,7 @@ getJenkinsApprovedScripts() {
     List<String> approvedSignatures = scriptApproval.getApprovedSignatures()
     String jsonOutput = JsonOutput.prettyPrint(JsonOutput.toJson([approvedSignatures: approvedSignatures]))
     println jsonOutput'
-    runJenkinsCurl "${SCRIPT}"
+    runJenkinsScript "${SCRIPT}"
 }
 
 checkJenkinsScriptApprovals() {
@@ -3852,7 +3852,7 @@ getJenkinsCrumb() {
   JENKINS_CRUMB=$(${CURL_BIN} -c .cookies -sk "${JENKINS_URL}/crumbIssuer/api/json" | ${JQ_BIN} -r .crumb )
 }
 
-runJenkinsCurl() {
+runJenkinsScript() {
   #1 groovy script
   ${CURL_BIN} --max-time 3 -b .cookies --data-urlencode "script=${1}" -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/scriptText" 2>>${HITT_ERR_FILE}
 }
@@ -4073,7 +4073,7 @@ updateJenkinsKubeconfig() {
         secretBytes                     // SecretBytes content
     )
     store.addCredentials(Domain.global(), fileCredential)"
-  runJenkinsCurl "${SCRIPT}" >/dev/null
+  runJenkinsScript "${SCRIPT}" >/dev/null
 }
 
 checkValidKubeconfig() {
@@ -4123,7 +4123,7 @@ fixJenkinsScriptApproval () {
            scriptApproval.approveSignature(signature)
         }
     }'
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
   logMessage "Updated Jenkins to approve scripts required by deployment pipelines."
 }
 
@@ -4194,7 +4194,7 @@ updateJenkinsPipelineLibrary() {
     newLibrary.setImplicit(implicit)
     globalLibraries.libraries += newLibrary
     jenkins.save()"
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 updateJenkinsUserCredentials() {
@@ -4237,7 +4237,7 @@ updateJenkinsUserCredentials() {
           )
           credentialsStore.addCredentials(domain, newCred)
       }"
-    runJenkinsCurl "${SCRIPT}" >/dev/null
+    runJenkinsScript "${SCRIPT}" >/dev/null
     logMessage "Updated Jenkins '${cred}' credentials."
   done
 }
@@ -4279,7 +4279,7 @@ updateJenkinsSecretTextCredentials() {
       store.addCredentials(domain, secretText)
   }
   instance.save()"
-  runJenkinsCurl "${SCRIPT}" >/dev/null
+  runJenkinsScript "${SCRIPT}" >/dev/null
   logMessage "Updated Jenkins password_vault_apikey credentials."
 }
 
@@ -4324,7 +4324,7 @@ updateJenkinsSecretFileCredentials() {
       store.addCredentials(domain, fileSecret)
     }
     instance.save()"
-  runJenkinsCurl "${SCRIPT}" >/dev/null
+  runJenkinsScript "${SCRIPT}" >/dev/null
   logMessage "Updated Jenkins TOKENS credentials."
 }
 
@@ -4416,7 +4416,7 @@ triggerHelixDryRun() {
       def build = future.get()
     }"
   logMessage "Started dry runs of Helix deployment pipelines..."
-  runJenkinsCurl "${SCRIPT}"
+  runJenkinsScript "${SCRIPT}"
 }
 
 isJenkinsInCluster() {
@@ -4506,7 +4506,7 @@ addJenkinsNodeLabel() {
         }
     }"
   logMessage "Adding missing node label..."
-  runJenkinsCurl "${SCRIPT}" >/dev/null
+  runJenkinsScript "${SCRIPT}" >/dev/null
 }
 
 generateISDbID() {
@@ -6732,6 +6732,10 @@ validateHittK8sPermissions() {
   return 0
 }
 
+getJenkinsAgentLog() {
+  "${CURL_BIN}" --max-time 3 -b .cookies -sk -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/computer/jenkins-agent/logText/progressiveText?start=0"
+}
+
 getJenkinsSystemLog() {
   SCRIPT='import java.util.logging.LogManager
     import java.util.logging.LogRecord
@@ -6762,7 +6766,7 @@ getJenkinsSystemLog() {
             println sw.toString()
         }
     }'
-runJenkinsCurl "${SCRIPT}"
+runJenkinsScript "${SCRIPT}"
 }
 
 #End functions
@@ -6961,15 +6965,25 @@ if [ "${MODE}" == "fix" ]; then
 fi
 
 if [ "${MODE}" == "getlog" ]; then
-  if [ "${PIPELINE_NAME}" == "msgs" ]; then echo "${ALL_MSGS_JSON}"; exit; fi
-  checkJenkinsIsRunning 1
-  if [ "${PIPELINE_NAME}" == "jenkins" ]; then
-    getJenkinsSystemLog
-    exit
-  else
-    getPipelineConsoleOutput "${PIPELINE_NAME}"
+  if [ "${PIPELINE_NAME}" == "msgs" ]; then
+    echo "${ALL_MSGS_JSON}"
     exit
   fi
+  checkJenkinsIsRunning 1
+  case "${PIPELINE_NAME}" in
+    jenkins)
+      getJenkinsSystemLog
+      exit
+      ;;
+    agent)
+      getJenkinsAgentLog
+      exit
+      ;;
+    *)
+      getPipelineConsoleOutput "${PIPELINE_NAME}"
+      exit
+      ;;
+  esac
 fi
 
 if [ "${MODE}" == "pipeline" ]; then
@@ -7209,7 +7223,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260710-07"
+HITT_BUILD_VERSION="20260713-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
