@@ -4805,7 +4805,7 @@ showUtilHelp() { # utility mode help
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
     \tcheckpat \t| Validate Docker Hub username and PAT. Args: [USERNAME] [PAT] — omit both to use bmc-dtrhub from HP namespace or be prompted.
-    \tcheckrbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Legacy alias: authcheck (= checkrbac hitt).
+    \tcheckrbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Use -v for each permission checked. Legacy alias: authcheck (= checkrbac hitt).
     \thelp \t\t| Show this list.
     "
 }
@@ -6635,11 +6635,22 @@ _hittK8sCanI() {
   ${KUBECTL_BIN} auth can-i "${verb}" "${resource}" "$@" --quiet 2>>"${HITT_ERR_FILE}"
 }
 
+_hittK8sLogPermissionCheck() {
+  # $1=severity $2=scope $3=verb $4=resource $5=granted $6=desc $7=namespace (optional)
+  [[ "${VERBOSITY}" -lt 1 ]] || [[ "${QUIET}" != "0" ]] && return
+  if [[ -n "${7:-}" ]]; then
+    logMessage "${1} ${3} ${4} (${2}, namespace '${7}'): ${5}" 1
+  else
+    logMessage "${1} ${3} ${4} (${2}): ${5}" 1
+  fi
+}
+
 validateHittK8sPermissions() {
   local active_profile="${1:-hitt}"
   local required denied optional_denied skipped checked
-  local profile req scope verb resource desc granted ns
+  local profile req scope verb resource desc granted ns ns_granted ns_logged _ln
   local -a helix_ns=()
+  local -a rbac_logged_ns=()
   local -a missing_required=()
   local -a missing_optional=()
   local -a skipped_checks=()
@@ -6688,11 +6699,13 @@ validateHittK8sPermissions() {
         if ! _hittK8sCanI "${verb}" "${resource}"; then
           granted="no"
         fi
+        _hittK8sLogPermissionCheck "${req}" "${scope}" "${verb}" "${resource}" "${granted}" "${desc}"
         ;;
       all-ns)
         if ! _hittK8sCanI "${verb}" "${resource}" --all-namespaces; then
           granted="no"
         fi
+        _hittK8sLogPermissionCheck "${req}" "${scope}" "${verb}" "${resource}" "${granted}" "${desc}"
         ;;
       helix-ns)
         if ((${#helix_ns[@]} == 0)); then
@@ -6701,10 +6714,21 @@ validateHittK8sPermissions() {
           skipped_checks+=("${verb}|${resource}|helix-ns|no namespaces configured|${desc}")
         else
           for ns in "${helix_ns[@]}"; do
-            if ! _hittK8sCanI "${verb}" "${resource}" -n "${ns}"; then
-              granted="no (${ns})"
-              break
+            ns_logged=0
+            for _ln in "${rbac_logged_ns[@]}"; do
+              [[ "${_ln}" == "${ns}" ]] && ns_logged=1 && break
+            done
+            if (( ! ns_logged )); then
+              logMessage "Checking permissions for namespace - '${ns}'"
+              rbac_logged_ns+=("${ns}")
             fi
+            ns_granted="yes"
+            if ! _hittK8sCanI "${verb}" "${resource}" -n "${ns}"; then
+              ns_granted="no"
+              granted="no (${ns})"
+            fi
+            _hittK8sLogPermissionCheck "${req}" "${scope}" "${verb}" "${resource}" "${ns_granted}" "${desc}" "${ns}"
+            [[ "${granted}" != "yes" ]] && break
           done
         fi
         ;;
@@ -7272,7 +7296,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-07"
+HITT_BUILD_VERSION="20260713-08"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
