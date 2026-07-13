@@ -4804,7 +4804,7 @@ showUtilHelp() { # utility mode help
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
-    \tcheckpat \t| Validate Docker Hub username and PAT. Args: USERNAME [PAT] (PAT prompted if omitted).
+    \tcheckpat \t| Validate Docker Hub username and PAT. Args: [USERNAME] [PAT] — omit both to use bmc-dtrhub from HP namespace or be prompted.
     \tcheckrbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Legacy alias: authcheck (= checkrbac hitt).
     \thelp \t\t| Show this list.
     "
@@ -6240,24 +6240,32 @@ writeInfoJson() {
 }
 
 validateDockerIOPat() {
-  local DOCKER_IO_USERNAME DOCKER_IO_PAT RESPONSE REGISTRY_JWT PAYLOAD_BASE64 REM DECODED_PAYLOAD ACTIONS DOCKER_IO_JSON
+  local DOCKER_IO_USERNAME DOCKER_IO_PAT RESPONSE REGISTRY_JWT PAYLOAD_BASE64 REM DECODED_PAYLOAD ACTIONS
+  local skip_registry_saved registry_username registry_password
   DOCKER_IO_USERNAME="${1:-}"
   DOCKER_IO_PAT="${2:-}"
 
   if [ -z "${DOCKER_IO_USERNAME}" ] && [ -z "${DOCKER_IO_PAT}" ]; then
-    DOCKER_IO_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret bmc-dtrhub -o jsonpath='{.data.\.dockerconfigjson}' 2>/dev/null | ${BASE64_BIN} -d | ${JQ_BIN} '.auths["docker.io"]')
-    if [ -n "${DOCKER_IO_JSON}" ]; then
-      DOCKER_IO_USERNAME=$(echo "${DOCKER_IO_JSON}" | ${JQ_BIN} -r .username)
-      DOCKER_IO_PAT=$(echo "${DOCKER_IO_JSON}" | ${JQ_BIN} -r .password)
-      if ! askYesNo "Use docker.io credentials from the Helix Platform namespace (username: ${DOCKER_IO_USERNAME})?" ; then
-        DOCKER_IO_USERNAME=""
-        DOCKER_IO_PAT=""
-        read -r -p "Enter your docker.io username : " DOCKER_IO_USERNAME
-        echo ""
-        if [ -z "${DOCKER_IO_USERNAME}" ]; then
-          logError "999" "Docker Hub username is required (pass on the command line or enter when prompted)." 1
+    if [ -n "${HP_NAMESPACE}" ] && ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret bmc-dtrhub &>/dev/null; then
+      skip_registry_saved=${SKIP_REGISTRY:-0}
+      getRegistryDetailsFromSecret "${HP_NAMESPACE}" "bmc-dtrhub"
+      registry_username="${REGISTRY_USERNAME}"
+      registry_password="${REGISTRY_PASSWORD}"
+      SKIP_REGISTRY=${skip_registry_saved}
+      if [[ -n "${registry_username}" && "${registry_username}" != "null" ]]; then
+        if askYesNo "Use docker.io credentials from the Helix Platform namespace (username: ${registry_username})?"; then
+          DOCKER_IO_USERNAME="${registry_username}"
+          DOCKER_IO_PAT="${registry_password}"
         fi
       fi
+    fi
+  fi
+
+  if [ -z "${DOCKER_IO_USERNAME}" ]; then
+    read -r -p "Enter your docker.io username : " DOCKER_IO_USERNAME
+    echo ""
+    if [ -z "${DOCKER_IO_USERNAME}" ]; then
+      logError "999" "Docker Hub username is required (pass on the command line or enter when prompted)." 1
     fi
   fi
 
@@ -6270,7 +6278,7 @@ validateDockerIOPat() {
     logError "999" "Docker Hub PAT is required (pass on the command line or enter when prompted)." 1
   fi
 
-  echo "Checking docker.io token scope for user '${DOCKER_IO_USERNAME}'..."
+  logMessage "Checking docker.io token scope for user '${DOCKER_IO_USERNAME}'..."
 
   # Request a registry token for private repository pull (bmchelix under this user)
   RESPONSE=$(${CURL_BIN} -s -u "${DOCKER_IO_USERNAME}:${DOCKER_IO_PAT}" \
@@ -7090,10 +7098,8 @@ if [ "${MODE}" == "utility" ]; then
       parseUtilSQL
       ;;
     checkpat)
-#      if [ ${#UTILARGS[@]} -lt 2 ]; then
-#        logError "999" "Usage: bash $0 -u \"checkpat USERNAME [PAT]\"" 1
-#      fi
-      validateDockerIOPat "${UTILARGS[1]}" "${UTILARGS[2]:-}"
+      # USERNAME and PAT optional — offers bmc-dtrhub credentials from HP_NAMESPACE, then prompts
+      validateDockerIOPat "${UTILARGS[1]:-}" "${UTILARGS[2]:-}"
       ;;
     help)
       showUtilHelp
@@ -7266,7 +7272,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-06"
+HITT_BUILD_VERSION="20260713-07"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

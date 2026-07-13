@@ -718,12 +718,14 @@ window.HITT_USE_CASES = {
       "order": 28,
       "title": "I want to validate my Docker Hub Personal Access Token (PAT)",
       "commands": [
+        "bash hitt.sh -u checkpat",
         "bash hitt.sh -u \"checkpat DOCKERHUB_USERNAME YOUR_PAT\"",
         "bash hitt.sh -u \"checkpat DOCKERHUB_USERNAME\""
       ],
       "notes": [
         "Utility mode (-u) with checkpat requests a Docker Hub registry token and verifies the PAT has pull scope for a private BMC Helix image repository under your Docker Hub user.",
-        "If you omit the PAT on the command line, HITT prompts for it interactively (hidden input)."
+        "With no arguments, HITT offers docker.io credentials from the bmc-dtrhub secret in the Helix Platform namespace (HP_NAMESPACE in hitt.conf), then prompts if needed.",
+        "If you omit only the PAT on the command line, HITT prompts for it interactively (hidden input)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },

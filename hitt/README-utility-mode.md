@@ -16,7 +16,7 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 | `get fields` | Lists fields on one form using its **Schema ID** from `get forms`. Args: **SCHEMAID** [**KEYWORD**]. Omit the keyword to list all fields; add a keyword to filter by field name. |
 | `sql` | Runs a custom AR SQL query via the IS REST API and prints the full JSON response. Args: **SQL_QUERY** (put the entire query inside the quoted `-u` string). |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
-| `checkpat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit **PAT** to be prompted (hidden). |
+| `checkpat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit both args to offer credentials from the **bmc-dtrhub** secret in **HP_NAMESPACE**; omit **PAT** only to be prompted (hidden). |
 | `checkrbac [hitt\|deploy\|all]` | Validates Kubernetes RBAC for the current kubeconfig user. **hitt** (default): triage/read checks plus fix-mode writes (tctl, cacerts, SAT). **deploy**: shared reads plus install/upgrade permissions (Helix Platform, IS, logging, DE namespaces from `hitt.conf`). **all**: union of both. |
 | `help` | Prints the same summary as this file (built into the script). |
 
@@ -50,7 +50,8 @@ bash hitt.sh -u "sql select [Login Name],[Full Name] from [User] where [Login Na
 # Generate DBID before deployment / license (mssql | oracle | postgres)
 bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
 
-# Validate Docker Hub PAT (optional PAT on CLI — otherwise prompted)
+# Validate Docker Hub PAT (omit both args to use HP namespace secret, or USERNAME only / PAT prompted)
+bash hitt.sh -u checkpat
 bash hitt.sh -u "checkpat mydockerhubuser"
 bash hitt.sh -u "checkpat mydockerhubuser dckr_pat_xxxxxxxx"
 
@@ -157,11 +158,13 @@ If the query fails, HITT reports an error (for example bad HTTP status, invalid 
 
 Generates a DBID string from the values provided. **DB_TYPE** is one of `mssql`, `oracle`, or `postgres`.
 
-### `checkpat USERNAME [PAT]`
+### `checkpat [USERNAME] [PAT]`
 
 Calls Docker Hub’s token service with **USERNAME** and **PAT** to verify the permissions for the **`bmchelix`** repository. On success you see a confirmation; on failure, HITT explains that the token may be limited to public-repo read-only and should be recreated with the correct access (see Docker Hub / EPD documentation).
 
-If **PAT** is omitted, it is read from a hidden prompt (same pattern as other password prompts).
+If you omit **both** arguments, HITT looks for **bmc-dtrhub** in **HP_NAMESPACE** (from **hitt.conf**) and offers those docker.io credentials. If the secret is missing or you decline, you are prompted for username and PAT.
+
+If **USERNAME** is given but **PAT** is omitted, **PAT** is read from a hidden prompt (same pattern as other password prompts).
 
 ### `checkrbac [hitt|deploy|all]`
 
