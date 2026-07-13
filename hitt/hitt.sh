@@ -4810,6 +4810,19 @@ showUtilHelp() { # utility mode help
     "
 }
 
+showConsoleLogHelp() { # -o console log options help
+  echo "HITT console log options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o"
+  echo .
+  echo 'Usage: bash hitt.sh -o <jenkins|agent|PIPELINE_NAME|help>'
+  echo "Requires hitt.conf and a working login to the Deployment Engine."
+  echo -e "
+    \tjenkins \t| Jenkins system log (controller messages).
+    \tagent \t\t| jenkins-agent node log (pipeline worker).
+    \tPIPELINE_NAME \t| Latest console log for a pipeline job (e.g. helix_onprem_deployment).
+    \thelp \t\t| Show this list.
+    "
+}
+
 showPipelineHelp() { # pipeline mode help
   echo "HITT pipeline mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
   echo .
@@ -4823,10 +4836,7 @@ showPipelineHelp() { # pipeline mode help
     "
   echo "After build or kickstart, rebuild the job in the Deployment Engine and complete any missing values."
   echo "Password parameters in get output are redacted unless -p is used."
-  echo "Deployment Engine logs (use -o, not -k):"
-  echo "  bash hitt.sh -o jenkins                  - Jenkins system log (controller messages)"
-  echo "  bash hitt.sh -o agent                    - jenkins-agent node log (pipeline worker)"
-  echo "  bash hitt.sh -o helix_onprem_deployment  - latest console log for a pipeline job"
+  echo "For Deployment Engine logs, use -o (see: bash hitt.sh -o help)."
 }
 
 showInfoHelp() { # info mode help
@@ -4868,11 +4878,8 @@ showGeneralHelp() {
   echo ""
   echo "Examples:"
   echo "bash $0 -m post-hp  - run post HP installation only checks"
-  echo "OR"
   echo "bash $0 -m pre-is   - run pre-installation checks"
-  echo "OR"
   echo "bash $0 -m post-is  - run post-installation checks"
-  echo "OR"
   echo "bash $0 -m jenkins  - run Jenkins configuration checks"
   echo ""
   echo -e "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
@@ -4881,11 +4888,12 @@ showGeneralHelp() {
   echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
   echo
   echo "Mode-specific help:"
-  echo "  bash $0 -h fix       - fix mode options"
-  echo "  bash $0 -h info      - info mode options"
-  echo "  bash $0 -h utility   - utility mode options"
-  echo "  bash $0 -h pipeline  - pipeline mode options"
-  echo "  bash $0 -h override  - config override options"
+  echo "  bash $0 -h fix         - fix mode options"
+  echo "  bash $0 -h info        - info mode options"
+  echo "  bash $0 -h utility     - utility mode options"
+  echo "  bash $0 -h pipeline    - pipeline mode options"
+  echo "  bash $0 -h consolelog  - Deployment Engine log options (-o)"
+  echo "  bash $0 -h override    - config override options"
   echo
   echo -e "${BOLD}Interactive help page with HITT use-cases available at https://bit.ly/hitthelp${NORMAL}"
   echo
@@ -4908,11 +4916,14 @@ showHittHelp() {
     pipeline)
       showPipelineHelp
       ;;
+    consolelog|log)
+      showConsoleLogHelp
+      ;;
     override)
       showOverrideHelp
       ;;
     *)
-      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, override)."
+      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, consolelog, override)."
       showGeneralHelp
       exit 1
       ;;
@@ -6984,6 +6995,10 @@ if [ "${MODE}" == "getlog" ]; then
     echo "${ALL_MSGS_JSON}"
     exit
   fi
+  if [ "${PIPELINE_NAME}" == "help" ]; then
+    showConsoleLogHelp
+    exit
+  fi
   checkJenkinsIsRunning 1
   case "${PIPELINE_NAME}" in
     jenkins)
@@ -7238,7 +7253,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-04"
+HITT_BUILD_VERSION="20260713-05"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8746,7 +8761,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
       SKIP_UPDATE_CHECK=1
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "Usage: bash $0 -o [PIPELINE_NAME|jenkins]" 1
+        logError "999" "Usage: bash $0 -o <jenkins|agent|PIPELINE_NAME|help>" 1
       fi
       PIPELINE_NAME="${OPTARG}"
       ;;

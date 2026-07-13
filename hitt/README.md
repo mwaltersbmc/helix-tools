@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260713-04`**
+**Latest build `20260713-05`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -34,7 +34,7 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` for **HELIX_ONPREM_DEPLOYMENT**
 - [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info ingress`, `info full`
 
-Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h info`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, or `bash hitt.sh -m "info help"` from within each mode.
+Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h consolelog`, `bash hitt.sh -h info`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, `bash hitt.sh -o help`, or `bash hitt.sh -m "info help"` from within each mode.
 
 **Info ingress** (`bash hitt.sh -m "info ingress"`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires `hitt.conf` and Platform namespace access. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
 
@@ -320,6 +320,7 @@ Run `bash hitt.sh -h` for general usage and a list of topics. Each topic prints 
 | `bash hitt.sh -h fix` | Fix mode options ([README-fix-mode.md](README-fix-mode.md)) |
 | `bash hitt.sh -h utility` | Utility mode options ([README-utility-mode.md](README-utility-mode.md)) |
 | `bash hitt.sh -h pipeline` | Pipeline mode options ([README-pipeline-mode.md](README-pipeline-mode.md)) |
+| `bash hitt.sh -h consolelog` | Deployment Engine log options (`-o`; [README-pipeline-mode.md](README-pipeline-mode.md#view-logs-from-the-deployment-engine--o)) |
 | `bash hitt.sh -h info` | Info mode options ([README-info-mode.md](README-info-mode.md)) |
 | `bash hitt.sh -h override` | Config override switches (see below) |
 
