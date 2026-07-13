@@ -4823,7 +4823,10 @@ showPipelineHelp() { # pipeline mode help
     "
   echo "After build or kickstart, rebuild the job in the Deployment Engine and complete any missing values."
   echo "Password parameters in get output are redacted unless -p is used."
-  echo "Console log for a job: bash hitt.sh -o PIPELINE_NAME (e.g. helix_onprem_deployment)."
+  echo "Deployment Engine logs (use -o, not -k):"
+  echo "  bash hitt.sh -o jenkins                  - Jenkins system log (controller messages)"
+  echo "  bash hitt.sh -o agent                    - jenkins-agent node log (pipeline worker)"
+  echo "  bash hitt.sh -o helix_onprem_deployment  - latest console log for a pipeline job"
 }
 
 showInfoHelp() { # info mode help
@@ -6614,6 +6617,10 @@ validateHittK8sPermissions() {
   fi
   mapfile -t helix_ns < <(_hittK8sHelixNamespaces)
 
+  if [[ "${active_profile}" == "deploy" || "${active_profile}" == "all" ]] && ((${#helix_ns[@]} == 0)); then
+    logError "999" "Profile '${active_profile}' needs Helix namespaces in hitt.conf (HP_NAMESPACE, IS_NAMESPACE, and optionally CDE_NAMESPACE / HELIX_LOGGING_NAMESPACE) before deploy permissions can be checked." 1
+  fi
+
   logStatus "Kubernetes RBAC audit (profile: ${active_profile})..."
   logMessage  "User: $(${KUBECTL_BIN} config view --minify -o jsonpath='{.contexts[0].context.user}' 2>/dev/null || echo unknown)"
   logMessage  "Context: $(${KUBECTL_BIN} config current-context 2>/dev/null || echo unknown)"
@@ -7024,7 +7031,7 @@ if [ "${MODE}" == "utility" ]; then
       profile="${UTILARGS[1]:-hitt}"
       case "${profile}" in
         hitt|deploy|all)
-          validateHittK8sPermissions "${profile}"
+          validateHittK8sPermissions "${profile}" || exit 1
           ;;
         *)
           logError "999" "Usage: bash $0 -u \"checkrbac [hitt|deploy|all]\" (default: hitt)." 1
@@ -7223,7 +7230,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-02"
+HITT_BUILD_VERSION="20260713-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
