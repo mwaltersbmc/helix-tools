@@ -5302,6 +5302,13 @@ decodeK8sSecret() {
 
 parseUtilGet() {
   case "${UTILARGS[1]}" in
+    arlicense)
+      initISAdminREST
+      IS_LIC=$(getISServerInfo licensetype)
+      IS_LIC_FIXED=$(getISServerInfo fixedlicensecount)
+      IS_LIC_FLOATING=$(getISServerInfo floatinglicensecount)
+      logMessage "IS license type is '${IS_LIC}' (${IS_LIC_FIXED} fixed / ${IS_LIC_FLOATING} floating)."
+      ;;
     jwt)
       getISJWTToken "${UTILARGS[2]}" "${UTILARGS[3]}"
       ;;
@@ -7338,7 +7345,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260713-09"
+HITT_BUILD_VERSION="20260714-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

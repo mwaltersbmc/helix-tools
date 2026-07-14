@@ -1,6 +1,6 @@
 # HITT Utility Mode
 
-**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, secret decode, ConfigMap export, AR form/field search and custom SQL queries, generated DBID, Docker Hub PAT check).
+**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, IS license type, secret decode, ConfigMap export, AR form/field search and custom SQL queries, generated DBID, Docker Hub PAT check).
 
 Utility commands are invoked with **`-u`**. When the command has spaces or multiple words, pass the whole thing in **double quotes**.
 
@@ -9,6 +9,7 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 | Command | Description |
 |--------|-------------|
 | `get dbid` | Displays the database ID (DBID) for the system (used for licensing). |
+| `get arlicense` | Displays the current **IS Server license type** (for example **AR Server** for a permanent license, or a temporary type before a full license is applied). |
 | `get jwt` | Prints an AR-JWT for the IS REST API. Defaults to `hannah_admin` using credentials from the cluster; optional username/password. |
 | `get secret` | Decodes and displays Kubernetes secret `.data`. Binary keys are written to files; remaining keys are printed. Args: **SECRETNAME** [**NAMESPACE**]. If namespace is omitted, searches `IS_NAMESPACE`, then `HP_NAMESPACE`, then `CDE_NAMESPACE` from `hitt.conf`; prompts if more than one match (use explicit namespace with `-q` / automation). |
 | `get configmap` | Exports ConfigMap `.data` and `.binaryData` keys to files under a new directory (named after the ConfigMap, with a numeric suffix if that name already exists). With **`-v`**, lists key names only (no files). Args: **CM_NAME** [**NAMESPACE**]. Optional namespace uses the same search and prompt rules as `get secret`. |
@@ -25,6 +26,9 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 ```bash
 # Current DBID from the running system
 bash hitt.sh -u "get dbid"
+
+# Current IS Server license type
+bash hitt.sh -u "get arlicense"
 
 # JWT for hannah_admin (cluster credentials)
 bash hitt.sh -u "get jwt"
@@ -67,6 +71,10 @@ bash hitt.sh -u help
 ### `get dbid`
 
 Uses `hitt.conf`, cluster access, and IS REST to print the current DBID.
+
+### `get arlicense`
+
+Uses `hitt.conf`, cluster access, and IS REST to print the current **IS Server license type**. A permanent production license is usually shown as **AR Server**; temporary or evaluation types indicate you may still need to apply a full license (see fix mode **arlicense** in [README-fix-mode.md](README-fix-mode.md)).
 
 ### `get jwt`
 

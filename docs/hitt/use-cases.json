@@ -505,6 +505,21 @@
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
     {
+      "id": "utility-get-arlicense",
+      "topicId": "helix-is-mgmt",
+      "order": 15,
+      "title": "I want to see the current IS server license type",
+      "commands": [
+        "bash hitt.sh -u \"get arlicense\""
+      ],
+      "notes": [
+        "Requires hitt.conf, cluster access, and a running Helix IS deployment.",
+        "Shows the license type from the IS Server (for example AR Server for a permanent license, or a temporary type before a full license is applied).",
+        "To apply a license key, use fix mode arlicense — see the apply AR license use case in this section."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-arlicense"
+    },
+    {
       "id": "utility-jwt",
       "topicId": "helix-is-mgmt",
       "order": 20,
