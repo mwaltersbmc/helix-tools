@@ -4911,7 +4911,7 @@ showHittHelp() {
     info)
       showInfoHelp
       ;;
-    utility)
+    utility|util)
       showUtilHelp
       ;;
     pipeline)
@@ -5291,7 +5291,7 @@ decodeK8sSecret() {
       local fname
       fname=$(getUniqueFilename "${k}")
       logMessage "Saving data from key '${k}' in secret '${SECRETNAME}' as file named '${fname}'"
-      echo "${K8S_SECRET}" | ${JQ_BIN} -r --arg key "${k}" '.data[$key] | @base64d' > "${fname}"
+      echo "${K8S_SECRET}" | ${JQ_BIN} -r --arg key "${k}" '.data[$key]' | ${BASE64_BIN} -d > "${fname}"
       # Remove key from JSON
       K8S_SECRET=$(echo "${K8S_SECRET}" | ${JQ_BIN} --arg key "$k" 'del(.data[$key])')
     done
@@ -7345,7 +7345,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260714-01"
+HITT_BUILD_VERSION="20260714-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
