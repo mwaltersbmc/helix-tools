@@ -535,6 +535,22 @@
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
     {
+      "id": "fix-addcert",
+      "topicId": "helix-is-mgmt",
+      "order": 28,
+      "title": "I want to add new certificates for use by pods in the Helix IS namespace",
+      "commands": [
+        "bash hitt.sh -f \"addcert /path/to/custom-certs.pem\""
+      ],
+      "notes": [
+        "Requires hitt.conf with IS_NAMESPACE set, cluster access, and the cacerts secret in the IS namespace.",
+        "PEM file may contain one or more certificates. Expired certificates are rejected; certificates expiring within 4 weeks show a warning but the command continues.",
+        "HITT downloads the current cacerts keystore, adds the new certificates, validates the result, then asks you to confirm before updating the secret.",
+        "To replace the entire cacerts file instead, use fix mode cacerts — see fix-cacerts use case."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md#addcert-certificatespem---add-pem-certificates-to-the-is-cacerts-secret"
+    },
+    {
       "id": "fix-cacerts",
       "topicId": "helix-is-mgmt",
       "order": 30,

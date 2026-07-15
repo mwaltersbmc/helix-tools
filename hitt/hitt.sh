@@ -2189,6 +2189,11 @@ validateISDetails() {
 getCacertsFile() {
   SKIP_CACERTS=1
   if [ "${1}" == "IS" ]; then
+    if [[ "${MODE}" == "fix" ]] && [[ -f "${CACERTS_FILENAME}" ]]; then
+      SKIP_CACERTS=0
+      logMessage "Using cacerts file '${CACERTS_FILENAME}'." 1
+      return
+    fi
     if [ "${MODE}" == "pre-is" ]; then
       if [ -f configsrepo/customer/customCerts/cacerts ] ; then
         SKIP_CACERTS=0
@@ -3883,6 +3888,134 @@ getPodNameByLabel() {
   ${KUBECTL_BIN} -n "${1}" get pod -l "${2}" -o custom-columns=:metadata.name --no-headers | head -1
 }
 
+downloadISCacertsFromSecret() {
+  local IS_CACERTS_JSON IS_CACERTS
+  CACERTS_FILENAME="${CACERTS_FILENAME:-is-sealcacerts}"
+  logMessage "Downloading cacerts from the '${IS_NAMESPACE}' cacerts secret..."
+  if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts >/dev/null 2>&1; then
+    logError "999" "'cacerts' secret not found in Helix IS namespace '${IS_NAMESPACE}'." 1
+  fi
+  IS_CACERTS_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o json 2>>"${HITT_ERR_FILE}")
+  IS_CACERTS=$(echo "${IS_CACERTS_JSON}" | ${JQ_BIN} -r '.data.cacerts')
+  if [ "${IS_CACERTS}" == "null" ] || [ -z "${IS_CACERTS}" ]; then
+    logError "999" "Required file 'cacerts' not found in the cacerts secret. Keys present:"
+    echo "${IS_CACERTS_JSON}" | ${JQ_BIN} -r '.data | keys[]?' 1>&2
+    return 1
+  fi
+  echo "${IS_CACERTS}" | ${BASE64_BIN} -d > "${CACERTS_FILENAME}"
+  if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" == "" ]; then
+    IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
+  fi
+  if ! ${KEYTOOL_BIN} -list -keystore "${CACERTS_FILENAME}" -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" >/dev/null 2>&1; then
+    logError "999" "Downloaded cacerts file could not be opened — check CACERTS_SSL_TRUSTSTORE_PASSWORD for the IS namespace." 1
+  fi
+  logMessage "Downloaded cacerts from '${IS_NAMESPACE}' to '${CACERTS_FILENAME}'."
+}
+
+splitPemCertificatesToDir() {
+  local pem_file=$1 out_dir=$2
+  mkdir -p "${out_dir}"
+  rm -f "${out_dir}"/cert_*.pem
+  awk -v dir="${out_dir}" '
+    BEGIN { n=0; fn="" }
+    /-----BEGIN CERTIFICATE-----/ {
+      n++
+      fn=sprintf("%s/cert_%03d.pem", dir, n)
+    }
+    fn { print > fn }
+  ' "${pem_file}"
+  find "${out_dir}" -maxdepth 1 -name 'cert_*.pem' 2>/dev/null | wc -l | tr -d ' '
+}
+
+validatePemCertificateFile() {
+  local pem_file=$1 out_dir=$2 cert_count cert_file idx subject end_date expiry_warn=$((28 * 24 * 3600))
+  cert_count=$(grep -c "BEGIN CERTIFICATE" "${pem_file}" 2>/dev/null || echo 0)
+  if [[ "${cert_count}" -eq 0 ]]; then
+    logError "999" "No certificates found in '${pem_file}' — expected a PEM file with one or more CERTIFICATE blocks." 1
+  fi
+  logMessage "Found ${cert_count} certificate(s) in '${pem_file}'."
+  cert_count=$(splitPemCertificatesToDir "${pem_file}" "${out_dir}")
+  if [[ "${cert_count}" -eq 0 ]]; then
+    logError "999" "Unable to read certificates from '${pem_file}'." 1
+  fi
+  idx=0
+  for cert_file in "${out_dir}"/cert_*.pem; do
+    [[ -f "${cert_file}" ]] || continue
+    idx=$((idx + 1))
+    if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout 2>>"${HITT_ERR_FILE}"; then
+      logError "999" "Certificate ${idx} in '${pem_file}' is not a valid X.509 certificate." 1
+    fi
+    subject=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -subject 2>/dev/null | sed 's/^subject=//')
+    end_date=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')
+    logMessage "Certificate ${idx}: ${subject}"
+    if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout -checkend 0 2>/dev/null; then
+      logError "999" "Certificate ${idx} has expired (${end_date})." 1
+    fi
+    if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout -checkend "${expiry_warn}" 2>/dev/null; then
+      logWarning "999" "Certificate ${idx} expires within 4 weeks (${end_date}) — continuing."
+    fi
+  done
+}
+
+importPemCertificatesFromDir() {
+  local cert_dir=$1 cert_file alias fp imported=0 skipped=0
+  if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" == "" ]; then
+    IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
+  fi
+  for cert_file in "${cert_dir}"/cert_*.pem; do
+    [[ -f "${cert_file}" ]] || continue
+    fp=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -fingerprint -sha256 2>/dev/null | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
+    alias="addcert-${fp:0:16}"
+    if ${KEYTOOL_BIN} -list -keystore "${CACERTS_FILENAME}" -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${alias}" >/dev/null 2>&1; then
+      logMessage "Certificate already present in cacerts (alias '${alias}') — skipping."
+      skipped=$((skipped + 1))
+      continue
+    fi
+    if ${KEYTOOL_BIN} -import -trustcacerts -alias "${alias}" -file "${cert_file}" \
+      -keystore "${CACERTS_FILENAME}" -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -noprompt >/dev/null 2>>"${HITT_ERR_FILE}"; then
+      logMessage "Added certificate to cacerts (alias '${alias}')."
+      imported=$((imported + 1))
+    else
+      logError "999" "Failed to import certificate into cacerts (alias '${alias}')." 1
+    fi
+  done
+  logMessage "Imported ${imported} certificate(s) into '${CACERTS_FILENAME}' (${skipped} already present)."
+}
+
+fixAddCert() {
+  local PEM_FILE PEM_TMP_DIR
+  if [ ${#FIXARGS[@]} -ne 2 ]; then
+    logError "999" "Usage: bash $0 -f \"addcert /path/to/certificates.pem\"" 1
+  fi
+  PEM_FILE="${FIXARGS[1]/#\~/$HOME}"
+  if [ ! -f "${PEM_FILE}" ]; then
+    logError "999" "Certificate file '${PEM_FILE}' not found." 1
+  fi
+  checkToolVersion kubectl
+  checkBinary keytool
+  checkBinary openssl
+  PEM_TMP_DIR=$(mktemp -d addcert-certs.XXXXXX)
+  validatePemCertificateFile "${PEM_FILE}" "${PEM_TMP_DIR}"
+  getVersions
+  setVarsFromPlatform
+  getDomain
+  buildISAliasesArray
+  CACERTS_FILENAME="is-sealcacerts"
+  downloadISCacertsFromSecret
+  importPemCertificatesFromDir "${PEM_TMP_DIR}"
+  rm -rf "${PEM_TMP_DIR}"
+  validateCacertsFile IS
+  if [ "${VALID_CACERTS}" != "0" ]; then
+    logError "999" "Updated cacerts file did not pass validation — the cacerts secret was not changed." 1
+  fi
+  if askYesNo "Updated cacerts file is valid — replace the cacerts secret in '${IS_NAMESPACE}'?"; then
+    replaceISCacertsSecret
+    logMessage "cacerts secret in '${IS_NAMESPACE}' updated with certificate(s) from '${PEM_FILE}'."
+  else
+    logMessage "No changes made to the cacerts secret in '${IS_NAMESPACE}'."
+  fi
+}
+
 updateISCacerts() {
   CACERTS_FILENAME="is-sealcacerts"
   cp "${NEWCACERTS}" "${CACERTS_FILENAME}"
@@ -4774,6 +4907,7 @@ showFixHelp() { # fix mode help
     \tssh \t\t| Set up/update passwordless ssh for the git user.
     \trealm \t\t| Create/update the Helix Service Management realm in SSO.
     \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
+    \taddcert \t| Add PEM certificate(s) to the IS cacerts secret. Args: /path/to/certificates.pem
     \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
     \tarlicense \t| Apply an Innovation Suite/AR server license to the system via the REST API.
     \tresetssopwd \t| Resets the Helix SSO admin user password to the BMC default value.
@@ -7041,6 +7175,9 @@ if [ "${MODE}" == "fix" ]; then
     cacerts)
       fixCacerts
       ;;
+    addcert)
+      fixAddCert
+      ;;
     sat)
       fixSATRole
       ;;
@@ -7345,7 +7482,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260714-03"
+HITT_BUILD_VERSION="20260715-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

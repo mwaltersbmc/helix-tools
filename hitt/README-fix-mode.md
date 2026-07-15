@@ -9,6 +9,7 @@
 | `ssh`    | Set up/update passwordless ssh for the git user. |
 | `realm`  | Create/update the Helix Service Management realm in SSO. |
 | `cacerts`  | Update the cacerts secret in the Helix IS namespace with a new file. |
+| `addcert`  | Add one or more PEM certificates to the IS cacerts secret (downloads current cacerts, imports certs, validates, then updates the secret). |
 | `sat`   | Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool in the Helix IS namespace. |
 | `arlicense`   | Apply an Innovation Suite/AR server license to the system via the REST API. |
 | `resetssopwd`   | Resets the Helix SSO admin user password to the BMC default value. |
@@ -31,6 +32,7 @@ Fix modes are called using the `-f <fixmode>` command line option.  Some of the 
 Examples:
 bash hitt.sh -f sat # Run the Support Assistant Tool fix
 bash hitt.sh -f "cacerts /tmp/newcacerts" # Update the cacerts secret with the newcacerts file
+bash hitt.sh -f "addcert /path/to/custom-certs.pem" # Add PEM certificates to the IS cacerts secret
 ```
 
 #### `ssh` - set up passwordless ssh for the git user
@@ -51,6 +53,14 @@ Creates or updates the SSO realm required by the Helix Service management applic
 bash hitt.sh -f "cacerts /path/to/newcacertsfile"
 ```
 Updates the `cacerts` secret in the Helix IS namespace with a new cacerts file.  Used when the `HELIX_ONPREM_DEPLOYMENT` pipeline was run but the cacerts file was not attached or the existing secret needs to be updated with one containing a new third party certificate.  If the new cacerts file is valid you will be prompted to confirm the update.
+
+#### `"addcert certificates.pem"` - add PEM certificates to the IS cacerts secret
+```bash
+bash hitt.sh -f "addcert /path/to/custom-certs.pem"
+```
+Adds one or more certificates from a **PEM** file to the Java keystore in the `cacerts` secret in the Helix IS namespace. HITT downloads the current cacerts from the cluster, validates each certificate in the PEM file (expired certificates are rejected; certificates expiring within 4 weeks produce a warning), imports them into the keystore, runs the same cacerts checks used elsewhere in HITT, and asks you to confirm before replacing the secret.
+
+Use this when pods in the IS namespace need to trust an additional CA or server certificate (for example a new third-party integration) without rebuilding the full cacerts file by hand.
 
 #### `sat` - add the role and rolebinding needed by the Support Assistant Tool
 ```bash
