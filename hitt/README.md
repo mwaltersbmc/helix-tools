@@ -16,7 +16,7 @@ The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic c
 Run the following commands as the `git` user:
 
 ```bash
-mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
+mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh && chmod a+x hitt.sh
 curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz   # Optional, enables DB validation
 ```
 
@@ -119,7 +119,6 @@ Run the script using bash or make it executable with chmod if preferred.
 ```bash
 bash hitt.sh
 OR
-chmod a+x hitt.sh
 ./hitt.sh
 ```
 
