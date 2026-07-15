@@ -6491,33 +6491,44 @@ validateDockerIOPat() {
   fi
 }
 
+# Kickstart manifests: kickstartManifestJsonBase() holds common overrides for all releases.
+# Per-release additions: add kickstartManifestJsonDelta<ID>() (e.g. kickstartManifestJsonDelta26201).
+# An empty delta ([]) registers the release and suppresses the unknown-release warning.
+# Manifest id is derived from PLATFORM_HELM_VERSION major prefix: 2026201 -> 26201.
+# Override delta id with HITT_KICKSTART_MANIFEST_ID (base is always applied).
+
 kickstartManifestIdFromPlatformVersion() {
   # $1 = PLATFORM_HELM_VERSION from Jenkins (e.g. 2026201.1.00.00) -> manifest id (e.g. 26201)
   local platform_helm_version="$1"
   local major="${platform_helm_version%%.*}"
-  case "${major}" in
-    2026201)
-      echo 26201
-      ;;
-    *)
-      logError "999" "No kickstart manifest for PLATFORM_HELM_VERSION '${platform_helm_version}'. Add a KICKSTART_MANIFEST_<id> block in hitt.sh for this release." 1
-      ;;
-  esac
+  if [[ "${major}" =~ ^20[0-9]{5}$ ]]; then
+    echo "${major:2}"
+    return 0
+  fi
+  logWarning "999" "Could not determine the HELIX_ONPREM_DEPLOYMENT release from pipeline defaults; using common kickstart values only."
+  echo ""
 }
 
-kickstartGetManifestJson() {
-  # $1 = manifest id (e.g. 26201). Prints manifest JSON array to stdout.
-  case "${1}" in
-    26201)
-      kickstartManifestJson26201
-      ;;
-    *)
-      logError "999" "Unknown kickstart manifest id '${1}'." 1
-      ;;
-  esac
+kickstartHasManifestDelta() {
+  declare -f "kickstartManifestJsonDelta${1}" &>/dev/null
 }
 
-kickstartManifestJson26201() {
+kickstartGetManifestDeltaJson() {
+  # $1 = manifest id, $2 = PLATFORM_HELM_VERSION (for messages). Prints delta JSON array to stdout.
+  local manifest_id="$1" platform_helm_version="$2"
+  if [ -z "${manifest_id}" ]; then
+    echo '[]'
+    return 0
+  fi
+  if kickstartHasManifestDelta "${manifest_id}"; then
+    "kickstartManifestJsonDelta${manifest_id}"
+    return 0
+  fi
+  logWarning "999" "No version-specific kickstart settings for HELIX_ONPREM_DEPLOYMENT release '${platform_helm_version}'; using common values only."
+  echo '[]'
+}
+
+kickstartManifestJsonBase() {
   cat <<'EOF'
 [
   { "param": "OS_RESTRICTED_SCC", "source": { "type": "handler", "name": "openshift_scc" } },
@@ -6548,6 +6559,20 @@ kickstartManifestJson26201() {
   { "param": "HELIX_PLATFORM_CUSTOMER_NAME", "source": { "type": "var", "key": "HP_COMPANY_NAME" } }
 ]
 EOF
+}
+
+# Registered releases with no extra kickstart rows beyond kickstartManifestJsonBase.
+kickstartManifestJsonDelta26201() {
+  echo '[]'
+}
+
+kickstartMergeManifestJson() {
+  # $1 = base JSON array, $2 = delta JSON array. Delta entries override base for the same param.
+  ${JQ_BIN} -n --argjson base "${1}" --argjson delta "${2}" '
+    ($base + $delta)
+    | group_by(.param)
+    | map(last)
+  '
 }
 
 kickstartResolveHandler() {
@@ -6602,7 +6627,7 @@ kickstartAddOverride() {
 }
 
 kickstartResolveManifest() {
-  local manifest_id manifest_json manifest_row param source_json value pipeline_defaults_json platform_helm_version resolved_count skipped_count
+  local manifest_id manifest_json base_json delta_json manifest_row param source_json value pipeline_defaults_json platform_helm_version resolved_count skipped_count manifest_scope
   if ! pipeline_defaults_json=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT); then
     return 1
   fi
@@ -6612,17 +6637,24 @@ kickstartResolveManifest() {
   fi
   if [ -n "${HITT_KICKSTART_MANIFEST_ID}" ]; then
     manifest_id="${HITT_KICKSTART_MANIFEST_ID}"
-    logMessage "Using kickstart manifest id '${manifest_id}' (HITT_KICKSTART_MANIFEST_ID override)." 1
+    logMessage "Using kickstart release id '${manifest_id}' (HITT_KICKSTART_MANIFEST_ID override)." 1
   else
-    if ! manifest_id=$(kickstartManifestIdFromPlatformVersion "${platform_helm_version}"); then
-      return 1
-    fi
+    manifest_id=$(kickstartManifestIdFromPlatformVersion "${platform_helm_version}")
   fi
-  if ! manifest_json=$(kickstartGetManifestJson "${manifest_id}"); then
+  base_json=$(kickstartManifestJsonBase)
+  if ! delta_json=$(kickstartGetManifestDeltaJson "${manifest_id}" "${platform_helm_version}"); then
+    return 1
+  fi
+  if ! manifest_json=$(kickstartMergeManifestJson "${base_json}" "${delta_json}"); then
     return 1
   fi
   if ! ${JQ_BIN} -e 'type == "array"' <<< "${manifest_json}" &>/dev/null; then
-    logError "999" "Kickstart manifest '${manifest_id}' must be a JSON array." 1
+    logError "999" "Kickstart manifest must be a JSON array." 1
+  fi
+  if [ -n "${manifest_id}" ] && kickstartHasManifestDelta "${manifest_id}"; then
+    manifest_scope="common + release ${manifest_id}"
+  else
+    manifest_scope="common"
   fi
   KICKSTART_OVERRIDES_JSON='{}'
   resolved_count=0
@@ -6642,7 +6674,7 @@ kickstartResolveManifest() {
       resolved_count=$((resolved_count + 1))
     fi
   done < <(${JQ_BIN} -c '.[]' <<< "${manifest_json}")
-  logMessage "Kickstart manifest ${manifest_id} (pipeline ${platform_helm_version}): ${resolved_count} parameter override(s) (${skipped_count} skipped — not on this job)." 1
+  logMessage "Kickstart manifest (${manifest_scope}, pipeline ${platform_helm_version}): ${resolved_count} parameter override(s) (${skipped_count} skipped — not on this job)." 1
   KICKSTART_PIPELINE_DEFAULTS_JSON="${pipeline_defaults_json}"
 }
 
@@ -7502,7 +7534,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260715-02"
+HITT_BUILD_VERSION="20260715-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
