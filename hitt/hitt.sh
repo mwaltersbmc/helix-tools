@@ -233,7 +233,7 @@ logError() {
   # Print error message MSG_ID MSG / exit if value of 1 passed as third parameter
   stopOnError "${1}"
   MSG="${BOLD}${RED}ERROR${NORMAL} (${1}) - ${2}"
-  [[ "${QUIET}" == "0" ]] && echo -e "${MSG}"
+  [[ "${QUIET}" == "0" ]] && echo -e "${MSG}" >&2
   ((FAIL++))
   ERROR_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
@@ -244,7 +244,7 @@ logWarning() {
   # Print warning message MSG_ID MSG
   stopOnError "${1}"
   MSG="${BOLD}${YELLOW}WARNING${NORMAL} (${1}) - ${2}"
-  [[ "${QUIET}" == "0" ]] && echo -e "${MSG}"
+  [[ "${QUIET}" == "0" ]] && echo -e "${MSG}" >&2
   ((WARN++))
   WARN_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
@@ -5083,7 +5083,8 @@ getJenkinsPipelineValues() {
       ;;
     kickstart)
       kickstartGatherPlatformContext
-      PIPELINE_VALUES_JSON=$(kickstartMergedPipelineJson)
+      kickstartMergedPipelineJson || exit 1
+      PIPELINE_VALUES_JSON="${KICKSTART_MERGED_JSON}"
       ;;
     last)
       PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getLastBuild)
@@ -5098,6 +5099,9 @@ getJenkinsPipelineValues() {
       logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|kickstart|N> [filename]\"" 1
       ;;
   esac
+  if ! echo "${PIPELINE_VALUES_JSON}" | ${JQ_BIN} -e . &>/dev/null; then
+    logError "999" "Pipeline values are not valid JSON." 1
+  fi
   local redact_passwords="true"
   if [ "${LOG_PASSWDS}" == "1" ]; then
     redact_passwords="false"
@@ -6568,7 +6572,7 @@ kickstartResolveHandler() {
 
 kickstartResolveSource() {
   # $1 = source object JSON from manifest row
-  local source_type source_key handler_name
+  local source_type source_key handler_name value
   source_type=$(${JQ_BIN} -r '.type' <<< "${1}")
   case "${source_type}" in
     var)
@@ -6580,7 +6584,10 @@ kickstartResolveSource() {
       ;;
     handler)
       handler_name=$(${JQ_BIN} -r '.name' <<< "${1}")
-      kickstartResolveHandler "${handler_name}"
+      if ! value=$(kickstartResolveHandler "${handler_name}"); then
+        return 1
+      fi
+      printf '%s' "${value}"
       ;;
     *)
       logError "999" "Unknown kickstart source type '${source_type}'." 1
@@ -6596,7 +6603,9 @@ kickstartAddOverride() {
 
 kickstartResolveManifest() {
   local manifest_id manifest_json manifest_row param source_json value pipeline_defaults_json platform_helm_version resolved_count skipped_count
-  pipeline_defaults_json=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT)
+  if ! pipeline_defaults_json=$(getPipelineDefaults HELIX_ONPREM_DEPLOYMENT); then
+    return 1
+  fi
   platform_helm_version=$(${JQ_BIN} -r '.PLATFORM_HELM_VERSION // empty' <<< "${pipeline_defaults_json}")
   if [ -z "${platform_helm_version}" ]; then
     logError "999" "Unable to read PLATFORM_HELM_VERSION from HELIX_ONPREM_DEPLOYMENT pipeline defaults." 1
@@ -6605,9 +6614,13 @@ kickstartResolveManifest() {
     manifest_id="${HITT_KICKSTART_MANIFEST_ID}"
     logMessage "Using kickstart manifest id '${manifest_id}' (HITT_KICKSTART_MANIFEST_ID override)." 1
   else
-    manifest_id=$(kickstartManifestIdFromPlatformVersion "${platform_helm_version}")
+    if ! manifest_id=$(kickstartManifestIdFromPlatformVersion "${platform_helm_version}"); then
+      return 1
+    fi
   fi
-  manifest_json=$(kickstartGetManifestJson "${manifest_id}")
+  if ! manifest_json=$(kickstartGetManifestJson "${manifest_id}"); then
+    return 1
+  fi
   if ! ${JQ_BIN} -e 'type == "array"' <<< "${manifest_json}" &>/dev/null; then
     logError "999" "Kickstart manifest '${manifest_id}' must be a JSON array." 1
   fi
@@ -6621,7 +6634,9 @@ kickstartResolveManifest() {
       continue
     fi
     source_json=$(${JQ_BIN} -c '.source' <<< "${manifest_row}")
-    value=$(kickstartResolveSource "${source_json}")
+    if ! value=$(kickstartResolveSource "${source_json}"); then
+      return 1
+    fi
     if [ -n "${value}" ]; then
       kickstartAddOverride "${param}" "${value}"
       resolved_count=$((resolved_count + 1))
@@ -6670,17 +6685,22 @@ hittPipelineJsonForKickstartExport() {
 }
 
 kickstartMergedPipelineJson() {
-  local merged_json
-  kickstartResolveManifest
-  merged_json=$(${JQ_BIN} -n \
+  local merged_json export_json
+  kickstartResolveManifest || return 1
+  if ! merged_json=$(${JQ_BIN} -n \
     --arg defaults "${KICKSTART_PIPELINE_DEFAULTS_JSON}" \
     --arg overrides "${KICKSTART_OVERRIDES_JSON}" \
-    '($defaults | fromjson) * ($overrides | fromjson)')
-  hittPipelineJsonForKickstartExport HELIX_ONPREM_DEPLOYMENT "${merged_json}"
+    '($defaults | fromjson) * ($overrides | fromjson)'); then
+    return 1
+  fi
+  if ! export_json=$(hittPipelineJsonForKickstartExport HELIX_ONPREM_DEPLOYMENT "${merged_json}"); then
+    return 1
+  fi
+  KICKSTART_MERGED_JSON="${export_json}"
 }
 
 kickStartUberPipeline() {
-  kickstartResolveManifest
+  kickstartResolveManifest || exit 1
   PIPELINE_INPUT_JSON="${KICKSTART_OVERRIDES_JSON}"
   triggerHelixOnpremPipelineBuild "kickstart discovery"
 }
@@ -7482,7 +7502,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260715-01"
+HITT_BUILD_VERSION="20260715-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
