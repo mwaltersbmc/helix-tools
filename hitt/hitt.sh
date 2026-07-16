@@ -689,6 +689,12 @@ setVarsFromPlatform() {
   else
     HP_TENANT_ACTIVATED_STATUS="REG_COMPLETED"
   fi
+
+  if compare "${HP_VERSION%.*} >= 26.1" ; then
+    ARSERVICES_MSG="SM_PLATFORM_CORE"
+  else
+    ARSERVICES_MSG="ARSERVICES"
+  fi
 }
 
 getRSSODetails() {
@@ -1147,7 +1153,7 @@ checkServiceDetails() {
   fi
   getTCTLOutput
   if ! echo "${TCTL_OUTPUT}" | grep -q "^ITSM "  ; then
-    logError "124" "ITSM services not found in Helix Platform - please check that ARSERVICES=yes was set in your deployment.config file."
+    logError "124" "ITSM services not found in Helix Platform - please check that ${ARSERVICES_MSG}=yes was set in your deployment.config file."
   else
     logMessage "ITSM services found in Helix Platform." 1
   fi
@@ -7534,7 +7540,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260715-03"
+HITT_BUILD_VERSION="20260716-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8092,9 +8098,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"124\",
-    \"cause\": \"The required ITSM services are not installed in the Helix Platform, likely because the ARSERVICES option in the deployment.config was not set to yes.\",
+    \"cause\": \"The required ITSM services are not installed in the Helix Platform, likely because of an invalid setting in the deployment.config.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Rerun the Helix Platform deployment-manager.sh script with only ARSERVICES=yes to install the missing services.\"
+    \"remediation\": \"Rerun the Helix Platform deployment-manager.sh script with the setting named in the error set to yes to install the missing services.\"
   },
   {
     \"id\": \"125\",

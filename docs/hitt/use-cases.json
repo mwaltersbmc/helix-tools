@@ -69,8 +69,7 @@
       "order": 10,
       "title": "I want to download the HITT script",
       "commands": [
-        "mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
-        "chmod a+x hitt.sh   # optional"
+        "mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh && chmod a+x hitt.sh"
       ],
       "notes": [
         "Optional: curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz in the same directory to enable database validation (see README).",
