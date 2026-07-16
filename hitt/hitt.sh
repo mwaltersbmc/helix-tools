@@ -1096,7 +1096,7 @@ validateAliasAccessibleFromDE(){
   HTTP_CODE=$(${CURL_BIN} -ks -o /dev/null -w "%{http_code}" --max-time 3 "https://${1}")
   case "${HTTP_CODE}" in
     200|201|202|204|404|409|302)
-      logMessage "  - url 'https://${1}' is accessible from the Deployment Engine system." 1
+      logMessage "  - url 'https://${1}' is accessible from the this system." 1
       ;;
     *)
       if echo "${1}" | grep -q reporting ; then
@@ -2601,7 +2601,7 @@ testNetConnection () {
 
 checkISDBSettings() {
   if ! testNetConnection "${IS_DATABASE_HOST_NAME}" "${IS_DB_PORT}"; then
-    logWarning "027" "IS DB server '${IS_DATABASE_HOST_NAME}' is not reachable on port '${IS_DB_PORT}' - this is expected if there is no connectivity from the Deployment Engine - skipping DB checks."
+    logWarning "027" "IS DB server '${IS_DATABASE_HOST_NAME}' is not reachable on port '${IS_DB_PORT}' - this is expected if there is no connectivity from this system - skipping DB checks."
     SKIP_DB_CHECKS=1
     return
   else
@@ -7540,7 +7540,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260716-01"
+HITT_BUILD_VERSION="20260716-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -7828,9 +7828,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"027\",
-    \"cause\": \"The DATABASE_HOST_NAME is not reachable from the Deployment Engine on the DB_PORT.\",
+    \"cause\": \"The DATABASE_HOST_NAME is not reachable from this system on the DB_PORT.\",
     \"impact\": \"Later checks to validate the database will not be run and deployment will fail if either of the values are wrong.\",
-    \"remediation\": \"This is expected if there is no connectivity to the database server from the Deployment Engine, otherwise verify the DATABASE_HOST_NAME/DB_PORT values.\"
+    \"remediation\": \"This is expected if there is no connectivity to the database server from this system, otherwise verify the DATABASE_HOST_NAME/DB_PORT values.\"
   },
   {
     \"id\": \"028\",
@@ -7924,7 +7924,7 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"043\",
-    \"cause\": \"The named alias is not accessible from the Deployment Engine system using a curl command.\",
+    \"cause\": \"The named alias is not accessible from this system using a curl command.\",
     \"impact\": \"Deployment may fail as some aliases, RESTAPI for example, are used by the pipeline scripts.\",
     \"remediation\": \"Make sure the aliases are correctly set up and accessible - check firewall settings etc.\"
   },
@@ -8508,7 +8508,7 @@ ALL_MSGS_JSON="[
     \"id\": \"192\",
     \"cause\": \"The HITT script attempted a 'docker login' to the registry server using the credentials in the IMAGESECRET_NAME secret but failed.\",
     \"impact\": \"Helix Service Management deployment may fail if the credentials are invalid.\",
-    \"remediation\": \"Verify the credentials in the IMAGESECRET_NAME secret in the Helix Service Management namespace. This is expected if the registry server is not accessible from the Deployment Engine.\"
+    \"remediation\": \"Verify the credentials in the IMAGESECRET_NAME secret in the Helix Service Management namespace. This is expected if the registry server is not accessible from this system.\"
   },
   {
     \"id\": \"193\",
