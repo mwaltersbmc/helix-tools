@@ -2291,7 +2291,7 @@ validateCacertsFile() {
     logMessage "${CACERTS_SOURCE} cacerts file is a valid Java keystore." 1
   fi
 
-  logMessage "Processing cacerts..."
+  logMessage "Validating cacerts..."
   # Convert JKS to pem
   #  ${KEYTOOL_BIN} -importkeystore -srckeystore ${CACERTS_FILENAME} -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
   #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
@@ -3919,7 +3919,7 @@ downloadISCacertsFromSecret() {
 }
 
 splitPemCertificatesToDir() {
-  local pem_file=$1 out_dir=$2
+  local pem_file=$1 out_dir=$2 count
   mkdir -p "${out_dir}"
   rm -f "${out_dir}"/cert_*.pem
   awk -v dir="${out_dir}" '
@@ -3930,18 +3930,21 @@ splitPemCertificatesToDir() {
     }
     fn { print > fn }
   ' "${pem_file}"
-  find "${out_dir}" -maxdepth 1 -name 'cert_*.pem' 2>/dev/null | wc -l | tr -d ' '
+  count=$(find "${out_dir}" -maxdepth 1 -name 'cert_*.pem' 2>/dev/null | wc -l | tr -d '[:space:]')
+  echo "${count:-0}"
 }
 
 validatePemCertificateFile() {
   local pem_file=$1 out_dir=$2 cert_count cert_file idx subject end_date expiry_warn=$((28 * 24 * 3600))
-  cert_count=$(grep -c "BEGIN CERTIFICATE" "${pem_file}" 2>/dev/null || echo 0)
-  if [[ "${cert_count}" -eq 0 ]]; then
+  cert_count=$(grep -c "BEGIN CERTIFICATE" "${pem_file}" 2>/dev/null || true)
+  cert_count=${cert_count:-0}
+  if ! [[ "${cert_count}" =~ ^[0-9]+$ ]] || [ "${cert_count}" -eq 0 ]; then
     logError "999" "No certificates found in '${pem_file}' — expected a PEM file with one or more CERTIFICATE blocks." 1
   fi
   logMessage "Found ${cert_count} certificate(s) in '${pem_file}'."
   cert_count=$(splitPemCertificatesToDir "${pem_file}" "${out_dir}")
-  if [[ "${cert_count}" -eq 0 ]]; then
+  cert_count=${cert_count:-0}
+  if ! [[ "${cert_count}" =~ ^[0-9]+$ ]] || [ "${cert_count}" -eq 0 ]; then
     logError "999" "Unable to read certificates from '${pem_file}'." 1
   fi
   idx=0
@@ -3954,72 +3957,291 @@ validatePemCertificateFile() {
     subject=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -subject 2>/dev/null | sed 's/^subject=//')
     end_date=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')
     logMessage "Certificate ${idx}: ${subject}"
-    if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout -checkend 0 2>/dev/null; then
+    if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout -checkend 0 >/dev/null 2>/dev/null; then
       logError "999" "Certificate ${idx} has expired (${end_date})." 1
     fi
-    if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout -checkend "${expiry_warn}" 2>/dev/null; then
+    if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout -checkend "${expiry_warn}" >/dev/null 2>/dev/null; then
       logWarning "999" "Certificate ${idx} expires within 4 weeks (${end_date}) — continuing."
     fi
   done
 }
 
+addcertNormalizeSha256Fingerprint() {
+  echo "$1" | sed 's/://g' | tr '[:upper:]' '[:lower:]'
+}
+
+addcertPemSha256Fingerprint() {
+  addcertNormalizeSha256Fingerprint "$(${OPENSSL_BIN} x509 -in "$1" -noout -fingerprint -sha256 2>/dev/null | sed 's/.*=//')"
+}
+
+addcertBuildKeystoreFingerprintSet() {
+  ADD_CERT_KEYSTORE_FPS=$(mktemp addcert-fps.XXXXXX)
+  ${KEYTOOL_BIN} -list -v -keystore "${CACERTS_FILENAME}" \
+    -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" 2>>"${HITT_ERR_FILE}" \
+    | awk '/SHA256:/ {
+        fp=$0
+        sub(/.*SHA256: /, "", fp)
+        gsub(/:/, "", fp)
+        print tolower(fp)
+      }' > "${ADD_CERT_KEYSTORE_FPS}"
+}
+
+addcertKeystoreContainsFingerprint() {
+  grep -qFx "${1}" "${ADD_CERT_KEYSTORE_FPS}" 2>/dev/null
+}
+
+addcertRecordKeystoreFingerprint() {
+  echo "${1}" >> "${ADD_CERT_KEYSTORE_FPS}"
+}
+
+addcertCleanupKeystoreFingerprintSet() {
+  [ -n "${ADD_CERT_KEYSTORE_FPS}" ] && rm -f "${ADD_CERT_KEYSTORE_FPS}"
+  ADD_CERT_KEYSTORE_FPS=""
+}
+
 importPemCertificatesFromDir() {
-  local cert_dir=$1 cert_file alias fp imported=0 skipped=0
+  local cert_dir=$1 cert_file alias fp subject imported=0 skipped=0
   if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" == "" ]; then
     IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
   fi
+  addcertBuildKeystoreFingerprintSet
   for cert_file in "${cert_dir}"/cert_*.pem; do
     [[ -f "${cert_file}" ]] || continue
-    fp=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -fingerprint -sha256 2>/dev/null | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
-    alias="addcert-${fp:0:16}"
-    if ${KEYTOOL_BIN} -list -keystore "${CACERTS_FILENAME}" -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -alias "${alias}" >/dev/null 2>&1; then
-      logMessage "Certificate already present in cacerts (alias '${alias}') — skipping."
+    fp=$(addcertPemSha256Fingerprint "${cert_file}")
+    if addcertKeystoreContainsFingerprint "${fp}"; then
+      subject=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -subject 2>/dev/null | sed 's/^subject=//')
+      logMessage "Certificate already present in cacerts (${subject}) — skipping."
       skipped=$((skipped + 1))
       continue
     fi
+    alias="addcert-${fp:0:16}"
     if ${KEYTOOL_BIN} -import -trustcacerts -alias "${alias}" -file "${cert_file}" \
       -keystore "${CACERTS_FILENAME}" -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -noprompt >/dev/null 2>>"${HITT_ERR_FILE}"; then
       logMessage "Added certificate to cacerts (alias '${alias}')."
+      addcertRecordKeystoreFingerprint "${fp}"
       imported=$((imported + 1))
     else
       logError "999" "Failed to import certificate into cacerts (alias '${alias}')." 1
     fi
   done
+  addcertCleanupKeystoreFingerprintSet
+  ADD_CERT_IMPORTED_COUNT=${imported}
   logMessage "Imported ${imported} certificate(s) into '${CACERTS_FILENAME}' (${skipped} already present)."
 }
 
-fixAddCert() {
-  local PEM_FILE PEM_TMP_DIR
-  if [ ${#FIXARGS[@]} -ne 2 ]; then
-    logError "999" "Usage: bash $0 -f \"addcert /path/to/certificates.pem\"" 1
-  fi
-  PEM_FILE="${FIXARGS[1]/#\~/$HOME}"
-  if [ ! -f "${PEM_FILE}" ]; then
-    logError "999" "Certificate file '${PEM_FILE}' not found." 1
-  fi
+ADD_CERT_CERT_DIR=""
+ADD_CERT_IMPORTED_COUNT=0
+
+addcertPreparePemCertDir() {
+  local pem_file=$1
+  checkBinary openssl
+  addcertCleanupPemCertDir
+  ADD_CERT_CERT_DIR=$(mktemp -d addcert-certs.XXXXXX)
+  validatePemCertificateFile "${pem_file}" "${ADD_CERT_CERT_DIR}"
+}
+
+addcertCleanupPemCertDir() {
+  [ -n "${ADD_CERT_CERT_DIR}" ] && rm -rf "${ADD_CERT_CERT_DIR}"
+  ADD_CERT_CERT_DIR=""
+}
+
+addcertPreparePlatformContext() {
   checkToolVersion kubectl
   checkBinary keytool
   checkBinary openssl
-  PEM_TMP_DIR=$(mktemp -d addcert-certs.XXXXXX)
-  validatePemCertificateFile "${PEM_FILE}" "${PEM_TMP_DIR}"
   getVersions
   setVarsFromPlatform
   getDomain
   buildISAliasesArray
   CACERTS_FILENAME="is-sealcacerts"
+}
+
+addcertImportPemIntoKeystore() {
+  local pem_file=$1
+  if [ -z "${ADD_CERT_CERT_DIR}" ] || [ ! -d "${ADD_CERT_CERT_DIR}" ]; then
+    addcertPreparePemCertDir "${pem_file}"
+  fi
+  importPemCertificatesFromDir "${ADD_CERT_CERT_DIR}"
+}
+
+addcertLoadJenkinsPipelineParams() {
+  checkJenkinsIsRunning 1
+  JENKINS_PARAMS=$(getPipelineValuesJSON getLastBuild)
+}
+
+gitGiteaCmd() {
+  # Gitea in-cluster often uses a self-signed certificate.
+  if isJenkinsInCluster; then
+    ${GIT_BIN} -c http.sslVerify=false "$@"
+  else
+    ${GIT_BIN} "$@"
+  fi
+}
+
+gitItsmRepoCmd() {
+  gitGiteaCmd -C itsmrepo "$@"
+}
+
+setupGiteaUrlFromCluster() {
+  GITEA_CREDS_JSON=$(getGITEACredentials)
+  GITEA_ADMIN_USER=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_USER')
+  GITEA_ADMIN_PASS=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_PASS')
+  GITEA_EP_JSON=$(getEPjson gitea "${CDE_NAMESPACE}")
+  GITEA_HOST=$(echo "${GITEA_EP_JSON}" | ${JQ_BIN} -r '.[0].host')
+  GITEA_PROTOCOL=$(echo "${GITEA_EP_JSON}" | ${JQ_BIN} -r '.[0].protocol')
+  GITEA_PORT=$(echo "${GITEA_EP_JSON}" | ${JQ_BIN} -r '.[0].port')
+  GITEA_URL="${GITEA_PROTOCOL}://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}@${GITEA_HOST}:${GITEA_PORT}"
+}
+
+getItsmInstallerRepoUrl() {
+  if isJenkinsInCluster; then
+    setupGiteaUrlFromCluster
+    if [ -z "${GITEA_HOST}" ] || [ "${GITEA_HOST}" == "null" ]; then
+      logError "999" "Unable to find Gitea connection details — cannot access the ITSM installer repository." 1
+    fi
+    echo "${GITEA_URL}/${GITEA_ADMIN_USER}/itsm-on-premise-installer"
+  else
+    GIT_REPO_DIR=$(parseJenkinsParam GIT_REPO_DIR)
+    if [ -z "${GIT_REPO_DIR}" ] || [ "${GIT_REPO_DIR}" == "null" ]; then
+      logError "999" "GIT_REPO_DIR is not set in the HELIX_ONPREM_DEPLOYMENT pipeline — cannot access the ITSM installer repository." 1
+    fi
+    echo "${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git"
+  fi
+}
+
+cloneItsmInstallerCacertsSparse() {
+  # $1 = repository URL
+  local repo_url=$1 cacerts_path="pipeline/tasks/cacerts" default_branch
+  export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
+  rm -rf itsmrepo
+  default_branch=$(gitGiteaCmd ls-remote --symref "${repo_url}" HEAD 2>>"${HITT_ERR_FILE}" \
+    | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }')
+  [ -z "${default_branch}" ] && default_branch=master
+  logMessage "Checking out ${cacerts_path} from the ITSM installer repository (branch ${default_branch})..."
+  if ! gitGiteaCmd clone --depth 1 --filter=blob:none --no-checkout \
+    "${repo_url}" itsmrepo >>"${HITT_ERR_FILE}" 2>&1; then
+    logError "999" "Failed to clone the ITSM installer repository." 1
+  fi
+  # Target is a single file — non-cone sparse checkout (cone mode needs --skip-checks for files).
+  if ! gitItsmRepoCmd sparse-checkout init --no-cone >>"${HITT_ERR_FILE}" 2>&1 \
+    || ! gitItsmRepoCmd sparse-checkout set "${cacerts_path}" >>"${HITT_ERR_FILE}" 2>&1; then
+    if ! gitItsmRepoCmd sparse-checkout set --skip-checks "${cacerts_path}" >>"${HITT_ERR_FILE}" 2>&1; then
+      logError "999" "Failed to configure sparse checkout for ${cacerts_path}." 1
+    fi
+  fi
+  if ! gitItsmRepoCmd checkout "${default_branch}" >>"${HITT_ERR_FILE}" 2>&1; then
+    logError "999" "Failed to check out ${cacerts_path} from branch '${default_branch}'." 1
+  fi
+  if [ ! -f "itsmrepo/${cacerts_path}" ]; then
+    logError "999" "File ${cacerts_path} was not found in the ITSM installer repository." 1
+  fi
+  logMessage "Checked out ${cacerts_path} to itsmrepo/${cacerts_path}."
+}
+
+commitPushItsmInstallerCacerts() {
+  # $1 = PEM file path (for commit message)
+  local pem_file=$1 pem_name push_branch
+  pem_name=$(basename "${pem_file}")
+  cp -f "${CACERTS_FILENAME}" itsmrepo/pipeline/tasks/cacerts
+  gitItsmRepoCmd add pipeline/tasks/cacerts
+  if gitItsmRepoCmd diff --cached --quiet; then
+    logMessage "No changes to pipeline/tasks/cacerts — nothing to commit."
+    return 0
+  fi
+  if ! gitItsmRepoCmd -c user.name=HITT -c user.email=hitt@noreply.local \
+    commit -m "HITT addcert: import certificate(s) from ${pem_name}" >>"${HITT_ERR_FILE}" 2>&1; then
+    logError "999" "Failed to commit pipeline/tasks/cacerts to the ITSM installer repository." 1
+  fi
+  push_branch=$(gitItsmRepoCmd rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [ -z "${push_branch}" ] || [ "${push_branch}" == "HEAD" ]; then
+    push_branch=$(gitItsmRepoCmd remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
+  fi
+  [ -z "${push_branch}" ] && push_branch=master
+  if ! gitItsmRepoCmd push origin "HEAD:${push_branch}" >>"${HITT_ERR_FILE}" 2>&1; then
+    logError "999" "Failed to push pipeline/tasks/cacerts to the ITSM installer repository." 1
+  fi
+  logMessage "Committed and pushed pipeline/tasks/cacerts to the ITSM installer repository (branch ${push_branch})."
+}
+
+fixAddCertToSecret() {
+  local pem_file=$1
   downloadISCacertsFromSecret
-  importPemCertificatesFromDir "${PEM_TMP_DIR}"
-  rm -rf "${PEM_TMP_DIR}"
+  addcertImportPemIntoKeystore "${pem_file}"
+  if [ "${ADD_CERT_IMPORTED_COUNT}" -eq 0 ]; then
+    logMessage "All certificate(s) from '${pem_file}' are already in cacerts — the cacerts secret was not changed."
+    return 0
+  fi
   validateCacertsFile IS
   if [ "${VALID_CACERTS}" != "0" ]; then
     logError "999" "Updated cacerts file did not pass validation — the cacerts secret was not changed." 1
   fi
   if askYesNo "Updated cacerts file is valid — replace the cacerts secret in '${IS_NAMESPACE}'?"; then
     replaceISCacertsSecret
-    logMessage "cacerts secret in '${IS_NAMESPACE}' updated with certificate(s) from '${PEM_FILE}'."
+    logMessage "cacerts secret in '${IS_NAMESPACE}' updated with certificate(s) from '${pem_file}'."
   else
     logMessage "No changes made to the cacerts secret in '${IS_NAMESPACE}'."
   fi
+}
+
+fixAddCertToGit() {
+  local pem_file=$1 repo_url
+  checkBinary git
+  addcertLoadJenkinsPipelineParams
+  repo_url=$(getItsmInstallerRepoUrl)
+  cloneItsmInstallerCacertsSparse "${repo_url}"
+  cp -f itsmrepo/pipeline/tasks/cacerts "${CACERTS_FILENAME}"
+  if [ "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" == "" ]; then
+    IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
+  fi
+  if ! ${KEYTOOL_BIN} -list -keystore "${CACERTS_FILENAME}" -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" >/dev/null 2>&1; then
+    logError "999" "Checked-out cacerts file could not be opened — check the keystore password for this environment." 1
+  fi
+  addcertImportPemIntoKeystore "${pem_file}"
+  if [ "${ADD_CERT_IMPORTED_COUNT}" -eq 0 ]; then
+    logMessage "All certificate(s) from '${pem_file}' are already in cacerts — pipeline/tasks/cacerts was not changed in git."
+    return 0
+  fi
+  validateCacertsFile IS
+  if [ "${VALID_CACERTS}" != "0" ]; then
+    logError "999" "Updated cacerts file did not pass validation — pipeline/tasks/cacerts was not changed in git." 1
+  fi
+  if askYesNo "Updated cacerts file is valid — commit and push pipeline/tasks/cacerts to the ITSM installer repository?"; then
+    commitPushItsmInstallerCacerts "${pem_file}"
+  else
+    logMessage "No changes pushed to the ITSM installer repository."
+  fi
+}
+
+fixAddCert() {
+  local PEM_FILE ADD_CERT_GIT=0
+  case ${#FIXARGS[@]} in
+    2)
+      ;;
+    3)
+      if [ "${FIXARGS[2]}" != "git" ]; then
+        logError "999" "Optional third argument for addcert must be 'git' only." 1
+      fi
+      ADD_CERT_GIT=1
+      ;;
+    *)
+      logError "999" "Usage: bash $0 -f \"addcert /path/to/certificates.pem [git]\"" 1
+      ;;
+  esac
+  PEM_FILE="${FIXARGS[1]/#\~/$HOME}"
+  if [ ! -f "${PEM_FILE}" ]; then
+    logError "999" "Certificate file '${PEM_FILE}' not found." 1
+  fi
+  if [ ! -s "${PEM_FILE}" ]; then
+    logError "999" "Certificate file '${PEM_FILE}' is empty." 1
+  fi
+  addcertPreparePemCertDir "${PEM_FILE}"
+  addcertPreparePlatformContext
+  if [ "${ADD_CERT_GIT}" == "1" ]; then
+    fixAddCertToGit "${PEM_FILE}"
+  else
+    fixAddCertToSecret "${PEM_FILE}"
+  fi
+  addcertCleanupPemCertDir
 }
 
 updateISCacerts() {
@@ -4913,7 +5135,7 @@ showFixHelp() { # fix mode help
     \tssh \t\t| Set up/update passwordless ssh for the git user.
     \trealm \t\t| Create/update the Helix Service Management realm in SSO.
     \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
-    \taddcert \t| Add PEM certificate(s) to the IS cacerts secret. Args: /path/to/certificates.pem
+    \taddcert \t| Add PEM certificate(s) to the IS cacerts secret, or with 'git' to pipeline/tasks/cacerts. Args: /path/to/certificates.pem [git]
     \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
     \tarlicense \t| Apply an Innovation Suite/AR server license to the system via the REST API.
     \tresetssopwd \t| Resets the Helix SSO admin user password to the BMC default value.
@@ -7540,7 +7762,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260716-02"
+HITT_BUILD_VERSION="20260717-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

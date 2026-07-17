@@ -541,7 +541,8 @@ window.HITT_USE_CASES = {
       "order": 28,
       "title": "I want to add new certificates for use by pods in the Helix IS namespace",
       "commands": [
-        "bash hitt.sh -f \"addcert /path/to/custom-certs.pem\""
+        "bash hitt.sh -f \"addcert /path/to/custom-certs.pem\"",
+        "bash hitt.sh -f \"addcert /path/to/custom-certs.pem git\""
       ],
       "notes": [
         "Requires hitt.conf with IS_NAMESPACE set, cluster access, and the cacerts secret in the IS namespace.",

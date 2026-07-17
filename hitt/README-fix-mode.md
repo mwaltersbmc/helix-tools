@@ -9,7 +9,7 @@
 | `ssh`    | Set up/update passwordless ssh for the git user. |
 | `realm`  | Create/update the Helix Service Management realm in SSO. |
 | `cacerts`  | Update the cacerts secret in the Helix IS namespace with a new file. |
-| `addcert`  | Add one or more PEM certificates to the IS cacerts secret (downloads current cacerts, imports certs, validates, then updates the secret). |
+| `addcert`  | Add one or more PEM certificates to the IS cacerts secret, or with `git` to `pipeline/tasks/cacerts` in the ITSM installer repository. |
 | `sat`   | Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool in the Helix IS namespace. |
 | `arlicense`   | Apply an Innovation Suite/AR server license to the system via the REST API. |
 | `resetssopwd`   | Resets the Helix SSO admin user password to the BMC default value. |
@@ -33,6 +33,7 @@ Examples:
 bash hitt.sh -f sat # Run the Support Assistant Tool fix
 bash hitt.sh -f "cacerts /tmp/newcacerts" # Update the cacerts secret with the newcacerts file
 bash hitt.sh -f "addcert /path/to/custom-certs.pem" # Add PEM certificates to the IS cacerts secret
+bash hitt.sh -f "addcert /path/to/custom-certs.pem git" # Add PEM certificates to pipeline/tasks/cacerts in git
 ```
 
 #### `ssh` - set up passwordless ssh for the git user
@@ -55,12 +56,29 @@ bash hitt.sh -f "cacerts /path/to/newcacertsfile"
 Updates the `cacerts` secret in the Helix IS namespace with a new cacerts file.  Used when the `HELIX_ONPREM_DEPLOYMENT` pipeline was run but the cacerts file was not attached or the existing secret needs to be updated with one containing a new third party certificate.  If the new cacerts file is valid you will be prompted to confirm the update.
 
 #### `"addcert certificates.pem"` - add PEM certificates to the IS cacerts secret
+
 ```bash
 bash hitt.sh -f "addcert /path/to/custom-certs.pem"
 ```
+
 Adds one or more certificates from a **PEM** file to the Java keystore in the `cacerts` secret in the Helix IS namespace. HITT downloads the current cacerts from the cluster, validates each certificate in the PEM file (expired certificates are rejected; certificates expiring within 4 weeks produce a warning), imports them into the keystore, runs the same cacerts checks used elsewhere in HITT, and asks you to confirm before replacing the secret.
 
 Use this when pods in the IS namespace need to trust an additional CA or server certificate (for example a new third-party integration) without rebuilding the full cacerts file by hand.
+
+#### `"addcert certificates.pem git"` - add PEM certificates to pipeline/tasks/cacerts in git
+
+```bash
+bash hitt.sh -f "addcert /path/to/custom-certs.pem git"
+```
+
+Same PEM validation and cacerts checks as above, but updates `pipeline/tasks/cacerts` in the **itsm-on-premise-installer** repository instead of the cluster secret. HITT checks out only that file (sparse checkout), imports the certificate(s), validates the keystore, then asks you to confirm before committing and pushing.
+
+Repository location depends on your Deployment Engine setup:
+
+- **Containerized Jenkins** — Gitea repository for the ITSM installer (same source used by in-cluster pipelines)
+- **Standalone Jenkins** — `${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git` from the HELIX_ONPREM_DEPLOYMENT pipeline parameters
+
+Requires Jenkins access (to read `GIT_REPO_DIR` on standalone systems) and git push permissions to the repository.
 
 #### `sat` - add the role and rolebinding needed by the Support Assistant Tool
 ```bash
