@@ -1,6 +1,6 @@
 # HITT Utility Mode
 
-**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, IS license type, secret decode, ConfigMap export, AR form/field search and custom SQL queries, generated DBID, Docker Hub PAT check).
+**HITT** utility mode provides small helpers for Helix deployments (DBID/JWT, IS license type, secret decode, ConfigMap export, AR form/field search and custom SQL queries, generated DBID, Docker Hub PAT check, container image tag listing).
 
 Utility commands are invoked with **`-u`**. When the command has spaces or multiple words, pass the whole thing in **double quotes**.
 
@@ -18,6 +18,7 @@ Utility commands are invoked with **`-u`**. When the command has spaces or multi
 | `sql` | Runs a custom AR SQL query via the IS REST API and prints the full JSON response. Args: **SQL_QUERY** (put the entire query inside the quoted `-u` string). |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
 | `checkpat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit both args to offer credentials from the **bmc-dtrhub** secret in **HP_NAMESPACE**; omit **PAT** only to be prompted (hidden). |
+| `imagels` | Lists tags available in a container image repository using **skopeo**. Args: **IMAGE** — either an image name, for example `ars` in which case `docker.io/bmchelix/` is assumed, or a full **registry/host/path/repository/image** (for other registries). Requires **skopeo** and a prior **`skopeo login`** to the registry host. |
 | `checkrbac [hitt\|deploy\|all]` | Validates Kubernetes RBAC for the current kubeconfig user. **hitt** (default): triage/read checks plus fix-mode writes (tctl, cacerts, SAT). **deploy**: shared reads plus install/upgrade permissions (Helix Platform, IS, logging, DE namespaces from `hitt.conf`). **all**: union of both. |
 | `help` | Prints the same summary as this file (built into the script). |
 
@@ -58,6 +59,13 @@ bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
 bash hitt.sh -u checkpat
 bash hitt.sh -u "checkpat mydockerhubuser"
 bash hitt.sh -u "checkpat mydockerhubuser dckr_pat_xxxxxxxx"
+
+# List tags for a BMC Helix image on Docker Hub (repository docker.io/bmchelix/platform-core)
+bash hitt.sh -u "imagels ars"
+
+# List tags on a private registry (Harbor example — log in with skopeo first)
+skopeo login harbor.example.com
+bash hitt.sh -u "imagels harbor.example.com/bmchelix/ars"
 
 # Kubernetes RBAC audit (requires hitt.conf namespaces for namespace-scoped checks)
 bash hitt.sh -u checkrbac
@@ -173,6 +181,36 @@ Calls Docker Hub’s token service with **USERNAME** and **PAT** to verify the p
 If you omit **both** arguments, HITT looks for **bmc-dtrhub** in **HP_NAMESPACE** (from **hitt.conf**) and offers those docker.io credentials. If the secret is missing or you decline, you are prompted for username and PAT.
 
 If **USERNAME** is given but **PAT** is omitted, **PAT** is read from a hidden prompt (same pattern as other password prompts).
+
+### `imagels IMAGE`
+
+Lists tags for a container image repository using **skopeo** (`skopeo list-tags`). Output is JSON (pretty-printed with **jq**).
+
+**Requirements**
+
+1. Install **skopeo** — see [skopeo.org](https://skopeo.org/#download).
+2. Log in to the registry host before running HITT:
+
+```bash
+skopeo login docker.io          # Docker Hub
+skopeo login harbor.example.com # private Harbor or other registry
+```
+
+**IMAGE argument**
+
+| Form | Resolves to |
+|------|-------------|
+| Short name (no `/`) | `docker.io/bmchelix/IMAGE` — for example `ars` → `docker.io/bmchelix/ars` |
+| Full path (contains `/`) | Used as-is — for example `registry.example.com/project/my-image` |
+
+Examples:
+
+```bash
+bash hitt.sh -u imagels ars
+bash hitt.sh -u "imagels my-registry.example.com/bmchelix/ars"
+```
+
+If the repository is missing or you are not logged in, HITT reports an error.
 
 ### `checkrbac [hitt|deploy|all]`
 

@@ -5167,6 +5167,7 @@ showUtilHelp() { # utility mode help
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
     \tcheckpat \t| Validate Docker Hub username and PAT. Args: [USERNAME] [PAT] — omit both to use bmc-dtrhub from HP namespace or be prompted.
+    \timagels \t| List tags for a container image repository (requires skopeo). Args: IMAGE — name under docker.io/bmchelix/ or full registry/host/path/repo.
     \tcheckrbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Use -v for each permission checked. Legacy alias: authcheck (= checkrbac hitt).
     \thelp \t\t| Show this list.
     "
@@ -7297,6 +7298,24 @@ getJenkinsSystemLog() {
 runJenkinsScript "${SCRIPT}"
 }
 
+# Requires
+listImageTags() {
+  local host SKOPEO_JSON
+  if ! which skopeo >/dev/null 2>&1; then
+    logError "999" "'imagels' requires skopeo to be installed - see https://skopeo.org/#download"
+  fi
+  host="${SKOPEO_IMAGE%%/*}"
+  if ! skopeo login --get-login "${host}" >/dev/null 2>&1; then
+    logError "999" "Please use 'skopeo login ${host}' to authenticate and then try again." 1
+  fi
+  SKOPEO_JSON=$(skopeo list-tags "docker://${SKOPEO_IMAGE}" 2>/dev/null)
+  if [ "$?" != "0" ]; then
+    logError "999" "Error listing repository tags: repository '${SKOPEO_IMAGE}' not found"
+  else
+    echo "${SKOPEO_JSON}" | ${JQ_BIN}
+  fi
+}
+
 #End functions
 
 # MAIN Start
@@ -7584,6 +7603,16 @@ if [ "${MODE}" == "utility" ]; then
       IS_AR_DB_NAME="${UTILARGS[3]}"
       generateISDbID
       ;;
+    imagels)
+      # 1 image
+      # 2 dtr host/path optional
+      if [[ "${UTILARGS[1]}" =~ / ]]; then
+        SKOPEO_IMAGE="${UTILARGS[1]}"
+      else
+        SKOPEO_IMAGE="docker.io/bmchelix/${UTILARGS[1]}"
+      fi
+      listImageTags
+      ;;
     sql)
       parseUtilSQL
       ;;
@@ -7762,7 +7791,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260717-01"
+HITT_BUILD_VERSION="20260721-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

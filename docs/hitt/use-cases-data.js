@@ -70,8 +70,7 @@ window.HITT_USE_CASES = {
       "order": 10,
       "title": "I want to download the HITT script",
       "commands": [
-        "mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
-        "chmod a+x hitt.sh   # optional"
+        "mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh && chmod a+x hitt.sh"
       ],
       "notes": [
         "Optional: curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz in the same directory to enable database validation (see README).",
@@ -794,6 +793,23 @@ window.HITT_USE_CASES = {
         "If you omit only the PAT on the command line, HITT prompts for it interactively (hidden input)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "utility-imagels",
+      "topicId": "other-features",
+      "order": 29,
+      "title": "I want to see the tags of images in a registry server",
+      "commands": [
+        "bash hitt.sh -u \"imagels ars\"",
+        "bash hitt.sh -u \"imagels my-server.example.com/bmchelix/ars\"",
+        "skopeo login my-server.example.com"
+      ],
+      "notes": [
+        "Utility mode (-u) with imagels lists tags for a container image repository using skopeo. Output is JSON on stdout.",
+        "Install skopeo and run skopeo login against the registry host before HITT (for example skopeo login docker.io or skopeo login your-harbor-host).",
+        "Use a short image name for docker.io/bmchelix/IMAGE (for example ars), or a full registry/host/path/repository when the image is on a private registry."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#imagels-image"
     },
     {
       "id": "bundle-status",
