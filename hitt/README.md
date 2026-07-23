@@ -1,16 +1,15 @@
 # Helix IS Triage Tool (HITT)
 **Latest build `20260723-02`**
 
-The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
+The **Helix IS Triage Tool (HITT)** is a command-line helper for BMC Helix on-premises deployments. It can check your environment, fix common setup problems, work with the **HELIX_ONPREM_DEPLOYMENT** pipeline, and gather information for troubleshooting or support.
 
-> 💡 **Run this tool as the `git` user on the Deployment Engine system where Jenkins is installed.**
-
-#### **Interactive help page with HITT use-cases available at https://bit.ly/hitthelp**
-
+- **Lifecycle checks** — validation for Helix Platform, the Deployment Engine, and Helix IS at install and post-deploy stages (`post-hp`, `pre-is`, `post-is`, `jenkins`), with clear errors, warnings, and suggested fixes.
+- **Targeted fixes** — apply common corrections in fix mode (`-f`): certificates, SSO realm, Jenkins credentials and libraries, licenses, Support Assistant roles, and related items.
+- **Pipeline helpers** — export, prefill, queue, and manage the **HELIX_ONPREM_DEPLOYMENT** pipeline from saved settings (`get`, `kickstart`, `build`, `delete`), including kickstart from an existing Helix Platform install.
+- **Everyday utilities** — decode secrets, fetch JWTs and DBIDs, query AR forms, validate Docker Hub tokens, list image tags, and more (`-u` utility mode).
+- **Environment overview** — summarize cluster, Helix namespaces, ingress, and the full Helix stack (`-m info`), plus an interactive use-case guide at https://bit.ly/hitthelp.
 
 ### Quick Start ###
-
-Run the following commands as the `git` user:
 
 ```bash
 mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh && chmod a+x hitt.sh
