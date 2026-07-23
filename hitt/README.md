@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260723-02`**
+**Latest build `20260723-03`**
 
 The **Helix IS Triage Tool (HITT)** is a command-line helper for BMC Helix on-premises deployments. It can check your environment, fix common setup problems, work with the **HELIX_ONPREM_DEPLOYMENT** pipeline, and gather information for troubleshooting or support.
 

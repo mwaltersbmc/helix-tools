@@ -7337,7 +7337,7 @@ enumerateHelixVersions() {
     for n in "${IS_NS_CANDIDATES[@]}"; do
       IS_VERSION=$(${KUBECTL_BIN} -n "${n}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -d'-' -f2)
       [[ "${n}" == "${IS_NAMESPACE}" ]] && n="${n}*"
-      echo -e "${n}\t\t${IS_VERSION}"
+      echo -e "${n}\t\t${IS_VERSION:-unknown}"
     done
   fi
   if [ "${#CDE_NS_CANDIDATES[@]}" -gt 0 ]; then
@@ -7345,7 +7345,7 @@ enumerateHelixVersions() {
     for n in "${CDE_NS_CANDIDATES[@]}"; do
       CDE_VERSION=$(${KUBECTL_BIN} -n "${n}" get deployments.apps gitea -o jsonpath='{.metadata.labels.helix-de/version}')
       [[ "${n}" == "${CDE_NAMESPACE}" ]] && n="${n}*"
-      echo -e "${n}\t\t${CDE_VERSION}"
+      echo -e "${n}\t\t${CDE_VERSION:-unknown}"
     done
   fi
   if [ "${#HL_NS_CANDIDATES[@]}" -gt 0 ]; then
@@ -7838,7 +7838,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260723-02"
+HITT_BUILD_VERSION="20260723-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
