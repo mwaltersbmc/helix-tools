@@ -7321,13 +7321,14 @@ listImageTags() {
   fi
 }
 
-enunerateHelixVersions() {
+enumerateHelixVersions() {
   NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
   discoverHelixNamespaceCandidates
   if [ "${#HP_NS_CANDIDATES[@]}" -gt 0 ]; then
     logStatus "Helix Platform"
     for n in "${HP_NS_CANDIDATES[@]}"; do
       HP_VERSION=$(${KUBECTL_BIN} -n "${n}" get cm helix-on-prem-config -o jsonpath='{.data.version}' | head -1)
+      [[ "${n}" == "${HP_NAMESPACE}" ]] && n="${n}*"
       echo -e "${n}\t\t${HP_VERSION:-unknown}"
     done
   fi
@@ -7335,6 +7336,7 @@ enunerateHelixVersions() {
     logStatus "Helix IS"
     for n in "${IS_NS_CANDIDATES[@]}"; do
       IS_VERSION=$(${KUBECTL_BIN} -n "${n}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -d'-' -f2)
+      [[ "${n}" == "${IS_NAMESPACE}" ]] && n="${n}*"
       echo -e "${n}\t\t${IS_VERSION}"
     done
   fi
@@ -7342,6 +7344,7 @@ enunerateHelixVersions() {
     logStatus "Containerized Deployment Engine"
     for n in "${CDE_NS_CANDIDATES[@]}"; do
       CDE_VERSION=$(${KUBECTL_BIN} -n "${n}" get deployments.apps gitea -o jsonpath='{.metadata.labels.helix-de/version}')
+      [[ "${n}" == "${CDE_NAMESPACE}" ]] && n="${n}*"
       echo -e "${n}\t\t${CDE_VERSION}"
     done
   fi
@@ -7365,7 +7368,10 @@ logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
 
 # config file checks
-if [ ! -f "${HITT_CONFIG_FILE}" ]; then
+if [ ! -f "${HITT_CONFIG_FILE}" ] && [ "${MODEARGS[*]}" == "info helix" ]; then
+  # Catch "info helix" and allow to run without hitt.conf
+  SKIP_UPDATE_CHECK=1
+elif [ ! -f "${HITT_CONFIG_FILE}" ]; then
   if ! ${KUBECTL_BIN} get ns > /dev/null 2>&1 ; then
     createHITTconf "${HITT_CONFIG_FILE}"
     logError "199" "'kubectl get namespaces' command returned unexpected results - please update the HITT config file '${HITT_CONFIG_FILE}' manually." 1
@@ -7382,7 +7388,8 @@ else
   createHITTconf ".hitt.conf"
   checkHITTconf "${HITT_CONFIG_FILE}"
 fi
-source "./${HITT_CONFIG_FILE}"
+
+[[ -f "./${HITT_CONFIG_FILE}" ]] && source "./${HITT_CONFIG_FILE}"
 
 # Conf overrides
 if [ "${CONF_OVERRIDE}" == "1" ]; then
@@ -7686,7 +7693,7 @@ if [ "${MODE}" == "info" ]; then
       fi
       ;;
     helix)
-      enunerateHelixVersions
+      enumerateHelixVersions
       ;;
     ingress)
       QUIET=1
@@ -7831,7 +7838,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260723-01"
+HITT_BUILD_VERSION="20260723-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -9329,7 +9336,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
       # Parse UTILOPTS to array
       read -r -a MODEARGS <<< "${OPTARG}"
       MODE="${MODEARGS[0]}"
-      if [ "${#MODEARGS[@]}" -eq 1 ]; then
+      if [ "${MODE}" == "info" ] && [ "${#MODEARGS[@]}" -eq 1 ]; then
         MODEARGS+=("full")
       fi
       ;;
