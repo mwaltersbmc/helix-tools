@@ -12,6 +12,7 @@ discoverHelixNamespaceCandidates() {
   HP_NS_CANDIDATES=()
   IS_NS_CANDIDATES=()
   CDE_NS_CANDIDATES=()
+  HL_NS_CANDIDATES=()
   local ns
   for ns in "${NS_ARRAY[@]}"; do
     [[ "${ns}" == "PENDING" ]] && continue
@@ -23,6 +24,9 @@ discoverHelixNamespaceCandidates() {
     fi
     if ${KUBECTL_BIN} -n "${ns}" get deployment jenkins-master >/dev/null 2>&1; then
       CDE_NS_CANDIDATES+=("${ns}")
+    fi
+    if ${KUBECTL_BIN} -n "${ns}" get sts efk-elasticsearch-data >/dev/null 2>&1; then
+      HL_NS_CANDIDATES+=("${ns}")
     fi
   done
 }
@@ -5210,6 +5214,7 @@ showInfoHelp() { # info mode help
   echo "Multi-word -m values must be double-quoted (e.g. bash hitt.sh -m \"info ingress\")."
   echo -e "
     \tcluster \t| Kubernetes/OpenShift version and node resource summary table (allocatable, requested, usage, status).
+    \thelix \t\t| Scan the cluster for Helix namespaces (Platform, IS, Deployment Engine, Logging) and show version where available.
     \tingress \t| Ingress controller for Helix INGRESS_CLASS: workload type, namespace, name, and image.
     \tfull \t\t| Full BMC Helix Environment Summary on the console and info.json.
     \thelp \t\t| Show this list.
@@ -7316,6 +7321,38 @@ listImageTags() {
   fi
 }
 
+enunerateHelixVersions() {
+  NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
+  discoverHelixNamespaceCandidates
+  if [ "${#HP_NS_CANDIDATES[@]}" -gt 0 ]; then
+    logStatus "Helix Platform"
+    for n in "${HP_NS_CANDIDATES[@]}"; do
+      HP_VERSION=$(${KUBECTL_BIN} -n "${n}" get cm helix-on-prem-config -o jsonpath='{.data.version}' | head -1)
+      echo -e "${n}\t\t${HP_VERSION:-unknown}"
+    done
+  fi
+  if [ "${#IS_NS_CANDIDATES[@]}" -gt 0 ]; then
+    logStatus "Helix IS"
+    for n in "${IS_NS_CANDIDATES[@]}"; do
+      IS_VERSION=$(${KUBECTL_BIN} -n "${n}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -d'-' -f2)
+      echo -e "${n}\t\t${IS_VERSION}"
+    done
+  fi
+  if [ "${#CDE_NS_CANDIDATES[@]}" -gt 0 ]; then
+    logStatus "Containerized Deployment Engine"
+    for n in "${CDE_NS_CANDIDATES[@]}"; do
+      CDE_VERSION=$(${KUBECTL_BIN} -n "${n}" get deployments.apps gitea -o jsonpath='{.metadata.labels.helix-de/version}')
+      echo -e "${n}\t\t${CDE_VERSION}"
+    done
+  fi
+  if [ "${#HL_NS_CANDIDATES[@]}" -gt 0 ]; then
+    logStatus "Helix Logging"
+    for n in "${HL_NS_CANDIDATES[@]}"; do
+      echo -e "${n}"
+    done
+  fi
+}
+
 #End functions
 
 # MAIN Start
@@ -7648,6 +7685,9 @@ if [ "${MODE}" == "info" ]; then
         printK8sOomPods
       fi
       ;;
+    helix)
+      enunerateHelixVersions
+      ;;
     ingress)
       QUIET=1
       logStatus "Gathering ingress information..." 1
@@ -7668,7 +7708,7 @@ if [ "${MODE}" == "info" ]; then
       showInfoHelp
       ;;
     *)
-      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, ingress, full, help)." 1
+      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, helix, ingress, full, help)." 1
       ;;
   esac
   exit
@@ -7791,7 +7831,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260721-02"
+HITT_BUILD_VERSION="20260723-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

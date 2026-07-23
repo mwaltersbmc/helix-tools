@@ -23,14 +23,18 @@ Audience: Helix administrators and operators with **minimal technical skills**. 
 - **Implementation details**: Groovy script console, jq filters, HTTP status codes, crumb/cookie handling, internal variable names.
 - **Source file paths** (`hitt/hitt.sh`, `.cursor/`, `.githooks/`) except **`hitt.conf`** when the user must create or edit it.
 - **“Under the hood”** lists of automatic steps — summarize the **user-visible outcome** in one or two sentences instead.
+- **Implicit prerequisites** — do not state that a command “requires kubectl”, “needs kubectl access”, “requires cluster access”, or similar. HITT already assumes a working cluster connection; only mention extra requirements that are **not** obvious (Jenkins login, Helix Platform deployed, a specific namespace configured in HITT, metrics-server for optional columns, and so on).
+- **Kubernetes object names** — do not name Deployments, StatefulSets, DaemonSets, ConfigMaps, Secrets, IngressClasses, or similar unless the user **must** know that object for the documented option (e.g. a secret name they must pass to **get secret**, or a field HITT prints and they must look up in the UI). Prefer product sections (**Helix Platform**, **Helix IS**, **Deployment Engine**) and **user-visible outcomes** over how HITT detects them in the cluster.
 
 ## OK to include
 
 - **Commands** the user must run (`bash hitt.sh -k "get lastsuccessful"`).
-- **`hitt.conf`** and **kubeconfig** when setup requires them.
+- **`hitt.conf`** when the user must create or edit it (not when a mode simply runs without that file).
 - **Jenkins job names** and **pipeline parameter names** when the user must fill or review them in Jenkins.
 - **Links** to other README mode docs or https://bit.ly/hitthelp when pointing to more help.
 - **`seeAlso` URLs** in use cases (required for the help site).
+- **Optional cluster features** when absence changes behaviour (e.g. metrics-server needed for usage percentages in **info cluster**) — describe the feature, not “kubectl access”.
+- **Kubernetes names** only when the doc is about that specific resource (e.g. `get secret cacerts`, or explaining a label printed by HITT that the operator must match in Jenkins).
 
 ## Use case notes (`use-cases.json`)
 
@@ -46,6 +50,22 @@ Audience: Helix administrators and operators with **minimal technical skills**. 
 
 # ✅ GOOD
 When you use **build**, HITT sends your saved settings to Jenkins but leaves out file uploads (those must be added in Jenkins). All **Pipelines** checkboxes are turned off so a full deployment does not start until you review the job.
+```
+
+```markdown
+# ❌ BAD
+Scans namespaces with a **rsso** Deployment, **midtier-user** Deployment, and **efk-elasticsearch-data** StatefulSet.
+
+# ✅ GOOD
+Lists **Helix Platform**, **Helix IS**, **Deployment Engine**, and **Helix Logging** namespaces, with version where available.
+```
+
+```markdown
+# ❌ BAD
+Requires kubectl access and a valid kubeconfig.
+
+# ✅ GOOD
+Lists Helix namespaces and versions found in the cluster.
 ```
 
 ```markdown

@@ -87,9 +87,9 @@
         "rm hitt.conf && bash hitt.sh -m post-hp"
       ],
       "notes": [
-        "Or delete the file and re-run HITT to be prompted again — use the second command above. The cluster must be reachable for namespace discovery when recreating hitt.conf interactively.",
+        "Or delete the file and re-run HITT to be prompted again — use the second command above. HITT will offer namespace menus from your environment.",
         "Namespace menus list discovered candidates first, with an Other option to pick any cluster namespace (for example an empty namespace on a cluster that already has deployments elsewhere).",
-        "hitt.conf holds HP_NAMESPACE, IS_NAMESPACE, IS_CUSTOMER_SERVICE, IS_ENVIRONMENT, Jenkins host/credentials, and tool paths.",
+        "hitt.conf holds Helix Platform namespace, Helix IS namespace, customer service, environment, Deployment Engine host and login, and tool paths.",
         "For a second config file without renaming the default, keep multiple files and pass -c /path/to/other.conf when you run HITT."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#configuration"
@@ -163,7 +163,7 @@
       ],
       "notes": [
         "Validates nodes, credentials, libraries, and related Jenkins setup (read-only checks).",
-        "Requires hitt.conf with working Jenkins host and credentials."
+        "Requires a working Deployment Engine login configured in HITT."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#running-hitt"
     },
@@ -275,7 +275,7 @@
         "bash hitt.sh -f realm"
       ],
       "notes": [
-        "Creates or updates the Helix Service Management SSO realm from hitt.conf (IS namespace, CUSTOMER_SERVICE, ENVIRONMENT).",
+        "Creates or updates the Helix Service Management SSO realm from your HITT settings (namespace, CUSTOMER_SERVICE, ENVIRONMENT).",
         "Can be used after Helix Platform is installed to add the realm before IS deployment."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
@@ -302,8 +302,8 @@
         "bash hitt.sh -m post-hp"
       ],
       "notes": [
-        "Validates Helix Platform and RSSO realm configuration; skips Jenkins checks.",
-        "Requires hitt.conf with HP namespace and related settings."
+        "Validates Helix Platform and SSO realm configuration; skips Deployment Engine checks.",
+        "Requires Helix Platform namespace configured in HITT."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes"
     },
@@ -330,8 +330,8 @@
         "bash hitt.sh -m post-is"
       ],
       "notes": [
-        "Post-deployment Helix IS checks; requires hitt.conf and cluster access.",
-        "Some checks deploy a short-lived tctl job/pod like HELIX_ITSM_INTEROPS, then remove it."
+        "Post-deployment Helix IS checks against your live Helix IS deployment.",
+        "Some checks run a short-lived tctl task (same approach as the HELIX_ITSM_INTEROPS pipeline), then remove it."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes"
     },
@@ -345,7 +345,7 @@
         "bash hitt.sh -m post-is"
       ],
       "notes": [
-        "Start with pre-is: it validates HELIX_ONPREM_DEPLOYMENT inputs against Jenkins and the cluster (same timing as before a fresh deploy—useful even after a failure to catch bad parameters or drift).",
+        "Start with pre-is: it validates HELIX_ONPREM_DEPLOYMENT inputs against the Deployment Engine and your environment (same timing as before a fresh deploy—useful even after a failure to catch bad parameters or drift).",
         "If the pipeline run is in service or upgrade mode (changing an already deployed environment), run post-is next. post-is exercises checks against the live Helix IS deployment and can surface issues in the current stack that relate to the failure."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes"
@@ -373,7 +373,7 @@
         "Password parameters (names containing PASSWORD) are redacted as ***REDACTED*** unless you use -p.",
         "Use -p when saving a file for build or migration; protect output on trusted hosts only.",
         "For a full edit-then-build workflow, see pipeline-kickstart-build-file under Pipeline Management.",
-        "Requires Jenkins in hitt.conf and working credentials."
+        "Requires a working Deployment Engine login."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
     },
@@ -387,7 +387,7 @@
         "bash hitt.sh -k \"get kickstart kickstart-preview.json\""
       ],
       "notes": [
-        "Requires hitt.conf, Deployment Engine login, cluster access, and Helix Platform already deployed — same discovery as kickstart build.",
+        "Requires a working Deployment Engine login and Helix Platform already deployed — same discovery as kickstart build.",
         "Shows merged Jenkins defaults plus values HITT can read from your environment; file parameters and INPUT_CONFIG_METHOD are omitted; Pipelines checkboxes are false.",
         "Use before kickstart or before saving a file for build, to confirm namespaces, domain, registry, sign-on, and related fields look correct.",
         "Passwords are redacted unless you add -p (needed if you will save the file for build)."
@@ -404,7 +404,7 @@
         "bash hitt.sh -k \"build deploy-params.json\""
       ],
       "notes": [
-        "Step 1: save JSON with every value HITT can discover from Helix Platform and hitt.conf. Use -p so password fields are real values, not ***REDACTED***.",
+        "Step 1: save JSON with every value HITT can discover from Helix Platform and your HITT settings. Use -p so password fields are real values, not ***REDACTED***.",
         "Step 2: edit deploy-params.json — add database settings, turn on the Pipelines checkboxes you need, and any other required fields kickstart does not set.",
         "Step 3: build queues HELIX_ONPREM_DEPLOYMENT; then open Jenkins, Rebuild the last run, attach file uploads (certificates, configs), and review before a full deploy.",
         "Alternative to bash hitt.sh -k kickstart when you want to review or change the JSON on disk before anything is queued."
@@ -436,7 +436,7 @@
         "bash hitt.sh -k kickstart"
       ],
       "notes": [
-        "Use when Helix Platform is already in the cluster and you are starting a new Helix IS deployment. Requires hitt.conf, cluster access, and a working Deployment Engine login.",
+        "Use when Helix Platform is already in the cluster and you are starting a new Helix IS deployment. Requires a working Deployment Engine login.",
         "HITT reads your environment (namespaces, domain, sign-on, registry, logging, and related settings), queues a HELIX_ONPREM_DEPLOYMENT run, then you open the job in Jenkins, rebuild the last run, and complete anything still missing — database details, passwords, file uploads, and which pipelines to run.",
         "Same safeguards as build: Pipelines checkboxes are turned off by default and file attachments are not sent from HITT.",
         "If you want to review or edit values before queuing, use get kickstart → edit JSON → build instead (see pipeline-kickstart-build-file use case)."
@@ -467,7 +467,7 @@
         "bash hitt.sh -o agent"
       ],
       "notes": [
-        "Requires Jenkins details in hitt.conf and a working login to the Deployment Engine.",
+        "Requires a working Deployment Engine login.",
         "-o jenkins shows recent messages from the Jenkins controller system log.",
         "-o agent shows the jenkins-agent node log where pipeline steps run.",
         "For the console log from a pipeline job run, use -o with the job name (for example helix_onprem_deployment) — see pipeline-console use case."
@@ -484,7 +484,7 @@
         "bash hitt.sh -k \"delete 1-50\""
       ],
       "notes": [
-        "Requires Jenkins login in hitt.conf and script-console permission on the Deployment Engine.",
+        "Requires a working Deployment Engine login and script-console permission on the Deployment Engine.",
         "Deletes one build number (42) or a range (1-50) from HELIX_ONPREM_DEPLOYMENT history. Optional third argument is another Jenkins job name.",
         "Build numbers that do not exist are skipped. This cannot be undone — check build numbers in Jenkins before running delete."
       ],
@@ -499,7 +499,7 @@
         "bash hitt.sh -u \"get dbid\""
       ],
       "notes": [
-        "Uses hitt.conf, cluster access, and IS REST to read the current DBID (licensing)."
+        "Reads the current DBID from your Helix IS deployment (licensing)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
@@ -512,7 +512,7 @@
         "bash hitt.sh -u \"get arlicense\""
       ],
       "notes": [
-        "Requires hitt.conf, cluster access, and a running Helix IS deployment.",
+        "Requires a running Helix IS deployment.",
         "Shows the license type from the IS Server (for example AR Server for a permanent license, or a temporary type before a full license is applied).",
         "To apply a license key, use fix mode arlicense — see the apply AR license use case in this section."
       ],
@@ -543,7 +543,7 @@
         "bash hitt.sh -f \"addcert /path/to/custom-certs.pem git\""
       ],
       "notes": [
-        "Requires hitt.conf with IS_NAMESPACE set, cluster access, and the cacerts secret in the IS namespace.",
+        "Requires Helix IS namespace configured in HITT and the cacerts secret in that namespace.",
         "PEM file may contain one or more certificates. Expired certificates are rejected; certificates expiring within 4 weeks show a warning but the command continues.",
         "HITT downloads the current cacerts keystore, adds the new certificates, validates the result, then asks you to confirm before updating the secret.",
         "To replace the entire cacerts file instead, use fix mode cacerts — see fix-cacerts use case."
@@ -601,7 +601,7 @@
         "bash hitt.sh -f sat"
       ],
       "notes": [
-        "Creates assisttool-rl and assisttool-rlb in the Helix IS namespace when SAT was deployed without SUPPORT_ASSISTANT_CREATE_ROLE."
+        "Creates the required role and role binding in the Helix IS namespace when SAT was deployed without SUPPORT_ASSISTANT_CREATE_ROLE."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md"
     },
@@ -618,6 +618,21 @@
         "Info mode is under development; use bash hitt.sh -m \"info help\" or README-info-mode.md for full environment summary (info full) and other options."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
+    },
+    {
+      "id": "info-helix-namespaces",
+      "topicId": "helix-system-info",
+      "order": 15,
+      "title": "I want to see the helix namespaces in my cluster",
+      "commands": [
+        "bash hitt.sh -m \"info helix\""
+      ],
+      "notes": [
+        "Scans all namespaces and lists Helix Platform, Helix IS, containerized Deployment Engine, and Helix Logging namespaces.",
+        "Shows a version per namespace when HITT can read one from the cluster. Helix Logging lists the namespace name only.",
+        "Lightweight alternative to info full — no interactive prompts and no info.json."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md#helix--helix-namespace-scan"
     },
     {
       "id": "info-helix-environment",
@@ -646,8 +661,8 @@
         "bash hitt.sh -t \"get tenant 1912102789 -o json\""
       ],
       "notes": [
-        "Deploys the same style job/pod used by HELIX_ITSM_INTEROPS; output prints when the job completes.",
-        "Not valid for Helix Platform CORE-only deployments (script will error with the documented message).",
+        "Runs tctl in your Helix Platform environment (same approach as the HELIX_ITSM_INTEROPS pipeline); output prints when it completes.",
+        "Not valid for Helix Platform CORE-only deployments (HITT reports an error with guidance).",
         "For a static tctl client config file, use bash hitt.sh -t config instead."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode"
@@ -662,9 +677,9 @@
         "bash hitt.sh -t config > config"
       ],
       "notes": [
-        "Reads secrets and deployment data from the Helix Platform namespace and creates a tctl config file.",
+        "Reads settings from the Helix Platform namespace and creates a tctl config file.",
         "SSO login credentials are written to the terminal for use when authenticating tctl.",
-        "Requires hitt.conf and a full Helix Platform deployment."
+        "Requires a full Helix Platform deployment."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode"
     },
@@ -740,8 +755,8 @@
         "bash hitt.sh -u \"get secret SECRET_NAME\""
       ],
       "notes": [
-        "With NAMESPACE: same as kubectl -n. Without NAMESPACE: looks for the secret in IS_NAMESPACE, then HP_NAMESPACE, then CDE_NAMESPACE from hitt.conf (skipping blanks and duplicates). Exactly one match uses that namespace; more than one prompts you to choose.",
-        "Printable keys are shown as text; other keys are decoded to files in the current directory (see decodeK8sSecret in hitt.sh)."
+        "With NAMESPACE: searches only that namespace. Without NAMESPACE: searches Helix IS, Platform, and Deployment Engine namespaces configured in HITT. Exactly one match uses that namespace; more than one prompts you to choose.",
+        "Printable keys are shown as text; other keys are saved as files in the current directory."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
@@ -756,8 +771,8 @@
       ],
       "notes": [
         "Creates a directory in the current working directory named after the ConfigMap (if that name exists, a numeric suffix is added). Each key in .data and .binaryData is written as a file using the key name.",
-        "Requires kubectl and jq; binaryData values are base64-decoded. Cluster and namespace must be reachable.",
-        "Without NAMESPACE: resolves the ConfigMap using IS_NAMESPACE, then HP_NAMESPACE, then CDE_NAMESPACE from hitt.conf (same rules as get secret for one match and multiple matches.)."
+        "Binary entries are decoded when written to files.",
+        "Without NAMESPACE: searches Helix IS, Platform, and Deployment Engine namespaces configured in HITT (same rules as get secret for one match and multiple matches)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
@@ -772,7 +787,7 @@
       ],
       "notes": [
         "The global -v (verbose) flag with get configmap lists the key names under .data and .binaryData only; nothing is written to disk.",
-        "Optional NAMESPACE uses the same IS_NAMESPACE → HP_NAMESPACE → CDE_NAMESPACE resolution as get configmap without -v."
+        "Without NAMESPACE: searches Helix IS, Platform, and Deployment Engine namespaces configured in HITT (same rules as get configmap without -v)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
     },
@@ -788,7 +803,7 @@
       ],
       "notes": [
         "Utility mode (-u) with checkpat requests a Docker Hub registry token and verifies the PAT has pull scope for a private BMC Helix image repository under your Docker Hub user.",
-        "With no arguments, HITT offers docker.io credentials from the bmc-dtrhub secret in the Helix Platform namespace (HP_NAMESPACE in hitt.conf), then prompts if needed.",
+        "With no arguments, HITT offers Helix Platform registry credentials from your configured Helix Platform namespace, then prompts if needed.",
         "If you omit only the PAT on the command line, HITT prompts for it interactively (hidden input)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
@@ -941,8 +956,8 @@
         "bash hitt.sh -d -m post-is"
       ],
       "notes": [
-        "With default logging (no -l), HITT enables set -x before running main and still tees output to hitt.log.",
-        "If you pass -l to disable log files, the script currently runs main without the tee branch, so -d does not enable set -x in that combination—omit -l when you need xtrace."
+        "With default logging (no -l), HITT writes detailed debug output to hitt.log as well as the console.",
+        "If you pass -l to disable log files, debug output may not appear—omit -l when you need full debug tracing."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options"
     },

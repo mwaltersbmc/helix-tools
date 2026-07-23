@@ -47,7 +47,7 @@ Configures and tests passwordless ssh from the `git` user to the `git` user.  A 
 ```bash
 bash hitt.sh -f realm
 ```
-Creates or updates the SSO realm required by the Helix Service management applications with values based on the IS namespace, CUSTOMER_SERVICE and ENVIRONMENT values found in the `hitt.conf` file .  This option may also be used to create the realm after the Helix Platform has been installed.
+Creates or updates the SSO realm required by the Helix Service management applications with values based on the IS namespace, CUSTOMER_SERVICE and ENVIRONMENT values from your **HITT configuration**.  This option may also be used to create the realm after the Helix Platform has been installed.
 
 #### `"cacerts new-cacerts-file"` - update the cacerts secret with a new file
 ```bash
@@ -75,7 +75,7 @@ Same PEM validation and cacerts checks as above, but updates `pipeline/tasks/cac
 
 Repository location depends on your Deployment Engine setup:
 
-- **Containerized Jenkins** — Gitea repository for the ITSM installer (same source used by in-cluster pipelines)
+- **Containerized Jenkins** — in-cluster source repository for the ITSM installer (same source used by in-cluster pipelines)
 - **Standalone Jenkins** — `${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git` from the HELIX_ONPREM_DEPLOYMENT pipeline parameters
 
 Requires Jenkins access (to read `GIT_REPO_DIR` on standalone systems) and git push permissions to the repository.

@@ -28,6 +28,8 @@ Interactive use-case reference: open [`index.html`](index.html) locally (with si
 
 ## Keep prose aligned with the product
 
+User-facing copy in `use-cases.json` and `hitt/README*.md` should follow **`.cursor/rules/hitt-user-facing-docs.mdc`**: plain language for operators, no internal function names, no implicit “kubectl/cluster access” prerequisites, and no Kubernetes object names unless the user must know them for that command (for example a secret name passed to **get secret**).
+
 When you add or change CLI behavior, update the matching narrative docs so the site does not drift:
 
 | Change touches | Also review |

@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260721-02`**
+**Latest build `20260723-01`**
 
 The **Helix IS Triage Tool (HITT)** is a shell script that performs diagnostic checks for common configuration issues encountered during the installation and operation of BMC Helix IS Service Management applications.
 
@@ -32,11 +32,11 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, addcert, Jenkins, license, …)
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `get arlicense`, `gendbid`, `imagels`, `checkpat`)
 - [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` / `delete` for **HELIX_ONPREM_DEPLOYMENT**
-- [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info ingress`, `info full`
+- [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info helix`, `info ingress`, `info full`
 
 Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h consolelog`, `bash hitt.sh -h info`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, `bash hitt.sh -o help`, or `bash hitt.sh -m "info help"` from within each mode.
 
-**Info ingress** (`bash hitt.sh -m "info ingress"`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires `hitt.conf` and Platform namespace access. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
+**Info ingress** (`bash hitt.sh -m "info ingress"`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires **HITT configuration** with the Helix Platform namespace set. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
 
 **Quoting:** HITT options whose values contain spaces must be double-quoted (e.g. `-m "info ingress"`, `-f "jenkins kubeconfig"`, `-u "get jwt"`). See [README-info-mode.md](README-info-mode.md) for info mode examples.
 
@@ -69,13 +69,13 @@ HITT supports different modes for Helix and Jenkins validation:
 
 The HITT script requires minimal configuration and will read the information it needs from Kubernetes, Jenkins, and the CUSTOMER_CONFIGS git repository.
 
-There are some optional tests that will attempt to validate the Helix IS database.  These require the use of a Java SQL client, called JISQL, and JDBC drivers for each database type.  To enable these tests, download the dbjars.tgz file and save it in the same directory as the hitt.sh script.  HITT will run the SQL checks when this file is present.
+There are some optional tests that will attempt to validate the Helix IS database.  These require the use of a Java SQL client, called JISQL, and JDBC drivers for each database type.  To enable these tests, download the dbjars.tgz file and save it in your HITT directory.  HITT will run the SQL checks when this file is present.
 
 ### Configuration ###
 
 HITT is configured by a file called `hitt.conf` which, if not found, is created when the script is run. You will be prompted to select your Helix namespaces and enter the other required settings.
 
-When the config file is created interactively, HITT probes the cluster for the Helix Platform `rsso` deployment, the Helix IS `midtier-user` deployment, and (for in-cluster Jenkins) the `jenkins-master` deployment. If exactly one namespace matches a role, HITT asks **y/n** to confirm that namespace; answer **n** to open a menu of discovered candidates plus **Other** (full cluster namespace list). If several namespaces match a role, the menu lists those candidates and **Other**. If none match, you choose from all cluster namespaces. For Helix IS, when the sole candidate is the same as the Platform namespace already chosen, HITT skips the confirmation and shows the candidate menu with **Other**.
+When the config file is created interactively, HITT scans the cluster for namespaces that look like Helix Platform, Helix IS, and (when the Deployment Engine runs in the cluster) the containerized Deployment Engine. If exactly one namespace matches a role, HITT asks **y/n** to confirm that namespace; answer **n** to open a menu of discovered candidates plus **Other** (full cluster namespace list). If several namespaces match a role, the menu lists those candidates and **Other**. If none match, you choose from all cluster namespaces. For Helix IS, when the sole candidate is the same as the Platform namespace already chosen, HITT skips the confirmation and shows the candidate menu with **Other**.
 
 If you need to change any of the values, either edit the file or delete it so that it is recreated the next time HITT is used.
 
@@ -152,13 +152,13 @@ All of the tests are read-only and will not make changes to the system.  However
 
 ### Logging ###
 
-HITT creates various log files in the directory that the script is run from:
+HITT creates various log files in your HITT directory:
 
 - `hitt.log` - script output.
 - `hittmsgs.log` - additional details on the cause, impact, and steps to fix, warnings and errors reported by the script.
 - `values.*` - the pipeline input values in pre-is mode, or values read from the cluster for post-is.
 - `PIPELINE_NAME.log` - console output for each of the Jenkins pipelines.
-- `k8s*.log` - output from various kubectl commands such as 'get pods'.
+- `k8s*.log` - output from cluster status checks (for example pod listings).
 - `hittdebug.log` - error messages from commands run by the script which may be useful if it does not work as expected.
 - `*.txt` - text only versions of log files with formatting and colour codes removed.
 
@@ -171,7 +171,7 @@ Quiet mode `-q` only prints the summary messages.
 
 ### Pipeline Mode ###
 
-Pipeline mode (`-k`) exports and submits **`HELIX_ONPREM_DEPLOYMENT`** parameters on the Jenkins in **`hitt.conf`**: **`get`** (export JSON, including **`get kickstart`** from Platform discovery), **`build`** (queue from file), **`kickstart`** (prefill and queue in one step), and **`delete`** (remove builds from job history).
+Pipeline mode (`-k`) exports and submits **`HELIX_ONPREM_DEPLOYMENT`** parameters on the Deployment Engine configured in your **HITT settings**: **`get`** (export JSON, including **`get kickstart`** from Platform discovery), **`build`** (queue from file), **`kickstart`** (prefill and queue in one step), and **`delete`** (remove builds from job history).
 
 See **[README-pipeline-mode.md](README-pipeline-mode.md)** for requirements, quoting, the rebuild-in-Jenkins workflow, and what the build trigger applies automatically.
 
@@ -257,7 +257,7 @@ Running IS deployment status check for bundle ID IDGIUNLUI5ENUASTJV8FSTJV8FT3JQ.
 
 ### Display Jenkins logs ###
 
-Use **`-o`** to print logs from the Deployment Engine on screen. Requires **hitt.conf** and a working Jenkins login.
+Use **`-o`** to print logs from the Deployment Engine on screen. Requires **HITT configuration** and a working login to the Deployment Engine.
 
 | Command | What you get |
 |---------|----------------|
@@ -351,7 +351,6 @@ Run `bash hitt.sh -h override` for the same list on the console.
 HITT performs over 150 diagnostic checks based on the selected mode, including:
 
 - Required CLI tools and version validation
-- A valid kubeconfig file is present or configured via the KUBECONFIG environment variable.
 - Kubernetes namespace health and pod status
 - Platform and IS component version discovery
 - Helix Platform and RSSO realm configuration

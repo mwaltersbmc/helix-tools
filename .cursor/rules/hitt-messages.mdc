@@ -49,6 +49,8 @@ Follow the same style as HITT READMEs and use cases:
 
 - **Do not** mention `hitt.conf`, `hitt.sh`, log file paths, or other internal files unless the user **must** open or fix that specific thing.
 - When a config file *is* salient, name it plainly and say why: e.g. “Add Jenkins details in **hitt.conf**” — not “set `JENKINS_URL` in `${HITT_CONFIG_FILE}`”.
+- **Do not** state that kubectl, kubeconfig, or “cluster access” is required — that is implicit for HITT. Same style as READMEs (`hitt-user-facing-docs.mdc`).
+- **Do not** name Kubernetes workloads or API objects (Deployments, StatefulSets, and so on) unless the operator must act on that specific resource — describe the product outcome instead.
 
 ## Commands in messages
 
