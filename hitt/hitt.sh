@@ -340,7 +340,7 @@ checkCLITools() {
     M1="tools"
     M2="they are"
     [[ "${#MISSING_CLI[@]}" -eq 1 ]] && M1="tool" && M2="this is"
-    logError "999" "Missing command line ${M1} '${MISSING_CLI[*]}' - HITT commands and results are likely to be unreliable unless ${M2} installed."
+    logError "999" "Missing command line ${M1} '${MISSING_CLI[*]}' - HITT results may be unreliable, or output mis-formatted, unless ${M2} installed."
   fi
 }
 
@@ -7857,7 +7857,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260724-02"
+HITT_BUILD_VERSION="20260724-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
