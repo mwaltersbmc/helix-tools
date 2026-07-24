@@ -180,16 +180,21 @@ getConfValues() {
   fi
   logMessage "Jenkins server - ${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
 
-  if isJenkinsInCluster ; then
-    JENKINS_CREDS_JSON=$(${KUBECTL_BIN} -n "${CDE_NAMESPACE}" get secret jenkins-master-admin -o jsonpath='{.data}')
-    JENKINS_USERNAME=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} -r '.username | @base64d')
-    JENKINS_PASSWORD=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} -r '.password | @base64d')
-    logMessage "Auto configured Jenkins credentials."
-  else
-    logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
-    read -p "Username : " JENKINS_USERNAME
-    read -r -s -p "Password : " JENKINS_PASSWORD
+  if ! isJenkinsInCluster ; then
+    askForJenkinsCredentials
   fi
+}
+
+askForJenkinsCredentials() {
+  logStatus "Please enter your Jenkins GUI username and password if required, otherwise just press return:" 1
+  read -p "Username : " JENKINS_USERNAME
+  read -r -s -p "Password : " JENKINS_PASSWORD
+}
+
+getJenkinsCDECredentials() {
+  JENKINS_CREDS_JSON=$(${KUBECTL_BIN} -n "${CDE_NAMESPACE}" get secret jenkins-master-admin -o jsonpath='{.data}')
+  JENKINS_USERNAME=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} -r '.username | @base64d')
+  JENKINS_PASSWORD=$(echo "${JENKINS_CREDS_JSON}" | ${JQ_BIN} -r '.password | @base64d')
 }
 
 createHITTconf() {
@@ -7398,6 +7403,13 @@ fi
 
 [[ -f "./${HITT_CONFIG_FILE}" ]] && source "./${HITT_CONFIG_FILE}"
 
+if [ -n "${CDE_NAMESPACE}" ]; then
+  getJenkinsCDECredentials
+  if [ "${JENKINS_USERNAME}" = "" ]; then
+    askForJenkinsCredentials
+  fi
+fi
+
 # Conf overrides
 if [ "${CONF_OVERRIDE}" == "1" ]; then
   for opt in HP_NAMESPACE IS_NAMESPACE CDE_NAMESPACE IS_ENVIRONMENT IS_CUSTOMER_SERVICE JENKINS_USERNAME JENKINS_PASSWORD; do
@@ -7845,7 +7857,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260724-01"
+HITT_BUILD_VERSION="20260724-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
