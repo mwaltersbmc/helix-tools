@@ -39,20 +39,6 @@ Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `ba
 
 **Quoting:** HITT options whose values contain spaces must be double-quoted (e.g. `-m "info ingress"`, `-f "jenkins kubeconfig"`, `-u "get jwt"`). See [README-info-mode.md](README-info-mode.md) for info mode examples.
 
-### Build version (developers, git clone only)
-
-`hitt.sh` defines **`HITT_BUILD_VERSION`** (`YYYYMMDD-NN` in **UTC**, `NN` zero-padded **01–99**). It is shown in the welcome line when you run the script, and the second line of this README (bold **Latest build** with the version in backticks) is updated to match when the pre-commit hook runs for a commit that stages **`hitt/hitt.sh`**.
-
-If you work from a **git clone** of this repo, enable the hook so the counter advances when **`hitt/hitt.sh`** is included in a commit:
-
-```bash
-git config core.hooksPath .githooks
-```
-
-To make one commit without bumping: `SKIP_HITT_VERSION_HOOK=1 git commit ...`
-
-`curl` installs of `hitt.sh` alone keep the version baked into the file at publish time (no hook).
-
 ## Features & Modes
 
 HITT supports different modes for Helix and Jenkins validation:
@@ -81,6 +67,8 @@ If you need to change any of the values, either edit the file or delete it so th
 You can use a different config file by using the `-c filename` command line option.  This may be useful when using the pipeline mode option to migrate pipeline values between Jenkins systems.
 
 You can override individual settings from **hitt.conf** on the command line without editing the file — for example when testing against a different namespace or Jenkins login. See [Config overrides](#config-overrides) or run `bash hitt.sh -h override`.
+
+The Jenkins credentials will be blank when using a Containerized Deployment Engine as HITT will read them from a secret in the CDE namespace.
 
 The `hitt.conf` file:
 
