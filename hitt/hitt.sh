@@ -568,8 +568,8 @@ setVarsFromPlatform() {
   EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
   LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helixingress-master -o jsonpath='{.spec.rules[0].host}')
   TMS_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helix-tms-ingress-master -o jsonpath='{.spec.rules[0].host}')
-  MINIO_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio -o jsonpath='{.spec.rules[0].host}')
-  MINIO_API_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio-api -o jsonpath='{.spec.rules[0].host}')
+  MINIO_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
+  MINIO_API_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio-api -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
   KIBANA_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress efk-elasticsearch-kibana -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
   LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
   FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
@@ -577,18 +577,6 @@ setVarsFromPlatform() {
   LOG_ELASTICSEARCH_USERNAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_USERNAME | @base64d')
   #FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
   FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods -l "$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get svc "${FTS_ELASTIC_SERVICENAME}" -o jsonpath='{.spec.selector}' | ${JQ_BIN} -r 'to_entries | map("\(.key)=\(.value)") | join(",")')" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -n 1)
-  # Catch cases where the LB_HOST is the same as the IS CUSTOMER_SERVICE-ENVIRONMENT.CLUSTER_DOMAIN
-  if [ "${IS_ENVIRONMENT}" == "prod" ]; then
-    IS_PREFIX="${IS_CUSTOMER_SERVICE}"
-  else
-    IS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
-  fi
-  for i in LB_HOST TMS_LB_HOST MINIO_LB_HOST MINIO_API_LB_HOST KIBANA_LB_HOST; do
-    if [ "${!i}" == "${IS_PREFIX}.${LB_HOST#*.}" ]; then
-      logError "110" "${i} value '${!i}' conflicts with the derived MidTier alias '${IS_PREFIX}.${LB_HOST#*.}'."
-      #logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
-    fi
-  done
 
   if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
     FTS_ELASTIC_POD_CONTAINER="-c opensearch"
@@ -699,6 +687,25 @@ setVarsFromPlatform() {
   else
     ARSERVICES_MSG="ARSERVICES"
   fi
+
+  if compare "${HP_VERSION%.*} >= 26.2" ; then
+    # no-op placeholder
+    :
+  fi
+
+  # Catch cases where the LB_HOST is the same as the IS CUSTOMER_SERVICE-ENVIRONMENT.CLUSTER_DOMAIN
+  if [ "${IS_ENVIRONMENT}" == "prod" ]; then
+    IS_PREFIX="${IS_CUSTOMER_SERVICE}"
+  else
+    IS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
+  fi
+  for i in LB_HOST TMS_LB_HOST MINIO_LB_HOST MINIO_API_LB_HOST KIBANA_LB_HOST; do
+    if [ "${!i}" == "${IS_PREFIX}.${LB_HOST#*.}" ]; then
+      logError "110" "${i} value '${!i}' conflicts with the derived MidTier alias '${IS_PREFIX}.${LB_HOST#*.}'."
+      #logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
+    fi
+  done
+
 }
 
 getRSSODetails() {
@@ -7709,7 +7716,7 @@ if [ "${MODE}" == "info" ]; then
     full)
       gatherInfo
       printInfo
-      writeInfoJson || true
+      #writeInfoJson || true
       ;;
     help)
       showInfoHelp
@@ -7838,7 +7845,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260723-03"
+HITT_BUILD_VERSION="20260724-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
