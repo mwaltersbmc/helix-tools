@@ -1,0 +1,11 @@
+Kubernetes control plane: v1.28.4
+OpenShift version: 4.14.12
+
+Node summary (demo output — no live cluster required for this recording):
+
+NAME           CPU (alloc/used)   MEM (alloc/used)   PODS (run/bad)   STATUS
+worker-01      8 / 42%            32Gi / 61%         45 / 0           Ready
+worker-02      8 / 38%            32Gi / 55%         41 / 0           Ready
+worker-03      8 / 51%            32Gi / 68%         52 / 1           Ready
+
+Metrics from metrics-server when available. See README-info-mode.md for full details.
