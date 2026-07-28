@@ -6042,6 +6042,40 @@ hittFormatCpuMilliAsCores() {
   }'
 }
 
+# Format memory (Mi) as Gi for info cluster display (e.g. 75652 -> 73.9Gi, 131072 -> 128Gi).
+hittFormatMemMiAsGi() {
+  awk -v mi="${1:-0}" 'BEGIN {
+    g = mi / 1024
+    if (g == int(g)) printf "%dGi", int(g)
+    else printf "%.1fGi", g
+  }'
+}
+
+# Format bytes as Gi for info cluster display (e.g. kubelet fs stats).
+hittFormatBytesAsGi() {
+  awk -v b="${1:-0}" 'BEGIN {
+    g = b / 1024 / 1024 / 1024
+    if (g == int(g)) printf "%dGi", int(g)
+    else printf "%.1fGi", g
+  }'
+}
+
+# Read node kubelet stats/summary ephemeral filesystem usage.
+# Prints "capacityBytes usedBytes" on success; returns 1 when stats are unavailable.
+hittGetNodeEphemeralStorageBytes() {
+  local node_name="$1" stats_json
+  stats_json=$(${KUBECTL_BIN} get --raw "/api/v1/nodes/${node_name}/proxy/stats/summary" 2>>"${HITT_ERR_FILE}") || return 1
+  [[ -z "${stats_json}" ]] && return 1
+  echo "${stats_json}" | ${JQ_BIN} -r '
+    (.node["ephemeral-storage"] // .node.fs // empty) as $fs
+    | select($fs != null and (($fs.capacityBytes // 0) > 0))
+    | ($fs.capacityBytes) as $cap
+    | ($fs.usedBytes // (if ($fs.availableBytes // null) != null then ($cap - $fs.availableBytes) else empty end)) as $used
+    | select($used != null)
+    | "\($cap) \($used)"
+  ' 2>>"${HITT_ERR_FILE}"
+}
+
 # getK8sNodeDetails  — fills global K8S_NODE_DETAILS_TABLE (pipe rows, \\n-separated);
 #                      and K8S_OOM_PODS_TABLE (POD_NAME|CONTAINER_NAME|NAMESPACE|NODE_NAME rows);
 #                      returns 0 on success, 1 on failure (does not exit).
@@ -6049,10 +6083,12 @@ hittFormatCpuMilliAsCores() {
 # printK8sOomPods     — formats K8S_OOM_PODS_TABLE to stdout; returns 1 if no OOM pods.
 # =============================================================================
 getK8sNodeDetails() {
-  local nodes_json top_nodes_text node_name node_type runtime alloc_cpu_milli alloc_cpu_cores alloc_mem allocatable
+  local nodes_json top_nodes_text node_name node_type runtime alloc_cpu_milli alloc_cpu_cores alloc_mem_mi alloc_mem allocatable
   local node_top pct_cpu pct_mem actual_usage conditions is_ready node_status pods_json
-  local req_cpu_milli req_cpu_cores req_mem req_mem_mi allocated count_running count_bad count_crash
-  local pod_stats count_oom TABLE_DATA OOM_PODS_DATA oom_row node
+  local req_cpu_milli req_cpu_cores req_mem req_mem_gi remain_mem_mi remain_mem_gi allocated
+  local ephem_cap_bytes ephem_used_bytes ephem_storage ephem_stats ephem_stats_na
+  local count_running count_bad count_crash pod_stats count_oom TABLE_DATA OOM_PODS_DATA oom_row node
+  local k8s_qty_to_mi='if endswith("Ti") then (sub("Ti$"; "") | tonumber * 1024 * 1024) elif endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024) elif endswith("G") then (sub("G$"; "") | tonumber * 953) elif endswith("Mi") then (sub("Mi$"; "") | tonumber) elif endswith("M") then (sub("M$"; "") | tonumber * 0.953) elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024) else (tonumber / 1024 / 1024) end'
 
   K8S_NODE_DETAILS_TABLE=""
   K8S_NODE_DETAILS_JSON=""
@@ -6073,8 +6109,9 @@ getK8sNodeDetails() {
 
   TABLE_DATA=""
   OOM_PODS_DATA=""
+  ephem_stats_na=0
   # Use $'\n' — in bash, "\n" inside "..." is a literal backslash+n, not a newline (echo -e expands it for display; jq does not).
-  TABLE_DATA+=$'NODE_NAME|NODE_TYPE|ALLOCATABLE_(CPU/MEM)|ALLOCATED_REQ_(CPU/MEM)|ACTUAL_USAGE|NODE_STATUS/CONDITIONS|PODS_(RUN/BAD/CRASH)|OOM_KILLS|CONTAINER_RUNTIME\n'
+  TABLE_DATA+=$'NODE_NAME|NODE_TYPE|ALLOCATABLE_(CPU/MEM)|ALLOCATED_REQ_(CPU/MEM)|EPHEMERAL_STORAGE_(TOTAL/USED)|ACTUAL_USAGE|NODE_STATUS/CONDITIONS|PODS_(RUN/BAD/CRASH)|OOM_KILLS|CONTAINER_RUNTIME\n'
   OOM_PODS_DATA+=$'POD_NAME|CONTAINER_NAME|NAMESPACE|NODE_NAME\n'
 
   while read -r node; do
@@ -6093,7 +6130,7 @@ getK8sNodeDetails() {
         end
     ' 2>>"${HITT_ERR_FILE}")
     alloc_cpu_cores=$(hittFormatCpuMilliAsCores "${alloc_cpu_milli:-0}")
-    alloc_mem=$(echo "${node}" | ${JQ_BIN} -r '
+    alloc_mem_mi=$(echo "${node}" | ${JQ_BIN} -r '
       .status.allocatable.memory
       | if endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024)
         elif endswith("G") then (sub("G$"; "") | tonumber * 953)
@@ -6103,9 +6140,8 @@ getK8sNodeDetails() {
         else (tonumber / 1024 / 1024)
         end
       | round
-      | tostring + "Mi"
     ' 2>>"${HITT_ERR_FILE}")
-    alloc_mem="${alloc_mem:-0Mi}"
+    alloc_mem=$(hittFormatMemMiAsGi "${alloc_mem_mi:-0}")
     allocatable="${alloc_cpu_cores}_/_${alloc_mem}"
 
     node_top=""
@@ -6142,10 +6178,21 @@ getK8sNodeDetails() {
     req_cpu_milli=$(echo "${pods_json}" | ${JQ_BIN} -r '[.items[] | select(.status.phase == "Running") | .spec.containers[].resources.requests.cpu // "0"] | map(if endswith("m") then (sub("m$"; "") | tonumber) else (tonumber * 1000) end) | add // 0' 2>>"${HITT_ERR_FILE}")
     req_cpu_cores=$(hittFormatCpuMilliAsCores "${req_cpu_milli:-0}")
 
-    req_mem=$(echo "${pods_json}" | ${JQ_BIN} -r '[.items[] | select(.status.phase == "Running") | .spec.containers[].resources.requests.memory // "0"] | map(if endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024) elif endswith("G") then (sub("G$"; "") | tonumber * 953) elif endswith("Mi") then (sub("Mi$"; "") | tonumber) elif endswith("M") then (sub("M$"; "") | tonumber * 0.953) elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024) else (tonumber / 1024 / 1024) end) | add | round // 0' 2>>"${HITT_ERR_FILE}")
-    req_mem_mi="${req_mem:-0}Mi"
+    req_mem=$(echo "${pods_json}" | ${JQ_BIN} -r "[.items[] | select(.status.phase == \"Running\") | .spec.containers[].resources.requests.memory // \"0\"] | map(${k8s_qty_to_mi}) | add | round // 0" 2>>"${HITT_ERR_FILE}")
+    req_mem_gi=$(hittFormatMemMiAsGi "${req_mem:-0}")
+    remain_mem_mi=$(( alloc_mem_mi - req_mem ))
+    remain_mem_gi=$(hittFormatMemMiAsGi "${remain_mem_mi}")
 
-    allocated="${req_cpu_cores}_/_${req_mem_mi}"
+    allocated="${req_cpu_cores}_/_${req_mem_gi}_(${remain_mem_gi})"
+
+    ephem_stats=$(hittGetNodeEphemeralStorageBytes "${node_name}") || ephem_stats=""
+    if [[ -n "${ephem_stats}" ]]; then
+      read -r ephem_cap_bytes ephem_used_bytes <<< "${ephem_stats}"
+      ephem_storage="$(hittFormatBytesAsGi "${ephem_cap_bytes}")_/_$(hittFormatBytesAsGi "${ephem_used_bytes}")"
+    else
+      ephem_storage="Stats_N/A"
+      ephem_stats_na=1
+    fi
 
     count_running=$(echo "${pods_json}" | ${JQ_BIN} '[.items[] | select(.status.phase == "Running")] | length')
     count_bad=$(echo "${pods_json}" | ${JQ_BIN} '[.items[] | select(.status.phase as $p | ["Failed", "Unknown"] | any(. == $p))] | length')
@@ -6167,8 +6214,12 @@ getK8sNodeDetails() {
       ] | .[]
     ' 2>>"${HITT_ERR_FILE}")
 
-    TABLE_DATA+="${node_name}|${node_type}|${allocatable}|${allocated}|${actual_usage}|${node_status}|${pod_stats}|${count_oom}|${runtime}"$'\n'
+    TABLE_DATA+="${node_name}|${node_type}|${allocatable}|${allocated}|${ephem_storage}|${actual_usage}|${node_status}|${pod_stats}|${count_oom}|${runtime}"$'\n'
   done < <(echo "${nodes_json}" | ${JQ_BIN} -c '.items[]')
+
+  if [[ "${ephem_stats_na}" -eq 1 ]] && [[ "${VERBOSITY}" -ge 1 ]] && [[ "${QUIET}" == "0" ]]; then
+    logMessage "Ephemeral storage totals show Stats N/A for one or more nodes — check permission to read kubelet stats/summary (nodes/stats or nodes/proxy)." 1
+  fi
 
   K8S_NODE_DETAILS_TABLE="${TABLE_DATA}"
   K8S_OOM_PODS_TABLE="${OOM_PODS_DATA}"
@@ -7970,7 +8021,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260728-04"
+HITT_BUILD_VERSION="20260728-05"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
