@@ -6325,7 +6325,7 @@ getK8sNodePodDetails() {
   fi
 
   TABLE_DATA=""
-  TABLE_DATA+=$'POD_NAME|REQUESTS_(CPU/MEM)|LIMITS_(CPU/MEM)|CURRENT_USAGE_(CPU/MEM)|EPHEMERAL_STORAGE\n'
+  TABLE_DATA+=$'POD_NAME|REQUESTS_(CPU/MEM)|LIMITS_(CPU/MEM)|CURRENT_(CPU/MEM)|EPHEMERAL_STORAGE\n'
 
   while read -r pod; do
     [[ -z "${pod}" ]] && continue
