@@ -50,8 +50,8 @@ Columns:
 |--------|---------|
 | **NODE_NAME** | Kubernetes node name. |
 | **NODE_TYPE** | Role label (`control-plane`, `worker`, or comma-separated roles). |
-| **ALLOCATABLE (CPU/MEM)** | Total allocatable CPU and memory on the node. |
-| **ALLOCATED REQ (CPU/MEM)** | Sum of **container resource requests** for pods scheduled on the node (not limits). |
+| **ALLOCATABLE (CPU/MEM)** | Total allocatable CPU (**cores**) and memory (**Mi**) on the node. |
+| **ALLOCATED REQ (CPU/MEM)** | Sum of **container resource requests** for **Running** pods on the node (**cores** / **Mi**; not limits). |
 | **ACTUAL_USAGE** | CPU and memory **percentage** when node metrics are available; otherwise `Metrics N/A`. |
 | **NODE_STATUS/CONDITIONS** | `Healthy`, `NotReady`, or pressure conditions (e.g. disk/memory pressure). |
 | **PODS (RUN/BAD/CRASH)** | Running / Failed+Unknown / CrashLoopBackOff counts for pods on the node. |

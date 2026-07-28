@@ -6033,6 +6033,15 @@ parseUtilSQL() {
   runARRESTSQL "${UTILARGS[*]:1}"
 }
 
+# Format millicores as CPU cores for info cluster display (e.g. 6334 -> 6.3, 8000 -> 8).
+hittFormatCpuMilliAsCores() {
+  awk -v m="${1:-0}" 'BEGIN {
+    c = m / 1000
+    if (c == int(c)) printf "%d", c
+    else printf "%.1f", c
+  }'
+}
+
 # getK8sNodeDetails  — fills global K8S_NODE_DETAILS_TABLE (pipe rows, \\n-separated);
 #                      and K8S_OOM_PODS_TABLE (POD_NAME|CONTAINER_NAME|NAMESPACE|NODE_NAME rows);
 #                      returns 0 on success, 1 on failure (does not exit).
@@ -6040,9 +6049,9 @@ parseUtilSQL() {
 # printK8sOomPods     — formats K8S_OOM_PODS_TABLE to stdout; returns 1 if no OOM pods.
 # =============================================================================
 getK8sNodeDetails() {
-  local nodes_json top_nodes_text node_name node_type runtime alloc_cpu alloc_mem allocatable
+  local nodes_json top_nodes_text node_name node_type runtime alloc_cpu_milli alloc_cpu_cores alloc_mem allocatable
   local node_top pct_cpu pct_mem actual_usage conditions is_ready node_status pods_json
-  local req_cpu req_cpu_milli req_mem req_mem_mi allocated count_running count_bad count_crash
+  local req_cpu_milli req_cpu_cores req_mem req_mem_mi allocated count_running count_bad count_crash
   local pod_stats count_oom TABLE_DATA OOM_PODS_DATA oom_row node
 
   K8S_NODE_DETAILS_TABLE=""
@@ -6077,7 +6086,13 @@ getK8sNodeDetails() {
 
     runtime=$(echo "${node}" | ${JQ_BIN} -r '.status.nodeInfo.containerRuntimeVersion')
 
-    alloc_cpu=$(echo "${node}" | ${JQ_BIN} -r '.status.allocatable.cpu')
+    alloc_cpu_milli=$(echo "${node}" | ${JQ_BIN} -r '
+      .status.allocatable.cpu
+      | if endswith("m") then (sub("m$"; "") | tonumber)
+        else (tonumber * 1000)
+        end
+    ' 2>>"${HITT_ERR_FILE}")
+    alloc_cpu_cores=$(hittFormatCpuMilliAsCores "${alloc_cpu_milli:-0}")
     alloc_mem=$(echo "${node}" | ${JQ_BIN} -r '
       .status.allocatable.memory
       | if endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024)
@@ -6091,7 +6106,7 @@ getK8sNodeDetails() {
       | tostring + "Mi"
     ' 2>>"${HITT_ERR_FILE}")
     alloc_mem="${alloc_mem:-0Mi}"
-    allocatable="${alloc_cpu}_/_${alloc_mem}"
+    allocatable="${alloc_cpu_cores}_/_${alloc_mem}"
 
     node_top=""
     if [[ -n "${top_nodes_text}" ]]; then
@@ -6124,13 +6139,13 @@ getK8sNodeDetails() {
 
     pods_json=$(${KUBECTL_BIN} get pods --all-namespaces --field-selector "spec.nodeName=${node_name}" -o json 2>>"${HITT_ERR_FILE}") || pods_json='{"items":[]}'
 
-    req_cpu=$(echo "${pods_json}" | ${JQ_BIN} -r '[.items[].spec.containers[].resources.requests.cpu // "0"] | map(if endswith("m") then (sub("m$"; "") | tonumber) else (tonumber * 1000) end) | add' 2>>"${HITT_ERR_FILE}")
-    req_cpu_milli="${req_cpu:-0}m"
+    req_cpu_milli=$(echo "${pods_json}" | ${JQ_BIN} -r '[.items[] | select(.status.phase == "Running") | .spec.containers[].resources.requests.cpu // "0"] | map(if endswith("m") then (sub("m$"; "") | tonumber) else (tonumber * 1000) end) | add // 0' 2>>"${HITT_ERR_FILE}")
+    req_cpu_cores=$(hittFormatCpuMilliAsCores "${req_cpu_milli:-0}")
 
-    req_mem=$(echo "${pods_json}" | ${JQ_BIN} -r '[.items[].spec.containers[].resources.requests.memory // "0"] | map(if endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024) elif endswith("G") then (sub("G$"; "") | tonumber * 953) elif endswith("Mi") then (sub("Mi$"; "") | tonumber) elif endswith("M") then (sub("M$"; "") | tonumber * 0.953) elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024) else (tonumber / 1024 / 1024) end) | add | round' 2>>"${HITT_ERR_FILE}")
+    req_mem=$(echo "${pods_json}" | ${JQ_BIN} -r '[.items[] | select(.status.phase == "Running") | .spec.containers[].resources.requests.memory // "0"] | map(if endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024) elif endswith("G") then (sub("G$"; "") | tonumber * 953) elif endswith("Mi") then (sub("Mi$"; "") | tonumber) elif endswith("M") then (sub("M$"; "") | tonumber * 0.953) elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024) else (tonumber / 1024 / 1024) end) | add | round // 0' 2>>"${HITT_ERR_FILE}")
     req_mem_mi="${req_mem:-0}Mi"
 
-    allocated="${req_cpu_milli}_/_${req_mem_mi}"
+    allocated="${req_cpu_cores}_/_${req_mem_mi}"
 
     count_running=$(echo "${pods_json}" | ${JQ_BIN} '[.items[] | select(.status.phase == "Running")] | length')
     count_bad=$(echo "${pods_json}" | ${JQ_BIN} '[.items[] | select(.status.phase as $p | ["Failed", "Unknown"] | any(. == $p))] | length')
@@ -7955,7 +7970,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260728-03"
+HITT_BUILD_VERSION="20260728-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
