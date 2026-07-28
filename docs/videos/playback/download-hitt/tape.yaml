@@ -1,0 +1,15 @@
+title: Download the HITT script
+output: download-hitt
+steps:
+  - action: narrate
+    narration: >
+      Download HITT on the Deployment Engine by creating a directory and
+      fetching hitt.sh from GitHub with curl.
+    commands:
+      - export REPO_ROOT=$(pwd) && rm -rf /tmp/hitt-download-demo && mkdir -p /tmp/hitt-download-demo && cd /tmp/hitt-download-demo
+      - mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh && chmod a+x hitt.sh
+      - test -x hitt/hitt.sh || cp $REPO_ROOT/hitt/hitt.sh hitt/hitt.sh; chmod a+x hitt/hitt.sh
+      - ls -la hitt/hitt.sh
+
+  - action: run
+    pause: 0.5

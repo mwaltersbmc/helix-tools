@@ -1,0 +1,30 @@
+title: Change HITT configuration
+output: hitt-config-change
+steps:
+  - action: type
+    command: cd docs/videos/demo && cp -f sample-hitt.conf hitt.conf && chmod +x hitt.sh
+    narration: >
+      HITT settings live in hitt.conf. You can edit the file directly, or
+      delete it and re-run HITT to go through the setup wizard again.
+    pause: 0.5
+
+  - action: run
+    pause: 0.5
+
+  - action: type
+    command: cat hitt.conf
+    narration: Option one — review or edit hitt.conf in your editor.
+    pause: 1
+
+  - action: run
+    pause: 0.5
+
+  - action: type
+    command: rm hitt.conf && bash hitt.sh -m post-hp
+    narration: >
+      Option two — remove hitt.conf and run post-hp to recreate settings
+      from interactive prompts.
+    pause: 1
+
+  - action: run
+    pause: 0.5

@@ -1,0 +1,13 @@
+title: Use case title
+description: >
+  Short summary for video metadata and captions context.
+episode: 1
+locale: en-GB
+series: topic-id-from-use-cases-json
+tags:
+  - hitt
+version: "1.0.0"
+# Run VHS from repo root so paths like docs/videos/demo work.
+vhsCwd: "."
+voices:
+  - northern_english_male

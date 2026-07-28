@@ -1,0 +1,17 @@
+{
+  "name": "helix-tools",
+  "private": true,
+  "description": "BMC Helix tools including HITT and use-case video pipelines",
+  "scripts": {
+    "playback:setup": "bash scripts/setup-playback.sh",
+    "playback:validate": "bash scripts/render-playback.sh --validate",
+    "playback:render": "bash scripts/render-playback.sh",
+    "playback:vhs-only": "bash scripts/render-playback.sh --vhs-only"
+  },
+  "devDependencies": {
+    "playback-cli": "^1.5.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

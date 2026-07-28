@@ -79,7 +79,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#quick-start",
       "video": {
         "enabled": true,
-        "tape": "download-hitt.tape"
+        "tape": "download-hitt.tape",
+        "playback": {
+          "dir": "download-hitt",
+          "enabled": true
+        }
       }
     },
     {
@@ -100,7 +104,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#configuration",
       "video": {
         "enabled": true,
-        "tape": "hitt-config-change.tape"
+        "tape": "hitt-config-change.tape",
+        "playback": {
+          "dir": "hitt-config-change",
+          "enabled": true
+        }
       }
     },
     {
@@ -117,7 +125,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#configuration",
       "video": {
         "enabled": false,
-        "tape": "alt-config.tape"
+        "tape": "alt-config.tape",
+        "playback": {
+          "dir": "alt-config",
+          "enabled": false
+        }
       }
     },
     {
@@ -138,7 +150,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#config-overrides",
       "video": {
         "enabled": false,
-        "tape": "config-override.tape"
+        "tape": "config-override.tape",
+        "playback": {
+          "dir": "config-override",
+          "enabled": false
+        }
       }
     },
     {
@@ -157,7 +173,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#quick-start",
       "video": {
         "enabled": false,
-        "tape": "update-hitt-latest.tape"
+        "tape": "update-hitt-latest.tape",
+        "playback": {
+          "dir": "update-hitt-latest",
+          "enabled": false
+        }
       }
     },
     {
@@ -175,7 +195,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options",
       "video": {
         "enabled": false,
-        "tape": "ignore-proxy.tape"
+        "tape": "ignore-proxy.tape",
+        "playback": {
+          "dir": "ignore-proxy",
+          "enabled": false
+        }
       }
     },
     {
@@ -193,7 +217,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#running-hitt",
       "video": {
         "enabled": false,
-        "tape": "jenkins-check.tape"
+        "tape": "jenkins-check.tape",
+        "playback": {
+          "dir": "jenkins-check",
+          "enabled": false
+        }
       }
     },
     {
@@ -213,7 +241,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options",
       "video": {
         "enabled": false,
-        "tape": "dump-jenkins-creds.tape"
+        "tape": "dump-jenkins-creds.tape",
+        "playback": {
+          "dir": "dump-jenkins-creds",
+          "enabled": false
+        }
       }
     },
     {
@@ -232,7 +264,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-kubeconfig.tape"
+        "tape": "fix-kubeconfig.tape",
+        "playback": {
+          "dir": "fix-kubeconfig",
+          "enabled": false
+        }
       }
     },
     {
@@ -250,7 +286,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-jenkins-credentials.tape"
+        "tape": "fix-jenkins-credentials.tape",
+        "playback": {
+          "dir": "fix-jenkins-credentials",
+          "enabled": false
+        }
       }
     },
     {
@@ -267,7 +307,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-jenkins-scriptapproval.tape"
+        "tape": "fix-jenkins-scriptapproval.tape",
+        "playback": {
+          "dir": "fix-jenkins-scriptapproval",
+          "enabled": false
+        }
       }
     },
     {
@@ -286,7 +330,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-jenkins-pipelinelibs.tape"
+        "tape": "fix-jenkins-pipelinelibs.tape",
+        "playback": {
+          "dir": "fix-jenkins-pipelinelibs",
+          "enabled": false
+        }
       }
     },
     {
@@ -303,7 +351,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-jenkins-dryrun.tape"
+        "tape": "fix-jenkins-dryrun.tape",
+        "playback": {
+          "dir": "fix-jenkins-dryrun",
+          "enabled": false
+        }
       }
     },
     {
@@ -320,7 +372,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-jenkins-all.tape"
+        "tape": "fix-jenkins-all.tape",
+        "playback": {
+          "dir": "fix-jenkins-all",
+          "enabled": false
+        }
       }
     },
     {
@@ -338,7 +394,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-realm.tape"
+        "tape": "fix-realm.tape",
+        "playback": {
+          "dir": "fix-realm",
+          "enabled": false
+        }
       }
     },
     {
@@ -355,7 +415,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-resetssopwd.tape"
+        "tape": "fix-resetssopwd.tape",
+        "playback": {
+          "dir": "fix-resetssopwd",
+          "enabled": false
+        }
       }
     },
     {
@@ -373,7 +437,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes",
       "video": {
         "enabled": false,
-        "tape": "mode-post-hp.tape"
+        "tape": "mode-post-hp.tape",
+        "playback": {
+          "dir": "mode-post-hp",
+          "enabled": false
+        }
       }
     },
     {
@@ -391,7 +459,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes",
       "video": {
         "enabled": false,
-        "tape": "mode-pre-is.tape"
+        "tape": "mode-pre-is.tape",
+        "playback": {
+          "dir": "mode-pre-is",
+          "enabled": false
+        }
       }
     },
     {
@@ -409,7 +481,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes",
       "video": {
         "enabled": false,
-        "tape": "mode-post-is.tape"
+        "tape": "mode-post-is.tape",
+        "playback": {
+          "dir": "mode-post-is",
+          "enabled": false
+        }
       }
     },
     {
@@ -428,7 +504,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#features--modes",
       "video": {
         "enabled": false,
-        "tape": "troubleshoot-failed-onprem-pipeline.tape"
+        "tape": "troubleshoot-failed-onprem-pipeline.tape",
+        "playback": {
+          "dir": "troubleshoot-failed-onprem-pipeline",
+          "enabled": false
+        }
       }
     },
     {
@@ -459,7 +539,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md",
       "video": {
         "enabled": false,
-        "tape": "pipeline-get.tape"
+        "tape": "pipeline-get.tape",
+        "playback": {
+          "dir": "pipeline-get",
+          "enabled": false
+        }
       }
     },
     {
@@ -480,7 +564,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#get-kickstart--preview-values-without-starting-a-run",
       "video": {
         "enabled": false,
-        "tape": "pipeline-kickstart-preview.tape"
+        "tape": "pipeline-kickstart-preview.tape",
+        "playback": {
+          "dir": "pipeline-kickstart-preview",
+          "enabled": false
+        }
       }
     },
     {
@@ -501,7 +589,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#get-kickstart--preview-values-without-starting-a-run",
       "video": {
         "enabled": false,
-        "tape": "pipeline-kickstart-build-file.tape"
+        "tape": "pipeline-kickstart-build-file.tape",
+        "playback": {
+          "dir": "pipeline-kickstart-build-file",
+          "enabled": false
+        }
       }
     },
     {
@@ -521,7 +613,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md",
       "video": {
         "enabled": false,
-        "tape": "pipeline-build.tape"
+        "tape": "pipeline-build.tape",
+        "playback": {
+          "dir": "pipeline-build",
+          "enabled": false
+        }
       }
     },
     {
@@ -541,7 +637,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#kickstart--fill-values-from-helix-platform",
       "video": {
         "enabled": false,
-        "tape": "pipeline-kickstart.tape"
+        "tape": "pipeline-kickstart.tape",
+        "playback": {
+          "dir": "pipeline-kickstart",
+          "enabled": false
+        }
       }
     },
     {
@@ -559,7 +659,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o",
       "video": {
         "enabled": false,
-        "tape": "pipeline-console.tape"
+        "tape": "pipeline-console.tape",
+        "playback": {
+          "dir": "pipeline-console",
+          "enabled": false
+        }
       }
     },
     {
@@ -580,7 +684,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o",
       "video": {
         "enabled": false,
-        "tape": "pipeline-jenkins-logs.tape"
+        "tape": "pipeline-jenkins-logs.tape",
+        "playback": {
+          "dir": "pipeline-jenkins-logs",
+          "enabled": false
+        }
       }
     },
     {
@@ -600,7 +708,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#delete--remove-builds-from-job-history",
       "video": {
         "enabled": false,
-        "tape": "pipeline-delete-builds.tape"
+        "tape": "pipeline-delete-builds.tape",
+        "playback": {
+          "dir": "pipeline-delete-builds",
+          "enabled": false
+        }
       }
     },
     {
@@ -617,7 +729,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "utility-dbid.tape"
+        "tape": "utility-dbid.tape",
+        "playback": {
+          "dir": "utility-dbid",
+          "enabled": false
+        }
       }
     },
     {
@@ -636,7 +752,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-arlicense",
       "video": {
         "enabled": false,
-        "tape": "utility-get-arlicense.tape"
+        "tape": "utility-get-arlicense.tape",
+        "playback": {
+          "dir": "utility-get-arlicense",
+          "enabled": false
+        }
       }
     },
     {
@@ -655,7 +775,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "utility-jwt.tape"
+        "tape": "utility-jwt.tape",
+        "playback": {
+          "dir": "utility-jwt",
+          "enabled": false
+        }
       }
     },
     {
@@ -676,7 +800,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md#addcert-certificatespem---add-pem-certificates-to-the-is-cacerts-secret",
       "video": {
         "enabled": false,
-        "tape": "fix-addcert.tape"
+        "tape": "fix-addcert.tape",
+        "playback": {
+          "dir": "fix-addcert",
+          "enabled": false
+        }
       }
     },
     {
@@ -693,7 +821,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-cacerts.tape"
+        "tape": "fix-cacerts.tape",
+        "playback": {
+          "dir": "fix-cacerts",
+          "enabled": false
+        }
       }
     },
     {
@@ -712,7 +844,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-arlicense.tape"
+        "tape": "fix-arlicense.tape",
+        "playback": {
+          "dir": "fix-arlicense",
+          "enabled": false
+        }
       }
     },
     {
@@ -730,7 +866,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "utility-gendbid.tape"
+        "tape": "utility-gendbid.tape",
+        "playback": {
+          "dir": "utility-gendbid",
+          "enabled": false
+        }
       }
     },
     {
@@ -747,7 +887,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md",
       "video": {
         "enabled": false,
-        "tape": "fix-sat.tape"
+        "tape": "fix-sat.tape",
+        "playback": {
+          "dir": "fix-sat",
+          "enabled": false
+        }
       }
     },
     {
@@ -765,7 +909,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md",
       "video": {
         "enabled": true,
-        "tape": "info-cluster-status.tape"
+        "tape": "info-cluster-status.tape",
+        "playback": {
+          "dir": "info-cluster-status",
+          "enabled": true
+        }
       }
     },
     {
@@ -784,7 +932,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md#helix--helix-namespace-scan",
       "video": {
         "enabled": false,
-        "tape": "info-helix-namespaces.tape"
+        "tape": "info-helix-namespaces.tape",
+        "playback": {
+          "dir": "info-helix-namespaces",
+          "enabled": false
+        }
       }
     },
     {
@@ -805,7 +957,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md",
       "video": {
         "enabled": false,
-        "tape": "info-helix-environment.tape"
+        "tape": "info-helix-environment.tape",
+        "playback": {
+          "dir": "info-helix-environment",
+          "enabled": false
+        }
       }
     },
     {
@@ -825,7 +981,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode",
       "video": {
         "enabled": false,
-        "tape": "tctl.tape"
+        "tape": "tctl.tape",
+        "playback": {
+          "dir": "tctl",
+          "enabled": false
+        }
       }
     },
     {
@@ -845,7 +1005,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode",
       "video": {
         "enabled": false,
-        "tape": "tctl-config.tape"
+        "tape": "tctl-config.tape",
+        "playback": {
+          "dir": "tctl-config",
+          "enabled": false
+        }
       }
     },
     {
@@ -865,7 +1029,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "ar-forms-find-form.tape"
+        "tape": "ar-forms-find-form.tape",
+        "playback": {
+          "dir": "ar-forms-find-form",
+          "enabled": false
+        }
       }
     },
     {
@@ -885,7 +1053,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "ar-forms-find-fields.tape"
+        "tape": "ar-forms-find-fields.tape",
+        "playback": {
+          "dir": "ar-forms-find-fields",
+          "enabled": false
+        }
       }
     },
     {
@@ -905,7 +1077,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "ar-sql-run-query.tape"
+        "tape": "ar-sql-run-query.tape",
+        "playback": {
+          "dir": "ar-sql-run-query",
+          "enabled": false
+        }
       }
     },
     {
@@ -923,7 +1099,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "ar-sql-save-results.tape"
+        "tape": "ar-sql-save-results.tape",
+        "playback": {
+          "dir": "ar-sql-save-results",
+          "enabled": false
+        }
       }
     },
     {
@@ -942,7 +1122,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "utility-secret.tape"
+        "tape": "utility-secret.tape",
+        "playback": {
+          "dir": "utility-secret",
+          "enabled": false
+        }
       }
     },
     {
@@ -962,7 +1146,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "utility-configmap-export.tape"
+        "tape": "utility-configmap-export.tape",
+        "playback": {
+          "dir": "utility-configmap-export",
+          "enabled": false
+        }
       }
     },
     {
@@ -981,7 +1169,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "utility-configmap-list-keys.tape"
+        "tape": "utility-configmap-list-keys.tape",
+        "playback": {
+          "dir": "utility-configmap-list-keys",
+          "enabled": false
+        }
       }
     },
     {
@@ -1002,7 +1194,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md",
       "video": {
         "enabled": false,
-        "tape": "utility-check-dockerhub-pat.tape"
+        "tape": "utility-check-dockerhub-pat.tape",
+        "playback": {
+          "dir": "utility-check-dockerhub-pat",
+          "enabled": false
+        }
       }
     },
     {
@@ -1023,7 +1219,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#imagels-image",
       "video": {
         "enabled": false,
-        "tape": "utility-imagels.tape"
+        "tape": "utility-imagels.tape",
+        "playback": {
+          "dir": "utility-imagels",
+          "enabled": false
+        }
       }
     },
     {
@@ -1040,7 +1240,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#get-is-bundle-deployment-status",
       "video": {
         "enabled": false,
-        "tape": "bundle-status.tape"
+        "tape": "bundle-status.tape",
+        "playback": {
+          "dir": "bundle-status",
+          "enabled": false
+        }
       }
     },
     {
@@ -1059,7 +1263,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#log-files",
       "video": {
         "enabled": false,
-        "tape": "results-suggested-fixes.tape"
+        "tape": "results-suggested-fixes.tape",
+        "playback": {
+          "dir": "results-suggested-fixes",
+          "enabled": false
+        }
       }
     },
     {
@@ -1077,7 +1285,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options",
       "video": {
         "enabled": false,
-        "tape": "error-message-help.tape"
+        "tape": "error-message-help.tape",
+        "playback": {
+          "dir": "error-message-help",
+          "enabled": false
+        }
       }
     },
     {
@@ -1096,7 +1308,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#log-files",
       "video": {
         "enabled": false,
-        "tape": "results-support-bundle.tape"
+        "tape": "results-support-bundle.tape",
+        "playback": {
+          "dir": "results-support-bundle",
+          "enabled": false
+        }
       }
     },
     {
@@ -1113,7 +1329,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#log-files",
       "video": {
         "enabled": false,
-        "tape": "results-log-files.tape"
+        "tape": "results-log-files.tape",
+        "playback": {
+          "dir": "results-log-files",
+          "enabled": false
+        }
       }
     },
     {
@@ -1137,7 +1357,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#help",
       "video": {
         "enabled": false,
-        "tape": "cli-help.tape"
+        "tape": "cli-help.tape",
+        "playback": {
+          "dir": "cli-help",
+          "enabled": false
+        }
       }
     },
     {
@@ -1155,7 +1379,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options",
       "video": {
         "enabled": false,
-        "tape": "verbose-logging.tape"
+        "tape": "verbose-logging.tape",
+        "playback": {
+          "dir": "verbose-logging",
+          "enabled": false
+        }
       }
     },
     {
@@ -1177,7 +1405,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#help",
       "video": {
         "enabled": false,
-        "tape": "modes-help.tape"
+        "tape": "modes-help.tape",
+        "playback": {
+          "dir": "modes-help",
+          "enabled": false
+        }
       }
     },
     {
@@ -1195,7 +1427,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options",
       "video": {
         "enabled": false,
-        "tape": "debug-trace.tape"
+        "tape": "debug-trace.tape",
+        "playback": {
+          "dir": "debug-trace",
+          "enabled": false
+        }
       }
     },
     {
@@ -1214,7 +1450,11 @@ window.HITT_USE_CASES = {
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#advanced-cli-options",
       "video": {
         "enabled": false,
-        "tape": "debug-stop-on-error.tape"
+        "tape": "debug-stop-on-error.tape",
+        "playback": {
+          "dir": "debug-stop-on-error",
+          "enabled": false
+        }
       }
     }
   ]

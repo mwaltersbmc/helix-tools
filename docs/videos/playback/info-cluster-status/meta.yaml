@@ -1,0 +1,14 @@
+title: Cluster resource summary
+description: >
+  HITT info cluster — node CPU, memory, and pod summary (demo mock).
+episode: 1
+locale: en-GB
+series: helix-system-info
+tags:
+  - hitt
+  - info
+  - cluster
+version: "1.0.0"
+vhsCwd: "."
+voices:
+  - northern_english_male

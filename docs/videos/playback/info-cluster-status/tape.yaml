@@ -1,0 +1,21 @@
+title: Cluster resource summary
+output: info-cluster-status
+steps:
+  - action: type
+    command: cd docs/videos/demo && cp -f sample-hitt.conf hitt.conf && chmod +x hitt.sh
+    narration: >
+      HITT info cluster prints Kubernetes version and a node summary table —
+      CPU, memory, pod counts, and node health. This demo uses a mock
+      environment so no live cluster is required.
+    pause: 0.5
+
+  - action: run
+    pause: 0.5
+
+  - action: type
+    command: bash hitt.sh -m 'info cluster'
+    narration: Run info cluster to display the node summary.
+    pause: 1
+
+  - action: run
+    pause: 0.5

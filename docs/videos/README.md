@@ -1,41 +1,134 @@
-# HITT terminal videos (VHS)
+# HITT terminal videos (VHS + Playback)
 
-On-demand terminal recordings for selected [HITT use cases](../hitt/use-cases.json), generated with [VHS](https://github.com/charmbracelet/vhs) (MIT license). Videos are **not** rendered on commit — run the render script locally when you want new assets.
+On-demand terminal recordings for selected [HITT use cases](../hitt/use-cases.json).
+
+| Pipeline | Tooling | Output |
+|----------|---------|--------|
+| **Silent** | [VHS](https://github.com/charmbracelet/vhs) `.tape` files | MP4 + GIF |
+| **Narrated** | [playback-cli](https://github.com/philsherry/playback) YAML tapes | MP4 + GIF + VTT/SRT captions + voiceover |
+
+Videos are **not** rendered on commit — run a render script locally when you want new assets.
 
 ## Directory layout
 
 | Path | Purpose |
 |------|---------|
-| `docs/videos/*.tape` | VHS source tapes (one per use case, named `<use-case-id>.tape`) |
+| `docs/videos/*.tape` | Silent VHS tapes (legacy / quick renders) |
+| `docs/videos/playback/<id>/` | **Playback** source — `tape.yaml` + `meta.yaml` per use case |
+| `docs/videos/playback/_template/` | Copy this when adding a new narrated use case |
+| `docs/videos/playback/voices/` | Piper ONNX models (downloaded by setup script) |
 | `docs/videos/demo/` | Offline demo helpers (`hitt.sh` mock, sample `hitt.conf`, fixtures) |
-| `docs/assets/videos/` | Rendered `.mp4` and `.gif` output (commit manually when satisfied) |
-| `docs/hitt/use-cases.json` | Canonical manifest — each use case has a `video` object |
-| `scripts/render-videos.sh` | Local selective render script |
+| `docs/assets/videos/` | Silent VHS output (MP4/GIF) |
+| `docs/assets/videos/playback/<id>/` | Playback output (MP4, GIF, captions, segments) |
+| `docs/hitt/use-cases.json` | Canonical manifest — `video` + `video.playback` per use case |
+| `scripts/render-videos.sh` | Silent VHS render |
+| `scripts/render-playback.sh` | Narrated playback render |
+| `scripts/setup-playback.sh` | One-time playback dependency + voice setup |
+| `playback.config.mjs` | Playback output paths and default voice |
 
-## Enable or disable a use case
+## Manifest (`use-cases.json`)
 
-Edit [`docs/hitt/use-cases.json`](../hitt/use-cases.json). Every use case has:
+Every use case has:
 
 ```json
 "video": {
   "enabled": false,
-  "tape": "<use-case-id>.tape"
+  "tape": "<use-case-id>.tape",
+  "playback": {
+    "dir": "<use-case-id>",
+    "enabled": false
+  }
 }
 ```
 
-Set `"enabled": true` for use cases that should render when you run the script with **no** arguments. Explicit IDs on the command line always render, regardless of `enabled`.
+| Field | Meaning |
+|-------|---------|
+| `video.enabled` | Include in `./scripts/render-videos.sh` when no IDs passed |
+| `video.playback.enabled` | Include in `./scripts/render-playback.sh` when no IDs passed |
+| `video.playback.dir` | Directory under `docs/videos/playback/` (usually same as use case `id`) |
 
-After JSON changes, regenerate the bundled help data:
+**Pilot use cases** (both silent + playback enabled): `download-hitt`, `info-cluster-status`, `hitt-config-change`.
+
+After JSON changes, regenerate bundled help data:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File docs\hitt\update-bundled-data.ps1
 ```
 
-Commit `use-cases.json` and `use-cases-data.js` together.
+---
 
-**Initial pilot use cases** (enabled by default): `download-hitt`, `info-cluster-status`, `hitt-config-change`.
+## Narrated videos (Playback) — recommended
 
-## Prerequisites
+One command rebuilds terminal video, **piper-tts voiceover**, and **captions**, with timing synced automatically.
+
+### Setup (once per machine)
+
+From repo root in **WSL or Linux** (Node.js >= 22):
+
+```bash
+chmod +x scripts/setup-playback.sh scripts/render-playback.sh
+npm run playback:setup
+```
+
+Installs `playback-cli`, checks `vhs` / `ffmpeg` / `piper`, and downloads the default en-GB voice model.
+
+### Render
+
+```bash
+# Validate YAML without recording
+npm run playback:validate -- info-cluster-status
+
+# Full pipeline (VHS + TTS + captions + mux)
+npm run playback:render -- info-cluster-status
+npm run playback:render -- download-hitt hitt-config-change
+
+# All use cases with video.playback.enabled == true
+npm run playback:render
+
+# Terminal only (no narration) — useful while editing commands
+npm run playback:vhs-only -- info-cluster-status
+```
+
+Output: `docs/assets/videos/playback/<id>/<id>.mp4`, `.gif`, `.vtt`, `.srt`.
+
+### Timing tweaks
+
+If narration overlaps or feels rushed:
+
+```bash
+# Audit pause values against synthesized audio
+./scripts/render-playback.sh --audit info-cluster-status
+
+# Auto-fix shortfalls in tape.yaml
+./scripts/render-playback.sh --audit-fix info-cluster-status
+```
+
+Optional visual editor (install separately):
+
+```bash
+go install github.com/philsherry/playback/tui/cmd/playback-tui@latest
+playback-tui docs/videos/playback/info-cluster-status
+```
+
+### Add a narrated use case
+
+1. Copy `docs/videos/playback/_template/` → `docs/videos/playback/<id>/`.
+2. Edit `tape.yaml` (commands + `narration` fields) and `meta.yaml` (title, tags, `vhsCwd: "."`).
+3. Set `"playback": { "dir": "<id>", "enabled": true }` in `use-cases.json`.
+4. Regenerate `use-cases-data.js`.
+5. `npm run playback:render -- <id>`.
+
+Use `docs/videos/demo/` mocks when a live cluster is not available. Set `vhsCwd: "."` in `meta.yaml` so paths like `docs/videos/demo` resolve from the repo root.
+
+**Playback YAML rule:** `command` / `commands` strings must not contain double quotes — use single quotes for shell arguments (e.g. `bash hitt.sh -m 'info cluster'`).
+
+---
+
+## Silent videos (VHS only)
+
+For quick terminal captures without narration, use the VHS `.tape` files under `docs/videos/`.
+
+### Prerequisites
 
 **Linux / Deployment Engine / WSL** — native VHS:
 
@@ -50,7 +143,7 @@ Commit `use-cases.json` and `use-cases-data.js` together.
 
 Run from the **repository root**.
 
-## Local rendering
+### Local rendering
 
 ```bash
 chmod +x scripts/render-videos.sh docs/videos/demo/hitt.sh   # once
@@ -61,12 +154,11 @@ chmod +x scripts/render-videos.sh docs/videos/demo/hitt.sh   # once
 
 # Windows / Git Bash (recommended)
 ./scripts/render-videos.sh --docker info-cluster-status
-./scripts/render-videos.sh --docker download-hitt hitt-config-change
 ```
 
 The script resolves tape files from the manifest, runs VHS, and prints paths under `docs/assets/videos/`.
 
-## Troubleshooting
+## Troubleshooting (silent VHS)
 
 ### Hangs after `Set TypingSpeed` / Ctrl+C does nothing
 

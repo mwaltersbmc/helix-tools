@@ -1,0 +1,13 @@
+title: Download the HITT script
+description: >
+  Quick start — download hitt.sh with curl on the Deployment Engine.
+episode: 1
+locale: en-GB
+series: getting-started
+tags:
+  - hitt
+  - download
+version: "1.0.0"
+vhsCwd: "."
+voices:
+  - northern_english_male

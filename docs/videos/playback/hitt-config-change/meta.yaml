@@ -1,0 +1,13 @@
+title: Change HITT configuration
+description: >
+  Edit hitt.conf or delete it and re-run post-hp to reconfigure HITT.
+episode: 2
+locale: en-GB
+series: getting-started
+tags:
+  - hitt
+  - configuration
+version: "1.0.0"
+vhsCwd: "."
+voices:
+  - northern_english_male
