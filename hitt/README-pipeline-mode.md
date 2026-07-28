@@ -48,11 +48,14 @@ Use **`-o`** (not pipeline mode **`-k`**) to print logs on screen. Requires **HI
 | `bash hitt.sh -o jenkins` | Recent Jenkins **system** log (controller messages). |
 | `bash hitt.sh -o agent` | **jenkins-agent** node log (where pipeline steps run on the Deployment Engine). |
 | `bash hitt.sh -o helix_onprem_deployment` | Console output from the **latest build** of that job (job name as in the Jenkins URL, usually lowercase with underscores). |
+| `bash hitt.sh -o "follow helix_onprem_deployment"` | Stream the **latest build** console log until the run finishes (like `tail -f`). If the latest build is already complete, the full log is printed once and HITT exits. Optional poll interval: `bash hitt.sh -o "follow helix_onprem_deployment 5"` (default **2** seconds). **follow** applies to pipeline jobs only, not **jenkins** or **agent** logs. |
 
 ```bash
 bash hitt.sh -o jenkins
 bash hitt.sh -o agent
 bash hitt.sh -o helix_onprem_deployment
+bash hitt.sh -o "follow helix_onprem_deployment"
+bash hitt.sh -o "follow helix_onprem_deployment 5"
 ```
 
 ---

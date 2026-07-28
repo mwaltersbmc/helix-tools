@@ -1296,7 +1296,8 @@ getLastBuildFromJenkins() {
 
 savePipelineConsoleOutput() {
   # PIPELINE_NAME / BUILD_NUMBER
-  ${CURL_BIN} -skf "${JENKINS_URL}/job/${1}/${2}/consoleText" > "${1}.log"
+  ${CURL_BIN} -skf -b .cookies -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
+    "${JENKINS_URL}/job/${1}/${2}/consoleText" > "${1}.log"
 }
 
 saveAllPipelineConsoleOutput() {
@@ -5101,8 +5102,125 @@ validateSSHPermissions() {
   fi
 }
 
+# Jenkins masks secrets in console output with ANSI conceal (ESC[8m ... ESC[0m) and ha:// blobs.
+# Strip those blocks for -o display; optional carry file preserves partial sequences across follow chunks.
+stripJenkinsConsoleText() {
+  local in_file=$1 carry_file=${2:-}
+  if command -v perl >/dev/null 2>&1; then
+    perl -Mbytes - "$in_file" "$carry_file" <<'EOF'
+use strict;
+use warnings;
+use bytes;
+my ($in_file, $carry_file) = @ARGV;
+open my $fh, '<:raw', $in_file or exit 0;
+local $/; my $chunk = <$fh> // '';
+close $fh;
+my $carry = '';
+if ($carry_file && -e $carry_file && -s $carry_file) {
+  open my $cf, '<:raw', $carry_file or exit 1;
+  $carry = <$cf> // '';
+  close $cf;
+}
+my $data = $carry . $chunk;
+$carry = '';
+while ($data =~ s/\e\[8m.*?\e\[0m//gs) {}
+if ($data =~ /\e\[8m/s) {
+  if ($data =~ /\e\[8m(.*)$/s) {
+    $carry = "\e[8m$1";
+    $data =~ s/\e\[8m.*$//s;
+  }
+}
+print $data;
+if ($carry_file) {
+  if (length $carry) {
+    open my $cf, '>:raw', $carry_file or exit 1;
+    print $cf $carry;
+    close $cf;
+  } elsif (-e $carry_file) {
+    unlink $carry_file;
+  }
+}
+EOF
+  else
+    sed $'s/\x1b\\[8m[^\x1b]*\x1b\\[0m//g' "${in_file}"
+  fi
+}
+
 getPipelineConsoleOutput() {
-  ${CURL_BIN} -skf "${JENKINS_URL}/job/${1^^}/lastBuild/consoleText"
+  local body_file
+  body_file=$(mktemp)
+  if ! ${CURL_BIN} -skf -b .cookies -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
+    "${JENKINS_URL}/job/${1^^}/lastBuild/consoleText" > "${body_file}"; then
+    rm -f "${body_file}"
+    logError "999" "Failed to read console log from the Deployment Engine." 1
+  fi
+  stripJenkinsConsoleText "${body_file}"
+  rm -f "${body_file}"
+}
+
+# Poll Jenkins logText/progressiveText until X-More-Data is false (tail -f for running builds).
+jenkinsFollowProgressiveText() {
+  local base_url=$1 poll_interval=${2:-2}
+  local start=0 more headers_file body_file carry_file
+
+  trap 'printf "\n"; rm -f "${carry_file}"; exit 0' INT TERM
+
+  carry_file=$(mktemp)
+  : > "${carry_file}"
+
+  while true; do
+    headers_file=$(mktemp)
+    body_file=$(mktemp)
+    if ! ${CURL_BIN} -sk -D "${headers_file}" -o "${body_file}" \
+      -b .cookies -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
+      "${base_url}?start=${start}"; then
+      rm -f "${headers_file}" "${body_file}" "${carry_file}"
+      logError "999" "Failed to read log from the Deployment Engine." 1
+    fi
+    stripJenkinsConsoleText "${body_file}" "${carry_file}"
+    more=$(awk 'BEGIN{IGNORECASE=1} /^X-More-Data:/ {gsub(/\r/,"",$2); print $2}' "${headers_file}")
+    start=$(awk 'BEGIN{IGNORECASE=1} /^X-Text-Size:/ {gsub(/\r/,"",$2); print $2}' "${headers_file}")
+    rm -f "${headers_file}" "${body_file}"
+    [ "${more}" == "true" ] || break
+    sleep "${poll_interval}"
+  done
+  rm -f "${carry_file}"
+}
+
+followPipelineConsoleOutput() {
+  local job_name=$1 poll_interval=${2:-2}
+  jenkinsFollowProgressiveText \
+    "${JENKINS_URL}/job/${job_name^^}/lastBuild/logText/progressiveText" \
+    "${poll_interval}"
+}
+
+parseConsoleLogOpts() {
+  read -r -a CONSOLE_ARGS <<< "${PIPELINE_NAME}"
+  CONSOLE_FOLLOW=0
+  CONSOLE_POLL_INTERVAL=2
+  CONSOLE_TARGET=""
+
+  if [ "${#CONSOLE_ARGS[@]}" -eq 0 ]; then
+    logError "999" "Usage: bash $0 -o <jenkins|agent|PIPELINE_NAME|help>" 1
+  fi
+
+  if [ "${CONSOLE_ARGS[0]}" == "follow" ]; then
+    CONSOLE_FOLLOW=1
+    CONSOLE_ARGS=("${CONSOLE_ARGS[@]:1}")
+    if [ "${#CONSOLE_ARGS[@]}" -eq 0 ]; then
+      logError "999" "Usage: bash $0 -o \"follow <PIPELINE_NAME> [POLL_SECONDS]\"" 1
+    fi
+    local last_idx=$((${#CONSOLE_ARGS[@]} - 1))
+    if [[ "${CONSOLE_ARGS[$last_idx]}" =~ ^[0-9]+$ ]]; then
+      CONSOLE_POLL_INTERVAL="${CONSOLE_ARGS[$last_idx]}"
+      CONSOLE_ARGS=("${CONSOLE_ARGS[@]:0:$last_idx}")
+    fi
+    if [ "${#CONSOLE_ARGS[@]}" -eq 0 ]; then
+      logError "999" "Usage: bash $0 -o \"follow <PIPELINE_NAME> [POLL_SECONDS]\"" 1
+    fi
+  fi
+
+  CONSOLE_TARGET="${CONSOLE_ARGS[0]}"
 }
 
 logK8sNodeDetails() {
@@ -5193,11 +5311,14 @@ showConsoleLogHelp() { # -o console log options help
   echo "HITT console log options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o"
   echo .
   echo 'Usage: bash hitt.sh -o <jenkins|agent|PIPELINE_NAME|help>'
+  echo '       bash hitt.sh -o "follow <PIPELINE_NAME> [POLL_SECONDS]"'
   echo "Requires hitt.conf and a working login to the Deployment Engine."
+  echo "Multi-word -o values must be double-quoted (e.g. bash hitt.sh -o \"follow helix_onprem_deployment\")."
   echo -e "
     \tjenkins \t| Jenkins system log (controller messages).
     \tagent \t\t| jenkins-agent node log (pipeline worker).
     \tPIPELINE_NAME \t| Latest console log for a pipeline job (e.g. helix_onprem_deployment).
+    \tfollow \t\t| Stream latest build console log until the run finishes (tail -f). Optional POLL_SECONDS between polls (default 2). Pipeline jobs only.
     \thelp \t\t| Show this list.
     "
 }
@@ -7587,17 +7708,28 @@ if [ "${MODE}" == "getlog" ]; then
     exit
   fi
   checkJenkinsIsRunning 1
-  case "${PIPELINE_NAME}" in
+  parseConsoleLogOpts
+  case "${CONSOLE_TARGET}" in
     jenkins)
+      if [ "${CONSOLE_FOLLOW}" == "1" ]; then
+        logError "999" "follow is not supported for jenkins system log." 1
+      fi
       getJenkinsSystemLog
       exit
       ;;
     agent)
+      if [ "${CONSOLE_FOLLOW}" == "1" ]; then
+        logError "999" "follow is not supported for agent log — use a pipeline job name (e.g. helix_onprem_deployment)." 1
+      fi
       getJenkinsAgentLog
       exit
       ;;
     *)
-      getPipelineConsoleOutput "${PIPELINE_NAME}"
+      if [ "${CONSOLE_FOLLOW}" == "1" ]; then
+        followPipelineConsoleOutput "${CONSOLE_TARGET}" "${CONSOLE_POLL_INTERVAL}"
+      else
+        getPipelineConsoleOutput "${CONSOLE_TARGET}"
+      fi
       exit
       ;;
   esac
@@ -7857,7 +7989,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260728-01"
+HITT_BUILD_VERSION="20260728-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -9365,7 +9497,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
       SKIP_UPDATE_CHECK=1
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "Usage: bash $0 -o <jenkins|agent|PIPELINE_NAME|help>" 1
+        logError "999" "When using -o follow you must enclose the value in double quotes - eg: bash $0 -o \"follow helix_onprem_deployment\"" 1
       fi
       PIPELINE_NAME="${OPTARG}"
       ;;

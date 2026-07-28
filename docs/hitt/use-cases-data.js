@@ -654,6 +654,7 @@ window.HITT_USE_CASES = {
       ],
       "notes": [
         "PIPELINE_NAME is the Jenkins job name as shown in the URL (underscores).",
+        "For a running build, use follow to stream the console log until the run finishes — see pipeline-console-follow use case.",
         "For Jenkins system log or jenkins-agent node log, use -o jenkins or -o agent (see pipeline-jenkins-logs use case)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o",
@@ -662,6 +663,30 @@ window.HITT_USE_CASES = {
         "tape": "pipeline-console.tape",
         "playback": {
           "dir": "pipeline-console",
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "pipeline-console-follow",
+      "topicId": "pipeline-mgmt",
+      "order": 31,
+      "title": "I want to watch/tail a running pipeline build",
+      "commands": [
+        "bash hitt.sh -o \"follow helix_onprem_deployment\"",
+        "bash hitt.sh -o \"follow helix_onprem_deployment 5\""
+      ],
+      "notes": [
+        "Streams the latest build console log until the run finishes (like tail -f). Use double quotes because follow takes multiple words.",
+        "Requires a working Deployment Engine login. If the latest build is already complete, the full log is printed once and HITT exits.",
+        "Optional trailing number is seconds between polls (default 2). For a one-shot dump of the latest log, use -o helix_onprem_deployment (see pipeline-console use case)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md#view-logs-from-the-deployment-engine--o",
+      "video": {
+        "enabled": false,
+        "tape": "pipeline-console-follow.tape",
+        "playback": {
+          "dir": "pipeline-console-follow",
           "enabled": false
         }
       }
