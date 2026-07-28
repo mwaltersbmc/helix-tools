@@ -800,7 +800,7 @@ getTenantDetails() {
   else
     logWarning "041" "Tenant has not been activated."
   fi
-  logMessage "Helix Portal hostname is '${PORTAL_HOSTNAME}'."
+  logMessage "Helix Portal URL is 'https://${PORTAL_HOSTNAME}'."
   HP_COMPANY_NAME=$(echo "${HP_TENANT%%.*}")
   logMessage "Helix Platform ${HP_COMPANY_NAME_LABEL} is '${HP_COMPANY_NAME}'."
 }
@@ -7857,7 +7857,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260724-03"
+HITT_BUILD_VERSION="20260728-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
