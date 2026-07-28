@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260728-05`**
+**Latest build `20260728-06`**
 
 The **Helix IS Triage Tool (HITT)** is a command-line helper for BMC Helix on-premises deployments. It can check your environment, fix common setup problems, work with the **HELIX_ONPREM_DEPLOYMENT** pipeline, and gather information for troubleshooting or support.
 
@@ -31,7 +31,7 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, addcert, Jenkins, license, …)
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `get arlicense`, `gendbid`, `imagels`, `checkpat`)
 - [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` / `delete` for **HELIX_ONPREM_DEPLOYMENT**
-- [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info helix`, `info ingress`, `info full`
+- [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info node`, `info helix`, `info ingress`, `info full`
 
 Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h consolelog`, `bash hitt.sh -h info`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, `bash hitt.sh -o help`, or `bash hitt.sh -m "info help"` from within each mode.
 

@@ -6,6 +6,7 @@
 
 ```bash
 bash hitt.sh -m "info cluster"
+bash hitt.sh -m "info node <node-name>"
 bash hitt.sh -m "info helix"
 bash hitt.sh -m "info ingress"
 bash hitt.sh -m "info full"
@@ -20,7 +21,8 @@ Built-in summary: `bash hitt.sh -m "info help"`
 
 | Sub-command | Typical requirements |
 |-------------|----------------------|
-| `cluster` | Optional: **metrics-server** (or equivalent) for CPU/memory usage columns in the node table. |
+| `cluster` | Optional: **metrics-server** (or equivalent) for CPU/memory usage columns in the node table. Optional: **nodes/stats** or **nodes/proxy** for ephemeral storage. |
+| `node` | **metrics-server** for pod CPU/memory usage; **nodes/stats** or **nodes/proxy** for per-pod ephemeral storage. No HITT configuration needed. |
 | `helix` | No HITT configuration needed — scans the whole cluster. |
 | `ingress` | **Helix Platform namespace** configured for HITT (reads **`INGRESS_CLASS`** from Platform configuration). |
 | `full` | **HITT configuration** with Helix namespaces and settings, plus Deployment Engine login for the full environment summary. Interactive prompts (environment type, live system, tenant/logging namespace when multiple exist). |
@@ -31,6 +33,7 @@ Built-in summary: `bash hitt.sh -m "info help"`
 | Sub-command | Description |
 |-------------|-------------|
 | `cluster` | Kubernetes/OpenShift version and a **node summary table** (allocatable vs requested resources, usage, status, pods, runtime). |
+| `node` | **Per-pod resource table** for one named node (requests, limits, current usage, ephemeral storage). |
 | `helix` | **Helix namespace scan** — lists namespaces that look like Helix Platform, Helix IS, containerized Deployment Engine, or Helix Logging, with **version** where HITT can read it from the cluster. |
 | `ingress` | **Ingress controller** details for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and container image. |
 | `full` | Full **BMC Helix Environment Summary** on the console and **`info.json`** (machine-readable, schema version in the file). |
@@ -64,6 +67,33 @@ Columns:
 - Request totals can exceed allocatable on a node when many pods use small requests or when workloads rely on limits/bursts rather than requests. Remaining memory in parentheses can be negative when requests exceed allocatable memory.
 - Ephemeral storage **total/used** comes from kubelet filesystem stats (actual disk use for logs, emptyDir, container layers, images on that filesystem). It is **not** the same as pod **ephemeral-storage** resource requests, which most pods do not set.
 - Usage percentages require a working **metrics-server** (or equivalent); absence of metrics does not stop the rest of the table.
+
+## `node` — per-pod resource usage
+
+```bash
+bash hitt.sh -m "info node"
+bash hitt.sh -m "info node vs-ak8s02-hlxcussp-cl2-04"
+```
+
+If you omit the node name, HITT lists cluster nodes and prompts you to **select one** interactively.
+
+Lists every pod scheduled on the named node, sorted by namespace and name.
+
+Columns:
+
+| Column | Meaning |
+|--------|---------|
+| **POD_NAME** | Pod namespace and name (`namespace/pod`). |
+| **REQUESTS (CPU/MEM)** | Sum of **container resource requests** (**cores** / **Gi**). |
+| **LIMITS (CPU/MEM)** | Sum of **container resource limits** (**cores** / **Gi**); `0` / `0Gi` when unset. |
+| **CURRENT USAGE (CPU/MEM)** | Live CPU and memory from **metrics-server** (`kubectl top pods`) when available; otherwise `Metrics N/A`. |
+| **EPHEMERAL STORAGE** | Actual ephemeral storage **used** by the pod (Gi) from kubelet **stats/summary**; `N/A` when stats exist but omit the pod, `Stats N/A` when stats cannot be read. |
+
+**Notes:**
+
+- Does not require **hitt.conf** — only cluster access via **kubeconfig**.
+- Ephemeral storage is omitted from kubelet stats for some pods (for example pods with no volumes); those rows show `N/A`.
+- **CURRENT USAGE** is only reported for Running pods that metrics-server tracks.
 
 ## `helix` — Helix namespace scan
 

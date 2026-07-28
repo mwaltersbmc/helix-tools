@@ -5309,9 +5309,11 @@ showInfoHelp() { # info mode help
   echo "HITT info mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
   echo .
   echo 'Usage: bash hitt.sh -m "info <subcommand>"'
+  echo '       bash hitt.sh -m "info node [node-name]"'
   echo "Multi-word -m values must be double-quoted (e.g. bash hitt.sh -m \"info ingress\")."
   echo -e "
     \tcluster \t| Kubernetes/OpenShift version and node resource summary table (allocatable, requested, usage, status).
+    \tnode [NAME]\t| Per-pod resource table for one node (requests, limits, current usage, ephemeral storage). Omit NAME to choose from a menu.
     \thelix \t\t| Scan the cluster for Helix namespaces (Platform, IS, Deployment Engine, Logging) and show version where available.
     \tingress \t| Ingress controller for Helix INGRESS_CLASS: workload type, namespace, name, and image.
     \tfull \t\t| Full BMC Helix Environment Summary on the console and info.json.
@@ -6256,6 +6258,127 @@ printK8sOomPods() {
     return 1
   fi
   echo -e "${K8S_OOM_PODS_TABLE}" | column -s '|' -t  | sed 's/_/ /g'
+  return 0
+}
+
+# Parse kubectl top CPU values (e.g. 250m, 1, 0) to millicores.
+hittParseTopCpuToMilli() {
+  local v="${1:-0}"
+  if [[ "${v}" == *m ]]; then
+    echo "${v%m}"
+  else
+    awk -v c="${v}" 'BEGIN { printf "%.0f", c * 1000 }'
+  fi
+}
+
+# Parse Kubernetes quantity strings (Mi, Gi, raw bytes, etc.) to Mi.
+hittParseK8sQuantityToMi() {
+  local qty="${1:-0}"
+  echo "\"${qty}\"" | ${JQ_BIN} -r '
+    if endswith("Ti") then (sub("Ti$"; "") | tonumber * 1024 * 1024)
+    elif endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024)
+    elif endswith("G") then (sub("G$"; "") | tonumber * 953)
+    elif endswith("Mi") then (sub("Mi$"; "") | tonumber)
+    elif endswith("M") then (sub("M$"; "") | tonumber * 0.953)
+    elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024)
+    else (tonumber / 1024 / 1024)
+    end
+    | round
+  ' 2>>"${HITT_ERR_FILE}"
+}
+
+# getK8sNodePodDetails NODE_NAME — fills global K8S_NODE_POD_DETAILS_TABLE; returns 0 on success.
+getK8sNodePodDetails() {
+  local node_name="$1"
+  local pods_json top_pods_text stats_json TABLE_DATA pod pod_label
+  local pod_ns pod_name req_cpu_milli req_mem_mi lim_cpu_milli lim_mem_mi
+  local requests limits top_cpu top_mem top_cpu_milli top_mem_mi current_usage ephem_bytes ephem_display
+  local -A pod_ephem_bytes=()
+  local k8s_cpu_to_milli='if endswith("m") then (sub("m$"; "") | tonumber) else (tonumber * 1000) end'
+  local k8s_qty_to_mi='if endswith("Ti") then (sub("Ti$"; "") | tonumber * 1024 * 1024) elif endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024) elif endswith("G") then (sub("G$"; "") | tonumber * 953) elif endswith("Mi") then (sub("Mi$"; "") | tonumber) elif endswith("M") then (sub("M$"; "") | tonumber * 0.953) elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024) else (tonumber / 1024 / 1024) end'
+
+  K8S_NODE_POD_DETAILS_TABLE=""
+
+  if ! ${KUBECTL_BIN} get node "${node_name}" >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    logError "265" "Node '${node_name}' not found or not accessible - check the name, kubeconfig, and permissions."
+    return 1
+  fi
+
+  pods_json=$(${KUBECTL_BIN} get pods --all-namespaces --field-selector "spec.nodeName=${node_name}" -o json 2>>"${HITT_ERR_FILE}") || pods_json='{"items":[]}'
+  if ! echo "${pods_json}" | ${JQ_BIN} -e . >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    logError "265" "Unable to read pods for node '${node_name}'."
+    return 1
+  fi
+
+  top_pods_text=$(${KUBECTL_BIN} top pods -A --no-headers 2>>"${HITT_ERR_FILE}") || top_pods_text=""
+  stats_json=$(${KUBECTL_BIN} get --raw "/api/v1/nodes/${node_name}/proxy/stats/summary" 2>>"${HITT_ERR_FILE}") || stats_json=""
+  if [[ -n "${stats_json}" ]] && echo "${stats_json}" | ${JQ_BIN} -e . >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    while IFS=$'\t' read -r pod_key ephem_bytes; do
+      [[ -z "${pod_key}" || -z "${ephem_bytes}" ]] && continue
+      pod_ephem_bytes["${pod_key}"]="${ephem_bytes}"
+    done < <(echo "${stats_json}" | ${JQ_BIN} -r '
+      [.pods[]
+       | select(."ephemeral-storage".usedBytes != null)
+       | {key: (.podRef.namespace + "/" + .podRef.name), used: ."ephemeral-storage".usedBytes}
+      ] | .[] | [.key, (.used | tostring)] | @tsv
+    ' 2>>"${HITT_ERR_FILE}")
+  fi
+
+  TABLE_DATA=""
+  TABLE_DATA+=$'POD_NAME|REQUESTS_(CPU/MEM)|LIMITS_(CPU/MEM)|CURRENT_USAGE_(CPU/MEM)|EPHEMERAL_STORAGE\n'
+
+  while read -r pod; do
+    [[ -z "${pod}" ]] && continue
+
+    pod_ns=$(echo "${pod}" | ${JQ_BIN} -r '.metadata.namespace')
+    pod_name=$(echo "${pod}" | ${JQ_BIN} -r '.metadata.name')
+    pod_label="${pod_ns}/${pod_name}"
+
+    req_cpu_milli=$(echo "${pod}" | ${JQ_BIN} -r "[.spec.containers[].resources.requests.cpu // \"0\"] | map(${k8s_cpu_to_milli}) | add // 0" 2>>"${HITT_ERR_FILE}")
+    req_mem_mi=$(echo "${pod}" | ${JQ_BIN} -r "[.spec.containers[].resources.requests.memory // \"0\"] | map(${k8s_qty_to_mi}) | add | round // 0" 2>>"${HITT_ERR_FILE}")
+    lim_cpu_milli=$(echo "${pod}" | ${JQ_BIN} -r "[.spec.containers[].resources.limits.cpu // \"0\"] | map(${k8s_cpu_to_milli}) | add // 0" 2>>"${HITT_ERR_FILE}")
+    lim_mem_mi=$(echo "${pod}" | ${JQ_BIN} -r "[.spec.containers[].resources.limits.memory // \"0\"] | map(${k8s_qty_to_mi}) | add | round // 0" 2>>"${HITT_ERR_FILE}")
+
+    requests="$(hittFormatCpuMilliAsCores "${req_cpu_milli:-0}")_/_$(hittFormatMemMiAsGi "${req_mem_mi:-0}")"
+    limits="$(hittFormatCpuMilliAsCores "${lim_cpu_milli:-0}")_/_$(hittFormatMemMiAsGi "${lim_mem_mi:-0}")"
+
+    read -r top_cpu top_mem <<< "$(printf '%s\n' "${top_pods_text}" | awk -v ns="${pod_ns}" -v pod="${pod_name}" '
+      { gsub(/\r/, ""); if ($1 == ns && $2 == pod) { print $3, $4; exit } }
+    ')"
+    if [[ -n "${top_cpu}" && -n "${top_mem}" ]]; then
+      top_cpu_milli=$(hittParseTopCpuToMilli "${top_cpu}")
+      top_mem_mi=$(hittParseK8sQuantityToMi "${top_mem}")
+      current_usage="$(hittFormatCpuMilliAsCores "${top_cpu_milli:-0}")_/_$(hittFormatMemMiAsGi "${top_mem_mi:-0}")"
+    else
+      current_usage="Metrics_N/A"
+    fi
+
+    ephem_bytes="${pod_ephem_bytes[${pod_label}]:-}"
+    if [[ -n "${ephem_bytes}" ]]; then
+      ephem_display=$(hittFormatBytesAsGi "${ephem_bytes}")
+    elif [[ -n "${stats_json}" ]]; then
+      ephem_display="N/A"
+    else
+      ephem_display="Stats_N/A"
+    fi
+
+    TABLE_DATA+="${pod_label}|${requests}|${limits}|${current_usage}|${ephem_display}"$'\n'
+  done < <(echo "${pods_json}" | ${JQ_BIN} -c '.items | sort_by(.metadata.namespace, .metadata.name)[]' 2>>"${HITT_ERR_FILE}")
+
+  K8S_NODE_POD_DETAILS_TABLE="${TABLE_DATA}"
+  return 0
+}
+
+printK8sNodePodDetails() {
+  if [[ -z "${K8S_NODE_POD_DETAILS_TABLE}" ]]; then
+    echo "Not available. Check kubeconfig, cluster reachability and permissions."
+    return 1
+  fi
+  if [[ $(printf '%s' "${K8S_NODE_POD_DETAILS_TABLE}" | awk 'NF' | wc -l) -lt 2 ]]; then
+    echo "No pods scheduled on this node."
+    return 0
+  fi
+  echo -e "${K8S_NODE_POD_DETAILS_TABLE}" | column -s '|' -t | sed 's/_/ /g'
   return 0
 }
 
@@ -7238,6 +7361,10 @@ all|required|all-ns|list|events|List Events
 all|required|all-ns|get|pods/log|Read pod and job logs
 hitt|optional|metrics|get|nodes.metrics.k8s.io|Node CPU/memory via kubectl top nodes
 hitt|optional|metrics|list|nodes.metrics.k8s.io|List node metrics
+hitt|optional|metrics|get|pods.metrics.k8s.io|Pod CPU/memory via kubectl top pods (info node)
+hitt|optional|metrics|list|pods.metrics.k8s.io|List pod metrics
+hitt|optional|cluster|get|nodes/stats|Kubelet stats/summary for ephemeral storage (info cluster, info node)
+hitt|optional|cluster|get|nodes/proxy|Proxy kubelet stats on nodes (info cluster, info node)
 hitt|optional|openshift|get|clusteroperators|Detect OpenShift clusters
 hitt|optional|openshift|list|clusteroperators|List OpenShift cluster operators
 hitt|optional|openshift|get|clusterversion|Read OpenShift cluster version
@@ -7532,8 +7659,8 @@ logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
 
 # config file checks
-if [ ! -f "${HITT_CONFIG_FILE}" ] && [ "${MODEARGS[*]}" == "info helix" ]; then
-  # Catch "info helix" and allow to run without hitt.conf
+if [ ! -f "${HITT_CONFIG_FILE}" ] && [[ "${MODEARGS[0]:-}" == "info" && "${MODEARGS[1]:-}" =~ ^(helix|cluster|node)$ ]]; then
+  # info helix, info cluster, and info node do not require hitt.conf
   SKIP_UPDATE_CHECK=1
 elif [ ! -f "${HITT_CONFIG_FILE}" ]; then
   if ! ${KUBECTL_BIN} get ns > /dev/null 2>&1 ; then
@@ -7875,6 +8002,22 @@ if [ "${MODE}" == "info" ]; then
         printK8sOomPods
       fi
       ;;
+    node)
+      QUIET=1
+      INFO_NODE_NAME="${MODEARGS[2]:-}"
+      if [[ -z "${INFO_NODE_NAME}" ]]; then
+        NODE_ARRAY=($(${KUBECTL_BIN} get nodes --no-headers -o custom-columns=':metadata.name' 2>>"${HITT_ERR_FILE}"))
+        if [[ ${#NODE_ARRAY[@]} -eq 0 ]]; then
+          logError "265" "No Kubernetes nodes found - check cluster access and permissions." 1
+        fi
+        logStatus "Please select a node..." 1
+        INFO_NODE_NAME=$(selectFromArray NODE_ARRAY)
+      fi
+      logStatus "Gathering pod resource usage for node ${INFO_NODE_NAME}..." 1
+      getK8sNodePodDetails "${INFO_NODE_NAME}" || exit 1
+      hittInfoPrintSection "Pod resource usage — ${INFO_NODE_NAME}"
+      printK8sNodePodDetails
+      ;;
     helix)
       enumerateHelixVersions
       ;;
@@ -7898,7 +8041,7 @@ if [ "${MODE}" == "info" ]; then
       showInfoHelp
       ;;
     *)
-      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, helix, ingress, full, help)." 1
+      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, node, helix, ingress, full, help)." 1
       ;;
   esac
   exit
@@ -8021,7 +8164,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260728-05"
+HITT_BUILD_VERSION="20260728-06"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

@@ -941,6 +941,29 @@
       }
     },
     {
+      "id": "info-node-pods",
+      "topicId": "helix-system-info",
+      "order": 12,
+      "title": "I want to see pod resource usage on a specific node",
+      "commands": [
+        "bash hitt.sh -m \"info node\"",
+        "bash hitt.sh -m \"info node <node-name>\""
+      ],
+      "notes": [
+        "Lists pods scheduled on a node with requests, limits, current CPU/memory usage (when metrics-server is available), and actual ephemeral storage used from kubelet stats.",
+        "Omit the node name to pick from an interactive menu of cluster nodes. Does not require hitt.conf."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md#node--per-pod-resource-usage",
+      "video": {
+        "enabled": false,
+        "tape": "info-node-pods.tape",
+        "playback": {
+          "dir": "info-node-pods",
+          "enabled": false
+        }
+      }
+    },
+    {
       "id": "info-helix-namespaces",
       "topicId": "helix-system-info",
       "order": 15,
