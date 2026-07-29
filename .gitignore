@@ -3,3 +3,9 @@ hitt/test.sh
 docs/assets/
 node_modules/
 .playback/
+# Local secret / credential files (never commit)
+.env
+.env.*
+*-key.json
+gcp-tts-key.json
+*credentials*.json

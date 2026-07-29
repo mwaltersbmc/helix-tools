@@ -1,0 +1,49 @@
+# Gitleaks config for helix-tools (pre-commit: gitleaks protect --staged).
+# Extends built-in rules; tune allowlists when intentional docs/samples false-positive.
+title = "helix-tools gitleaks"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "gitignored or generated paths"
+paths = [
+  '''(?:^|/)node_modules(?:/.*)?$''',
+  '''(?:^|/)docs/assets(?:/.*)?$''',
+  '''(?:^|/)\\.playback(?:/.*)?$''',
+  '''(?:^|/)\\.venv(?:/.*)?$''',
+]
+
+[[allowlists]]
+description = "BMC lab defaults and doc examples (not production secrets)"
+paths = [
+  '''(?:^|/)troubleshooting\\.txt$''',
+  '''(?:^|/)seal-pipelines/pipeline-values\\.sample$''',
+  '''(?:^|/)seal-pipelines/README\\.md$''',
+  '''(?:^|/)deployment-engine/00-variables\\.yaml$''',
+  '''(?:^|/)docs/hitt/use-cases\\.json$''',
+  '''(?:^|/)docs/hitt/use-cases-data\\.js$''',
+  '''(?:^|/)docs/videos/demo/sample-hitt\\.conf$''',
+  '''(?:^|/)docs/videos/demo/hitt\\.conf$''',
+  '''(?:^|/)hitt/README-utility-mode\\.md$''',
+]
+stopwords = [
+  '''RSSO#Admin#''',
+  '''P@ssw0rd''',
+  '''changeme''',
+  '''mysecretpwd''',
+  '''mypassword''',
+  '''dckr_pat_xxxxxxxx''',
+  '''changeit''',
+  '''password_vault_apikey''',
+]
+
+[[allowlists]]
+description = "Known RSSO reset password hashes in hitt.sh (BMC product defaults)"
+paths = [
+  '''(?:^|/)hitt/hitt\\.sh$''',
+]
+regexes = [
+  '''3a544f348f1ed1ec7bdfbfb41cb3f752''',
+  '''\\x020a7e17c23b9cb42174e31d1d39085f305bdbab57544b163e1c2be70c7523b43''',
+]
