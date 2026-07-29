@@ -9,5 +9,8 @@ tags:
   - configuration
 version: "1.0.0"
 vhsCwd: "."
+vhs:
+  shell: bash
+  fontFamily: DejaVu Sans Mono
 voices:
   - northern_english_male

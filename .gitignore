@@ -2,3 +2,4 @@
 hitt/test.sh
 docs/assets/
 node_modules/
+.playback/

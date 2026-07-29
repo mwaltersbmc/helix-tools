@@ -4,10 +4,58 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=scripts/vhs-docker-lib.sh
+source "$REPO_ROOT/scripts/vhs-docker-lib.sh"
+
+USE_DOCKER=""
+
+# npm run often uses a minimal PATH; piper from `uv tool install` lives in ~/.local/bin.
+ensure_playback_path() {
+  local dir
+  for dir in "${HOME}/.local/bin" "${HOME}/.cargo/bin" "/usr/local/bin"; do
+    if [[ -d "$dir" && ":${PATH}:" != *":${dir}:"* ]]; then
+      PATH="${dir}:${PATH}"
+    fi
+  done
+  export PATH
+}
+ensure_playback_path
+
+# Optional explicit ffmpeg dir for patched playback-cli (see scripts/patch-playback-ffmpeg.mjs).
+ensure_playback_ffmpeg() {
+  local ffmpeg ffprobe shim_dir
+  ffmpeg="$(command -v ffmpeg || true)"
+  ffprobe="$(command -v ffprobe || true)"
+  if [[ -z "$ffmpeg" || -z "$ffprobe" ]]; then
+    echo "error: ffmpeg and ffprobe are required on PATH." >&2
+    exit 1
+  fi
+  shim_dir="$REPO_ROOT/.playback/ffmpeg-bin"
+  mkdir -p "$shim_dir"
+  ln -sf "$ffmpeg" "$shim_dir/ffmpeg"
+  ln -sf "$ffprobe" "$shim_dir/ffprobe"
+  export PLAYBACK_FFMPEG_BIN="$shim_dir"
+}
+
+ensure_vhs_prereqs() {
+  if vhs_should_use_docker; then
+    vhs_ensure_docker_prereqs || exit 1
+    vhs_install_docker_shim "$REPO_ROOT"
+    echo "VHS recording: Docker ($VHS_IMAGE) via playback-cli shim"
+    return
+  fi
+
+  if ! command -v vhs >/dev/null 2>&1; then
+    echo "error: vhs is not installed or not on PATH (--native mode)." >&2
+    echo "  docs/videos/SETUP-ubuntu-wsl.md  or omit --native to use Docker (default)" >&2
+    exit 1
+  fi
+  echo "VHS recording: native vhs on host"
+}
+
 MANIFEST="$REPO_ROOT/docs/hitt/use-cases.json"
 PLAYBACK_ROOT="$REPO_ROOT/docs/videos/playback"
 OUTPUT_ROOT="$REPO_ROOT/docs/assets/videos/playback"
-MODE="tape"
 VALIDATE_ONLY=0
 REQUESTED_IDS=()
 PLAYBACK_EXTRA=()
@@ -20,6 +68,8 @@ Usage: scripts/render-playback.sh [options] [use-case-id ...]
   With IDs      — render those use cases (ignores playback.enabled)
 
 Options:
+  --docker      Run VHS inside Docker (default; playback-cli uses a PATH shim)
+  --native      Use native vhs on the host for terminal recording
   --validate       Parse and validate tapes only (no recording)
   --vhs-only       Terminal recording only — skip TTS and caption mux
   --audit          Print timing audit after synthesis
@@ -28,12 +78,17 @@ Options:
   --mkv            Also produce MKV with embedded subtitles
   -h, --help       Show this help
 
+Environment:
+  VHS_DOCKER=0         Same as --native
+  VHS_FORCE_NATIVE=1   Same as --native
+  VHS_IMAGE            Docker image (default: ghcr.io/charmbracelet/vhs)
+
 Examples:
   npm run playback:render -- info-cluster-status
   ./scripts/render-playback.sh --validate info-cluster-status
-  ./scripts/render-playback.sh download-hitt hitt-config-change
+  ./scripts/render-playback.sh --native download-hitt
 
-Requires: npm run playback:setup (Node >= 22, vhs, ffmpeg, piper, voice models)
+Requires: Docker (default for VHS), ffmpeg, piper, voice models; --native also needs host vhs
 EOF
 }
 
@@ -43,13 +98,19 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
+    --docker)
+      USE_DOCKER=1
+      shift
+      ;;
+    --native)
+      USE_DOCKER=0
+      shift
+      ;;
     --validate)
       VALIDATE_ONLY=1
-      MODE="validate"
       shift
       ;;
     --vhs-only)
-      MODE="tape"
       PLAYBACK_EXTRA+=(--vhs-only)
       shift
       ;;
@@ -89,6 +150,20 @@ fi
 if [[ ! -x "$REPO_ROOT/node_modules/.bin/playback" ]] && ! command -v playback >/dev/null 2>&1; then
   echo "error: playback-cli not installed. Run: npm run playback:setup" >&2
   exit 1
+fi
+
+if (( ! VALIDATE_ONLY )); then
+  ensure_vhs_prereqs
+fi
+
+if [[ "${PLAYBACK_SKIP_PIPER_CHECK:-}" != "1" ]] && (( ! VALIDATE_ONLY )) && [[ " ${PLAYBACK_EXTRA[*]} " != *" --vhs-only "* ]]; then
+  if ! command -v piper >/dev/null 2>&1; then
+    echo "error: piper not on PATH (checked after ~/.local/bin)." >&2
+    echo "  uv tool install piper-tts" >&2
+    echo "  Or export PATH=\"\$HOME/.local/bin:\$PATH\" before npm run" >&2
+    exit 1
+  fi
+  ensure_playback_ffmpeg
 fi
 
 playback_cmd() {

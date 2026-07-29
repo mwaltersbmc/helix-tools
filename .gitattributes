@@ -1,3 +1,9 @@
 *.sh text eol=lf
 docs/videos/demo/hitt.sh text eol=lf
 scripts/render-videos.sh text eol=lf
+scripts/render-playback.sh text eol=lf
+scripts/download-playback-voice.sh text eol=lf
+scripts/setup-playback.sh text eol=lf
+scripts/vhs-docker-lib.sh text eol=lf
+scripts/vhs-docker-shim.sh text eol=lf
+scripts/install-ubuntu-wsl-deps.sh text eol=lf

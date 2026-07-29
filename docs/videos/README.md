@@ -24,7 +24,13 @@ Videos are **not** rendered on commit — run a render script locally when you w
 | `scripts/render-videos.sh` | Silent VHS render |
 | `scripts/render-playback.sh` | Narrated playback render |
 | `scripts/setup-playback.sh` | One-time playback dependency + voice setup |
+| `scripts/download-playback-voice.sh` | Download Piper voice models by name |
+| `scripts/vhs-docker-lib.sh` | Shared Docker VHS helpers |
+| `scripts/vhs-docker-shim.sh` | PATH shim so playback-cli runs VHS in Docker |
+| `scripts/install-ubuntu-wsl-deps.sh` | Ubuntu 24.04 / WSL2 dependency install helper |
+| `docs/videos/SETUP-ubuntu-wsl.md` | Full WSL2 setup guide |
 | `playback.config.mjs` | Playback output paths and default voice |
+| `voices.yaml` | Piper voice catalogue and synthesis tuning (repo root) |
 
 ## Manifest (`use-cases.json`)
 
@@ -63,22 +69,53 @@ One command rebuilds terminal video, **piper-tts voiceover**, and **captions**, 
 
 ### Setup (once per machine)
 
-From repo root in **WSL or Linux** (Node.js >= 22):
+**Ubuntu 24.04 on WSL2:** see **[SETUP-ubuntu-wsl.md](SETUP-ubuntu-wsl.md)** (recommended). Quick path:
 
 ```bash
-chmod +x scripts/setup-playback.sh scripts/render-playback.sh
+# Inside WSL — clone under ~/ not /mnt/c
+bash scripts/install-ubuntu-wsl-deps.sh --install
+cd ~/dev/github/helix-tools
+chmod +x scripts/*.sh docs/videos/demo/hitt.sh
+npm install
 npm run playback:setup
 ```
 
-Installs `playback-cli`, checks `vhs` / `ffmpeg` / `piper`, and downloads the default en-GB voice model.
+Or install dependencies manually (same guide), then from repo root:
+
+```bash
+chmod +x scripts/setup-playback.sh scripts/render-playback.sh scripts/download-playback-voice.sh
+npm run playback:setup
+```
+
+Installs `playback-cli`, checks **Docker** (default VHS), `ffmpeg`, and `piper`, applies the ffmpeg patch, and downloads the default Piper voice.
+
+### Download another voice
+
+```bash
+chmod +x scripts/download-playback-voice.sh   # once
+
+./scripts/download-playback-voice.sh --list
+./scripts/download-playback-voice.sh alan
+npm run playback:voice -- alan alba
+```
+
+Then set `voices: [alan]` in the tape’s `meta.yaml` and re-render.
+
+Built-in names: `alan`, `alba`, `northern_english_male`, `southern_english_female`, `aru_09`. Catalogue and Piper tuning live in [`voices.yaml`](../../voices.yaml) at the repo root; download with `scripts/download-playback-voice.sh`.
+
+`piper` from `uv tool install piper-tts` is usually in `~/.local/bin`. The render scripts add that to `PATH` automatically.
+
+**Linux/WSL:** `playback-cli` defaults to Homebrew `ffmpeg-full`; this repo patches it on `npm install` to use system `ffmpeg`/`ffprobe` from `/usr/bin` (or `PLAYBACK_FFMPEG_BIN`). Re-run `npm install` if you see `ffprobe ENOENT` under `/usr/local/opt/ffmpeg-full`.
 
 ### Render
+
+VHS terminal capture uses **Docker by default** (via a PATH shim). TTS and mux still run on the host (`piper`, `ffmpeg`).
 
 ```bash
 # Validate YAML without recording
 npm run playback:validate -- info-cluster-status
 
-# Full pipeline (VHS + TTS + captions + mux)
+# Full pipeline (Docker VHS + TTS + captions + mux)
 npm run playback:render -- info-cluster-status
 npm run playback:render -- download-hitt hitt-config-change
 
@@ -87,6 +124,9 @@ npm run playback:render
 
 # Terminal only (no narration) — useful while editing commands
 npm run playback:vhs-only -- info-cluster-status
+
+# Native VHS on the host instead of Docker
+npm run playback:render -- --native info-cluster-status
 ```
 
 Output: `docs/assets/videos/playback/<id>/<id>.mp4`, `.gif`, `.vtt`, `.srt`.
@@ -122,6 +162,10 @@ Use `docs/videos/demo/` mocks when a live cluster is not available. Set `vhsCwd:
 
 **Playback YAML rule:** `command` / `commands` strings must not contain double quotes — use single quotes for shell arguments (e.g. `bash hitt.sh -m 'info cluster'`).
 
+**Caption length:** keep each `narration` field to **~25 words or fewer** (playback warns above that limit — long text is hard to read as burned-in captions).
+
+**Shell:** playback defaults to **zsh**; set `vhs.shell: bash` in `meta.yaml` on WSL/Linux or you get `execvp failed` in the recording.
+
 ---
 
 ## Silent videos (VHS only)
@@ -130,53 +174,47 @@ For quick terminal captures without narration, use the VHS `.tape` files under `
 
 ### Prerequisites
 
-**Linux / Deployment Engine / WSL** — native VHS:
+**Docker** is the default for VHS in both silent and narrated pipelines. Install [Docker Desktop](https://docs.docker.com/desktop/) with WSL integration, or Docker Engine inside WSL.
 
-- **VHS** — `brew install vhs` or `go install github.com/charmbracelet/vhs@latest`
-- **ffmpeg** and **ttyd** — required by VHS (usually on PATH when VHS is installed)
-- **bash**, **jq** (optional; falls back to `python3`)
+Host tools still required for narrated videos: **Node 22+**, **ffmpeg**, **piper**, and Piper voice models.
 
-**Windows / Git Bash** — use Docker (native VHS often hangs; see Troubleshooting):
-
-- **Docker Desktop** running
-- Render with `--docker` (auto-selected on Windows/Git Bash)
-
-Run from the **repository root**.
+For **`--native`** (host VHS without Docker), see [SETUP-ubuntu-wsl.md](SETUP-ubuntu-wsl.md) — requires `vhs`, `ttyd`, and a Chromium-based browser.
 
 ### Local rendering
 
 ```bash
 chmod +x scripts/render-videos.sh docs/videos/demo/hitt.sh   # once
 
-# Linux / WSL / Deployment Engine
+# Default — VHS in Docker (WSL, Linux, Windows)
 ./scripts/render-videos.sh                           # all enabled use cases
 ./scripts/render-videos.sh info-cluster-status       # one use case
 
-# Windows / Git Bash (recommended)
-./scripts/render-videos.sh --docker info-cluster-status
+# Native VHS on the host (requires vhs + ttyd + browser)
+./scripts/render-videos.sh --native info-cluster-status
 ```
 
 The script resolves tape files from the manifest, runs VHS, and prints paths under `docs/assets/videos/`.
 
 ## Troubleshooting (silent VHS)
 
-### Hangs after `Set TypingSpeed` / Ctrl+C does nothing
+### Docker not available
+
+Start Docker Desktop (enable WSL integration) or install Docker Engine in WSL, then re-run. Or use native VHS:
+
+```bash
+./scripts/render-videos.sh --native info-cluster-status
+```
+
+### Hangs after `Set TypingSpeed` / Ctrl+C does nothing (`--native` on Windows)
 
 This is a **known native Windows issue**: VHS depends on `ttyd`, which often fails to spawn the terminal on Windows 11 / Git Bash. The process appears stuck and may ignore Ctrl+C; a stale `ttyd.exe` can block later runs.
 
-**Fix (recommended):** use Docker:
+**Fix:** omit `--native` so Docker is used (default), or run from **WSL** with Docker.
 
-```bash
-./scripts/render-videos.sh --docker info-cluster-status
-```
+**If you must use native on Windows:**
 
-**Alternatives:**
-
-- Run from **WSL** with native `vhs` installed
 - Kill stale processes: `taskkill //F //IM ttyd.exe` (and close any Edge/Chrome tab opened by ttyd)
-- Native Windows: try [ttyd 1.7.3](https://github.com/tsl0922/ttyd/releases/tag/1.7.3) or an MSVC build — see [vhs#437](https://github.com/charmbracelet/vhs/issues/437), [vhs#631](https://github.com/charmbracelet/vhs/issues/631)
-
-Force native (not recommended on Windows): `VHS_FORCE_NATIVE=1 ./scripts/render-videos.sh info-cluster-status`
+- Try [ttyd 1.7.3](https://github.com/tsl0922/ttyd/releases/tag/1.7.3) or an MSVC build — see [vhs#437](https://github.com/charmbracelet/vhs/issues/437), [vhs#631](https://github.com/charmbracelet/vhs/issues/631)
 
 ## Committing generated assets
 

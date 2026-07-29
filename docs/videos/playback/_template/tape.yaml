@@ -3,12 +3,12 @@ output: use-case-id
 steps:
   - action: comment
     narration: >
-      Introduce the use case in plain language. Mention prerequisites only
-      when the operator must know them for this command.
+      Introduce the use case in plain language (max ~25 words per step for
+      readable captions).
 
   - action: type
     command: bash hitt.sh -m 'info cluster'
-    narration: Describe what the command does while it runs on screen.
+    narration: Short line synced with the command on screen.
     pause: 0.5
 
   - action: run

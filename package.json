@@ -3,7 +3,11 @@
   "private": true,
   "description": "BMC Helix tools including HITT and use-case video pipelines",
   "scripts": {
+    "postinstall": "node scripts/patch-playback-ffmpeg.mjs",
     "playback:setup": "bash scripts/setup-playback.sh",
+    "playback:deps": "bash scripts/install-ubuntu-wsl-deps.sh",
+    "playback:deps:install": "bash scripts/install-ubuntu-wsl-deps.sh --install",
+    "playback:voice": "bash scripts/download-playback-voice.sh",
     "playback:validate": "bash scripts/render-playback.sh --validate",
     "playback:render": "bash scripts/render-playback.sh",
     "playback:vhs-only": "bash scripts/render-playback.sh --vhs-only"
@@ -13,5 +17,8 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^6.4.1"
   }
 }

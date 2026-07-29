@@ -4,10 +4,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=scripts/vhs-docker-lib.sh
+source "$REPO_ROOT/scripts/vhs-docker-lib.sh"
+
 MANIFEST="$REPO_ROOT/docs/hitt/use-cases.json"
 VIDEOS_DIR="$REPO_ROOT/docs/videos"
 ASSETS_DIR="$REPO_ROOT/docs/assets/videos"
-VHS_IMAGE="${VHS_IMAGE:-ghcr.io/charmbracelet/vhs}"
 USE_DOCKER=""
 REQUESTED_IDS=()
 
@@ -19,21 +21,21 @@ Usage: scripts/render-videos.sh [options] [use-case-id ...]
   With IDs      — render only those use cases (ignores enabled flag)
 
 Options:
-  --docker      Run VHS inside the official Docker image (recommended on Windows)
-  --native      Force native vhs even on Windows (often hangs — see README)
+  --docker      Run VHS inside the official Docker image (default)
+  --native      Use native vhs on the host instead of Docker
   -h, --help    Show this help
 
 Environment:
-  VHS_DOCKER=1         Same as --docker
+  VHS_DOCKER=0         Same as --native
   VHS_FORCE_NATIVE=1   Same as --native
   VHS_IMAGE            Docker image (default: ghcr.io/charmbracelet/vhs)
 
 Examples:
   ./scripts/render-videos.sh
-  ./scripts/render-videos.sh --docker info-cluster-status
-  ./scripts/render-videos.sh download-hitt hitt-config-change
+  ./scripts/render-videos.sh info-cluster-status
+  ./scripts/render-videos.sh --native info-cluster-status
 
-Requires: vhs + ffmpeg + ttyd (native), or Docker (recommended on Windows/Git Bash)
+Requires: Docker (default), or native vhs + ffmpeg + ttyd with --native
 EOF
 }
 
@@ -63,47 +65,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-is_windows_like() {
-  case "$(uname -s 2>/dev/null)" in
-    MINGW*|MSYS*|CYGWIN*) return 0 ;;
-  esac
-  [[ "${OS:-}" == "Windows_NT" ]]
-}
-
-docker_available() {
-  command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
-}
-
-repo_docker_mount() {
-  local root="$1"
-  if command -v cygpath >/dev/null 2>&1; then
-    cygpath -w "$root" | tr '\\' '/'
-  elif [[ "$root" =~ ^/[a-zA-Z]/.* ]]; then
-    local drive rest
-    drive="$(echo "${root:1:1}" | tr '[:lower:]' '[:upper:]')"
-    rest="${root:2}"
-    printf '%s:%s' "$drive" "$rest"
-  else
-    printf '%s' "$root"
-  fi
-}
-
-should_use_docker() {
-  if [[ -n "$USE_DOCKER" ]]; then
-    [[ "$USE_DOCKER" == "1" ]]
-    return
-  fi
-  if [[ "${VHS_FORCE_NATIVE:-}" == "1" ]]; then
-    return 1
-  fi
-  if [[ "${VHS_DOCKER:-}" == "1" ]]; then
-    return 0
-  fi
-  is_windows_like
-}
-
 warn_stale_ttyd() {
-  if ! is_windows_like; then
+  if ! vhs_is_windows_like; then
     return
   fi
   if command -v tasklist >/dev/null 2>&1 && tasklist 2>/dev/null | grep -qi ttyd; then
@@ -113,50 +76,32 @@ warn_stale_ttyd() {
 }
 
 ensure_prereqs() {
-  if should_use_docker; then
-    if ! docker_available; then
-      echo "error: Docker is required for VHS on Windows/Git Bash but is not available." >&2
-      echo "" >&2
-      echo "Native VHS on Windows often hangs after the Set commands (ttyd/ConPTY issue)." >&2
-      echo "Options:" >&2
-      echo "  1. Start Docker Desktop and re-run with --docker" >&2
-      echo "  2. Run from WSL or a Linux host" >&2
-      echo "  3. Set VHS_FORCE_NATIVE=1 to attempt native vhs anyway" >&2
-      exit 1
-    fi
+  if vhs_should_use_docker; then
+    vhs_ensure_docker_prereqs || exit 1
     return
   fi
 
   if ! command -v vhs >/dev/null 2>&1; then
-    echo "error: vhs is not installed or not on PATH." >&2
+    echo "error: vhs is not installed or not on PATH (--native mode)." >&2
     echo "" >&2
     echo "Install options:" >&2
-    echo "  brew install vhs" >&2
-    echo "  go install github.com/charmbracelet/vhs@latest" >&2
-    echo "  ./scripts/render-videos.sh --docker   (uses Docker instead)" >&2
+    echo "  docs/videos/SETUP-ubuntu-wsl.md  (Charm apt on Ubuntu/WSL)" >&2
+    echo "  Or omit --native to use Docker (default)" >&2
     exit 1
   fi
 
-  if is_windows_like; then
+  if vhs_is_windows_like; then
     warn_stale_ttyd
     echo "warning: native VHS on Windows/Git Bash often hangs (known ttyd issue)." >&2
-    echo "  Prefer: ./scripts/render-videos.sh --docker $*" >&2
+    echo "  Prefer Docker (default): ./scripts/render-videos.sh $*" >&2
   fi
 }
 
 run_vhs() {
   local tape_path="$1"
-  local rel_tape="${tape_path#$REPO_ROOT/}"
 
-  if should_use_docker; then
-    local mount
-    mount="$(repo_docker_mount "$REPO_ROOT")"
-    echo "Using Docker ($VHS_IMAGE) with mount $mount -> /vhs"
-    docker run --rm \
-      -v "${mount}:/vhs" \
-      -w /vhs \
-      "$VHS_IMAGE" \
-      "$rel_tape"
+  if vhs_should_use_docker; then
+    vhs_run_docker "$tape_path" "$REPO_ROOT"
   else
     vhs "$tape_path"
   fi
