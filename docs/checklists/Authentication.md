@@ -1,7 +1,5 @@
 # Helix Authentication Troubleshooting Checklist
 
-> Source: [Helix xWiki](https://wiki.helixops.ai/xwiki/bin/view/Personal-Spaces/mwalters/Helix-Content/Helix-Authentication-Troubleshooting-Checklist/)
-
 ## Pod Health
 
 Check that all pods are running and healthy:
@@ -15,15 +13,15 @@ Login to RSSO as the admin user — default **admin/RSSO#Admin#**.
 
 Click on the pin icon for the SAAS_TENANT and confirm that **Tenant: SAAS_TENANT** is displayed in the page header.
 
-Note the name of the non-SAAS_TENANT — for example **red.60831950** in the example below.
-
 ![RSSO tenant list](images/image-2024-3-5_12-38-16.png)
+
+Note the name of the non-SAAS_TENANT — for example **red.60831950** in the example above.
 
 Go to the **Realm** tab.
 
 Confirm that a realm exists with the name format **CUSTOMER_SERVICE-ENVIRONMENT**, where these values come from the **HELIX_ONPREM_DEPLOYMENT** pipeline. In the example, CUSTOMER_SERVICE is **seal-red** and ENVIRONMENT is **itsm**, so the realm is called **seal-red-itsm**.
 
-> **Note:** If the customer uses **prod** as the ENVIRONMENT value, the realm name must still include it even though the hostnames in the realm will not.
+> **Note:** If the ENVIRONMENT value is **prod** the realm name must still include it, even though the aliases in the realm will not.  For example, CUSTOMER_SERVICE=mydept-itsm and ENVIRONMENT=prod then the **realm name** must be mydept-itsm-prod.
 
 Confirm that the **Tenant** for the realm is the same as the **Tenant Name** above.
 
@@ -46,7 +44,7 @@ Validate using the **Test** button.
 Test connectivity to RSSO from the Deployment Engine command line — replace **LB_HOST** with the customer value:
 
 ```bash
-curl -k -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
+curl -sk -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"RSSO#Admin#"}'
 ```
@@ -54,7 +52,7 @@ curl -k -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
 Test that the **custom_cacert.pem** file is valid:
 
 ```bash
-curl -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
+curl -s -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
   --cacert /path/to/custom_cacert.pem \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"RSSO#Admin#"}'
@@ -62,9 +60,9 @@ curl -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
 
 ## Jenkins HELIX_ONPREM_DEPLOYMENT Pipeline Checks
 
-Check the RSSO_PARAMETERS section of the pipeline run that was used to deploy IS.
+Check the **RSSO PARAMETERS** section of the pipeline run that was used to deploy IS.
 
-- Make sure that the **/rsso** component is at the end of the RSSO_URL
+- Make sure that the **/rsso** component is present at the end of the RSSO_URL
 - Correct credentials?
 - The TENANT_DOMAIN should be the tenant name as shown in RSSO above
 
@@ -72,12 +70,12 @@ Check the RSSO_PARAMETERS section of the pipeline run that was used to deploy IS
 
 ## Helix IS Platform Pod
 
-Get a command prompt in the Helix IS platform pod and check **/opt/bmc/ARSystem/db/arjavaplugin-authentication.log** and **/tmp/rsso.0.log** for errors.
+Get a command prompt in a Helix IS platform pod and check **/opt/bmc/ARSystem/db/arjavaplugin-authentication.log** and **/tmp/rsso.0.log** for errors.
 
-Test connectivity to RSSO — expected to return an access token:
+Test connectivity to RSSO — this is expected to return an access token:
 
 ```bash
-curl -k -X POST $RSSO_SERVICE_URL/api/v1.1/admin/login \
+curl -sk -X POST $RSSO_SERVICE_URL/api/v1.1/admin/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"RSSO#Admin#"}'
 ```
@@ -99,23 +97,28 @@ cat /opt/bmc/ARSystem/conf/rsso-agent.properties | grep sso-
 
 ### From Helix IS platform pod
 
-Check that the Java **cacerts** in the IS platform pod has the customer's certificate — replace **XXX** with the alias name used when adding the certificate to the BMC-provided **cacerts** file.
+Check that the Java **cacerts** in the IS platform pod has the customer's certificate
+- pre-25.4.01 replace **XXX** with the alias name used when adding the certificate to the BMC-provided **cacerts** file.
+- 25.4.01 onwards check for presence of one or more customcert* aliases
+
+Substitute your keystore password in place of changeit if you set CACERTS_SSL_TRUSTSTORE_PASSWORD
 
 ```bash
 /opt/java/bin/keytool --list -cacerts -storepass changeit -alias XXX
+/opt/java/bin/keytool --list -cacerts -storepass changeit | grep customcert
 ```
 
 ![keytool list alias](images/image-2024-3-8_15-45-48.png)
 
 ### From Deployment Engine
 
-View certs from LB/ingress controller:
+View certs from LB/ingress controller - substitute LB_HOST value:
 
 ```bash
 openssl s_client -showcerts -connect LB_HOST:443
 ```
 
-This example is a wildcard certificate for **\*.seal-k3s.bmc.com**, so it is valid for any host with that domain. See below for one using **Subject Alternate Names (SANs)**.
+This example is a wildcard certificate for **\*.seal-k3s.bmc.com**, so it is valid for any host within that domain. See below for one using **Subject Alternate Names (SANs)**.
 
 Look at the **issuer information** — the customer will need a valid certificate chain for this and any higher-level CAs.
 
@@ -149,12 +152,13 @@ This helps you see which CA issued the certificate and whether you need intermed
 
 ## Recreate Helix IS cacerts Secret
 
-If you have a valid **cacerts** file and need to update the one that is deployed:
+If you have a valid **cacerts** file and need to update the one that is currently deployed:
 
-> **Warning:** The cacerts file must be called **cacerts** — not names such as mycacerts or newcacerts — because the filename is stored in the secret and referenced by name. A restart of pods that use the secret may be required for new values to be picked up.
+> **Warning:** The cacerts file must be called **cacerts** and not another name such as mycacerts or newcacerts. This is because the filename is stored in the secret and explicitly referenced. A restart of pods that use the secret may be required for new values to be picked up.
 
 ```bash
 kubectl delete secret cacerts -n HELIX-IS-NAMESPACE
 kubectl create secret -n HELIX-IS-NAMESPACE generic cacerts \
   --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n HELIX-IS-NAMESPACE rollout restart sts platform-fts (platform-user etc)
 ```
