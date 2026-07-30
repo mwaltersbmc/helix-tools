@@ -158,14 +158,3 @@ kubectl delete secret cacerts -n HELIX-IS-NAMESPACE
 kubectl create secret -n HELIX-IS-NAMESPACE generic cacerts \
   --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
 ```
-
-## BMC Docs Links
-
-### Helix IS
-
-- [Preparing to use self-signed or custom CA certificates](https://docs.bmc.com/docs/brid22106/preparing-to-use-self-signed-or-custom-ca-certificates-1218539860.html)
-
-### Helix Platform
-
-- [Using custom CA signed certificates](https://docs.bmc.com/docs/itomdeploy234/using-custom-ca-signed-certificates-1264854346.html)
-- [Updating expired certificates](https://docs.bmc.com/docs/itomdeploy234/updating-expired-certificates-1257362532.html)
