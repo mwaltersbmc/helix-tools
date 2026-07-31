@@ -813,8 +813,7 @@ window.HITT_USE_CASES = {
       "order": 28,
       "title": "I want to add new certificates for use by pods in the Helix IS namespace",
       "commands": [
-        "bash hitt.sh -f \"addcert /path/to/custom-certs.pem\"",
-        "bash hitt.sh -f \"addcert /path/to/custom-certs.pem git\""
+        "bash hitt.sh -f \"addcert /path/to/custom-certs.pem\""
       ],
       "notes": [
         "Requires Helix IS namespace configured in HITT and the cacerts secret in that namespace.",
@@ -828,6 +827,30 @@ window.HITT_USE_CASES = {
         "tape": "fix-addcert.tape",
         "playback": {
           "dir": "fix-addcert",
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "fix-addcert-git",
+      "topicId": "helix-is-mgmt",
+      "order": 29,
+      "title": "I want to add my custom certificates to the cacerts keystore in git",
+      "commands": [
+        "bash hitt.sh -f \"addcert /path/to/custom-certs.pem git\""
+      ],
+      "notes": [
+        "Requires Helix IS namespace configured in HITT and access to the ITSM installer git repository (via the Deployment Engine).",
+        "PEM file may contain one or more certificates. Expired certificates are rejected; certificates expiring within 4 weeks show a warning but the command continues.",
+        "HITT updates the default cacerts in the ITSM installer repository, validates the keystore, then asks you to confirm before committing and pushing.",
+        "Use this when preparing certificates for a future HELIX_ONPREM_DEPLOYMENT run. To update the live cacerts secret in the cluster, use addcert without git — see fix-addcert use case."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md#addcert-certificatespem-git---add-pem-certificates-to-pipelinetaskscacerts-in-git",
+      "video": {
+        "enabled": false,
+        "tape": "fix-addcert-git.tape",
+        "playback": {
+          "dir": "fix-addcert-git",
           "enabled": false
         }
       }
