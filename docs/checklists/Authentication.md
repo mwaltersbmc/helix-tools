@@ -2,14 +2,14 @@
 
 ## Pod Health
 
-Check that all pods are running and healthy:
+Check that all pods are running and healthy using **kubectl get/describe pod**:
 
-- Helix IS namespace — platform pods
+- Helix IS namespace — platform-fts/user/int/sr
 - Helix Platform namespace — RSSO and Postgres
 
 ## RSSO Checks
 
-Login to RSSO as the admin user — default **admin/RSSO#Admin#**.
+Log in to RSSO as the admin user — default **admin/RSSO#Admin#**.
 
 Click on the pin icon for the SAAS_TENANT and confirm that **Tenant: SAAS_TENANT** is displayed in the page header.
 
@@ -21,7 +21,7 @@ Go to the **Realm** tab.
 
 Confirm that a realm exists with the name format **CUSTOMER_SERVICE-ENVIRONMENT**, where these values come from the **HELIX_ONPREM_DEPLOYMENT** pipeline. In the example, CUSTOMER_SERVICE is **seal-red** and ENVIRONMENT is **itsm**, so the realm is called **seal-red-itsm**.
 
-> **Note:** If the ENVIRONMENT value is **prod** the realm name must still include it, even though the aliases in the realm will not.  For example, CUSTOMER_SERVICE=mydept-itsm and ENVIRONMENT=prod then the **realm name** must be mydept-itsm-prod.
+> **Note:** If the ENVIRONMENT value is **prod**, the realm name must still include it, even though the aliases in the realm will not.  For example, CUSTOMER_SERVICE=mydept-itsm and ENVIRONMENT=prod then the **realm name** must be mydept-itsm-prod.
 
 Confirm that the **Tenant** for the realm is the same as the **Tenant Name** above.
 
@@ -49,7 +49,7 @@ curl -sk -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
   -d '{"username":"admin","password":"RSSO#Admin#"}'
 ```
 
-Test that the **custom_cacert.pem** file is valid:
+Test that the **custom_cacert.pem** file is contains valid certificate(s):
 
 ```bash
 curl -s -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
@@ -62,15 +62,15 @@ curl -s -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
 
 Check the **RSSO PARAMETERS** section of the pipeline run that was used to deploy IS.
 
-- Make sure that the **/rsso** component is present at the end of the RSSO_URL
-- Correct credentials?
+- Make sure that the RSSO_URL ends in **/rsso** and is not just the LB_HOST URL.
+- RSSO admin credentials are correct.
 - The TENANT_DOMAIN should be the tenant name as shown in RSSO above
 
 ![Jenkins RSSO parameters](images/image-2024-3-21_11-27-4.png)
 
 ## Helix IS Platform Pod
 
-Get a command prompt in a Helix IS platform pod and check **/opt/bmc/ARSystem/db/arjavaplugin-authentication.log** and **/tmp/rsso.0.log** for errors.
+Use **kubectl exec** to get a command prompt in a Helix IS platform pod and check **/opt/bmc/ARSystem/db/arjavaplugin-authentication.log** and **/tmp/rsso.0.log** for errors.
 
 Test connectivity to RSSO — this is expected to return an access token:
 
@@ -97,11 +97,11 @@ cat /opt/bmc/ARSystem/conf/rsso-agent.properties | grep sso-
 
 ### From Helix IS platform pod
 
-Check that the Java **cacerts** in the IS platform pod has the customer's certificate
+Check that the Java **cacerts** in the IS platform pod has the customer's certificate:
 - pre-25.4.01 replace **XXX** with the alias name used when adding the certificate to the BMC-provided **cacerts** file.
 - 25.4.01 onwards check for presence of one or more customcert* aliases
 
-Substitute your keystore password in place of changeit if you set CACERTS_SSL_TRUSTSTORE_PASSWORD
+Substitute your keystore password in place of changeit if you set CACERTS_SSL_TRUSTSTORE_PASSWORD.
 
 ```bash
 /opt/java/bin/keytool --list -cacerts -storepass changeit -alias XXX
@@ -150,15 +150,51 @@ Grab the data from the customer's PEM file, or use the **BEGIN .. / .. END** blo
 
 This helps you see which CA issued the certificate and whether you need intermediate certificates.
 
-## Recreate Helix IS cacerts Secret
+## Add certificate(s) to the cacerts keystore file
 
-If you have a valid **cacerts** file and need to update the one that is currently deployed:
+If you need to update, or add a missing certificate, to the Java keystore used by the Helix IS platform pods:
 
-> **Warning:** The cacerts file must be called **cacerts** and not another name such as mycacerts or newcacerts. This is because the filename is stored in the secret and explicitly referenced. A restart of pods that use the secret may be required for new values to be picked up.
+- Get the current cacerts keystore from the Helix IS namespace:
 
 ```bash
+kubectl get secret cacerts -o jsonpath='{.data.cacerts}' -n HELIX-IS-NAMESPACE | base64 -d > cacerts
+```
+
+- Import the new certificate(s), you will be prompted to accept the new certificate by the keytool command.  If you have more than one certificate to add, run this for each file (one certificate per file).
+
+```bash
+keytool -importcert -v -alias <alias name> -file <certificatefilename> -keystore cacerts -storepass <password>
+```
+
+Use the steps below to update the cacerts secret.
+
+## Recreate Helix IS cacerts Secret
+
+If you have a valid Java keystore **cacerts** file and want to update the one that is currently deployed:
+
+- Back up the current cacerts secret and then delete it.
+
+```bash
+kubectl get secret cacerts -n HELIX-IS-NAMESPACE -o yaml > cacerts-secret-backup.yaml
 kubectl delete secret cacerts -n HELIX-IS-NAMESPACE
-kubectl create secret -n HELIX-IS-NAMESPACE generic cacerts \
-  --from-file=cacerts --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n HELIX-IS-NAMESPACE rollout restart sts platform-fts (platform-user etc)
+```
+
+- Create a new secret using the local cacerts file.  If the local file is named cacerts, use this command:
+
+```bash
+kubectl create secret generic cacerts --from-file=cacerts -n HELIX-IS-NAMESPACE
+```
+
+- If the local file is **not** named cacerts, use this command:
+
+```bash
+kubectl create secret generic cacerts --from-file=cacerts=LOCAL-FILENAME -n HELIX-IS-NAMESPACE
+```
+
+- Restart the platform pods.
+
+```bash
+kubectl -n HELIX-IS-NAMESPACE rollout restart statefulset/platform-fts
+# Restart other platform workloads that mount cacerts if required, for example:
+kubectl -n HELIX-IS-NAMESPACE rollout restart statefulset/platform-int
 ```

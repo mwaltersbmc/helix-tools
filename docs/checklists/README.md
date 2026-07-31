@@ -1,3 +1,3 @@
 # Helix Checklists
 
-![Authentication.md](Authentication.md) - Troubleshooting Helix Service Management authentication issue.
+![Authentication.md](Authentication.md) - Troubleshooting Helix Service Management authentication issues.
