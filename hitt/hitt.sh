@@ -4052,7 +4052,7 @@ importPemCertificatesFromDir() {
   done
   addcertCleanupKeystoreFingerprintSet
   ADD_CERT_IMPORTED_COUNT=${imported}
-  logMessage "Imported ${imported} certificate(s) into '${CACERTS_FILENAME}' (${skipped} already present)."
+  logMessage "Imported ${imported} certificate(s) into keystore (${skipped} already present)."
 }
 
 ADD_CERT_CERT_DIR=""
@@ -4297,7 +4297,10 @@ replaceISCacertsSecret() {
     logMessage "Current cacerts secret saved as ${BACKUP_FILE}."
   fi
   ${KUBECTL_BIN} -n "${IS_NAMESPACE}" delete secret cacerts >/dev/null 2>&1
-  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts="${CACERTS_FILENAME}" --dry-run=client -o yaml | ${KUBECTL_BIN} apply -f - >/dev/null 2>&1
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts="${CACERTS_FILENAME}" --dry-run=client -o yaml | ${KUBECTL_BIN} create -f - >"${HITT_ERR_FILE}" 2>&1
+  if [ $? -ne 0 ]; then
+    logError "999" "Failed to create cacerts secret in '${IS_NAMESPACE}' namespace. Check ${HITT_ERR_FILE} for errors and use 'kubectl create -f ${BACKUP_FILE}' to restore from backup." 1
+  fi
 }
 
 fixSATRole() {
@@ -8164,7 +8167,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260731-01"
+HITT_BUILD_VERSION="20260731-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
