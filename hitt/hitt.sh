@@ -7851,7 +7851,7 @@ if [ "${MODE}" == "fix" ]; then
       showFixHelp
       ;;
     *)
-      logError "999" "'${FIXARGS[0]}' is not a valid fix mode option." 1
+      logError "999" "'${FIXARGS[0]}' is not a valid fix mode option. Please check for an updated HITT." 1
       ;;
   esac
   exit
@@ -7920,7 +7920,7 @@ if [ "${MODE}" == "pipeline" ]; then
       kickStartUberPipeline
       ;;
     *)
-    logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option (try: get, build, kickstart, delete, help)." 1
+    logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option (try: get, build, kickstart, delete, help). Please check for an updated HITT." 1
     ;;
   esac
   exit
@@ -7978,7 +7978,7 @@ if [ "${MODE}" == "utility" ]; then
       showUtilHelp
       ;;
     *)
-      logError "999" "'${UTILARGS[0]}' is not a valid utility mode option." 1
+      logError "999" "'${UTILARGS[0]}' is not a valid utility mode option. Please check for an updated HITT." 1
       ;;
   esac
   exit
@@ -8041,7 +8041,7 @@ if [ "${MODE}" == "info" ]; then
       showInfoHelp
       ;;
     *)
-      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, node, helix, ingress, full, help)." 1
+      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, node, helix, ingress, full, help). Please check for an updated HITT." 1
       ;;
   esac
   exit
@@ -8164,7 +8164,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260728-06"
+HITT_BUILD_VERSION="20260731-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
