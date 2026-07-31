@@ -5936,7 +5936,7 @@ parseUtilGet() {
 
       ;;
     *)
-     logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option."
+     logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option. Please check for an updated HITT."
      ;;
   esac
 }
@@ -8167,7 +8167,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260731-02"
+HITT_BUILD_VERSION="20260731-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
