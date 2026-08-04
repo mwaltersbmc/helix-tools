@@ -49,7 +49,7 @@ curl -sk -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
   -d '{"username":"admin","password":"RSSO#Admin#"}'
 ```
 
-Test that the **custom_cacert.pem** file is contains valid certificate(s):
+Test that the **custom_cacert.pem** file contains valid certificate(s):
 
 ```bash
 curl -s -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
@@ -64,7 +64,7 @@ Check the **RSSO PARAMETERS** section of the pipeline run that was used to deplo
 
 - Make sure that the RSSO_URL ends in **/rsso** and is not just the LB_HOST URL.
 - RSSO admin credentials are correct.
-- The TENANT_DOMAIN should be the tenant name as shown in RSSO above
+- The TENANT_DOMAIN should be the tenant name as shown in RSSO above.
 
 ![Jenkins RSSO parameters](images/image-2024-3-21_11-27-4.png)
 
