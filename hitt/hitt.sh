@@ -3075,6 +3075,7 @@ checkJenkinsPlugins() {
     pipeline-rest-api
     )
   JK_PLUGINS=$(${CURL_BIN} -sk "${JENKINS_URL}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
+  echo "${JK_PLUGINS}" | ${JQ_BIN} -r '.plugins[] | {shortName, version}' > "${JENKINS_PLUGINS_LOG}"
   for i in "${EXPECTED_PLUGINS[@]}" ; do
     if ! echo "${JK_PLUGINS}" | grep -wq "${i}" ; then
       logError "195" "Jenkins plugin '${i}' is missing."
@@ -8167,7 +8168,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260804-01"
+HITT_BUILD_VERSION="20260804-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8177,6 +8178,7 @@ GIT_USER=$(whoami)
 FAIL=0
 WARN=0
 SKIP_JENKINS=0
+JENKINS_PLUGINS_LOG=jenkins-plugins.log
 CREATE_LOGS=1
 LOG_PASSWDS=0
 HITT_LOG_FILE=hitt.log
@@ -8187,7 +8189,7 @@ VALUES_LOG_FILE=values.log
 VALUES_JSON_FILE=values.json
 CLEANUP_DIRS=(configsrepo itsmrepo)
 CLEANUP_FILES=(is-sealcacerts hp-sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cookies)
-CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}" "jenkins-pipeline-build-response.log")
+CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}" "jenkins-pipeline-build-response.log" "${JENKINS_PLUGINS_LOG}")
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int reporting)
