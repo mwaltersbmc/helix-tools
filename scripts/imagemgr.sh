@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mark_Walters@bmc.com SEAL team Aug 2023
-# This script is provided as-is and BMC accepts no responsibilty for problems arising from use.
+# This script is provided as-is and BMC accepts no responsibility for problems arising from use.
 
 # Set the hostname of your registry server or use -t option
 TARGET_REGISTRY=""
@@ -15,7 +15,8 @@ DISK_REQUIRED=10
 SKIP_LOGIN=F
 CURRENT_JOBS=0
 COUNT=0
-DOCKER_ROOT_DIR=$(docker info --format '{{json .DockerRootDir}}' | tr -d \")
+FAILED=0
+CONTAINER_STORAGE_DIR=""
 BOLD=$'\e[1m'
 NORMAL=$'\e[0m'
 RED=$'\e[31m'
@@ -31,11 +32,11 @@ usage() {
 }
 
 pull_image() {
-  check_disk_space "${DOCKER_ROOT_DIR}"
+  check_disk_space "${CONTAINER_STORAGE_DIR}"
   log_result "Pulling ${SOURCE_IMAGE}" ${YELLOW}
   if ! docker pull -q "${SOURCE_IMAGE}" > /dev/null; then
     log_error "pull" "${SOURCE_IMAGE}"
-    exit
+    exit 1
   fi
 }
 
@@ -43,7 +44,7 @@ tag_image() {
   log_result "Tagging ${SOURCE_IMAGE} as ${TARGET_IMAGE}" ${BLUE}
   if ! docker tag "${SOURCE_IMAGE}" "${TARGET_IMAGE}"; then
     log_error "tag" "${SOURCE_IMAGE}"
-    exit
+    exit 1
   fi
 }
 
@@ -51,16 +52,16 @@ push_image() {
   log_result "Pushing ${TARGET_IMAGE}" ${PURPLE}
   if ! docker push -q "${TARGET_IMAGE}" > /dev/null; then
     log_error "push" "${TARGET_IMAGE}"
-    exit
+    exit 1
   fi
 }
 
 save_image() {
-  check_disk_space $(pwd)
+  check_disk_space "$(pwd)"
   log_result "Saving ${SOURCE_IMAGE}" ${YELLOW}
   if ! docker save "${SOURCE_IMAGE}" | gzip > "${IMAGE_FILENAME}" ; then
     log_error "save" "${SOURCE_IMAGE}"
-    exit
+    exit 1
   fi
 }
 
@@ -68,7 +69,7 @@ load_image() {
   log_result "Loading ${SOURCE_IMAGE}" ${YELLOW}
   if ! docker load < "${IMAGE_FILENAME}" > /dev/null; then
     log_error "load" "${SOURCE_IMAGE}"
-    exit
+    exit 1
   fi
 }
 
@@ -76,7 +77,7 @@ delete_image() {
   log_result "Deleting local image ${1}" ${YELLOW}
   if ! docker rmi "${1}" >/dev/null; then
     log_error "delete" "${1}"
-    exit
+    exit 1
   fi
   log_result "Deleted ${1} from the local system." ${GREEN}
 }
@@ -86,49 +87,146 @@ verify_image() {
   if ! docker manifest inspect "${1}" >/dev/null; then
     log_error "verify" "${1}"
     log_missing "${1}"
-    exit
+    exit 1
   fi
   log_result "Image ${1} found." ${GREEN}
 }
 
+# Returns linux/amd64 config or manifest digest for compare, or empty on failure.
+image_amd64_digest() {
+  local image="$1"
+  local manifest
+
+  manifest=$(docker manifest inspect "${image}" 2>/dev/null) || return 1
+
+  jq -r '
+    if .manifests then
+      (.manifests[]
+        | select(.platform.os == "linux" and .platform.architecture == "amd64")
+        | .digest) // empty
+    else
+      .config.digest // empty
+    end
+  ' <<< "${manifest}"
+}
+
 compare_images() {
   log_result "Comparing images ${SOURCE_IMAGE} / ${TARGET_IMAGE}" ${YELLOW}
-  SOURCE_DIGEST=""
-  TARGET_DIGEST=""
-  SOURCE_DIGEST=$(docker manifest inspect "${SOURCE_IMAGE}" 2>/dev/null | jq .config.digest)
+  SOURCE_DIGEST=$(image_amd64_digest "${SOURCE_IMAGE}")
   if [[ -z "${SOURCE_DIGEST}" ]]; then
     log_error "find" "${SOURCE_IMAGE}"
-    exit
+    exit 1
   fi
 
-  TARGET_DIGEST=$(docker manifest inspect "${TARGET_IMAGE}" 2>/dev/null | jq .config.digest)
+  TARGET_DIGEST=$(image_amd64_digest "${TARGET_IMAGE}")
   if [[ -z "${TARGET_DIGEST}" ]]; then
     log_error "find" "${TARGET_IMAGE}"
-    exit
+    exit 1
   fi
 
   if [[ "${SOURCE_DIGEST}" != "${TARGET_DIGEST}" ]]; then
     log_error "compare" "${TARGET_IMAGE}"
-    exit
+    exit 1
   else
-    log_result "Images ${SOURCE_IMAGE} and ${TARGET_IMAGE} match." ${GREEN}
+    log_result "Images ${SOURCE_IMAGE} and ${TARGET_IMAGE} match (linux/amd64)." ${GREEN}
   fi
 }
 
 registry_login() {
   [[ "${SKIP_LOGIN}" == "T" ]] && return
-  echo "Validating login to $1"
-  if ! docker login $1; then
-    echo "Failed to login to registry server - $1"
+  echo "Validating login to ${1}"
+  if ! docker login "${1}"; then
+    echo "Failed to login to registry server - ${1}"
     exit 1
   fi
 }
 
+# Resolve container image store (Docker or Podman via docker alias).
+get_container_storage_dir() {
+  local dir=""
+
+  dir=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)
+  if [[ -n "${dir}" && "${dir}" != "<no value>" ]]; then
+    echo "${dir}"
+    return 0
+  fi
+
+  dir=$(docker info --format '{{.Store.GraphRoot}}' 2>/dev/null)
+  if [[ -n "${dir}" && "${dir}" != "<no value>" ]]; then
+    echo "${dir}"
+    return 0
+  fi
+
+  if command -v podman >/dev/null 2>&1; then
+    dir=$(podman info --format '{{.Store.GraphRoot}}' 2>/dev/null)
+    if [[ -n "${dir}" && "${dir}" != "<no value>" ]]; then
+      echo "${dir}"
+      return 0
+    fi
+  fi
+
+  for dir in /var/lib/docker /var/lib/containers/storage "${HOME}/.local/share/containers/storage"; do
+    if [[ -d "${dir}" ]]; then
+      echo "${dir}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# Returns available space in whole GB for path, or empty on failure.
+get_disk_avail_gb() {
+  local path="$1"
+  local avail_kb=""
+
+  # GNU df: --output=avail (cannot combine with -P)
+  if avail_kb=$(df -k --output=avail "${path}" 2>/dev/null | awk 'NR==2 {print $1; exit}'); then
+    if [[ -n "${avail_kb}" && "${avail_kb}" =~ ^[0-9]+$ ]]; then
+      awk -v kb="${avail_kb}" 'BEGIN {printf "%.0f\n", kb/1024/1024}'
+      return 0
+    fi
+  fi
+
+  # POSIX df -kP: Available is column 4
+  avail_kb=$(df -kP "${path}" 2>/dev/null | awk 'NR==2 {print $4; exit}')
+  if [[ -n "${avail_kb}" && "${avail_kb}" =~ ^[0-9]+$ ]]; then
+    awk -v kb="${avail_kb}" 'BEGIN {printf "%.0f\n", kb/1024/1024}'
+    return 0
+  fi
+
+  return 1
+}
+
 check_disk_space() {
-  DISK_AVAIL=$(df -k --output=avail $1 | grep -v 'Avail' | awk '{print $1/1024/1024}' | awk '{printf "%.0f\n", $1}')
-  if (( ${DISK_AVAIL} < ${DISK_REQUIRED} )); then
-    echo "Not enough free disk space in $1"
-    echo "${DISK_REQUIRED}GB required / ${DISK_AVAIL}GB available"
+  local target="${1}"
+  local check_path="${target}"
+  local parent=""
+  local disk_avail=""
+
+  if [[ -z "${target}" ]]; then
+    echo "Unable to determine container storage path for disk space check."
+    exit 1
+  fi
+
+  while [[ ! -e "${check_path}" ]]; do
+    parent=$(dirname "${check_path}")
+    if [[ "${parent}" == "${check_path}" ]]; then
+      echo "Storage path '${target}' does not exist and could not be resolved."
+      exit 1
+    fi
+    check_path="${parent}"
+  done
+
+  disk_avail=$(get_disk_avail_gb "${check_path}") || true
+  if [[ -z "${disk_avail}" || ! "${disk_avail}" =~ ^[0-9]+$ ]]; then
+    echo "Unable to check free disk space for ${target}"
+    exit 1
+  fi
+
+  if (( disk_avail < DISK_REQUIRED )); then
+    echo "Not enough free disk space in ${target}"
+    echo "${DISK_REQUIRED}GB required / ${disk_avail}GB available"
     exit 1
   fi
 }
@@ -142,6 +240,11 @@ check_tools(){
       exit 1
     fi
   done
+
+  CONTAINER_STORAGE_DIR=$(get_container_storage_dir) || {
+    echo "Unable to determine container storage directory from docker/podman info."
+    exit 1
+  }
 }
 
 process_image(){
@@ -304,6 +407,12 @@ done
     exit 1
   fi
 
+  # -f and -i are mutually exclusive
+  if [[ -n ${IMAGE_FILE} && -n ${IMAGE_NAME} ]]; then
+    echo "Use -f image-file or -i image-name, not both."
+    exit 1
+  fi
+
   # IMAGE_FILE must exist if -f used
   if [[ -n ${IMAGE_FILE} && ! -f ${IMAGE_FILE} ]]; then
     echo "Image file '${IMAGE_FILE}' not found.  Please check the name and try again."
@@ -345,7 +454,7 @@ if [[ -n ${IMAGE_FILE} ]]; then
     REGISTRY_ARRAY["${IMAGE%%/*}"]=1
     #continue
     IMAGE_ARRAY+=($(echo "${IMAGE}"  | tr -d '[:space:]'))
-  done < <(cat ${IMAGE_FILE} | grep -v '^#' | sed '/^[[:space:]]*$/d')
+  done < <(grep -v '^#' "${IMAGE_FILE}" | sed '/^[[:space:]]*$/d')
   echo "${#IMAGE_ARRAY[@]} image(s) to process." | tee -a results.txt
 fi
 
@@ -364,9 +473,11 @@ done
 
 # Loop over the images in the IMAGE_ARRAY
 for SOURCE_IMAGE in "${IMAGE_ARRAY[@]}"; do
-  while [ $CURRENT_JOBS -ge $NUM_ACTIONS ]; do
-    sleep 1
-    CURRENT_JOBS=$(jobs | wc -l)
+  while (( CURRENT_JOBS >= NUM_ACTIONS )); do
+    if ! wait -n; then
+      ((FAILED++))
+    fi
+    ((CURRENT_JOBS--))
   done
   if [[ -n "${PROJECT}" ]] && [[ ! "${SOURCE_IMAGE}" == *"/${PROJECT_SOURCE}/"* ]]; then
     log_error "${ACTION}" "'${SOURCE_IMAGE}' does not include '/${PROJECT_SOURCE}/'."
@@ -374,11 +485,18 @@ for SOURCE_IMAGE in "${IMAGE_ARRAY[@]}"; do
   fi
   ((COUNT++))
   process_image "${SOURCE_IMAGE}" &
-  CURRENT_JOBS=$(jobs | wc -l)
+  ((CURRENT_JOBS++))
 done
-#printf '%s\n' "${!REGISTRY_ARRAY[@]}"
-# Wait for final image to be processed
-wait
+while (( CURRENT_JOBS > 0 )); do
+  if ! wait -n; then
+    ((FAILED++))
+  fi
+  ((CURRENT_JOBS--))
+done
+if (( FAILED > 0 )); then
+  echo "Finished processing images with ${FAILED} failure(s)."
+  exit 1
+fi
 echo "Finished processing images."
 
 # Redundant code
