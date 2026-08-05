@@ -736,6 +736,14 @@ getRSSODetails() {
   if [[ "${RSSO_TOKEN_JSON}" =~ "admin_token" ]]; then
     RSSO_TOKEN=$(echo "${RSSO_TOKEN_JSON}" | ${JQ_BIN} -r .admin_token)
     logMessage "RSSO login OK - got admin token." 1
+    RSSO_SERVICE_URL=$(${CURL_BIN} -sk -X GET "${RSSO_URL}/api/v1.1/config" -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} -r '.commonConfig.serverExternalUrl')
+    if [ -n "${RSSO_SERVICE_URL}" ]; then
+      if [ "${RSSO_SERVICE_URL}" == "${RSSO_URL}" ]; then
+        logWarning "048" "RSSO Backchannel Service URL is set to '${RSSO_SERVICE_URL}'.  This is not usually required."
+      else
+        logError "265" "RSSO Backchannel Service URL is set and the value '${RSSO_SERVICE_URL}' does not match the RSSO URL."
+      fi
+    fi
   else
     logError "112" "Unable to get the RSSO admin token. RSSO response: ${RSSO_TOKEN_JSON}" 1
   fi
@@ -2954,11 +2962,11 @@ dumpVARs() {
 
 checkJenkinsConfig() {
   [[ "${SKIP_JENKINS}" == 1 ]] && return
+    logMessage "Checking plugins..."
+    checkJenkinsPlugins
   if isJenkinsInCluster ; then
     logMessage "Jenkins is running in cluster - skipping remaining checks..."
   else
-    logMessage "Checking plugins..."
-    checkJenkinsPlugins
     logMessage "Checking approved scripts..."
     checkJenkinsScriptApprovals
     logMessage "Checking nodes..."
@@ -3074,17 +3082,21 @@ checkJenkinsPlugins() {
     pipeline-stage-view
     pipeline-rest-api
     )
-  JK_PLUGINS=$(${CURL_BIN} -sk "${JENKINS_URL}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[].shortName')
-  echo "${JK_PLUGINS}" | ${JQ_BIN} -r '.plugins[] | {shortName, version}' > "${JENKINS_PLUGINS_LOG}"
+  JK_PLUGINS=$(${CURL_BIN} -sk "${JENKINS_URL}/pluginManager/api/json?depth=1" | ${JQ_BIN} -r '.plugins[] | {shortName, version}')
+  echo "${JK_PLUGINS}" | ${JQ_BIN} . > "${JENKINS_PLUGINS_LOG}"
+  if isJenkinsInCluster ; then
+    return
+  fi
+  # Test for permissive script plugin
+  if [[ "${JK_PLUGINS}" =~ "permissive-script-security" ]]; then
+    SKIP_JENKINS_SCRIPTAPPROVAL_CHECK=1
+  fi
+
   for i in "${EXPECTED_PLUGINS[@]}" ; do
     if ! echo "${JK_PLUGINS}" | grep -wq "${i}" ; then
       logError "195" "Jenkins plugin '${i}' is missing."
     fi
   done
-  # Test for permissive script plugin
-  if [[ "${JK_PLUGINS[*]}" =~ "permissive-script-security" ]]; then
-    SKIP_JENKINS_SCRIPTAPPROVAL_CHECK=1
-  fi
 }
 
 # NOT USED
@@ -8168,7 +8180,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260804-02"
+HITT_BUILD_VERSION="20260805-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8580,6 +8592,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"DB_JDBC_URL is set which requires port 6200 on the DB server to be accessible if using RAC.\",
     \"impact\": \"Platform pods will not start.\",
     \"remediation\": \"Make sure the ONS port (6200) is open for connections from Kubernetes.\"
+  },
+  {
+    \"id\": \"048\",
+    \"cause\": \"RSSO Service URL is set - this is not usually required.\",
+    \"impact\": \"Application logins may fail if the Service URL is not valid.\",
+    \"remediation\": \"Confirm the Service URL is required and, if so, that it is valid for the environment.\"
   },
   {
     \"id\": \"100\",
@@ -9570,6 +9588,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"RSSO_URL value does not start with 'https://'.\",
     \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
     \"remediation\": \"Update the value and add the missing prefix.\"
+  },
+  {
+    \"id\": \"265\",
+    \"cause\": \"The RSSO Backchannel Service URL is set but does not match the URL of the SSO server.\",
+    \"impact\": \"Application logins will likely fail.\",
+    \"remediation\": \"Correct the Service URL value or remove it unless it is actually required.\"
   }
 ]"
 
