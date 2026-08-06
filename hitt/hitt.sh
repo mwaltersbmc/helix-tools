@@ -1126,7 +1126,7 @@ validateRealmDomains() {
 }
 
 validateAliasAccessibleFromDE(){
-  HTTP_CODE=$(${CURL_BIN} -ks -o /dev/null -w "%{http_code}" --max-time 3 "https://${1}")
+  HTTP_CODE=$(${CURL_BIN} -ks -o /dev/null -w "%{http_code}" --max-time 5 "https://${1}")
   case "${HTTP_CODE}" in
     200|201|202|204|404|409|302)
       logMessage "  - url 'https://${1}' is accessible from the this system." 1
@@ -8180,7 +8180,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260805-01"
+HITT_BUILD_VERSION="20260806-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
