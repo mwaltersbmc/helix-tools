@@ -393,7 +393,7 @@ checkBinary() {
 }
 
 cleanUp() {
-  if [ ! -z "${SKIP_CLEANUP}" ]; then return; fi
+  if [ -n "${SKIP_CLEANUP}" ]; then return; fi
   if [ "${1}" == "start" ]; then
       CLEANUP_FILES_TO_RM=("${CLEANUP_FILES[@]}" "${CLEANUP_START_FILES[@]}")
   fi
@@ -453,7 +453,7 @@ checkHPNamespace() {
   NS_TYPE="Helix Platform"
   checkNamespaceExists "${1}"
     if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
-    logError "107" "Deployment ${DEPLOYMENT} not found in '${1}' - please check the ${NS_TYPE} namespace name." 1
+    logError "107" "Deployment '${DEPLOYMENT}' not found in '${1}' - please check the ${NS_TYPE} namespace name." 1
   else
     logMessage "${NS_TYPE} namespace is '${1}'."
   fi
@@ -674,7 +674,7 @@ setVarsFromPlatform() {
       ADE_CS_OK=1
     else
       ADE_CS_ENABLED=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get deployment tms -o jsonpath='{.spec.template.spec.containers[?(@.name=="tms")].env[?(@.name=="ADE_CS_ENABLED")].value}')
-      [[ ! -z "${ADE_CS_ENABLED}" ]] && ADE_CS_OK=1
+      [[ -n "${ADE_CS_ENABLED}" ]] && ADE_CS_OK=1
     fi
     [[ "${ADE_CS_OK}" == "0" ]] && logError "111" "The Helix Platform credential service is not installed or disabled in the TMS deployment.  Please see the 'Known and corrected issues' documentation."
   fi
@@ -875,7 +875,7 @@ getTCTLOutput() {
 
 setTCTLRESTImageName() {
   TCTL_JOB_NAME=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job --no-headers -o custom-columns=':.metadata.name' | grep tctl$ | head -1)
-  if [ ! -z "${TCTL_JOB_NAME}" ]; then
+  if [ -n "${TCTL_JOB_NAME}" ]; then
     return 0
   else
     return 1
@@ -2442,7 +2442,7 @@ checkIsValidElastic() {
 
 getSvcFromExternalIP() {
   SERVICE_NAME=$(${KUBECTL_BIN} get svc -n "${HP_NAMESPACE}" -o jsonpath='{.items[?(@.spec.externalIPs[0]=="'"${1}"'")].metadata.name}')
-  [[ -n $SERVICE_NAME ]] && echo 0 || echo 1
+  [[ -n "${SERVICE_NAME}" ]] && echo 0 || echo 1
 }
 
 checkFTSElasticSettings() {
@@ -2642,7 +2642,7 @@ checkISDBSettings() {
     logMessage "IS DB server '${IS_DATABASE_HOST_NAME}' is reachable on port '${IS_DB_PORT}'." 1
   fi
   if [ -z "${IS_AR_DB_USER}" ] || [ -z "${IS_AR_DB_PASSWORD}" ]; then
-    logError "246" "AR_DB_USER and/or AR_DB_PASSWORD are blank - skipping checks."
+    logError "021" "AR_DB_USER and/or AR_DB_PASSWORD are blank - skipping checks."
     SKIP_AR_DB_CHECKS=1
   fi
   JISQL_USERNAME="${IS_AR_DB_USER}"
@@ -2650,7 +2650,7 @@ checkISDBSettings() {
   JISQL_DB_NAME="${IS_AR_DB_NAME}"
   if [ "${IS_DATABASE_RESTORE}" == "true" ] && [ "${IS_DB_TYPE}" == "postgres" ]; then
     if [ -z "${IS_DATABASE_ADMIN_USER}" ] || [ -z "${IS_DATABASE_ADMIN_PASSWORD}" ]; then
-      logError "246" "DATABASE_ADMIN_USER and/or DATABASE_ADMIN_PASSWORD are blank - skipping checks."
+      logError "021" "DATABASE_ADMIN_USER and/or DATABASE_ADMIN_PASSWORD are blank - skipping checks."
       SKIP_AR_DB_CHECKS=1
     fi
     JISQL_USERNAME="${IS_DATABASE_ADMIN_USER}"
@@ -2679,7 +2679,11 @@ checkISDBSettings() {
      return
     else
       DB_VERSION=$(echo "${SQL_RESULT}" | awk '{print $1}')
-      if [ ! -z "${IS_DB_VERSION}" ]; then
+      if [ -z "${DB_VERSION}" ] || ! [[ "${DB_VERSION}" =~ ^[0-9]+$ ]]; then
+        logError "269" "Blank or unexpected currDbVersion found in control table - check the database is valid."
+        return
+      fi
+      if [ -n "${IS_DB_VERSION}" ]; then
         if [ "${DB_VERSION}" != "${IS_DB_VERSION}" ] && [ "${DB_VERSION}" != "1" ]; then
           logError "181" "Database is not the expected version - found '${DB_VERSION}' but expected '${IS_DB_VERSION}'.  This is expected when running an upgrade."
         else
@@ -2773,7 +2777,7 @@ checkKubeconfig() {
   if ! ${KUBECTL_BIN} version > /dev/null 2>&1; then
     logError "184" "'kubectl version' command returned an error - unable to continue." 1
   fi
-  if [ ! -z "${KUBECONFIG}" ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
+  if [ -n "${KUBECONFIG}" ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
     if [ "${MODE}" == "info" ]; then return; fi
     logError "185" "KUBECONFIG environment variable is set '${KUBECONFIG}' but is not the default of '${HOME}/.kube/config' required by Jenkins."
     KUBECONFIG_ERROR=1
@@ -2988,7 +2992,7 @@ getPipelineParameterDefault() {
 checkJenkinsNodes() {
   NODE_STATUS=$(${CURL_BIN} -sk "${JENKINS_URL}/manage/computer/api/json?depth=1")
   OFFLINE_NODES=$(echo "${NODE_STATUS}" | ${JQ_BIN} -r '.computer[]| select(.offline=='true').displayName')
-  if [ ! -z "${OFFLINE_NODES}" ] ; then
+  if [ -n "${OFFLINE_NODES}" ] ; then
     logError "193" "One or more Jenkins nodes found in an 'offline' state."
     printf '%s\n' "${OFFLINE_NODES}"
   fi
@@ -4992,7 +4996,7 @@ applyARLicense() {
       IS_LICENSE_JSON="{\"values\":{\"License Type\":\"AR Server\",\"Number of Licenses\":1,\"Key\":\"${IS_LICENSE_KEY}\",\"Expiration Date\":\"${IS_LICENSE_EXPIRY}\"}}"
     fi
   fi
-  [[ ! -z "${INVALID_IS_LICENSE+x}" ]] && exit
+  [[ -n "${INVALID_IS_LICENSE+x}" ]] && exit
   initISAdminREST
   IS_LICENSE_TYPE=$(getISServerInfo licensetype)
   logMessage "Current server license type is '${IS_LICENSE_TYPE}'."
@@ -6115,7 +6119,7 @@ getK8sNodeDetails() {
   nodes_json=$(${KUBECTL_BIN} get nodes -o json 2>>"${HITT_ERR_FILE}") || true
   if [[ -z "${nodes_json}" ]] || ! echo "${nodes_json}" | ${JQ_BIN} -e . >/dev/null 2>>"${HITT_ERR_FILE}"; then
     # Do not pass exit flag to logError — caller may continue; check return value.
-    logError "265" "Unable to read Kubernetes nodes as JSON - check kubeconfig, cluster reachability, and '${KUBECTL_BIN}'."
+    logError "270" "Unable to read Kubernetes nodes as JSON - check kubeconfig, cluster reachability, and '${KUBECTL_BIN}'."
     return 1
   fi
 
@@ -6316,13 +6320,13 @@ getK8sNodePodDetails() {
   K8S_NODE_POD_DETAILS_TABLE=""
 
   if ! ${KUBECTL_BIN} get node "${node_name}" >/dev/null 2>>"${HITT_ERR_FILE}"; then
-    logError "265" "Node '${node_name}' not found or not accessible - check the name, kubeconfig, and permissions."
+    logError "271" "Node '${node_name}' not found or not accessible - check the name, kubeconfig, and permissions."
     return 1
   fi
 
   pods_json=$(${KUBECTL_BIN} get pods --all-namespaces --field-selector "spec.nodeName=${node_name}" -o json 2>>"${HITT_ERR_FILE}") || pods_json='{"items":[]}'
   if ! echo "${pods_json}" | ${JQ_BIN} -e . >/dev/null 2>>"${HITT_ERR_FILE}"; then
-    logError "265" "Unable to read pods for node '${node_name}'."
+    logError "272" "Unable to read pods for node '${node_name}'."
     return 1
   fi
 
@@ -7771,7 +7775,7 @@ fi
 cleanUp start
 
 # Run tctl command and then exit
-if [[ ! -z "${TCTL_CMD}" ]]; then
+if [[ -n "${TCTL_CMD}" ]]; then
   logStatus "Running in tctl mode..."
   checkToolVersion kubectl
   getVersions
@@ -7792,7 +7796,7 @@ if [[ ! -z "${TCTL_CMD}" ]]; then
 fi
 
 # Print Jenkins credentials and exit
-if [[ ! -z "${DUMP_JCREDS}" ]]; then
+if [[ -n "${DUMP_JCREDS}" ]]; then
   logStatus "Jenkins credentials..."
   checkJenkinsIsRunning 1
   validateJenkinsCredentials
@@ -7814,7 +7818,7 @@ if [ "${MODE}" == "jenkins" ]; then
   exit
 fi
 
-if [[ ! -z "${BUNDLE_ID}" ]]; then
+if [[ -n "${BUNDLE_ID}" ]]; then
   logStatus "Running IS deployment status check for bundle ID=${BUNDLE_ID}..."
   getDomain
   buildISAliasesArray
@@ -8024,7 +8028,7 @@ if [ "${MODE}" == "info" ]; then
       if [[ -z "${INFO_NODE_NAME}" ]]; then
         NODE_ARRAY=($(${KUBECTL_BIN} get nodes --no-headers -o custom-columns=':metadata.name' 2>>"${HITT_ERR_FILE}"))
         if [[ ${#NODE_ARRAY[@]} -eq 0 ]]; then
-          logError "265" "No Kubernetes nodes found - check cluster access and permissions." 1
+          logError "273" "No Kubernetes nodes found - check cluster access and permissions." 1
         fi
         logStatus "Please select a node..." 1
         INFO_NODE_NAME=$(selectFromArray NODE_ARRAY)
@@ -8067,7 +8071,7 @@ fi
 [[ "${MODE}" =~ ^pre-hp|^post-hp$|^pre-is$|^post-is$ ]] || usage
 
 # MODE is required
-if [[ -z ${MODE} ]]; then
+if [[ -z "${MODE}" ]]; then
   logError "200" "Mode must be specified with -m <post-hp|pre-is|post-is>" 1
 fi
 
@@ -8180,7 +8184,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260806-01"
+HITT_BUILD_VERSION="20260806-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -9594,6 +9598,48 @@ ALL_MSGS_JSON="[
     \"cause\": \"The RSSO Backchannel Service URL is set but does not match the URL of the SSO server.\",
     \"impact\": \"Application logins will likely fail.\",
     \"remediation\": \"Correct the Service URL value or remove it unless it is actually required.\"
+  },
+  {
+    \"id\": \"266\",
+    \"cause\": \"The IngressClass name configured for Helix could not be read from the cluster.\",
+    \"impact\": \"HITT cannot report ingress controller details for info mode.\",
+    \"remediation\": \"Check the INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline and confirm the IngressClass exists in the cluster.\"
+  },
+  {
+    \"id\": \"267\",
+    \"cause\": \"HITT could not list Deployments and DaemonSets while looking for the ingress controller.\",
+    \"impact\": \"Ingress controller details cannot be shown.\",
+    \"remediation\": \"Check cluster access and permissions to list workloads in all namespaces.\"
+  },
+  {
+    \"id\": \"269\",
+    \"cause\": \"The currDbVersion found in the control table is not valid or missing.\",
+    \"impact\": \"IS Platform pods will fail to start.\",
+    \"remediation\": \"Verify that the IS database contains valid data.\"
+  },
+  {
+    \"id\": \"270\",
+    \"cause\": \"HITT could not read Kubernetes node details from the cluster.\",
+    \"impact\": \"The info cluster node table cannot be shown.\",
+    \"remediation\": \"Check kubeconfig, cluster reachability, and permissions to list nodes.\"
+  },
+  {
+    \"id\": \"271\",
+    \"cause\": \"The selected node name was not found or is not accessible.\",
+    \"impact\": \"The info node pod table cannot be shown.\",
+    \"remediation\": \"Check the node name, kubeconfig, and permissions to get nodes.\"
+  },
+  {
+    \"id\": \"272\",
+    \"cause\": \"HITT could not read pods scheduled on the selected node.\",
+    \"impact\": \"The info node pod table cannot be shown.\",
+    \"remediation\": \"Check permissions to list pods in all namespaces.\"
+  },
+  {
+    \"id\": \"273\",
+    \"cause\": \"No Kubernetes nodes were returned by the cluster.\",
+    \"impact\": \"Interactive info node selection cannot run.\",
+    \"remediation\": \"Check cluster access and permissions to list nodes, or pass the node name on the command line.\"
   }
 ]"
 
