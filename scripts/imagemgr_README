@@ -12,6 +12,10 @@ Where:
 -n  set the number of parallel docker operations.  Defaults to 2 but can probably be increased to 4 or 6 for better performance.
 -k  skip docker login if already logged in to registries.
 -p  change the project name from 'project' to 'newproject' - eg: -p bmchelix:bmc
+-D  use docker-in-docker (recommended on Podman hosts). imagemgr runs on the host; a privileged docker:dind sidecar is started and the host docker CLI targets that daemon.
+-I  dind sidecar image (default: docker.io/library/docker:dind). Use with -D.
+-O  treat source registry host(s) as insecure (from image names in -i/-f).
+-U  treat target registry host as insecure (requires -t).
 
 The script will attempt a docker login to the registry servers when run and prompt for credentials if not cached.  All operations require either an image name or file containing a list of images to process.
 
@@ -26,7 +30,24 @@ compare - compares image checksums to make sure they are the same.
 
 The save option will name the files automatically, using URL encoding to avoid issues with /: and other similar characters in the image name.
 
-The script will check to make sure there is more than 10GB of free disk space in the current and /var/lib/docker directories to try and avoid running out of space.  Space is checked on every pull/save operation.
+The script will check to make sure there is more than 10GB of free disk space in the current and container storage directories to try and avoid running out of space.  Space is checked on every pull/save operation.
 Required disk space may be changed by modifying DISK_REQUIRED value in the script.
+
+Docker-in-Docker (-D):
+imagemgr always runs on the host (bash script). With -D, Podman or Docker on the host starts a privileged docker:dind sidecar only; imagemgr then invokes the host docker CLI against that daemon (DOCKER_HOST=tcp://127.0.0.1:2375). If the host docker command is Podman and cannot use DOCKER_HOST, imagemgr falls back to podman exec into the sidecar. imagemgr itself is never run inside dind. Host CA certificates under /etc/ssl/certs (and RHEL /etc/pki/ca-trust/.../tls-ca-bundle.pem when present) are mounted into the sidecar for registry TLS. Example:
+
+  ./imagemgr.sh -D -a sync -f images.txt -t "myregistry.example.com/myproject"
+
+Override the sidecar port with IMAGEMGR_DIND_PORT if 2375 is in use.
+
+Insecure registries (-O / -U):
+Use -O for source pulls and -U for target push/verify when a registry uses HTTP or TLS without a trusted CA. With -D, imagemgr writes a daemon.json and mounts it into the dind sidecar. Without -D on Podman hosts, a temporary registries.conf is used via CONTAINERS_REGISTRIES_CONF. Host Docker without -D requires manual /etc/docker/daemon.json changes. Example:
+
+  ./imagemgr.sh -D -O -U -a sync -f images.txt -t "myregistry.example.com/project"
+  ./imagemgr.sh -D -O -a verify -i "source.reg.example.com/bmchelix/ars:25401-RTM"
+
+Non-interactive login (e.g. dind exec mode): set IMAGEMGR_REGISTRY_USER and IMAGEMGR_REGISTRY_PASS before running.
+
+Docker Hub (docker.io): web-based device login is disabled. imagemgr always uses docker login -u. Set IMAGEMGR_DOCKERIO_USER and IMAGEMGR_DOCKERIO_PASS (Docker Hub PAT as password), or enter username when prompted.
 
 Progress is output to the screen and saved in a results.txt file.  Errors are logged in an errors.txt file but should not block processing.  Log lines start with a number to allow actions run in parallel to be differentiated.
