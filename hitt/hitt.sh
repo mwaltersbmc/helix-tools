@@ -7668,7 +7668,7 @@ enumerateHelixVersions() {
 }
 
 checkGenConfigOutput() {
-  local regex line file full_line expr_num char_num
+  local regex line file full_line expr_num char_num invalid_value
   local first_sed_block expr_line replacement_literal clean_var_name
   if [ "${SKIP_JENKINS}" == "1" ] || [ "${MODE}" != "pre-is" ]; then
     return
@@ -7700,7 +7700,12 @@ checkGenConfigOutput() {
   replacement_literal=$(echo "${expr_line}" | sed -E -e 's/^[[:space:]]*["'\'']s([^[:alnum:]])//' -e 's/([^[:alnum:]])[a-z]*["'\'']?[[:space:]]*\\?$//' | awk -F '[/,!+,]' '{print $2}')
   clean_var_name=$(echo "${replacement_literal}" | sed -E 's/\\?["'\'']//g; s/\$\{?([A-Za-z0-9_]+)\}?/\1/g')
   if [ -n "${clean_var_name}" ]; then
-    logError "274" "The parameter '${clean_var_name}' from the latest HELIX_ONPREM_DEPLOYMENT build contains an invalid character at position ${char_num}."
+    invalid_value=$(echo "${JENKINS_PARAMS}" | ${JQ_BIN} -r ".${clean_var_name} // empty")
+    if [ -n "${invalid_value}" ]; then
+      logMessage "    - the '${clean_var_name}' value from the latest HELIX_ONPREM_DEPLOYMENT build contains an invalid character: '${invalid_value}'."
+    else
+      logMessage "    - the failing sed expression is ${expr_line}."
+    fi
   else
     logError "274" "Could not map sed expression '#${expr_num}' to a pipeline parameter — review HELIX_GENERATE_CONFIG.log."
   fi
@@ -8223,7 +8228,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260807-01"
+HITT_BUILD_VERSION="20260807-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
