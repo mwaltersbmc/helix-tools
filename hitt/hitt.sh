@@ -7667,6 +7667,44 @@ enumerateHelixVersions() {
   fi
 }
 
+checkGenConfigOutput() {
+  local regex line file full_line expr_num char_num
+  local first_sed_block expr_line replacement_literal clean_var_name
+  if [ "${SKIP_JENKINS}" == "1" ] || [ "${MODE}" != "pre-is" ]; then
+    return
+  fi
+  savePipelineConsoleOutput "HELIX_GENERATE_CONFIG" "lastBuild"
+  [[ ! -f HELIX_GENERATE_CONFIG.log ]] && return
+  regex="^(sed: -e expression #([0-9]+), char ([0-9]+):.*)$"
+  while IFS= read -r line; do
+    if [[ "${line}" =~ ${regex} ]]; then
+        full_line="${BASH_REMATCH[1]}"
+        expr_num="${BASH_REMATCH[2]}"
+        char_num="${BASH_REMATCH[3]}"
+        break
+    fi
+  done < "HELIX_GENERATE_CONFIG.log"
+  if [ -z "${full_line}" ]; then
+    return
+  else
+    logError "274" "HELIX_GENERATE_CONFIG pipeline error due to an invalid character in one of the HELIX_ONPREM_DEPLOYMENT input values - ${full_line}"
+  fi
+  if [ "${SKIP_REPO}" == "1" ]; then
+    return
+  fi
+  file="itsmrepo/pipeline/tasks/generateITSMinput.sh"
+  [[ ! -f "${file}" ]] && return
+  # Best-effort mapping: layout of sed -e blocks in generateITSMinput.sh varies by ITSM installer version.
+  first_sed_block=$(sed -n '/^sed -i/,/${TARGET_FILE}/p' "${file}")
+  expr_line=$(echo "${first_sed_block}" | awk -v RS='-e' -v n="${expr_num}" 'NR==n+1 {print $0}')
+  replacement_literal=$(echo "${expr_line}" | sed -E -e 's/^[[:space:]]*["'\'']s([^[:alnum:]])//' -e 's/([^[:alnum:]])[a-z]*["'\'']?[[:space:]]*\\?$//' | awk -F '[/,!+,]' '{print $2}')
+  clean_var_name=$(echo "${replacement_literal}" | sed -E 's/\\?["'\'']//g; s/\$\{?([A-Za-z0-9_]+)\}?/\1/g')
+  if [ -n "${clean_var_name}" ]; then
+    logError "274" "The parameter '${clean_var_name}' from the latest HELIX_ONPREM_DEPLOYMENT build contains an invalid character at position ${char_num}."
+  else
+    logError "274" "Could not map sed expression '#${expr_num}' to a pipeline parameter — review HELIX_GENERATE_CONFIG.log."
+  fi
+}
 #End functions
 
 # MAIN Start
@@ -8143,6 +8181,7 @@ if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking IS details..."
   validateISDetails
   checkPipelinePwds
+  checkGenConfigOutput
   logStatus "Checking IS registry details..."
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
@@ -8184,7 +8223,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260806-02"
+HITT_BUILD_VERSION="20260807-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -9640,6 +9679,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"No Kubernetes nodes were returned by the cluster.\",
     \"impact\": \"Interactive info node selection cannot run.\",
     \"remediation\": \"Check cluster access and permissions to list nodes, or pass the node name on the command line.\"
+  },
+  {
+    \"id\": \"274\",
+    \"cause\": \"An error occurred processing the pipeline input values.\",
+    \"impact\": \"Deployment will fail.\",
+    \"remediation\": \"Check the value of the named parameter for invalid special characters such as /.\"
   }
 ]"
 
