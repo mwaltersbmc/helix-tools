@@ -1149,8 +1149,10 @@ validateAliasInDNS() {
     fi
     logError "122" "Entry for '${1}' not found in DNS. ${MSG_SUFFIX}"
     MSG_SUFFIX=""
+    return 1
   else
     logMessage "  - alias '${1}' found in DNS." 1
+    return 0
   fi
 }
 
@@ -2634,6 +2636,9 @@ testNetConnection () {
 }
 
 checkISDBSettings() {
+  if ! validateAliasInDNS "${IS_DATABASE_HOST_NAME}"; then
+    return
+  fi
   if ! testNetConnection "${IS_DATABASE_HOST_NAME}" "${IS_DB_PORT}"; then
     logWarning "027" "IS DB server '${IS_DATABASE_HOST_NAME}' is not reachable on port '${IS_DB_PORT}' - this is expected if there is no connectivity from this system - skipping DB checks."
     SKIP_DB_CHECKS=1
@@ -8228,7 +8233,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260807-02"
+HITT_BUILD_VERSION="20260810-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
