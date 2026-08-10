@@ -2384,7 +2384,7 @@ validateCacertsFile() {
 
 checkISFTSElasticHost() {
   # IP/service.ns pipeline_param_name
-  if [ $(isIPAddress "${1}") == "0" ]; then
+  if isIPAddress "${1}"; then
     if [ $(getSvcFromExternalIP "${1}") == "1" ]; then
       logError "165" "FTS_ELASTICSEARCH_HOSTNAME IP address '${1}' not found as an externalIP for any exposed service in the Helix Platform namespace."
     else
@@ -2413,7 +2413,7 @@ checkISFTSElasticHost() {
 
 checkIsValidElastic() {
   BAD_ELASTIC=0
-  if [ $(isIPAddress "${1}") == "0" ]; then
+  if isIPAddress "${1}"; then
     if [ $(getSvcFromExternalIP "${1}") == "1" ]; then
       logError "169" "${2} IP address '${1}' not found as an externalIP for any exposed service in the Helix Platform namespace."
       return
@@ -2636,9 +2636,10 @@ testNetConnection () {
 }
 
 checkISDBSettings() {
-  if ! validateAliasInDNS "${IS_DATABASE_HOST_NAME}"; then
-    return
-  fi
+  # If IS_DATABASE_HOST_NAME is an IP then proceed
+  # If not an IP then validateAliasInDNS
+  # If not valid DNS set SKIP_DB_CHECKS and return
+  isIPAddress "${IS_DATABASE_HOST_NAME}" || validateAliasInDNS "${IS_DATABASE_HOST_NAME}" || { SKIP_DB_CHECKS=1; return; }
   if ! testNetConnection "${IS_DATABASE_HOST_NAME}" "${IS_DB_PORT}"; then
     logWarning "027" "IS DB server '${IS_DATABASE_HOST_NAME}' is not reachable on port '${IS_DB_PORT}' - this is expected if there is no connectivity from this system - skipping DB checks."
     SKIP_DB_CHECKS=1
@@ -2727,11 +2728,7 @@ checkSRDBSettings() {
 }
 
 isIPAddress() {
-  if [[ "${1}" =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then
-    echo 0
-  else
-    echo 1
-  fi
+  [[ "${1}" =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]
 }
 
 isRFC1123() {
@@ -8233,7 +8230,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260810-01"
+HITT_BUILD_VERSION="20260810-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
