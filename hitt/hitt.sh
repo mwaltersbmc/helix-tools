@@ -2716,6 +2716,13 @@ checkISDBSettings() {
             logError "182" "Missing 'trace_xe_event_map' synonym in database - please refer to the BMC docs."
         fi
         ;;
+      oracle)
+        SQL_RESULT=$(${JISQLCMD} "SELECT count(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name='DBMS_LOB' AND privilege='EXECUTE'
+        go" 2>&1 | awk '{print $1}')
+        if [ "${SQL_RESULT}" == "0" ]; then
+            logError "275" "Missing execute permission on the Oracle SYS.DBMS_LOB tables."
+        fi
+        ;;
     esac
 
   else
@@ -8230,7 +8237,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260810-02"
+HITT_BUILD_VERSION="20260811-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -9692,6 +9699,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"An error occurred processing the pipeline input values.\",
     \"impact\": \"Deployment will fail.\",
     \"remediation\": \"Check the value of the named parameter for invalid special characters such as /.\"
+  },
+  {
+    \"id\": \"275\",
+    \"cause\": \"Execute permission on the SYS.DBMS_LOB tables is required but not allowed.\",
+    \"impact\": \"IS platform-fts-0 pod will not become ready and deployment will fail.\",
+    \"remediation\": \"Grant execute permission on the SYS.DBMS_LOB tables for the ARAdmin user.\"
   }
 ]"
 
