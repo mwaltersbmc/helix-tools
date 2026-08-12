@@ -12,6 +12,7 @@ Replace all placeholders in the manifests before applying.
 
 | Placeholder | Description |
 | ----------- | ----------- |
+| `<NAMESPACE>` | Kubernetes namespace (typically the IS namespace) |
 | `<CHISEL-ALIAS>` | Ingress hostname that clients connect to |
 | `<USER>:<PASS>` | Chisel credentials — used in `users.json` and client `--auth` |
 | `<LOCAL-PORT>` | Port bound on the client machine |
@@ -24,13 +25,24 @@ Edit the manifests, then apply:
 
 ```bash
 kubectl apply -f chisel-server.yaml -n <NAMESPACE>
-kubectl apply -f chisel-ingress -n <NAMESPACE>
+kubectl apply -f chisel-ingress.yaml -n <NAMESPACE>
 ```
 
 Before applying:
 
 - Set `<USER>:<PASS>` in `stringData.users.json` in the Secret.
-- Set `<CHISEL-ALIAS>` in `chisel-ingress` — DNS must resolve to your ingress controller or load balancer.
+- Set `<CHISEL-ALIAS>` in `chisel-ingress.yaml` — DNS must resolve to your ingress controller or load balancer.
+
+## Uninstall
+
+Stop any running chisel clients on your machine, then remove the cluster resources:
+
+```bash
+kubectl delete -f chisel-ingress.yaml -n <NAMESPACE>
+kubectl delete -f chisel-server.yaml -n <NAMESPACE>
+```
+
+This deletes the Ingress, Deployment, and `chisel-auth` Secret. If you enabled TLS in the manifest, delete the TLS Secret separately (for example `chisel-tls-cert`) if it was created outside these files.
 
 ## Ingress
 
