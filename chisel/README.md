@@ -12,7 +12,6 @@ Replace all placeholders in the manifests before applying.
 
 | Placeholder | Description |
 | ----------- | ----------- |
-| `<NAMESPACE>` | Kubernetes namespace (typically the IS namespace) |
 | `<CHISEL-ALIAS>` | Ingress hostname that clients connect to |
 | `<USER>:<PASS>` | Chisel credentials — used in `users.json` and client `--auth` |
 | `<LOCAL-PORT>` | Port bound on the client machine |

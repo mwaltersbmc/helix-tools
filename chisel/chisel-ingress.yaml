@@ -2,7 +2,6 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: chisel-ingress
-  namespace: <NAMESPACE>
   annotations:
     # Increase timeouts so long-lived TCP sessions over WebSocket don't drop (Default is 60s)
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
