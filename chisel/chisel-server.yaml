@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chisel-auth
+  namespace: <NAMESPACE>
+type: Opaque
+stringData:
+  users.json: |
+    {
+      "<USER>:<PASS>": [""]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chisel-server
+  namespace: <NAMESPACE>
+  labels:
+    app: chisel-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chisel-server
+  template:
+    metadata:
+      labels:
+        app: chisel-server
+    spec:
+      containers:
+        - name: chisel
+          image: jpillora/chisel:latest
+          args:
+            - "server"
+            - "--port"
+            - "8080"
+            - "--authfile"
+            - "/etc/chisel/users.json"
+            - "--reverse"
+          ports:
+            - containerPort: 8080
+              name: http
+          volumeMounts:
+            - name: auth-volume
+              mountPath: /etc/chisel
+              readOnly: true
+          resources:
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+      volumes:
+        - name: auth-volume
+          secret:
+            secretName: chisel-auth
+            items:
+              - key: users.json
+                path: users.json
