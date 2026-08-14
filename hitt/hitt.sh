@@ -1214,10 +1214,40 @@ checkFTSElasticStatus() {
   fi
 }
 
+ensureISPlatformCache() {
+  [[ -n "${IS_PLATFORM_STS:-}" ]] && return 0
+  IS_PLATFORM_STS=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts \
+    -o jsonpath='{.spec.template.spec.containers[?(@.name=="platform")]}' 2>/dev/null)
+  if [[ -z "${IS_PLATFORM_STS}" ]]; then
+    return 1
+  fi
+  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret > /dev/null 2>&1; then
+    IS_PLATFORM_SECRET=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data}')
+  else
+    IS_PLATFORM_SECRET=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret platform-fts -o jsonpath='{.data}')
+  fi
+}
+
+getDeployedISSTS() {
+  ensureISPlatformCache || return 1
+  getValueFromPlatformSTS "${1}"
+}
+
+getDeployedISSecret() {
+  ensureISPlatformCache || return 1
+  getValueFromPlatformSecret "${1}"
+}
+
+getDeployedISVersion() {
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts \
+    -o jsonpath='{.metadata.labels.chart}' 2>/dev/null | cut -f2 -d '-'
+}
+
+# Populates IS_* from the cluster. Do not call for upgrade-is — pipeline values must stay in IS_*.
 getISDetailsFromK8s() {
   [[ "${MODE}" != "post-is" && "${MODE}" != "info" ]] && return
   logMessage "Getting data from IS namespace..."
-  IS_PLATFORM_STS=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get sts platform-fts -o jsonpath='{.spec.template.spec.containers[?(@.name=="platform")]}')
+  ensureISPlatformCache || return
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret > /dev/null 2>&1; then
     IS_PLATFORM_SECRET=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data}')
     IS_AR_DB_USER=$(getValueFromPlatformSecret "AR_DB_USERNAME")
@@ -2227,6 +2257,29 @@ validateISDetails() {
       logError "158" "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' is not the expected value of '${HP_COMPANY_NAME}'."
     else
       logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of '${HP_COMPANY_NAME}'." 1
+    fi
+  fi
+}
+
+checkUpgradeISDeployedValues() {
+  [[ "${MODE}" != "upgrade-is" ]] && return
+  K8S_AR_SERVER_ALIAS=$(getDeployedISSTS "AR_SERVER_ALIAS")
+  if [[ -z "${K8S_AR_SERVER_ALIAS}" || "${K8S_AR_SERVER_ALIAS}" == "null" ]]; then
+    logMessage "Deployed AR_SERVER_ALIAS not found in the cluster - skipping comparison." 1
+  elif [[ "${IS_AR_SERVER_ALIAS}" != "${K8S_AR_SERVER_ALIAS}" ]]; then
+    logWarning "049" "Pipeline AR_SERVER_ALIAS '${IS_AR_SERVER_ALIAS}' is different to the currently deployed value '${K8S_AR_SERVER_ALIAS}'."
+  fi
+
+  if [[ -n "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" ]]; then
+    if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get svc platform-admin-ext > /dev/null 2>&1; then
+      logMessage "platform-admin-ext service not found - skipping PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS comparison." 1
+    else
+      PIPELINE_IPS_JSON=$(echo "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" | sed 's/^\[//;s/\]$//' | ${JQ_BIN} -c -R 'split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length>0)) | sort')
+      K8S_IPS_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get svc platform-admin-ext -o json | ${JQ_BIN} -c '[.spec.externalIPs[]?] | sort')
+      if [[ "${PIPELINE_IPS_JSON}" != "${K8S_IPS_JSON}" ]]; then
+        K8S_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS=$(echo "${K8S_IPS_JSON}" | ${JQ_BIN} -r 'if length == 0 then "[]" else "[" + join(",") + "]" end')
+        logWarning "050" "Pipeline PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS '${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}' is different to the currently deployed value '${K8S_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}' on the platform-admin-ext service."
+      fi
     fi
   fi
 }
@@ -8203,6 +8256,7 @@ if [ "${MODE}" != "post-hp" ]; then
   esac
   logStatus "Checking IS details..."
   validateISDetails
+  checkUpgradeISDeployedValues
   checkPipelinePwds
   checkGenConfigOutput
   logStatus "Checking IS registry details..."
@@ -8246,7 +8300,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260814-01"
+HITT_BUILD_VERSION="20260814-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8664,6 +8718,18 @@ ALL_MSGS_JSON="[
     \"cause\": \"RSSO Service URL is set - this is not usually required.\",
     \"impact\": \"Application logins may fail if the Service URL is not valid.\",
     \"remediation\": \"Confirm the Service URL is required and, if so, that it is valid for the environment.\"
+  },
+  {
+    \"id\": \"049\",
+    \"cause\": \"The AR_SERVER_ALIAS value in the HELIX_ONPREM_DEPLOYMENT pipeline differs from the value currently deployed in the cluster.\",
+    \"impact\": \"The upgrade may change application URLs or fail if the alias change is not intended.\",
+    \"remediation\": \"Confirm the pipeline AR_SERVER_ALIAS is correct for the upgrade, or align it with the deployed value before running the pipeline.\"
+  },
+  {
+    \"id\": \"050\",
+    \"cause\": \"The PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the HELIX_ONPREM_DEPLOYMENT pipeline differs from the externalIPs on the platform-admin-ext service in the cluster.\",
+    \"impact\": \"The upgrade may reconfigure platform admin access or fail if the external IP change is not intended.\",
+    \"remediation\": \"Confirm the pipeline PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is correct for the upgrade, or align it with the platform-admin-ext service externalIPs before running the pipeline.\"
   },
   {
     \"id\": \"100\",
