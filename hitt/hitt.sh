@@ -290,19 +290,22 @@ stopOnError() {
 usage() {
     echo ""
     echo -e "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
-    echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is|jenkins>${NORMAL}"
+    echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|upgrade-is|post-is|jenkins>${NORMAL}"
     echo ""
     echo "Examples:"
-    echo "bash $0 -m post-hp  - run post HP installation only checks"
+    echo "bash $0 -m post-hp     - run post HP installation only checks"
     echo "OR"
-    echo "bash $0 -m pre-is   - run pre-installation checks"
+    echo "bash $0 -m pre-is      - run pre-installation checks"
     echo "OR"
-    echo "bash $0 -m post-is  - run post-installation checks"
+    echo "bash $0 -m upgrade-is - run pre-upgrade pipeline validation checks"
     echo "OR"
-    echo "bash $0 -m jenkins  - run Jenkins configuration checks"
+    echo "bash $0 -m post-is     - run post-installation checks"
+    echo "OR"
+    echo "bash $0 -m jenkins     - run Jenkins configuration checks"
     echo ""
     echo -e "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
     echo -e "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
+    echo -e "Use ${BOLD}upgrade-is${NORMAL} to validate HELIX_ONPREM_DEPLOYMENT pipeline values before upgrading, when Helix IS is already deployed and running."
     echo -e "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
     echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
     echo
@@ -470,7 +473,7 @@ checkISNamespace() {
       logError "108" "Registry secret not found in ${1} namespace - HELIX_GENERATE_CONFIG pipeline must be run to enable all ${MODE} checks."
     fi
   fi
-  if [ "${MODE}" == "post-is" ]; then
+  if [[ ("${MODE}" == "post-is" || "${MODE}" == "upgrade-is") ]]; then
     if ! ${KUBECTL_BIN} -n "${1}" get secret cacerts > /dev/null 2>&1 ; then
       logError "107" "cacerts secret not found in '${1}' namespace - please check the ${NS_TYPE} namespace name." 1
     fi
@@ -1121,7 +1124,7 @@ validateRealmDomains() {
   fi
   # Should not be present in pre-is unless INTEROPS run
   if [ "${SM_PLATFORM_CORE}" == "no" ] && [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
-    logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is expected after the HELIX_ITSM_INTEROPS pipeline has completed."
+    logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is only expected after the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
 }
 
@@ -1327,7 +1330,7 @@ saveAllPipelineConsoleOutput() {
 }
 
 getISDetailsFromJenkins() {
-  if [ "${MODE}" != "pre-is" ] || [ "${SKIP_JENKINS}" == "1" ]; then
+  if [[ ("${MODE}" != "pre-is" && "${MODE}" != "upgrade-is") || "${SKIP_JENKINS}" == "1" ]]; then
     return
   fi
   #logMessage "Downloading jenkins-cli.jar from Jenkins..."
@@ -1591,8 +1594,8 @@ getPipelineValues() {
 
 checkPipelinePwds() {
   [[ "${SKIP_JENKINS}" == "1" ]] && return
-  if [ "${MODE}" != "pre-is" ]; then return; fi
-  PASSWDS_JSON=$(getPipelinePasswords | ${JQ_BIN} 'to_entries')
+  if [[ ("${MODE}" != "pre-is" && "${MODE}" != "upgrade-is") ]]; then return; fi
+    PASSWDS_JSON=$(getPipelinePasswords | ${JQ_BIN} 'to_entries')
   return # next bit no longer valid?
   for i in $(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r '.[].key'); do
     PASSWD=$(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r ".[] | select(.key==\"${i}\").value.plainText")
@@ -1812,8 +1815,8 @@ validateISDetails() {
     logMessage "AR_SERVER_MIDTIER_SERVICE_PASSWORD length is 20 characters or less." 1
   fi
 
-  # PRE mode only
-  if [ "${MODE}" == "pre-is" ]; then
+  # PRE/upgrade mode only
+  if [[ ("${MODE}" == "pre-is" || "${MODE}" == "upgrade-is") ]]; then
     logMessage "HELIX_ONPREM_DEPLOYMENT pipeline version is '${IS_PLATFORM_HELM_VERSION}'."
     logMessage "${IS_CUSTOMER_SIZE_LABEL} is '${IS_CUSTOMER_SIZE}'."
     logMessage "${IS_PIPELINE_MODE_LABEL} is '${IS_PIPELINE_MODE}'."
@@ -2236,7 +2239,7 @@ getCacertsFile() {
       logMessage "Using cacerts file '${CACERTS_FILENAME}'." 1
       return
     fi
-    if [ "${MODE}" == "pre-is" ]; then
+    if [[ ("${MODE}" == "pre-is" || "${MODE}" == "upgrade-is") ]]; then
       if [ -f configsrepo/customer/customCerts/cacerts ] ; then
         SKIP_CACERTS=0
         cp -f configsrepo/customer/customCerts/cacerts ${CACERTS_FILENAME}
@@ -2478,7 +2481,7 @@ checkFTSElasticSettings() {
 #  fi
 
   #if [ "${IS_FTS_ELASTICSEARCH_USERNAME}" == "bmcuser" ]; then
-  if [ "${MODE}" == "pre-is" ] && [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
+  if [[ ("${MODE}" == "pre-is" || "${MODE}" == "upgrade-is") ]] && [ "${IS_FTS_ELASTICSEARCH_USER_PASSWORD}" != "${LOG_ELASTICSEARCH_PASSWORD}" ]; then
     logError "175" "FTS_ELASTICSEARCH_USER_PASSWORD is not the expected value of '${LOG_ELASTICSEARCH_PASSWORD}'."
     BAD_FTS_ELASTIC=1
   else
@@ -2911,7 +2914,7 @@ checkISDockerLogin() {
     IS_HARBOR_REGISTRY_HOSTNAME=$(echo "${IS_SECRET_HARBOR_REGISTRY_HOST%%/*}")
   fi
 
-  if [ "${MODE}" == "pre-is" ] && [ "${SKIP_REGISTRY}" == "0" ]; then
+  if [[ ("${MODE}" == "pre-is" || "${MODE}" == "upgrade-is") ]] && [ "${SKIP_REGISTRY}" == "0" ]; then
     if [ "${IS_HARBOR_REGISTRY_HOST}" != "${IS_SECRET_HARBOR_REGISTRY_HOST}" ]; then
       logError "190" "HARBOR_REGISTRY_HOST '${IS_HARBOR_REGISTRY_HOST}' does not match the value in the registry secret '${IS_SECRET_HARBOR_REGISTRY_HOST}'."
     fi
@@ -2919,8 +2922,6 @@ checkISDockerLogin() {
       logError "190" "IMAGE_REGISTRY_USERNAME '${IS_IMAGE_REGISTRY_USERNAME}' does not match the value in the registry secret '${IS_SECRET_IMAGE_REGISTRY_USERNAME}'."
     fi
   fi
-
-
 
   if ! docker ps > /dev/null 2>&1; then
     if ! which docker > /dev/null 2>&1 ; then
@@ -2942,7 +2943,7 @@ dumpVARs() {
   [[ ${CREATE_LOGS} -eq 0 ]] && return
   rm -f "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}"
   # Debug mode to print all variables
-  if [ "${MODE}" == "pre-is" ]; then
+  if [[ ("${MODE}" == "pre-is" || "${MODE}" == "upgrade-is") ]]; then
     echo "CUSTOMER_SERVICE=${ISP_CUSTOMER_SERVICE}" >> "${VALUES_LOG_FILE}"
     echo "ENVIRONMENT=${ISP_ENVIRONMENT}" >> "${VALUES_LOG_FILE}"
     echo "FTS_ELASTICSEARCH_USERNAME=${IS_FTS_ELASTICSEARCH_USERNAME}" >> "${VALUES_LOG_FILE}"
@@ -5372,16 +5373,18 @@ showOverrideHelp() { # config override options help
 showGeneralHelp() {
   echo ""
   echo -e "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
-  echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|post-is|jenkins>${NORMAL}"
+  echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|upgrade-is|post-is|jenkins>${NORMAL}"
   echo ""
   echo "Examples:"
-  echo "bash $0 -m post-hp  - run post HP installation only checks"
-  echo "bash $0 -m pre-is   - run pre-installation checks"
-  echo "bash $0 -m post-is  - run post-installation checks"
-  echo "bash $0 -m jenkins  - run Jenkins configuration checks"
+  echo "bash $0 -m post-hp     - run post HP installation only checks"
+  echo "bash $0 -m pre-is      - run pre-installation checks"
+  echo "bash $0 -m upgrade-is - run pre-upgrade pipeline validation checks"
+  echo "bash $0 -m post-is     - run post-installation checks"
+  echo "bash $0 -m jenkins     - run Jenkins configuration checks"
   echo ""
   echo -e "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
   echo -e "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
+  echo -e "Use ${BOLD}upgrade-is${NORMAL} to validate HELIX_ONPREM_DEPLOYMENT pipeline values before upgrading, when Helix IS is already deployed and running."
   echo -e "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
   echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
   echo
@@ -7679,7 +7682,7 @@ enumerateHelixVersions() {
 checkGenConfigOutput() {
   local regex line file full_line expr_num char_num invalid_value
   local first_sed_block expr_line replacement_literal clean_var_name
-  if [ "${SKIP_JENKINS}" == "1" ] || [ "${MODE}" != "pre-is" ]; then
+  if [ "${SKIP_JENKINS}" == "1" ] || [[ ("${MODE}" != "pre-is" && "${MODE}" != "upgrade-is") ]]; then
     return
   fi
   savePipelineConsoleOutput "HELIX_GENERATE_CONFIG" "lastBuild"
@@ -8120,11 +8123,11 @@ if [ "${MODE}" == "info" ]; then
 fi
 
 # Validate action
-[[ "${MODE}" =~ ^pre-hp|^post-hp$|^pre-is$|^post-is$ ]] || usage
+[[ "${MODE}" =~ ^pre-hp|^post-hp$|^pre-is$|^upgrade-is$|^post-is$ ]] || usage
 
 # MODE is required
 if [[ -z "${MODE}" ]]; then
-  logError "200" "Mode must be specified with -m <post-hp|pre-is|post-is>" 1
+  logError "200" "Mode must be specified with -m <post-hp|pre-is|upgrade-is|post-is>" 1
 fi
 
 if [ "${MODE}" == "post-hp" ] || [ "${MODE}" == "pre-hp" ]; then
@@ -8190,8 +8193,14 @@ if [ "${MODE}" != "post-hp" ]; then
   checkCDE
   checkJenkinsConfig
   logStatus "Getting IS details..."
-  getISDetailsFromK8s
-  getISDetailsFromJenkins
+  case "${MODE}" in
+    post-is|info)
+      getISDetailsFromK8s
+      ;;
+    pre-is|upgrade-is)
+      getISDetailsFromJenkins
+      ;;
+  esac
   logStatus "Checking IS details..."
   validateISDetails
   checkPipelinePwds
@@ -8208,7 +8217,7 @@ fi
 
 logLBCertDetails
 
-if [ "${MODE}" == "pre-is" ]; then
+if [[ ("${MODE}" == "pre-is" || "${MODE}" == "upgrade-is") ]]; then
   logStatus "Checking Deployment Engine setup..."
   checkDERequirements
 fi
@@ -8222,7 +8231,7 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
   generateISDbID
 fi
 
-if [ "${MODE}" == "post-is" ]; then
+if [[ ("${MODE}" == "post-is" || "${MODE}" == "upgrade-is") ]]; then
   logPlatformFTSStartTime
   logStatus "Checking Helix IS platform-admin-ext service..."
   checkPlatformAdminExtSvc
@@ -8237,7 +8246,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260811-01"
+HITT_BUILD_VERSION="20260814-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
