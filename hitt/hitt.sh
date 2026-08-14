@@ -542,63 +542,10 @@ getVersions() {
     logMessage "Helix IS version '${IS_VERSION}'."
     setISDBVersion "${IS_VERSION}"
   fi
+  setHPVersionImageTags
 }
 
-setISDBVersion() {
-  # Set expected currDbVersion
-  case "${1%%.*}" in
-    21)
-      IS_DB_VERSION=199
-      ;;
-    22)
-      IS_DB_VERSION=200
-      ;;
-    23)
-      IS_DB_VERSION=201
-      [[ "${1}" == "23.3.04" ]] && IS_DB_VERSION=203
-      ;;
-    25)
-      [[ "${1}" == "25.1.01" ]] && IS_DB_VERSION=203
-      [[ "${1}" == "25.2.01" ]] && IS_DB_VERSION=215
-      [[ "${1}" == "25.3.01" ]] && IS_DB_VERSION=215
-      [[ "${1}" == "25.4.01" ]] && IS_DB_VERSION=216
-      ;;
-    26)
-      [[ "${1}" == "26.1.01" ]] && IS_DB_VERSION=236
-      [[ "${1}" == "26.2.01" ]] && IS_DB_VERSION=237
-      ;;
-    *)
-      logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
-  esac
-}
-
-checkNSResourceQuotas() {
-  # NS name
-  if [ $(${KUBECTL_BIN} -n "${1}" get resourcequotas 2>/dev/null | wc -l) != "0" ]; then
-    logWarning "034" "Resource quotas are set in the '${1}' namespace. See k8s-get-resourcequotas-${1}.log file for details."
-    ${KUBECTL_BIN} -n "${1}" get resourcequotas -o yaml > k8s-get-resourcequotas-${1}.log
-  fi
-}
-
-setVarsFromPlatform() {
-  FTS_ELASTIC_CERTNAME="esnode"
-  EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
-  LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helixingress-master -o jsonpath='{.spec.rules[0].host}')
-  TMS_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helix-tms-ingress-master -o jsonpath='{.spec.rules[0].host}')
-  MINIO_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
-  MINIO_API_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio-api -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
-  KIBANA_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress efk-elasticsearch-kibana -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
-  LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
-  FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
-  LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
-  LOG_ELASTICSEARCH_USERNAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_USERNAME | @base64d')
-  #FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
-  FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods -l "$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get svc "${FTS_ELASTIC_SERVICENAME}" -o jsonpath='{.spec.selector}' | ${JQ_BIN} -r 'to_entries | map("\(.key)=\(.value)") | join(",")')" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -n 1)
-
-  if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
-    FTS_ELASTIC_POD_CONTAINER="-c opensearch"
-  fi
-
+setHPVersionImageTags() {
   case "${HP_VERSION}" in
     22.2.01)
       TCTL_REST_VER=110
@@ -664,6 +611,64 @@ setVarsFromPlatform() {
       ;;
   esac
   # TCTL_REST_VER in compact.config ADE_INFRA_CLIENT_IMAGE_TAG in infra/infra-images-tag.config
+}
+
+setISDBVersion() {
+  # Set expected currDbVersion
+  case "${1%%.*}" in
+    21)
+      IS_DB_VERSION=199
+      ;;
+    22)
+      IS_DB_VERSION=200
+      ;;
+    23)
+      IS_DB_VERSION=201
+      [[ "${1}" == "23.3.04" ]] && IS_DB_VERSION=203
+      ;;
+    25)
+      [[ "${1}" == "25.1.01" ]] && IS_DB_VERSION=203
+      [[ "${1}" == "25.2.01" ]] && IS_DB_VERSION=215
+      [[ "${1}" == "25.3.01" ]] && IS_DB_VERSION=215
+      [[ "${1}" == "25.4.01" ]] && IS_DB_VERSION=216
+      ;;
+    26)
+      [[ "${1}" == "26.1.01" ]] && IS_DB_VERSION=236
+      [[ "${1}" == "26.2.01" ]] && IS_DB_VERSION=237
+      ;;
+    *)
+      logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
+  esac
+}
+
+checkNSResourceQuotas() {
+  # NS name
+  if [ $(${KUBECTL_BIN} -n "${1}" get resourcequotas 2>/dev/null | wc -l) != "0" ]; then
+    logWarning "034" "Resource quotas are set in the '${1}' namespace. See k8s-get-resourcequotas-${1}.log file for details."
+    ${KUBECTL_BIN} -n "${1}" get resourcequotas -o yaml > k8s-get-resourcequotas-${1}.log
+  fi
+}
+
+setVarsFromPlatform() {
+  FTS_ELASTIC_CERTNAME="esnode"
+  EFK_ELASTIC_SERVICENAME="efk-elasticsearch-data-hl"
+  LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helixingress-master -o jsonpath='{.spec.rules[0].host}')
+  TMS_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress helix-tms-ingress-master -o jsonpath='{.spec.rules[0].host}')
+  MINIO_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
+  MINIO_API_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress minio-api -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
+  KIBANA_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress efk-elasticsearch-kibana -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
+  LOG_ELASTICSEARCH_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get secret logelasticsearchsecret -o jsonpath='{.data}')
+  FTS_ELASTIC_SERVICENAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_CLUSTER | @base64d' | cut -d ':' -f 1)
+  LOG_ELASTICSEARCH_PASSWORD=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_PASSWORD | @base64d')
+  LOG_ELASTICSEARCH_USERNAME=$(echo ${LOG_ELASTICSEARCH_JSON} | ${JQ_BIN} -r '.LOG_ELASTICSEARCH_USERNAME | @base64d')
+  #FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get endpoints "${FTS_ELASTIC_SERVICENAME}" -o=jsonpath='{.subsets[*].addresses[0].ip}' | xargs -I % ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --field-selector=status.podIP=% -o jsonpath='{.items[0].metadata.name}')
+  FTS_ELASTIC_POD=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods -l "$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get svc "${FTS_ELASTIC_SERVICENAME}" -o jsonpath='{.spec.selector}' | ${JQ_BIN} -r 'to_entries | map("\(.key)=\(.value)") | join(",")')" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -n 1)
+
+  if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
+    FTS_ELASTIC_POD_CONTAINER="-c opensearch"
+  fi
+
+  setHPVersionImageTags
 
   HP_COMPANY_NAME_LABEL="COMPANY_NAME"
   if compare "${HP_VERSION%.*} >= 24.2" ; then
@@ -864,103 +869,189 @@ deleteTCTLJob() {
   ${KUBECTL_BIN} -n "${HP_NAMESPACE}" delete job "${SEALTCTL}" --wait=true > /dev/null 2>&1
 }
 
+parseTctlCommand() {
+  TCTL_FILE_USED=0
+  TCTL_FILE_JSON=""
+  [[ -z "${TCTL_CMD}" || "${TCTL_CMD}" == "config" ]] && return
+
+  local file_path="" command_part=""
+  if [[ "${TCTL_CMD}" =~ ^(.+)[[:space:]]+-f[[:space:]]+(.+)$ ]]; then
+    command_part="${BASH_REMATCH[1]%%[[:space:]]}"
+    file_path="${BASH_REMATCH[2]}"
+    file_path="${file_path#\"}"; file_path="${file_path%\"}"
+    file_path="${file_path#\'}"; file_path="${file_path%\'}"
+  else
+    return
+  fi
+
+  # tctl run job ... -f true|false is the force flag, not a JSON file
+  if [[ "${command_part}" =~ ^run[[:space:]]+job ]] && [[ "${file_path,,}" =~ ^(true|false)$ ]]; then
+    return
+  fi
+
+  TCTL_CMD="${command_part}"
+
+  if [[ ! -f "${file_path}" ]]; then
+    logError "276" "tctl JSON file not found: '${file_path}'." 1
+  fi
+  if ! TCTL_FILE_JSON=$(${JQ_BIN} -c . "${file_path}" 2>/dev/null); then
+    logError "277" "tctl JSON file is not valid JSON: '${file_path}'." 1
+  fi
+  TCTL_FILE_USED=1
+}
+
 getTCTLOutput() {
   TCTL_OUTPUT=""
-  if [ $(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} | grep "^HTTP" | cut -f 4 -d ' ') != "200" ] ; then
-    logError "115" "tctl job failed." 1
+  local tctl_pod_logs tctl_response_string tctl_status_code=""
+  tctl_pod_logs=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} 2>/dev/null)
+  tctl_response_string=$(echo "${tctl_pod_logs}" | grep "^HTTP Response" | head -1)
+  if [[ "${tctl_response_string}" =~ ([0-9]{3}) ]]; then
+    tctl_status_code="${BASH_REMATCH[1]}"
+  fi
+  if [[ ! "${tctl_status_code}" =~ ^2[0-9]{2}$ ]]; then
+    TCTL_OUTPUT="${tctl_pod_logs}"
+    if [[ "${QUIET}" == "0" ]] && [[ -n "${tctl_pod_logs}" ]]; then
+      echo "${tctl_pod_logs}" | sed 's/^/        /'
+    fi
+    if [[ -n "${tctl_status_code}" ]]; then
+      logError "115" "tctl job failed (HTTP Response Status: ${tctl_status_code})." 1
+    else
+      logError "115" "tctl job failed - no HTTP Response Status in job logs." 1
+    fi
   fi
   if [ "${1}" != "full" ]; then
-    TCTL_OUTPUT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} | sed -n -e '/^NAME/,$p' | tail -n +2)
+    TCTL_OUTPUT=$(echo "${tctl_pod_logs}" | sed -n -e '/^NAME/,$p' | tail -n +2)
   else
-    TCTL_OUTPUT=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL})
+    TCTL_OUTPUT="${tctl_pod_logs}"
   fi
 }
 
-setTCTLRESTImageName() {
-  TCTL_JOB_NAME=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job --no-headers -o custom-columns=':.metadata.name' | grep tctl$ | head -1)
-  if [ -n "${TCTL_JOB_NAME}" ]; then
+getTCTLImageFromJob() {
+  # job_name
+  local job_image
+  job_image=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${1}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+  if [ -n "${job_image}" ] && [ "${job_image}" != "null" ]; then
+    TCTL_IMAGE="${job_image}"
+    TCTL_JOB_NAME="${1}"
     return 0
-  else
+  fi
+  return 1
+}
+
+getDefaultTCTLImage() {
+  if [ -z "${TCTL_REST_VER}" ]; then
     return 1
   fi
+  if [ -z "${HP_REGISTRY_SERVER}" ]; then
+    getRegistryDetailsFromHP || true
+  fi
+  if [ -z "${HP_REGISTRY_SERVER}" ] || [ "${SKIP_REGISTRY}" == "1" ]; then
+    return 1
+  fi
+  local tctl_tag="tctlrest-${TCTL_REST_VER}"
+  if [[ "${HP_REGISTRY_SERVER}" == */* ]]; then
+    echo "${HP_REGISTRY_SERVER}:${tctl_tag}"
+  elif [ -n "${HP_REGISTRY_PROJECT}" ]; then
+    echo "${HP_REGISTRY_SERVER}/${HP_REGISTRY_PROJECT}:${tctl_tag}"
+  else
+    echo "${HP_REGISTRY_SERVER}/bmc:${tctl_tag}"
+  fi
+}
+
+resolveTCTLImage() {
+  TCTL_IMAGE=""
+  TCTL_JOB_NAME=""
+
+  if getTCTLImageFromJob "tenantonboarding"; then
+    logMessage "Using tctl image from job 'tenantonboarding': '${TCTL_IMAGE}'." 1
+    return 0
+  fi
+
+  TCTL_JOB_NAME=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job --no-headers -o custom-columns=':.metadata.name' 2>/dev/null | grep tctl$ | head -1)
+  if [ -n "${TCTL_JOB_NAME}" ] && getTCTLImageFromJob "${TCTL_JOB_NAME}"; then
+    logMessage "Using tctl image from job '${TCTL_JOB_NAME}': '${TCTL_IMAGE}'." 1
+    return 0
+  fi
+
+  TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get jobs -o json 2>/dev/null | ${JQ_BIN} -r '[.items[] | .spec.template.spec.containers[0].image // empty | select(test("tctlrest"))] | first // empty')
+  if [ -n "${TCTL_IMAGE}" ]; then
+    logWarning "278" "No standard tctl job found; using tctlrest image '${TCTL_IMAGE}' from another job."
+    return 0
+  fi
+
+  if TCTL_IMAGE=$(getDefaultTCTLImage); then
+    logWarning "278" "Unable to find an existing tctl job; using default image '${TCTL_IMAGE}' from TCTL_REST_VER '${TCTL_REST_VER}' (Helix Platform ${HP_VERSION})."
+    return 0
+  fi
+
+  logError "202" "Unable to find job with TCTL image details and no TCTL_REST_VER mapping for Helix Platform version '${HP_VERSION}'."
+  return 1
 }
 
 deployTCTL() {
   TCTL_COMMAND="${1}"
-  if ! setTCTLRESTImageName ; then
-    logError "202" "Unable to find job with TCTL image details."
-    TCTL_IMAGE="${HP_REGISTRY_SERVER}/bmc/tctlrest-${TCTL_REST_VER}"
+  if ! resolveTCTLImage; then
     return 1
-  else
-    TCTL_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o json)
-    #  TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${TCTL_JOB_NAME}" -o jsonpath='{.spec.template.spec.containers[0].image}')
-    TCTL_IMAGE=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].image')
-  #  TCTL_RUNASUSER=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].securityContext.runAsUser')
-  #  TCTL_RUNASGROUP=$(echo ${TCTL_JSON} | ${JQ_BIN} -r '.spec.template.spec.containers[0].securityContext.runAsGroup')
-    if [ -z "${TCTL_IMAGE}" ]; then
-      logError "203" "Unable to get TCTL image name from job ${TCTL_JOB_NAME}."
-      return 1
-    fi
+  fi
+  if [ -z "${TCTL_IMAGE}" ]; then
+    logError "203" "Unable to determine the tctl client image."
+    return 1
   fi
   logMessage "Deploying '${SEALTCTL}' job and waiting for it to complete..."
-  cat <<EOF | ${KUBECTL_BIN} -n "${HP_NAMESPACE}" apply -f - >/dev/null
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  labels:
-    app: ${SEALTCTL}
-  name: ${SEALTCTL}
-  namespace: ${HP_NAMESPACE}
-spec:
-  backoffLimit: 1
-  completions: 1
-  parallelism: 1
-  template:
-    metadata:
-      labels:
-        app: ${SEALTCTL}
-    spec:
-      containers:
-      - env:
-        - name: SERVICE_PORT
-          value: "8000"
-        - name: APP_URL
-          value: http://tms:8000
-        - name: CLIENT_ID
-          value: "123"
-        - name: CLIENT_SECRET
-          value: "123"
-        - name: RSSO_URL
-          valueFrom:
-            configMapKeyRef:
-              key: rssourl
-              name: rsso-admin-tas
-        - name: COMMAND
-          value: ${TCTL_COMMAND}
-        image: ${TCTL_IMAGE}
-        imagePullPolicy: IfNotPresent
-        name: ${SEALTCTL}
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
-          runAsNonRoot: true
-#          runAsUser: ${TCTL_RUNASUSER}
-#          runAsGroup: ${TCTL_RUNASGROUP}
-          seccompProfile:
-            type: RuntimeDefault
-        resources:
-          limits:
-            cpu: 512m
-            memory: 512Mi
-          requests:
-            cpu: 256m
-            memory: 256Mi
-      restartPolicy: Never
-      imagePullSecrets:
-        - name: bmc-dtrhub
-EOF
+  ${JQ_BIN} -n \
+    --arg ns "${HP_NAMESPACE}" \
+    --arg name "${SEALTCTL}" \
+    --arg image "${TCTL_IMAGE}" \
+    --arg command "${TCTL_COMMAND}" \
+    --argjson file_used "${TCTL_FILE_USED:-0}" \
+    --arg json "${TCTL_FILE_JSON:-}" \
+    '{
+      apiVersion: "batch/v1",
+      kind: "Job",
+      metadata: {labels: {app: $name}, name: $name, namespace: $ns},
+      spec: {
+        backoffLimit: 1,
+        completions: 1,
+        parallelism: 1,
+        template: {
+          metadata: {labels: {app: $name}},
+          spec: {
+            containers: [{
+              name: $name,
+              image: $image,
+              imagePullPolicy: "IfNotPresent",
+              env: (
+                [
+                  {name: "SERVICE_PORT", value: "8000"},
+                  {name: "APP_URL", value: "http://tms:8000"},
+                  {name: "CLIENT_ID", value: "123"},
+                  {name: "CLIENT_SECRET", value: "123"},
+                  {name: "RSSO_URL", valueFrom: {configMapKeyRef: {key: "rssourl", name: "rsso-admin-tas"}}},
+                  {name: "COMMAND", value: $command}
+                ]
+                + if $file_used == 1 then
+                    [{name: "FLAG", value: "-v"}, {name: "JSON_VALUE", value: $json}]
+                  else
+                    []
+                  end
+              ),
+              securityContext: {
+                allowPrivilegeEscalation: false,
+                capabilities: {drop: ["ALL"]},
+                runAsNonRoot: true,
+                seccompProfile: {type: "RuntimeDefault"}
+              },
+              resources: {
+                limits: {cpu: "512m", memory: "512Mi"},
+                requests: {cpu: "256m", memory: "256Mi"}
+              }
+            }],
+            restartPolicy: "Never",
+            imagePullSecrets: [{name: "bmc-dtrhub"}]
+          }
+        }
+      }
+    }' | ${KUBECTL_BIN} -n "${HP_NAMESPACE}" apply -f - >/dev/null
 
   # Wait for job to complete
   if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete job/"${SEALTCTL}" --timeout=90s > /dev/null 2>&1; then
@@ -7884,6 +7975,7 @@ cleanUp start
 
 # Run tctl command and then exit
 if [[ -n "${TCTL_CMD}" ]]; then
+  parseTctlCommand
   logStatus "Running in tctl mode..."
   checkToolVersion kubectl
   getVersions
@@ -8300,7 +8392,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260814-03"
+HITT_BUILD_VERSION="20260814-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8339,6 +8431,8 @@ RED=$'\e[31m'
 YELLOW=$'\e[33m'
 GREEN=$'\e[32m'
 SEALTCTL=sealtctl
+TCTL_FILE_USED=0
+TCTL_FILE_JSON=""
 # tmp set as used before processing config on initial setup
 KUBECTL_BIN=kubectl
 CURL_BIN=curl
@@ -9345,9 +9439,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"202\",
-    \"cause\": \"HITT failed to find an existing job to provide the tctl client image name.\",
+    \"cause\": \"HITT failed to find an existing job to provide the tctl client image name and no TCTL_REST_VER mapping exists for the Helix Platform version.\",
     \"impact\": \"Some later checks will not be run.\",
-    \"remediation\": \"No workaround available.\"
+    \"remediation\": \"Ensure tenant onboarding or a tctl job exists in the Helix Platform namespace, or use a Helix Platform version supported by HITT.\"
   },
   {
     \"id\": \"203\",
@@ -9780,6 +9874,24 @@ ALL_MSGS_JSON="[
     \"cause\": \"Execute permission on the SYS.DBMS_LOB tables is required but not allowed.\",
     \"impact\": \"IS platform-fts-0 pod will not become ready and deployment will fail.\",
     \"remediation\": \"Grant execute permission on the SYS.DBMS_LOB tables for the ARAdmin user.\"
+  },
+  {
+    \"id\": \"276\",
+    \"cause\": \"The JSON file named in the tctl -f option was not found.\",
+    \"impact\": \"HITT will not run the tctl command.\",
+    \"remediation\": \"Check the file path in the -t command and ensure the file exists.\"
+  },
+  {
+    \"id\": \"277\",
+    \"cause\": \"The JSON file named in the tctl -f option is not valid JSON.\",
+    \"impact\": \"HITT will not run the tctl command.\",
+    \"remediation\": \"Fix the file contents so it is valid JSON.\"
+  },
+  {
+    \"id\": \"278\",
+    \"cause\": \"HITT could not find a standard tctl job and is using a derived tctlrest image instead.\",
+    \"impact\": \"The tctl command should still run but the image may not match the cluster if the version mapping is wrong.\",
+    \"remediation\": \"Ensure tenantonboarding or a tctl registration job exists in the Helix Platform namespace, or verify TCTL_REST_VER for your Helix Platform version.\"
   }
 ]"
 
