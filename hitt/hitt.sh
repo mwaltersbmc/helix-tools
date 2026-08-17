@@ -613,32 +613,69 @@ setHPVersionImageTags() {
   # TCTL_REST_VER in compact.config ADE_INFRA_CLIENT_IMAGE_TAG in infra/infra-images-tag.config
 }
 
+# Helix IS release -> expected currDbVersion. Use exact release (26.2.01) or major.x (21.x = any 21.*).
+# Edit this list only — lookupISDBVersion and printISDBVersionTable both use it.
+_IS_DB_VERSION_MAP=(
+  "21.x:199"
+  "22.x:200"
+  "23.x:201"
+  "23.3.04:203"
+  "25.1.01:203"
+  "25.2.01:215"
+  "25.3.01:215"
+  "25.4.01:216"
+  "26.1.01:236"
+  "26.2.01:237"
+)
+
+lookupISDBVersion() {
+  # Echo expected currDbVersion for a Helix IS release; return 1 if unknown.
+  local ver="${1}" row pattern db major
+  for row in "${_IS_DB_VERSION_MAP[@]}"; do
+    IFS=: read -r pattern db <<< "${row}"
+    [[ "${pattern}" == *".x" ]] && continue
+    if [[ "${ver}" == "${pattern}" ]]; then
+      echo "${db}"
+      return 0
+    fi
+  done
+  for row in "${_IS_DB_VERSION_MAP[@]}"; do
+    IFS=: read -r pattern db <<< "${row}"
+    [[ "${pattern}" == *".x" ]] || continue
+    major="${pattern%.x}"
+    if [[ "${ver}" == "${major}."* || "${ver}" == "${major}" ]]; then
+      echo "${db}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 setISDBVersion() {
-  # Set expected currDbVersion
-  case "${1%%.*}" in
-    21)
-      IS_DB_VERSION=199
-      ;;
-    22)
-      IS_DB_VERSION=200
-      ;;
-    23)
-      IS_DB_VERSION=201
-      [[ "${1}" == "23.3.04" ]] && IS_DB_VERSION=203
-      ;;
-    25)
-      [[ "${1}" == "25.1.01" ]] && IS_DB_VERSION=203
-      [[ "${1}" == "25.2.01" ]] && IS_DB_VERSION=215
-      [[ "${1}" == "25.3.01" ]] && IS_DB_VERSION=215
-      [[ "${1}" == "25.4.01" ]] && IS_DB_VERSION=216
-      ;;
-    26)
-      [[ "${1}" == "26.1.01" ]] && IS_DB_VERSION=236
-      [[ "${1}" == "26.2.01" ]] && IS_DB_VERSION=237
-      ;;
-    *)
-      logError "109" "Unknown Helix IS version '${IS_VERSION}' - please check https://bit.ly/gethitt for HITT updates." 1
-  esac
+  if ! IS_DB_VERSION=$(lookupISDBVersion "${1}"); then
+    logError "109" "Unknown Helix IS version '${1}' - please check https://bit.ly/gethitt for HITT updates." 1
+  fi
+}
+
+printISDBVersionTable() {
+  local row pattern db raw="" formatted header rest
+  raw+=$'IS Version\t\tIS dbVersion\n'
+  for row in "${_IS_DB_VERSION_MAP[@]}"; do
+    IFS=: read -r pattern db <<< "${row}"
+    raw+="${pattern}"$'\t\t'"${db}"$'\n'
+  done
+  if formatted=$(printf '%s' "${raw}" | column -t -s $'\t' 2>/dev/null); then
+    header="${formatted%%$'\n'*}"
+    rest="${formatted#*$'\n'}"
+    printf '%b\n' "${BOLD}${header}${NORMAL}"
+    [[ -n "${rest}" ]] && printf '%s\n' "${rest}"
+  else
+    printf '%b\n' "${BOLD}IS Version\t\tIS dbVersion${NORMAL}"
+    for row in "${_IS_DB_VERSION_MAP[@]}"; do
+      IFS=: read -r pattern db <<< "${row}"
+      printf '%s\t\t%s\n' "${pattern}" "${db}"
+    done
+  fi
 }
 
 checkNSResourceQuotas() {
@@ -5533,6 +5570,7 @@ showInfoHelp() { # info mode help
     \tnode [NAME]\t| Per-pod resource table for one node (requests, limits, current usage, ephemeral storage). Omit NAME to choose from a menu.
     \thelix \t\t| Scan the cluster for Helix namespaces (Platform, IS, Deployment Engine, Logging) and show version where available.
     \tingress \t| Ingress controller for Helix INGRESS_CLASS: workload type, namespace, name, and image.
+    \tdbversion[s]\t| Tab-separated Helix IS release and expected database version (currDbVersion) from HITT.
     \tfull \t\t| Full BMC Helix Environment Summary on the console and info.json.
     \thelp \t\t| Show this list.
     "
@@ -7925,8 +7963,8 @@ logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
 
 # config file checks
-if [ ! -f "${HITT_CONFIG_FILE}" ] && [[ "${MODEARGS[0]:-}" == "info" && "${MODEARGS[1]:-}" =~ ^(helix|cluster|node)$ ]]; then
-  # info helix, info cluster, and info node do not require hitt.conf
+if [ ! -f "${HITT_CONFIG_FILE}" ] && [[ "${MODEARGS[0]:-}" == "info" && "${MODEARGS[1]:-}" =~ ^(helix|cluster|node|dbversions)$ ]]; then
+  # info helix, info cluster, info node, and info dbversions do not require hitt.conf
   SKIP_UPDATE_CHECK=1
 elif [ ! -f "${HITT_CONFIG_FILE}" ]; then
   if ! ${KUBECTL_BIN} get ns > /dev/null 2>&1 ; then
@@ -8302,6 +8340,9 @@ if [ "${MODE}" == "info" ]; then
       hittInfoPrintSection "Ingress controller"
       printIngressControllerDetails
       ;;
+    dbversions)
+      printISDBVersionTable
+      ;;
     full)
       gatherInfo
       printInfo
@@ -8311,7 +8352,7 @@ if [ "${MODE}" == "info" ]; then
       showInfoHelp
       ;;
     *)
-      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, node, helix, ingress, full, help). Please check for an updated HITT." 1
+      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, node, helix, ingress, dbversion, dbversions, full, help). Please check for an updated HITT." 1
       ;;
   esac
   exit
@@ -8442,7 +8483,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260817-01"
+HITT_BUILD_VERSION="20260817-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -10042,6 +10083,13 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
       if [ "${MODE}" == "info" ] && [ "${#MODEARGS[@]}" -eq 1 ]; then
         MODEARGS+=("full")
       fi
+      if [[ "${MODEARGS[1]:-}" == "dbversion" ]]; then
+        MODEARGS[1]="dbversions"
+      fi
+      if [[ "${MODE}" == "info" && "${MODEARGS[1]:-}" == "dbversions" ]]; then
+        QUIET=1
+        SKIP_UPDATE_CHECK=1
+      fi
       ;;
     o)
       QUIET=1
@@ -10110,6 +10158,11 @@ done
 
 if [[ "${MSG_LOOKUP_CANDIDATE}" == "1" ]] && ! isHittActionRun; then
   showMessageById "${STOP_ON_ERROR}"
+  exit 0
+fi
+
+if [[ "${MODE}" == "info" && "${MODEARGS[1]:-}" == "dbversions" ]]; then
+  printISDBVersionTable
   exit 0
 fi
 

@@ -9,6 +9,7 @@ bash hitt.sh -m "info cluster"
 bash hitt.sh -m "info node <node-name>"
 bash hitt.sh -m "info helix"
 bash hitt.sh -m "info ingress"
+bash hitt.sh -m "info dbversions"
 bash hitt.sh -m "info full"
 bash hitt.sh -m "info help"
 ```
@@ -25,6 +26,7 @@ Built-in summary: `bash hitt.sh -m "info help"`
 | `node` | **metrics-server** for pod CPU/memory usage; **nodes/stats** or **nodes/proxy** for per-pod ephemeral storage. No HITT configuration needed. |
 | `helix` | No HITT configuration needed — scans the whole cluster. |
 | `ingress` | **Helix Platform namespace** configured for HITT (reads **`INGRESS_CLASS`** from Platform configuration). |
+| `dbversion` / `dbversions` | No HITT configuration needed — prints a tab-separated table of Helix IS releases and the expected database version (**currDbVersion**) used by HITT checks. |
 | `full` | **HITT configuration** with Helix namespaces and settings, plus Deployment Engine login for the full environment summary. Interactive prompts (environment type, live system, tenant/logging namespace when multiple exist). |
 | `help` | None |
 
@@ -36,6 +38,7 @@ Built-in summary: `bash hitt.sh -m "info help"`
 | `node` | **Per-pod resource table** for one named node (requests, limits, current usage, ephemeral storage). |
 | `helix` | **Helix namespace scan** — lists namespaces that look like Helix Platform, Helix IS, containerized Deployment Engine, or Helix Logging, with **version** where HITT can read it from the cluster. |
 | `ingress` | **Ingress controller** details for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and container image. |
+| `dbversion` / `dbversions` | **Helix IS database versions** — tab-separated **IS_VERSION** and **IS_DB_VERSION** (expected **currDbVersion** for each supported release). |
 | `full` | Full **BMC Helix Environment Summary** on the console and **`info.json`** (machine-readable, schema version in the file). |
 | `help` | Prints this summary (same content as this file, built into the script). |
 
@@ -150,6 +153,32 @@ Resolves the ingress controller workload for the **`INGRESS_CLASS`** value from 
 **Notes:**
 
 - If no workload matches, the section may show `unknown` for some fields; check that the ingress class in Helix Platform configuration exists in the cluster.
+
+## `dbversion` / `dbversions` — Helix IS database version reference
+
+```bash
+bash hitt.sh -m "info dbversions"
+# or
+bash hitt.sh -m "info dbversion"
+```
+
+Prints a tab-separated table of Helix IS releases and the **expected database version** (**currDbVersion**) that HITT uses when validating your database during deployment checks:
+
+```text
+IS_VERSION      IS_DB_VERSION
+21.x            199
+22.x            200
+23.x            201
+23.3.04         203
+25.1.01         203
+...
+```
+
+**Notes:**
+
+- No HITT configuration file is required.
+- Rows use **21.x**, **22.x**, and **23.x** for all releases in those major versions except where a specific release is listed (for example **23.3.04**).
+- Only Helix IS releases known to HITT are listed; if your release is missing, update HITT or open a support case.
 
 ## `full` — Helix environment summary
 

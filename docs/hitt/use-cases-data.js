@@ -762,6 +762,29 @@ window.HITT_USE_CASES = {
       }
     },
     {
+      "id": "info-dbversions",
+      "topicId": "helix-is-mgmt",
+      "order": 12,
+      "title": "I want to see the dbVersion for each Helix Service Management release",
+      "commands": [
+        "bash hitt.sh -m \"info dbversions\""
+      ],
+      "notes": [
+        "Prints a tab-separated table of Helix IS release and expected database version (currDbVersion) — the values HITT uses when checking your database during deployment.",
+        "No HITT configuration file is required.",
+        "Use this when planning an upgrade or comparing your database version to the release you are deploying."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md#dbversions--helix-is-database-version-reference",
+      "video": {
+        "enabled": false,
+        "tape": "info-dbversions.tape",
+        "playback": {
+          "dir": "info-dbversions",
+          "enabled": false
+        }
+      }
+    },
+    {
       "id": "utility-get-arlicense",
       "topicId": "helix-is-mgmt",
       "order": 15,
