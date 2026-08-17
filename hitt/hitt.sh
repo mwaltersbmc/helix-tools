@@ -884,8 +884,8 @@ parseTctlCommand() {
     return
   fi
 
-  # tctl run job ... -f true|false is the force flag, not a JSON file
-  if [[ "${command_part}" =~ ^run[[:space:]]+job ]] && [[ "${file_path,,}" =~ ^(true|false)$ ]]; then
+  # tctl run job ... -f is the force flag (true|false), not a JSON file
+  if [[ "${command_part}" =~ ^run[[:space:]]+job ]]; then
     return
   fi
 
@@ -910,13 +910,13 @@ getTCTLOutput() {
   fi
   if [[ ! "${tctl_status_code}" =~ ^2[0-9]{2}$ ]]; then
     TCTL_OUTPUT="${tctl_pod_logs}"
+    if [[ -n "${tctl_status_code}" ]]; then
+      logError "115" "tctl job failed (HTTP Response Status: ${tctl_status_code})."
+    else
+      logError "115" "tctl job failed - no HTTP Response Status in job logs."
+    fi
     if [[ "${QUIET}" == "0" ]] && [[ -n "${tctl_pod_logs}" ]]; then
       echo "${tctl_pod_logs}" | sed 's/^/        /'
-    fi
-    if [[ -n "${tctl_status_code}" ]]; then
-      logError "115" "tctl job failed (HTTP Response Status: ${tctl_status_code})." 1
-    else
-      logError "115" "tctl job failed - no HTTP Response Status in job logs." 1
     fi
   fi
   if [ "${1}" != "full" ]; then
@@ -988,6 +988,24 @@ resolveTCTLImage() {
   return 1
 }
 
+waitForTCTLJob() {
+  # timeout e.g. 90s — return 0 when job Complete, 1 when Failed or timed out
+  local timeout="${1:-90s}" wp wf
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete "job/${SEALTCTL}" --timeout="${timeout}" >/dev/null 2>&1 &
+  wp=$!
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=failed "job/${SEALTCTL}" --timeout="${timeout}" >/dev/null 2>&1 &
+  wf=$!
+  wait -n "${wp}" "${wf}" 2>/dev/null || true
+  kill "${wp}" "${wf}" 2>/dev/null || true
+  wait "${wp}" "${wf}" 2>/dev/null || true
+
+  if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${SEALTCTL}" \
+      -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null | grep -q True; then
+    return 0
+  fi
+  return 1
+}
+
 deployTCTL() {
   TCTL_COMMAND="${1}"
   if ! resolveTCTLImage; then
@@ -1053,14 +1071,18 @@ deployTCTL() {
       }
     }' | ${KUBECTL_BIN} -n "${HP_NAMESPACE}" apply -f - >/dev/null
 
-  # Wait for job to complete
-  if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete job/"${SEALTCTL}" --timeout=90s > /dev/null 2>&1; then
+  # Wait for job to complete or fail (not only Complete — avoids full timeout on pod error)
+  if ! waitForTCTLJob 90s; then
     debugTCTLJob
-    logError "204" "Timed out waiting for job ${SEALTCTL} to complete."
+    if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${SEALTCTL}" \
+        -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null | grep -q True; then
+      logError "204" "tctl job ${SEALTCTL} failed."
+    else
+      logError "204" "Timed out waiting for job ${SEALTCTL} to complete."
+    fi
     return 1
-  else
-    return 0
   fi
+  return 0
 }
 
 # Extract JSON body from sealtctl job pod logs (tctl prints a "Response: {...}" block for -o json).
@@ -5479,6 +5501,27 @@ showPipelineHelp() { # pipeline mode help
   echo "For Deployment Engine logs, use -o (see: bash hitt.sh -o help)."
 }
 
+showTctlHelp() { # tctl mode help
+  echo "HITT tctl mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode"
+  echo .
+  echo 'Usage: bash hitt.sh -t "<tctl-command>"'
+  echo "The tctl sub-command only — do not prefix with 'tctl'. Multi-word commands must be double-quoted."
+  echo -e "
+    \tconfig \t\t| Print a tctl config file (redirect to 'config' for local tctl use).
+    \tget tenant \t| List tenants (add '-o json' or a tenant ID as needed).
+    \tget service \t| List services for the tenant.
+    \tcreate/update ... -f FILE | Pass JSON payload from a local file (validated before the job runs).
+    \trun job ... -f true|false | Force re-run flag only — not a JSON file path.
+    \thelp \t\t| Show this list.
+    "
+  echo "Examples:"
+  echo '  bash hitt.sh -t "get tenant"'
+  echo '  bash hitt.sh -t "get tenant -o json"'
+  echo '  bash hitt.sh -t "create firstuser TENANT_ID -f firstuser.json"'
+  echo '  bash hitt.sh -t "run job ITSM_USER_SYNC -f true"'
+  echo "Successful job logs show HTTP Response Status 2xx. On failure, the full job log is printed."
+}
+
 showInfoHelp() { # info mode help
   echo "HITT info mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
   echo .
@@ -5538,6 +5581,7 @@ showGeneralHelp() {
   echo "  bash $0 -h utility     - utility mode options"
   echo "  bash $0 -h pipeline    - pipeline mode options"
   echo "  bash $0 -h consolelog  - Deployment Engine log options (-o)"
+  echo "  bash $0 -h tctl        - tctl mode options (-t)"
   echo "  bash $0 -h override    - config override options"
   echo
   echo -e "${BOLD}Interactive help page with HITT use-cases available at https://bit.ly/hitthelp${NORMAL}"
@@ -5564,11 +5608,14 @@ showHittHelp() {
     consolelog|log)
       showConsoleLogHelp
       ;;
+    tctl)
+      showTctlHelp
+      ;;
     override)
       showOverrideHelp
       ;;
     *)
-      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, consolelog, override)."
+      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, consolelog, tctl, override)."
       showGeneralHelp
       exit 1
       ;;
@@ -7975,6 +8022,10 @@ cleanUp start
 
 # Run tctl command and then exit
 if [[ -n "${TCTL_CMD}" ]]; then
+  if [[ "${TCTL_CMD}" == "help" ]]; then
+    showTctlHelp
+    exit
+  fi
   parseTctlCommand
   logStatus "Running in tctl mode..."
   checkToolVersion kubectl
@@ -7988,7 +8039,6 @@ if [[ -n "${TCTL_CMD}" ]]; then
   fi
   deleteTCTLJob
   deployTCTL "${TCTL_CMD}"
-  logMessage "tctl output is...\n"
   getTCTLOutput full
   echo "${TCTL_OUTPUT}"
   deleteTCTLJob
@@ -8392,7 +8442,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260814-04"
+HITT_BUILD_VERSION="20260817-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)

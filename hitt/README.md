@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260814-04`**
+**Latest build `20260817-01`**
 
 The **Helix IS Triage Tool (HITT)** is a command-line helper for BMC Helix on-premises deployments. It can check your environment, fix common setup problems, work with the **HELIX_ONPREM_DEPLOYMENT** pipeline, and gather information for troubleshooting or support.
 
@@ -33,7 +33,7 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` / `delete` for **HELIX_ONPREM_DEPLOYMENT**
 - [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info node`, `info helix`, `info ingress`, `info full`
 
-Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h consolelog`, `bash hitt.sh -h info`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, `bash hitt.sh -o help`, or `bash hitt.sh -m "info help"` from within each mode.
+Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h consolelog`, `bash hitt.sh -h info`, `bash hitt.sh -h tctl`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, `bash hitt.sh -o help`, `bash hitt.sh -t help`, or `bash hitt.sh -m "info help"` from within each mode.
 
 **Info ingress** (`bash hitt.sh -m "info ingress"`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires **HITT configuration** with the Helix Platform namespace set. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
 
@@ -176,30 +176,60 @@ Use **`-o`** to print Deployment Engine logs on screen: **`-o jenkins`** (system
 
 ### tctl Mode ###
 
-HITT may also be used to:
- - generate a `tctl` config file.
+HITT can run **tctl** (Tenant Management Service CLI) commands against your Helix Platform cluster without installing tctl locally. It deploys a short-lived **sealtctl** job in the Helix Platform namespace (same pattern as Jenkins **HELIX_ITSM_INTEROPS**), runs the command, prints the output, and deletes the job.
 
- Output is displayed on the screen or may be redirected to a file for use by `tctl`.
+#### Generate a tctl config file
 
- ```bash
- bash hitt.sh -t config
- # Examples:
- bash hitt.sh -t config
- bash hitt.sh -t config > config
- ```
-
- - run simple `tctl` commands such as `get tenant` and `get service`.
-
- Running commands deploys the same job and pod used by the Jenkins HELIX_ITSM_INTEROPS pipeline which avoids having to download and configure the tctl client on a local system.  Use the `-t` switch along with the command to run enclosed in quotes:
+Use this if you want a standalone `config` file for tctl on your workstation:
 
 ```bash
-bash hitt.sh -t "tctl command"
-# Examples:
+bash hitt.sh -t config
+bash hitt.sh -t config > config
+```
+
+#### Read-only commands
+
+```bash
 bash hitt.sh -t "get tenant"
+bash hitt.sh -t "get service"
+bash hitt.sh -t "get tenant -o json"
 bash hitt.sh -t "get tenant 1912102789 -o json"
 ```
 
-Output will be displayed on the console when the job completes.
+#### Commands with a JSON file (`-f`)
+
+Many tctl write commands take a JSON payload via `-f`. Put the file path at the **end** of the command (still inside the double quotes):
+
+```bash
+bash hitt.sh -t "create tenant -f onboarding.json"
+bash hitt.sh -t "update tenant 1685000123 -f update-tenant.json"
+bash hitt.sh -t "create firstuser 1097259844 -f firstuser.json"
+```
+
+HITT reads the file on the machine where you run HITT, validates that it is JSON, and passes the payload to the cluster job as inline JSON — the same mechanism used by seal-pipelines **tctlrest** jobs.
+
+**Exception:** for `run job`, `-f` is only the **force** flag (`true` or `false`), not a JSON file — for example `bash hitt.sh -t "run job ITSM_USER_SYNC -f true"`. HITT passes that command through unchanged.
+
+If the file is missing or not valid JSON, HITT exits before deploying the job.
+
+#### HTTP responses and errors
+
+Successful commands print `HTTP Response Status: 2xx ...` in the job log. HITT treats any **2xx** response as success (for example **200 OK** for reads, **201 Created** for creates, **202 Accepted** for async jobs). On failure, the full job log is printed.
+
+#### Use cases
+
+| Use case | Example |
+|----------|---------|
+| Check tenant status | `bash hitt.sh -t "get tenant"` |
+| List registered services | `bash hitt.sh -t "get service"` |
+| Export tenant details as JSON | `bash hitt.sh -t "get tenant -o json"` |
+| Onboard or update a tenant from a template | `bash hitt.sh -t "create tenant -f tenant.json"` |
+| Create an admin user (e.g. after a failed activation email) | `bash hitt.sh -t "create firstuser TENANT_ID -f firstuser.json"` |
+| Force re-run a TMS job | `bash hitt.sh -t "run job ITSM_USER_SYNC -f true"` |
+
+**Quoting:** The entire tctl command must be enclosed in double quotes. File paths with spaces are supported inside the quotes.
+
+Output is printed to the console when the job completes. Run `bash hitt.sh -h tctl` or `bash hitt.sh -t help` for a short summary on the console.
 
 ### Get IS Bundle Deployment Status ###
 
@@ -290,6 +320,7 @@ There are several extra command line switches which may be helpful for troublesh
 `-j`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Display the Jenkins credentials details and save kubeconfig contents as kubeconfig.jenkins.\
 `-p`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Include plain pipeline password values in `-k get` output and in `values.log` during pre-is mode.
 `-q`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quiet mode - only print summary.\
+`-t "command"`&nbsp;&nbsp;Run a tctl command via a cluster job ([tctl Mode](#tctl-mode)).\
 `-v`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Increase verbosity of logging.\
 `-x`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ignore proxy environment variables.\
 `-z`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Do not delete temporary files after execution.
@@ -308,6 +339,7 @@ Run `bash hitt.sh -h` for general usage and a list of topics. Each topic prints 
 | `bash hitt.sh -h pipeline` | Pipeline mode options ([README-pipeline-mode.md](README-pipeline-mode.md)) |
 | `bash hitt.sh -h consolelog` | Deployment Engine log options (`-o`; [README-pipeline-mode.md](README-pipeline-mode.md#view-logs-from-the-deployment-engine--o)) |
 | `bash hitt.sh -h info` | Info mode options ([README-info-mode.md](README-info-mode.md)) |
+| `bash hitt.sh -h tctl` | tctl mode options (`-t`; [tctl Mode](#tctl-mode)) |
 | `bash hitt.sh -h override` | Config override switches (see below) |
 
 ### Config overrides ###

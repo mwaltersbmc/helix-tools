@@ -1059,6 +1059,31 @@
       }
     },
     {
+      "id": "tctl-json-file",
+      "topicId": "tctl-options",
+      "order": 15,
+      "title": "I want to run a tctl command with a JSON input file",
+      "commands": [
+        "bash hitt.sh -t \"create tenant -f onboarding.json\"",
+        "bash hitt.sh -t \"update tenant TENANT_ID -f update-tenant.json\"",
+        "bash hitt.sh -t \"create firstuser TENANT_ID -f firstuser.json\""
+      ],
+      "notes": [
+        "Put -f and the file path at the end of the tctl command, still inside the double quotes. The JSON file must exist on the computer where you run HITT.",
+        "HITT checks that the file is valid JSON before starting the job in your Helix Platform environment.",
+        "run job does not use a JSON file — its -f option is only true or false (force re-run). For that, use bash hitt.sh -t \"run job JOB_NAME -f true\"."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#tctl-mode",
+      "video": {
+        "enabled": false,
+        "tape": "tctl-json-file.tape",
+        "playback": {
+          "dir": "tctl-json-file",
+          "enabled": false
+        }
+      }
+    },
+    {
       "id": "tctl-config",
       "topicId": "tctl-options",
       "order": 20,
