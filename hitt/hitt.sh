@@ -5432,6 +5432,17 @@ logK8sNodeDetails() {
   fi
 }
 
+checkClusterConfig() {
+  # terminated-pod-gc-threshold test - causes issues if too low
+  POD_GC_THRESHOLD=$(${KUBECTL_BIN} get pod -n kube-system -l component=kube-controller-manager -o json 2>/dev/null | \
+    ${JQ_BIN} -r '.items[].spec.containers[].command[]?, .items[].spec.containers[].args[]?' | \
+    sed -nE 's/.*--terminated-pod-gc-threshold[= ]([0-9]+).*/\1/p' | \
+    head -n 1)
+  if [[ -n "${POD_GC_THRESHOLD}" ]] && [[ "${POD_GC_THRESHOLD}" -lt 100 ]]; then
+    logError "279" "Cluster terminated-pod-gc-threshold setting of '$POD_GC_THRESHOLD' is too low - recommend a minimum of 100 to avoid deployment timeouts."
+  fi
+}
+
 getPodConditionTime() {
     local CONDITION="$1"
     local NAMESPACE_NAME="$2"
@@ -8386,6 +8397,7 @@ if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
   logError "201" "It is recommended to install the Helix Platform and Helix IS in their own namespaces."
 fi
 logMessage "Gathering cluster information..."
+checkClusterConfig
 logK8sNodeDetails
 logMessage "Gathering Helix Platform namespace information..."
 checkHPNamespace "${HP_NAMESPACE}"
@@ -8483,7 +8495,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260817-02"
+HITT_BUILD_VERSION="20260818-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -9983,6 +9995,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"HITT could not find a standard tctl job and is using a derived tctlrest image instead.\",
     \"impact\": \"The tctl command should still run but the image may not match the cluster if the version mapping is wrong.\",
     \"remediation\": \"Ensure tenantonboarding or a tctl registration job exists in the Helix Platform namespace, or verify TCTL_REST_VER for your Helix Platform version.\"
+  },
+  {
+    \"id\": \"279\",
+    \"cause\": \"The kube-controller's terminated-pod-gc-threshold setting is lower than the required value.\",
+    \"impact\": \"Reading the logs of long running jobs will fail as the pods will be deleted as soon as they complete, leading to pipeline timeouts.\",
+    \"remediation\": \"Contact the cluster administrator and request the terminated-pod-gc-threshold be increased to at least 100.\"
   }
 ]"
 
