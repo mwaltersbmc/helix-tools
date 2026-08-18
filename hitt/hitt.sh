@@ -2983,6 +2983,23 @@ reportResults() {
   fi
 }
 
+ensureKubectlBin() {
+  # Load KUBECTL_BIN from hitt.conf before any kubectl call (checkKubeconfig and config bootstrap both use it).
+  if [[ -f "./${HITT_CONFIG_FILE}" ]]; then
+    # shellcheck disable=SC1090
+    source "./${HITT_CONFIG_FILE}"
+  fi
+  if [[ "${KUBECTL_BIN}" != */* ]] && ! command -v "${KUBECTL_BIN}" >/dev/null 2>&1; then
+    logError "105" "kubectl command not found ('${KUBECTL_BIN}'). Set KUBECTL_BIN in '${HITT_CONFIG_FILE}' to the full path to the binary (shell aliases are not supported)." 1
+  fi
+  if [[ "${KUBECTL_BIN}" == */* ]] && [[ ! -x "${KUBECTL_BIN}" ]]; then
+    logError "105" "'${KUBECTL_BIN}' is not executable — check KUBECTL_BIN in '${HITT_CONFIG_FILE}'." 1
+  fi
+  if ! "${KUBECTL_BIN}" version --client >/dev/null 2>&1; then
+    logError "184" "'${KUBECTL_BIN} version --client' returned an error — unable to continue." 1
+  fi
+}
+
 checkKubeconfig() {
   KUBECONFIG_ERROR=0
   if [ ! -f ~/.kube/config ]; then
@@ -7970,6 +7987,7 @@ main() {
 NOW=$(date)
 logStatus "Welcome to the Helix IS Triage Tool (build ${HITT_BUILD_VERSION}) - ${NOW}."
 logStatus "Using config file '${HITT_CONFIG_FILE}'."
+ensureKubectlBin
 logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
 
@@ -8495,7 +8513,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260818-02"
+HITT_BUILD_VERSION="20260818-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
