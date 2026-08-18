@@ -5692,7 +5692,7 @@ getJenkinsPipelineValues() {
       kickstartMergedPipelineJson || exit 1
       PIPELINE_VALUES_JSON="${KICKSTART_MERGED_JSON}"
       ;;
-    last)
+    last|latest)
       PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getLastBuild)
       ;;
     lastsuccessful)
@@ -8495,7 +8495,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260818-01"
+HITT_BUILD_VERSION="20260818-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
