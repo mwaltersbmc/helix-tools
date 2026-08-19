@@ -469,7 +469,7 @@ checkISNamespace() {
   NS_TYPE="Helix IS"
   checkNamespaceExists "${1}"
   if [ "${MODE}" == "pre-is" ]; then
-    if [ $(${KUBECTL_BIN} -n "${1}" get secret --field-selector type=kubernetes.io/dockerconfigjson 2>&1 | wc -l) == "1" ]; then
+    if [ $(${KUBECTL_BIN} -n "${1}" get secret --field-selector type=kubernetes.io/dockerconfigjson --no-headers 2>/dev/null | wc -l) == "0" ]; then
       logError "108" "Registry secret not found in ${1} namespace - HELIX_GENERATE_CONFIG pipeline must be run to enable all ${MODE} checks."
     fi
   fi
@@ -848,6 +848,7 @@ getTenantDetails() {
   fi
   if [ "${#TENANT_ARRAY[@]}" != "1" ]; then
 #    echo "${TENANT_ARRAY}"
+    MULTI_TENANT_HP=1
     logMessage "Multiple tenants found - please select the tenant you wish to use:"
     while [ "${HP_TENANT}" == "" ]; do
         HP_TENANT=$(selectFromArray TENANT_ARRAY)
@@ -2403,11 +2404,25 @@ validateISDetails() {
       logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of '${HP_NAMESPACE}'." 1
     fi
 
-    if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ] && [ "${HP_SM_PLATFORM_CORE}" == "no" ]; then
-      logError "158" "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' is not the expected value of '${HP_COMPANY_NAME}'."
-    else
-      logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of '${HP_COMPANY_NAME}'." 1
+    if [ "${HP_SM_PLATFORM_CORE}" == "no" ]; then
+      if [[ -z "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" ]]; then
+        logError "158" "HELIX_PLATFORM_CUSTOMER_NAME is blank."
+      else
+        HP_TENANT_ID="${HP_TENANT#*.}"
+        TENANT_MATCHES=$(printf '%s\n' "${TENANT_ARRAY[@]}" | grep -cF "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" || true)
+        if [ "${TENANT_MATCHES}" -eq 0 ]; then
+          logError "158" "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' does not match any Helix Platform tenant."
+        elif [ "${TENANT_MATCHES}" -gt 1 ]; then
+          logError "999" "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' matches more than one tenant — use the numeric TENANT_ID suffix '${HP_TENANT_ID}')."
+        elif [[ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" == "${HP_COMPANY_NAME}" ]] \
+           || [[ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" == "${HP_TENANT_ID}" ]]; then
+          logMessage "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' is valid for tenant '${HP_TENANT}'." 1
+        else
+          logError "158" "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' is not the expected value of '${HP_COMPANY_NAME}' or tenant id '${HP_TENANT_ID}'."
+        fi
+      fi
     fi
+
   fi
 }
 
@@ -8513,7 +8528,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260819-01"
+HITT_BUILD_VERSION="20260819-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8539,6 +8554,7 @@ CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar host zip unzip)
 IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int reporting)
 JENKINS_CREDS=(git github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
+MULTI_TENANT_HP=0
 IS_ALIAS_ARRAY=()
 ADE_ALIAS_ARRAY=()
 NAMESPACE_OTHER_OPTION="Other"
@@ -10019,6 +10035,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The kube-controller's terminated-pod-gc-threshold setting is lower than the required value.\",
     \"impact\": \"Reading the logs of long running jobs will fail as the pods will be deleted as soon as they complete, leading to pipeline timeouts.\",
     \"remediation\": \"Contact the cluster administrator and request the terminated-pod-gc-threshold be increased to at least 100.\"
+  },
+  {
+    \"id\": \"280\",
+    \"cause\": \"The HELIX_PLATFORM_CUSTOMER_NAME matches multiple tenants.\",
+    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
+    \"remediation\": \"Change the HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline to the numeric value of the TENANT_ID.\"
   }
 ]"
 
