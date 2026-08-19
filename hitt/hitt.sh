@@ -2386,6 +2386,10 @@ validateISDetails() {
       logMessage "PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is blank or matches the expected format - '${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}'." 1
     fi
 
+    if [[ "${IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS}" =~ " " ]]; then
+      logError "155" "IS_PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value contains an invalid space character. This will cause a deployment failure."
+    fi
+
     if [ "${IS_RSSO_ADMIN_USER,,}" != "${RSSO_USERNAME,,}" ]; then
       logError "156" "RSSO_ADMIN_USER '${IS_RSSO_ADMIN_USER}' does not match the Helix Platform RSSO_ADMIN_USER '${RSSO_USERNAME}'."
     else
@@ -8528,7 +8532,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260819-02"
+HITT_BUILD_VERSION="20260819-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
