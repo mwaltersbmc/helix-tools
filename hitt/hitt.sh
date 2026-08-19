@@ -1273,7 +1273,7 @@ validateRealmDomains() {
     logWarning "005" "Alias '${PORTAL_HOSTNAME}' not found in the realm Application Domains list. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
   # Should not be present in pre-is unless INTEROPS run
-  if [ "${SM_PLATFORM_CORE}" == "no" ] && [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
+  if [ "${HP_SM_PLATFORM_CORE}" == "no" ] && [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
     logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is only expected after the HELIX_ITSM_INTEROPS pipeline has completed."
   fi
 }
@@ -2403,7 +2403,7 @@ validateISDetails() {
       logMessage "HELIX_PLATFORM_NAMESPACE is the expected value of '${HP_NAMESPACE}'." 1
     fi
 
-    if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ] && [ "${SM_PLATFORM_CORE}" == "no" ]; then
+    if [ "${IS_HELIX_PLATFORM_CUSTOMER_NAME}" != "${HP_COMPANY_NAME}" ] && [ "${HP_SM_PLATFORM_CORE}" == "no" ]; then
       logError "158" "HELIX_PLATFORM_CUSTOMER_NAME '${IS_HELIX_PLATFORM_CUSTOMER_NAME}' is not the expected value of '${HP_COMPANY_NAME}'."
     else
       logMessage "HELIX_PLATFORM_CUSTOMER_NAME is the expected value of '${HP_COMPANY_NAME}'." 1
@@ -2734,13 +2734,13 @@ checkISTenant() {
   logMessage "IS tenant name: '${IS_TENANT_NAME}', domainIdentifier: '${IS_TENANT_DOMID}', virtualHostname: '${IS_TENANT_VHOSTNAME}'." 1
   return # skipping following as still under review
   if [ "${IS_TENANT_NAME}" != "${IS_CUSTOMER_SERVICE}" ]; then
-    logError "xxx" "IS tenant name is '${IS_TENANT_NAME}' and not the expected '${IS_CUSTOMER_SERVICE}'."
+    logError "999" "IS tenant name is '${IS_TENANT_NAME}' and not the expected '${IS_CUSTOMER_SERVICE}'."
   fi
   if [ "${IS_TENANT_DOMID}" != "${HP_TENANT}" ]; then
-    logError "xxx" "IS tenant domainIdentifier is '${IS_TENANT_DOMID}' and not the expected '${HP_TENANT}'."
+    logError "999" "IS tenant domainIdentifier is '${IS_TENANT_DOMID}' and not the expected '${HP_TENANT}'."
   fi
   if [ "${IS_TENANT_VHOSTNAME}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
-    logError "xxx" "IS tenant virtualHostname is '${IS_TENANT_VHOSTNAME}' and not the expected '${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}'."
+    logError "999" "IS tenant virtualHostname is '${IS_TENANT_VHOSTNAME}' and not the expected '${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}'."
   fi
 }
 
@@ -8513,7 +8513,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260818-03"
+HITT_BUILD_VERSION="20260819-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
