@@ -1,5 +1,16 @@
 # Helix Authentication Troubleshooting Checklist
 
+- [Pod Health](#pod-health)
+- [RSSO Checks](#rsso-checks)
+- [Jenkins HELIX_ONPREM_DEPLOYMENT Pipeline Checks](#jenkins-helixonpremdeployment-pipeline-checks)
+- [Helix IS Platform Pod](#helix-is-platform-pod)
+- [Certificate Issues](#certificate-issues)
+	- [From Helix IS platform pod](#from-helix-is-platform-pod)
+	- [From Deployment Engine](#from-deployment-engine)
+- [Certificate Chain Tests](#certificate-chain-tests)
+- [Add certificate(s) to the cacerts keystore file](#add-certificates-to-the-cacerts-keystore-file)
+- [Recreate Helix IS cacerts Secret](#recreate-helix-is-cacerts-secret)
+
 ## Pod Health
 
 Check that all pods are running and healthy using **kubectl get/describe pod**:
