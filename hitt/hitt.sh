@@ -1980,8 +1980,13 @@ validateISDetails() {
 
   if [ "${#IS_AR_SERVER_APP_SERVICE_PASSWORD}" -gt 19 ]; then
     logError "134" "AR_SERVER_APP_SERVICE_PASSWORD is too long - maximum of 19 characters."
-  else
-    logMessage "AR_SERVER_APP_SERVICE_PASSWORD length is 19 characters or less." 1
+  fi
+
+  if [ "${#IS_AR_SERVER_APP_SERVICE_PASSWORD}" -gt 8 ] && [[ "${IS_PLATFORM_HELM_VERSION}" =~ ^2026101 ]]; then
+    FULL_VER=$(echo "${IS_PLATFORM_HELM_VERSION}" | tr -d .)
+    if [ "${FULL_VER}" -lt 202610110600 ]; then
+      logError "134" "AR_SERVER_APP_SERVICE_PASSWORD is too long - maximum of 8 characters due to defect DRD21-151079."
+    fi
   fi
 
   if [ "${#IS_AR_SERVER_DSO_USER_PASSWORD}" -gt 20 ]; then
@@ -8532,7 +8537,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260819-03"
+HITT_BUILD_VERSION="20260820-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -9172,9 +9177,9 @@ ALL_MSGS_JSON="[
   },
   {
     \"id\": \"134\",
-    \"cause\": \"The AR_SERVER_APP_SERVICE_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline is too long. The maximum length is 19 characters.\",
+    \"cause\": \"The AR_SERVER_APP_SERVICE_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.\",
     \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Shorten the value to no more than 19 characters.\"
+    \"remediation\": \"Shorten the value to no more than maximum.\"
   },
   {
     \"id\": \"135\",
