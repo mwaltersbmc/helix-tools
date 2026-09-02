@@ -3252,6 +3252,7 @@ checkJenkinsConfig() {
     logMessage "Checking plugins..."
     checkJenkinsPlugins
   if isJenkinsInCluster ; then
+    checkGITEAPassword
     logMessage "Jenkins is running in cluster - skipping remaining checks..."
   else
     logMessage "Checking approved scripts..."
@@ -3264,6 +3265,17 @@ checkJenkinsConfig() {
     checkJenkinsGlobalLibs
     logMessage "Checking ssh configuration..."
     checkSSHSetup
+  fi
+}
+
+checkGITEAPassword() {
+  local invalid_found
+  #GITEA_CREDS_JSON=$(getGITEACredentials)
+  #GITEA_ADMIN_PASS=$(echo "${GITEA_CREDS_JSON}" | ${JQ_BIN} -r '.GITEA_ADMIN_PASS')
+  GITEA_ADMIN_PASS=$(${KUBECTL_BIN} -n "${CDE_NAMESPACE}" get secret gitea-admin -o jsonpath='{.data.password}' | ${BASE64_BIN} -d -w 0)
+  invalid_found=$(echo "${GITEA_ADMIN_PASS}" | tr -dc '@:/#?% ')
+  if [[ -n "${invalid_found}" ]]; then
+      logError "281" "GITEA_ADMIN_PASS includes invalid characters '${invalid_found}'. Update deployment-engine-config.env and redeploy."
   fi
 }
 
@@ -8575,7 +8587,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260902-01"
+HITT_BUILD_VERSION="20260902-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -10088,6 +10100,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The HELIX_PLATFORM_CUSTOMER_NAME matches multiple tenants.\",
     \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
     \"remediation\": \"Change the HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline to the numeric value of the TENANT_ID.\"
+  },
+  {
+    \"id\": \"281\",
+    \"cause\": \"The GITEA_ADMIN_PASS value set in the deployment-engine-config.env file contains invalid characters.\",
+    \"impact\": \"Jenkins pipelines will fail when checking out code from gitea.\",
+    \"remediation\": \"Update the GITEA_ADMIN_PASS value in the deployment-engine-config.env file and re-run the deployment-engine.sh script.\"
   }
 ]"
 
