@@ -1497,6 +1497,35 @@ getLastBuildFromJenkins() {
   echo "${BUILD_NUMBER}"
 }
 
+# Return 0 if Jenkins reports build JOB_NAME/BUILD_NUM exists (REST preflight for -k get N).
+jenkinsPipelineBuildExists() {
+  local job_name="${1}"
+  local build_num="${2}"
+  local http_code
+  http_code=$(${CURL_BIN} -sk -o /dev/null -w "%{http_code}" -b .cookies -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
+    "${JENKINS_URL}/job/${job_name}/${build_num}/api/json" 2>>"${HITT_ERR_FILE}")
+  case "${http_code}" in
+    200) return 0 ;;
+    404) return 1 ;;
+    *)
+      logError "999" "Unable to verify Jenkins build #${build_num} for '${job_name}' (HTTP ${http_code})." 1
+      ;;
+  esac
+}
+
+# Print highest build number for JOB_NAME (lastBuild), or nothing if the job has no builds.
+getJenkinsJobLastBuildNumber() {
+  local job_name="${1}"
+  local last_build_num
+  last_build_num=$(${CURL_BIN} -sk -b .cookies -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
+    "${JENKINS_URL}/job/${job_name}/lastBuild/buildNumber" 2>>"${HITT_ERR_FILE}" | tr -d '\r\n')
+  if [[ "${last_build_num}" =~ ^[0-9]+$ ]]; then
+    echo "${last_build_num}"
+    return 0
+  fi
+  return 1
+}
+
 savePipelineConsoleOutput() {
   # PIPELINE_NAME / BUILD_NUMBER
   ${CURL_BIN} -skf -b .cookies -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
@@ -5740,6 +5769,15 @@ getJenkinsPipelineValues() {
       PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getLastSuccessfulBuild)
       ;;
     [0-9]*)
+      if ! jenkinsPipelineBuildExists "${PIPELINE_NAME}" "${PIPELINE_BUILD}"; then
+        local last_build_num last_build_hint
+        if last_build_num=$(getJenkinsJobLastBuildNumber "${PIPELINE_NAME}"); then
+          last_build_hint=" Latest build is #${last_build_num}."
+        else
+          last_build_hint=" No builds found for this job."
+        fi
+        logError "999" "Build #${PIPELINE_BUILD} not found for Jenkins job '${PIPELINE_NAME}'.${last_build_hint}" 1
+      fi
       PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getBuildByNumber ${PIPELINE_BUILD})
       ;;
     *)
@@ -8537,7 +8575,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260820-01"
+HITT_BUILD_VERSION="20260902-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
