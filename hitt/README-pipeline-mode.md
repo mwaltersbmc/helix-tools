@@ -1,6 +1,6 @@
 # HITT Pipeline Mode
 
-Pipeline mode helps you work with **HELIX_ONPREM_DEPLOYMENT** on the Deployment Engine (Jenkins). HITT uses the Jenkins address and login from your **HITT configuration**.
+Pipeline mode helps you work with **HELIX_ONPREM_DEPLOYMENT** on the Deployment Engine (Jenkins).
 
 You can:
 
@@ -13,21 +13,11 @@ When a command has more than one word after **`-k`**, put the whole thing in **d
 
 ```bash
 bash hitt.sh -k "get lastsuccessful"
+bash hitt.sh -k "get 21 values.json"
 bash hitt.sh -k "build values.json"
 bash hitt.sh -k kickstart
 bash hitt.sh -k help
 ```
-
-## What you need first
-
-| Command | What you need |
-|---------|----------------|
-| **get** | **HITT configuration** with Deployment Engine URL and login. |
-| **build** | The same as **get**, plus a settings file from **get** (or one you edited by hand). |
-| **kickstart** | **HITT configuration** and Helix Platform already deployed so HITT can read namespace, domain, registry, and sign-on settings. Same for **get kickstart**. |
-| **delete** | **HITT configuration** with Deployment Engine URL and login (same as **get**). |
-
-HITT must be able to log in to the Deployment Engine for all pipeline mode commands.
 
 ## Commands at a glance
 
@@ -37,18 +27,18 @@ HITT must be able to log in to the Deployment Engine for all pipeline mode comma
 | **build** | Starts a new **HELIX_ONPREM_DEPLOYMENT** run using your saved settings file. |
 | **kickstart** | Looks up values from your environment, then starts a new run with those values filled in. |
 | **delete** | Removes one or more builds from a job’s build history (default job: **HELIX_ONPREM_DEPLOYMENT**). |
-| **help** | Shows a short summary of pipeline mode (same as this guide, built into the script). |
+| **help** | Shows a short summary of pipeline mode (same as this guide, built into HITT). |
 
 ## View logs from the Deployment Engine (`-o`)
 
-Use **`-o`** (not pipeline mode **`-k`**) to print logs on screen. Requires **HITT configuration** and a working login to the Deployment Engine.
+Use **`-o`** (not pipeline mode **`-k`**) to print logs on screen.
 
 | Command | What you get |
 |---------|----------------|
 | `bash hitt.sh -o jenkins` | Recent Jenkins **system** log (controller messages). |
 | `bash hitt.sh -o agent` | **jenkins-agent** node log (where pipeline steps run on the Deployment Engine). |
 | `bash hitt.sh -o helix_onprem_deployment` | Console output from the **latest build** of that job (job name as in the Jenkins URL, usually lowercase with underscores). |
-| `bash hitt.sh -o "follow helix_onprem_deployment"` | Stream the **latest build** console log until the run finishes (like `tail -f`). If the latest build is already complete, the full log is printed once and HITT exits. Optional poll interval: `bash hitt.sh -o "follow helix_onprem_deployment 5"` (default **2** seconds). **follow** applies to pipeline jobs only, not **jenkins** or **agent** logs. |
+| `bash hitt.sh -o "follow helix_onprem_deployment"` | Stream the **latest build** console log until the run finishes. If the latest build is already complete, the full log is printed once and HITT exits. Optional poll interval: `bash hitt.sh -o "follow helix_onprem_deployment 5"` (default **2** seconds). **follow** applies to pipeline jobs only, not **jenkins** or **agent** logs. |
 
 ```bash
 bash hitt.sh -o jenkins
@@ -71,8 +61,8 @@ bash hitt.sh -k "get <defaults|last|lastsuccessful|kickstart|N> [filename]"
 | **defaults** | The job’s default values on the Deployment Engine. |
 | **last** | Values from the most recent run (pass or fail). |
 | **lastsuccessful** | Values from the last run that completed successfully. |
-| **kickstart** | Job defaults with kickstart-discovered values filled in (see below). Requires **HITT configuration** and Helix Platform deployed — same as **kickstart** build. |
-| **N** | Values from run number **N** (for example **7**). |
+| **kickstart** | Job defaults with kickstart-discovered values filled in (see [kickstart](#kickstart--fill-values-from-helix-platform)). Helix Platform must already be deployed. |
+| **N** | Values from run number **N** (for example **7**). If that build does not exist, HITT reports it was not found and shows the latest build number for the job. |
 
 If you do not give a file name, the settings appear on screen. If you add a file name, they are saved to that file (for example **values.json**).
 
@@ -122,7 +112,7 @@ bash hitt.sh -k "build deploy-params.json"
 
 Then open **HELIX_ONPREM_DEPLOYMENT** on the Deployment Engine, **Rebuild** the last run, attach any **file** parameters (certificates, config uploads), and confirm the form before a real deployment.
 
-This workflow gives you the same pre-fill as **kickstart**, but you control the JSON on disk before anything is queued. Use **`-p`** when saving the file if you intend to run **build** with it; redacted `***REDACTED***` placeholders are not valid for Jenkins.
+This workflow gives you the same pre-fill as **kickstart**, but you control the saved settings file before anything is queued. Use **`-p`** when saving the file if you intend to run **build** with it; redacted `***REDACTED***` placeholders are not valid for Jenkins.
 
 ---
 
@@ -136,7 +126,7 @@ Use a settings file you created with **get** (including **get kickstart**), or e
 
 A typical path for a new deployment when Helix Platform is already installed:
 
-1. **`bash hitt.sh -p -k "get kickstart deploy-params.json"`** — known values from Platform and your HITT settings (use **`-p`** if the file will be used with **build**).
+1. **`bash hitt.sh -p -k "get kickstart deploy-params.json"`** — known values from Platform and your configured namespaces (use **`-p`** if the file will be used with **build**).
 2. **Edit** `deploy-params.json` — database details, enable the **Pipelines** checkboxes you need, and any other missing fields.
 3. **`bash hitt.sh -k "build deploy-params.json"`** — queue the run.
 4. **Rebuild** in the Deployment Engine and attach file uploads that HITT cannot send.
@@ -149,7 +139,7 @@ A typical path for a new deployment when Helix Platform is already installed:
 
 The first run often **fails on purpose** if required fields are still empty. That is normal. You finish the form in the Deployment Engine, then rebuild when you are ready for a real deployment.
 
-### What HITT does for you when you use build or kickstart
+### What HITT does when you use build or kickstart
 
 - **File attachments** (config files, certificates, and similar) are not sent from HITT. You attach those in the Deployment Engine when you rebuild.
 - Every checkbox under the **Pipelines** section is turned **off** unless you already set it in your settings file. That stops a full deployment from starting before you review the job.
@@ -176,8 +166,6 @@ Removes completed builds from the Deployment Engine job history. By default the 
 
 Build numbers that do not exist are skipped. **This cannot be undone** — confirm the build numbers before you run **delete**.
 
-Requires the same Jenkins login as **get** / **build**, and script-console permission on the Deployment Engine (same as other HITT Jenkins script actions).
-
 **Examples:**
 
 ```bash
@@ -193,22 +181,22 @@ bash hitt.sh -k "delete 1-50"
 bash hitt.sh -k kickstart
 ```
 
-Use this for a **new** deployment when Helix Platform is already in the cluster. HITT reads your **HITT configuration**, fills in every value it can find from the environment, and starts a **HELIX_ONPREM_DEPLOYMENT** run — the same follow-up steps as **build** above.
+Use this for a **new** deployment when Helix Platform is already in the cluster. HITT fills in every value it can find from the environment and starts a **HELIX_ONPREM_DEPLOYMENT** run — the same follow-up steps as **build** above.
 
-To preview those fills without starting a run, use **`bash hitt.sh -k "get kickstart"`** (see [get kickstart](#get-kickstart--preview-values-without-starting-a-run) above). To save, edit, and then queue a run, use **get kickstart** → edit JSON → **build** (documented in the same section).
+To preview those fills without starting a run, use **`bash hitt.sh -k "get kickstart"`** (see [get kickstart](#get-kickstart--preview-values-without-starting-a-run) above). To save, edit, and then queue a run, use **get kickstart** → edit the saved file → **build** (documented in the same section).
 
 HITT will **not** fill in everything. Database settings, some passwords, file uploads, and deployment choices are still yours to complete in the Deployment Engine after you rebuild.
 
 ### Where kickstart gets information
 
-- OpenShift vs Kubernetes (restricted security context when on OpenShift)
+- Cluster type (OpenShift adjusts security-related settings)
 - Cluster connection name
-- Names and customer settings from your **HITT settings**
+- Names and customer settings from your HITT configuration
 - Helix Platform namespace, domain, ingress, registry, and company name
 - Sign-on (RSSO) URL and admin login
 - Tenant name
-- Whether Helix Logging is installed (fluent-bit sidecar)
-- Search (FTS) connection details from Platform / logging
+- Whether Helix Logging is installed
+- Search (FTS) connection details from Platform or logging
 
 ### Jenkins parameters kickstart may set for you
 
@@ -218,13 +206,13 @@ These are the fields you should see already filled when you rebuild the job (nam
 |-----------|-------------|
 | **OS_RESTRICTED_SCC** | Cluster type (OpenShift) |
 | **CLUSTER_CONTEXT** | Your cluster connection |
-| **IS_NAMESPACE**, **CUSTOMER_SERVICE**, **ENVIRONMENT** | Your HITT settings |
+| **IS_NAMESPACE**, **CUSTOMER_SERVICE**, **ENVIRONMENT** | Your HITT configuration |
 | **INGRESS_CLASS** | Helix Platform |
 | **CLUSTER_DOMAIN**, **APPLICATION_PARENT_DOMAIN** | Helix domain |
 | **SIDECAR_FLUENTBIT** | Helix Logging present |
 | **HARBOR_REGISTRY_HOST**, **IMAGE_REGISTRY_USERNAME**, **IMAGE_REGISTRY_PASSWORD** | Platform image registry |
 | **IMAGESECRET_NAME** | Default registry secret name |
-| **FTS_ELASTICSEARCH_***(hostname, port, user, password, secure) | Platform / logging |
+| **FTS_ELASTICSEARCH_HOSTNAME**, **FTS_ELASTICSEARCH_PORT**, **FTS_ELASTICSEARCH_USERNAME**, **FTS_ELASTICSEARCH_USER_PASSWORD**, **FTS_ELASTICSEARCH_SECURE** | Platform / logging |
 | **RSSO_URL**, **RSSO_ADMIN_USER**, **RSSO_ADMIN_PASSWORD** | Platform sign-on |
 | **TENANT_DOMAIN** | Platform tenant |
 | **HELIX_PLATFORM_NAMESPACE**, **HELIX_PLATFORM_CUSTOMER_NAME** | Platform namespace and company |

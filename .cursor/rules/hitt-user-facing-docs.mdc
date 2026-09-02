@@ -23,13 +23,13 @@ Audience: Helix administrators and operators with **minimal technical skills**. 
 - **Implementation details**: Groovy script console, jq filters, HTTP status codes, crumb/cookie handling, internal variable names.
 - **Source file paths** (`hitt/hitt.sh`, `.cursor/`, `.githooks/`) except **`hitt.conf`** when the user must create or edit it.
 - **“Under the hood”** lists of automatic steps — summarize the **user-visible outcome** in one or two sentences instead.
-- **Implicit prerequisites** — do not state that a command “requires kubectl”, “needs kubectl access”, “requires cluster access”, or similar. HITT already assumes a working cluster connection; only mention extra requirements that are **not** obvious (Jenkins login, Helix Platform deployed, a specific namespace configured in HITT, metrics-server for optional columns, and so on).
+- **Implicit prerequisites** — do not state baseline setup that readers already have: **hitt.conf**, kubeconfig / cluster access, Jenkins login, or “HITT must be able to log in to Jenkins”. Assume these are in place. Do not add per-command “What you need first” tables for them. Only mention requirements that are **specific to that command and not obvious** (for example Helix Platform must already be deployed for **kickstart**, or metrics-server for optional **info** columns).
 - **Kubernetes object names** — do not name Deployments, StatefulSets, DaemonSets, ConfigMaps, Secrets, IngressClasses, or similar unless the user **must** know that object for the documented option (e.g. a secret name they must pass to **get secret**, or a field HITT prints and they must look up in the UI). Prefer product sections (**Helix Platform**, **Helix IS**, **Deployment Engine**) and **user-visible outcomes** over how HITT detects them in the cluster.
 
 ## OK to include
 
 - **Commands** the user must run (`bash hitt.sh -k "get lastsuccessful"`).
-- **`hitt.conf`** when the user must create or edit it (not when a mode simply runs without that file).
+- **`hitt.conf`** only when the user must **create, edit, or fix** it for the task (for example first-time setup in the main README, or pointing **hitt.conf** at a new Deployment Engine when migrating). Do not repeat that pipeline or utility commands need a valid **hitt.conf** or Jenkins login.
 - **Jenkins job names** and **pipeline parameter names** when the user must fill or review them in Jenkins.
 - **Links** to other README mode docs or https://bit.ly/hitthelp when pointing to more help.
 - **`seeAlso` URLs** in use cases (required for the help site).
@@ -39,7 +39,7 @@ Audience: Helix administrators and operators with **minimal technical skills**. 
 ## Use case notes (`use-cases.json`)
 
 - **Title**: “I want to …” in everyday language.
-- **Notes**: 1–3 bullets — prerequisites, expected result, next step in Jenkins or HITT. No code architecture.
+- **Notes**: 1–3 bullets — expected result and next step in Jenkins or HITT. Mention command-specific requirements only when not obvious (for example Helix Platform already installed for **kickstart**). No baseline setup bullets (hitt.conf, kubeconfig, Jenkins login). No code architecture.
 - **Commands**: exact quoted CLI only; no explanation of internal functions.
 
 ## Examples
@@ -62,6 +62,15 @@ Lists **Helix Platform**, **Helix IS**, **Deployment Engine**, and **Helix Loggi
 
 ```markdown
 # ❌ BAD
+| **get** | **hitt.conf** with Deployment Engine URL and login. |
+| **build** | The same as **get**, plus a settings file. |
+
+# ✅ GOOD
+(Omit a “What you need first” table — readers already have HITT configured.)
+```
+
+```markdown
+# ❌ BAD
 Requires kubectl access and a valid kubeconfig.
 
 # ✅ GOOD
@@ -70,10 +79,18 @@ Lists Helix namespaces and versions found in the cluster.
 
 ```markdown
 # ❌ BAD
+**kickstart** requires **hitt.conf** and a working Jenkins login.
+
+# ✅ GOOD
+**kickstart** fills values from Helix Platform — Platform must already be deployed in the cluster.
+```
+
+```markdown
+# ❌ BAD
 Requires `checkJenkinsIsRunning` and a valid `Jenkins-Crumb`.
 
 # ✅ GOOD
-Requires Jenkins details in **hitt.conf** and a working login to the Deployment Engine.
+When **build** succeeds, open **HELIX_ONPREM_DEPLOYMENT** and **Rebuild** to review parameters and attach file uploads.
 ```
 
 When updating existing docs, rewrite technical passages to match this style; do not add new internal references.

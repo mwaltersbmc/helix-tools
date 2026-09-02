@@ -1,145 +1,176 @@
-# HITT Fix Mode #
+# HITT Fix Mode
 
-**HITT's** fix mode provides a quick way to resolve some common Helix Deployment Engine/Jenkins and post-deployment configuration issues.
+**Fix mode** (`-f`) helps resolve common Deployment Engine (Jenkins) and post-deployment configuration issues.
 
-## Modes ##
-
-| Fix&nbsp;Mode   | Description                                                                 |
-|------------|-----------------------------------------------------------------------------|
-| `ssh`    | Set up/update passwordless ssh for the git user. |
-| `realm`  | Create/update the Helix Service Management realm in SSO. |
-| `cacerts`  | Update the cacerts secret in the Helix IS namespace with a new file. |
-| `addcert`  | Add one or more PEM certificates to the IS cacerts secret, or with `git` to `pipeline/tasks/cacerts` in the ITSM installer repository. |
-| `sat`   | Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool in the Helix IS namespace. |
-| `arlicense`   | Apply an Innovation Suite/AR server license to the system via the REST API. |
-| `resetssopwd`   | Resets the Helix SSO admin user password to the BMC default value. |
-| `jenkins`  | Jenkins specific fixes - see below. |
-
-### Jenkins Fixes ###
-| Fix Mode       | Description                                                                 |
-|------------|-----------------------------------------------------------------------------|
-| `scriptapproval`  | Approves the scripts required by the deployment pipelines.                     |
-| `pipelinelibs`  | Create/update the Global Trusted Pipeline Library definitions.              |
-| `credentials`  | Create/update all the required credentials, except kubeconfig - see the 'kubeconfig' option. |
-| `kubeconfig`   | Create/update the kubeconfig credential with a new kubeconfig file. |
-| `all`   | Runs all of the Jenkins fixes except for 'dryrun'. |
-| `dryrun`   | Trigger a dry run of all the HELIX pipelines. |
-## Usage ##
-
-Fix modes are called using the `-f <fixmode>` command line option.  Some of the fix commands require additional parameters in which case the mode and options must be enclosed in double quotes.
+When a fix command has more than one word, enclose the whole value in **double quotes**:
 
 ```bash
-Examples:
-bash hitt.sh -f sat # Run the Support Assistant Tool fix
-bash hitt.sh -f "cacerts /tmp/newcacerts" # Update the cacerts secret with the newcacerts file
-bash hitt.sh -f "addcert /path/to/custom-certs.pem" # Add PEM certificates to the IS cacerts secret
-bash hitt.sh -f "addcert /path/to/custom-certs.pem git" # Add PEM certificates to pipeline/tasks/cacerts in git
+bash hitt.sh -f sat
+bash hitt.sh -f "cacerts /tmp/newcacerts"
+bash hitt.sh -f "addcert /path/to/custom-certs.pem"
+bash hitt.sh -f "addcert /path/to/custom-certs.pem git"
 ```
 
-#### `ssh` - set up passwordless ssh for the git user
+## Fix commands
+
+| Fix | Description |
+|-----|-------------|
+| `ssh` | Set up or update passwordless SSH for the `git` user. |
+| `realm` | Create or update the Helix Service Management SSO realm. |
+| `cacerts` | Update the **cacerts** secret in the Helix IS namespace with a new file. |
+| `addcert` | Add one or more PEM certificates to the IS **cacerts** secret, or with `git` to **pipeline/tasks/cacerts** in the ITSM installer repository. |
+| `sat` | Create the role and role-binding required by the Support Assistant Tool in the Helix IS namespace. |
+| `arlicense` | Apply an Innovation Suite / AR server license via the REST API. |
+| `resetssopwd` | Reset the Helix SSO admin user password to the BMC default value. |
+| `jenkins` | Deployment Engine fixes — see [Jenkins fixes](#jenkins-fixes). |
+
+### Jenkins fixes
+
+| Fix | Description |
+|-----|-------------|
+| `scriptapproval` | Approve the scripts required by the deployment pipelines. |
+| `pipelinelibs` | Create or update global trusted pipeline library definitions. |
+| `credentials` | Create or update required credentials (except kubeconfig — use `kubeconfig`). |
+| `kubeconfig` | Create or update the kubeconfig credential from a kubeconfig file. |
+| `all` | Run all Jenkins fixes except `dryrun`. |
+| `dryrun` | Trigger a dry run of all HELIX pipelines. |
+
+Invoke Jenkins fixes as `bash hitt.sh -f "jenkins <fix>"` (for example `bash hitt.sh -f "jenkins all"`).
+
+## `ssh`
+
 ```bash
 bash hitt.sh -f ssh
 ```
-Configures and tests passwordless ssh from the `git` user to the `git` user.  A new ssh key will be created if one does not already exist.\
-**Note:** this option does not set up ssh from the `jenkins` user to the `git` user.  Please see the product documentation for steps to do this.
 
-#### `realm` - set up the SSO realm for Helix Service Management
+Configures and tests passwordless SSH from the `git` user to the `git` user. A new SSH key is created if one does not already exist.
+
+**Note:** This does not set up SSH from the `jenkins` user to the `git` user. See the product documentation for that step.
+
+## `realm`
+
 ```bash
 bash hitt.sh -f realm
 ```
-Creates or updates the SSO realm required by the Helix Service management applications with values based on the IS namespace, CUSTOMER_SERVICE and ENVIRONMENT values from your **HITT configuration**.  This option may also be used to create the realm after the Helix Platform has been installed.
 
-#### `"cacerts new-cacerts-file"` - update the cacerts secret with a new file
+Creates or updates the SSO realm required by Helix Service Management applications, using your configured **CUSTOMER_SERVICE**, **ENVIRONMENT**, and Helix IS namespace. May also be used after Helix Platform is installed.
+
+## `"cacerts new-cacerts-file"`
+
 ```bash
 bash hitt.sh -f "cacerts /path/to/newcacertsfile"
 ```
-Updates the `cacerts` secret in the Helix IS namespace with a new cacerts file.  Used when the `HELIX_ONPREM_DEPLOYMENT` pipeline was run but the cacerts file was not attached or the existing secret needs to be updated with one containing a new third party certificate.  If the new cacerts file is valid you will be prompted to confirm the update.
 
-#### `"addcert certificates.pem"` - add PEM certificates to the IS cacerts secret
+Updates the **cacerts** secret in the Helix IS namespace with a new Java keystore file. Use when **HELIX_ONPREM_DEPLOYMENT** ran without the cacerts attachment, or when the secret must include a new third-party certificate. If the file is valid, HITT prompts you to confirm before updating the secret.
+
+## `"addcert certificates.pem"`
 
 ```bash
 bash hitt.sh -f "addcert /path/to/custom-certs.pem"
 ```
 
-Adds one or more certificates from a **PEM** file to the Java keystore in the `cacerts` secret in the Helix IS namespace. HITT downloads the current cacerts from the cluster, validates each certificate in the PEM file (expired certificates are rejected; certificates expiring within 4 weeks produce a warning), imports them into the keystore, runs the same cacerts checks used elsewhere in HITT, and asks you to confirm before replacing the secret.
+Adds one or more certificates from a **PEM** file to the Java keystore in the **cacerts** secret in the Helix IS namespace. HITT downloads the current keystore from the cluster, validates each certificate (expired certificates are rejected; certificates expiring within four weeks produce a warning), imports them, runs the same cacerts checks used elsewhere in HITT, and asks you to confirm before replacing the secret.
 
-Use this when pods in the IS namespace need to trust an additional CA or server certificate (for example a new third-party integration) without rebuilding the full cacerts file by hand.
+Use this when Helix IS pods need to trust an additional CA or server certificate without rebuilding the full keystore by hand.
 
-#### `"addcert certificates.pem git"` - add PEM certificates to pipeline/tasks/cacerts in git
+## `"addcert certificates.pem git"`
 
 ```bash
 bash hitt.sh -f "addcert /path/to/custom-certs.pem git"
 ```
 
-Same PEM validation and cacerts checks as above, but updates `pipeline/tasks/cacerts` in the **itsm-on-premise-installer** repository instead of the cluster secret. HITT checks out only that file (sparse checkout), imports the certificate(s), validates the keystore, then asks you to confirm before committing and pushing.
+Same PEM validation and keystore checks as above, but updates **pipeline/tasks/cacerts** in the **itsm-on-premise-installer** repository instead of the cluster secret. HITT updates only that file in git, imports the certificate(s), validates the keystore, then asks you to confirm before committing and pushing.
 
 Repository location depends on your Deployment Engine setup:
 
-- **Containerized Jenkins** — in-cluster source repository for the ITSM installer (same source used by in-cluster pipelines)
-- **Standalone Jenkins** — `${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git` from the HELIX_ONPREM_DEPLOYMENT pipeline parameters
+- **Containerized Deployment Engine** — in-cluster source repository for the ITSM installer (same source used by in-cluster pipelines)
+- **Standalone Deployment Engine** — ITSM installer repository path from the **GIT_REPO_DIR** value on **HELIX_ONPREM_DEPLOYMENT**
 
-Requires Jenkins access (to read `GIT_REPO_DIR` on standalone systems) and git push permissions to the repository.
+You need permission to push to that repository. On a standalone Deployment Engine, HITT reads **GIT_REPO_DIR** from the pipeline job to locate the repo.
 
-#### `sat` - add the role and rolebinding needed by the Support Assistant Tool
+## `sat`
+
 ```bash
 bash hitt.sh -f sat
 ```
-Creates the default role and rolebinding required by the Support Assistant Tool.  Used when SAT was deployed but the **SUPPORT_ASSISTANT_CREATE_ROLE** option was not selected.
 
-#### `"arlicense key <expiry-date>"` - applies a server license to the system
+Creates the role and role-binding required by the Support Assistant Tool. Use when Support Assistant was deployed but **SUPPORT_ASSISTANT_CREATE_ROLE** was not selected.
+
+## `"arlicense key [expiry-date]"`
+
 ```bash
 bash hitt.sh -f "arlicense BRD-128754"
-or
 bash hitt.sh -f "arlicense LTD-761066 28-Apr-27"
-or
 bash hitt.sh -f "arlicense SHY-351098-GH-165"
 ```
-Applies a permanent or temporary server license to the system via the AR REST API.
 
-#### `resetssopwd` - resets the Helix SSO admin user password to the BMC default value
+Applies a permanent or temporary server license via the AR REST API.
+
+## `resetssopwd`
+
 ```bash
 bash hitt.sh -f resetssopwd
 ```
-Checks that the SSO 'Admin' user exists and prompts for confirmation before resetting the password to the default value.
 
-### Jenkins Fixes ###
-#### `"jenkins scriptapproval"` - approves Jenkins scripts
+Checks that the SSO **Admin** user exists and prompts for confirmation before resetting the password to the BMC default value.
+
+## Jenkins fixes
+
+### `"jenkins scriptapproval"`
+
 ```bash
 bash hitt.sh -f "jenkins scriptapproval"
 ```
-Updates Jenkins and adds the approval required for the two scripts used by the deployment pipelines.
 
-#### `"jenkins pipelinelibs"` - updates the Jenkins global trusted pipeline libraries
+Approves the scripts used by the deployment pipelines.
+
+### `"jenkins pipelinelibs"`
+
 ```bash
 bash hitt.sh -f "jenkins pipelinelibs"
-or
 bash hitt.sh -f "jenkins pipelinelibs /path/to/LIBRARY_REPO"
 ```
-Creates or updates the `pipeline-framework` and `JENKINS-27413-workaround-library` global trusted pipeline libraries.  If the path to the `LIBRARY_REPO` directory is not provided you will be prompted to select the library `.git` directory from a list.
 
-#### `"jenkins credentials"` - updates Jenkins credentials
+Creates or updates the **pipeline-framework** and **JENKINS-27413-workaround-library** global trusted pipeline libraries. If you do not pass a path to the library repository, HITT prompts you to select the library `.git` directory from a list.
+
+### `"jenkins credentials"`
+
 ```bash
 bash hitt.sh -f "jenkins credentials"
 ```
-Creates or updates the Jenkins `username/password` type, `TOKEN`, and `password-vault-api` credentials used by the deployment pipelines.  You will be prompted to enter the `git` user's password.\
-**Note:** does not create or update the `kubeconfig` credential - see the below.
 
-#### `"jenkins kubeconfig"` - updates the Jenkins kubeconfig credential
+Creates or updates the Jenkins credentials used by the deployment pipelines. You are prompted for the `git` user password.
+
+**Note:** Does not create or update the **kubeconfig** credential — use `jenkins kubeconfig`.
+
+### `"jenkins kubeconfig"`
+
 ```bash
 bash hitt.sh -f "jenkins kubeconfig"
-or
 bash hitt.sh -f "jenkins kubeconfig /path/to/kubeconfig"
 ```
-Creates or updates the Jenkins `kubeconfig` credential with the current `~/.kube/config` file or the file specified in the command.  The file is tested to make sure it is valid for the current cluster. If the new kubeconfig file is valid you will be prompted to confirm the update.
 
-#### `"jenkins all"` - run all Jenkins fixes
+Creates or updates the Jenkins **kubeconfig** credential from `~/.kube/config` or the file you specify. HITT validates the file for the current cluster and prompts you to confirm before updating the credential.
+
+### `"jenkins all"`
+
 ```bash
 bash hitt.sh -f "jenkins all"
 ```
-Runs all of the HITT Jenkins fixes, except for 'dryrun'. Useful for configuring a new installation of Jenkins.
 
-#### `"jenkins dryrun"` - starts a dry run of all Helix deployment pipelines
+Runs all HITT Jenkins fixes except `dryrun`. Useful when configuring a new Deployment Engine installation.
+
+### `"jenkins dryrun"`
+
 ```bash
 bash hitt.sh -f "jenkins dryrun"
 ```
-Performs a dry run build of all the Helix deployment pipelines.  Used after replacing the git repository files with those for a different version during an update, or upgrade, of Helix Service Management.
+
+Starts a dry run of all Helix deployment pipelines. Use after replacing git repository files for a different version during an update or upgrade of Helix Service Management.
+
+## See also
+
+- [Main HITT guide](README.md)
+- [Utility mode](README-utility-mode.md) — `-u` helpers
+- [Pipeline mode](README-pipeline-mode.md) — `-k` get / build / kickstart
+- Step-by-step use cases: https://bit.ly/hitthelp
