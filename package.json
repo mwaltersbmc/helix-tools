@@ -3,22 +3,18 @@
   "private": true,
   "description": "BMC Helix tools including HITT and use-case video pipelines",
   "scripts": {
-    "postinstall": "node scripts/patch-playback-ffmpeg.mjs",
-    "playback:setup": "bash scripts/setup-playback.sh",
-    "playback:deps": "bash scripts/install-ubuntu-wsl-deps.sh",
-    "playback:deps:install": "bash scripts/install-ubuntu-wsl-deps.sh --install",
-    "playback:voice": "bash scripts/download-playback-voice.sh",
-    "playback:validate": "bash scripts/render-playback.sh --validate",
-    "playback:render": "bash scripts/render-playback.sh",
-    "playback:vhs-only": "bash scripts/render-playback.sh --vhs-only"
+    "video:validate": "node scripts/video/render.mjs --validate",
+    "video:render": "node scripts/video/render.mjs",
+    "video:tts": "node scripts/video/render.mjs --tts-only",
+    "video:vhs": "node scripts/video/render.mjs --vhs-only",
+    "video:deps": "bash scripts/install-ubuntu-wsl-deps.sh",
+    "video:deps:install": "bash scripts/install-ubuntu-wsl-deps.sh --install"
   },
-  "devDependencies": {
-    "playback-cli": "^1.5.0"
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.45.0"
   },
   "engines": {
     "node": ">=22"
-  },
-  "dependencies": {
-    "@google-cloud/text-to-speech": "^6.4.1"
   }
 }

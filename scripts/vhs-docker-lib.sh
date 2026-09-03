@@ -1,4 +1,4 @@
-# Shared VHS Docker helpers for render-videos.sh and render-playback.sh.
+# Shared VHS Docker helpers for scripts/video/run-vhs.sh.
 # Source this file; do not execute directly.
 
 VHS_IMAGE="${VHS_IMAGE:-ghcr.io/charmbracelet/vhs}"
@@ -76,13 +76,4 @@ vhs_ensure_docker_prereqs() {
     echo "  2. Use native VHS: pass --native (or VHS_DOCKER=0)" >&2
     return 1
   fi
-}
-
-vhs_install_docker_shim() {
-  local repo_root="$1"
-  local bin_dir="$repo_root/.playback/vhs-bin"
-  mkdir -p "$bin_dir"
-  ln -sf "$repo_root/scripts/vhs-docker-shim.sh" "$bin_dir/vhs"
-  export HELIX_REPO_ROOT="$repo_root"
-  export PATH="$bin_dir:$PATH"
 }

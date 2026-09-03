@@ -1,0 +1,21 @@
+id: use-case-id
+title: Use case title
+locale: en-GB
+voice: azure_ryan_chat
+
+vhs:
+  shell: bash
+
+steps:
+  - hide: true
+    commands:
+      - cp -f docs/videos/demo/sample-hitt.conf docs/videos/demo/hitt.conf
+      - chmod +x docs/videos/demo/hitt.sh
+    show: true
+
+  - narration: >
+      Introduce the use case in plain language. Keep to about twenty-five words
+      for readable captions.
+    comment: "# Short on-screen title (use-case-id)"
+    command: bash docs/videos/demo/hitt.sh -m 'info cluster'
+    pauseAfter: 500

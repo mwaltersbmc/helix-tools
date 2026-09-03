@@ -10,7 +10,6 @@ description = "gitignored or generated paths"
 paths = [
   '''(?:^|/)node_modules(?:/.*)?$''',
   '''(?:^|/)docs/assets(?:/.*)?$''',
-  '''(?:^|/)\\.playback(?:/.*)?$''',
   '''(?:^|/)\\.venv(?:/.*)?$''',
 ]
 

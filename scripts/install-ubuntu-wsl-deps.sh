@@ -87,22 +87,11 @@ if ((INSTALL)); then
   echo ""
   echo "==> ttyd (user install) ..."
   install_ttyd_user
-  echo ""
-  echo "==> uv + piper-tts (user install) ..."
-  if ! command -v uv >/dev/null 2>&1; then
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    # shellcheck disable=SC1091
-    [[ -f "$HOME/.local/bin/env" ]] && source "$HOME/.local/bin/env"
-  fi
-  if command -v uv >/dev/null 2>&1; then
-    uv tool install piper-tts
-  else
-    echo "  warning: uv install failed; run: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
-  fi
   ensure_path_hint
   echo ""
   echo "System packages installed. Next from repo root:"
-  echo "  npm install && npm run playback:setup"
+  echo "  cp .env.example .env   # Azure Speech credentials"
+  echo "  npm install"
   exit 0
 fi
 
@@ -113,7 +102,8 @@ Manual setup (recommended first read):
 Quick install (Ubuntu 24.04 in WSL2):
   bash scripts/install-ubuntu-wsl-deps.sh --install
   cd ~/dev/github/helix-tools
-  npm install && npm run playback:setup
+  cp .env.example .env
+  npm install
 
 Or install step by step:
 
@@ -141,37 +131,29 @@ Or install step by step:
   chmod +x ~/.local/bin/ttyd
   export PATH="$HOME/.local/bin:$PATH"
 
-  # piper
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  source "$HOME/.local/bin/env"
-  uv tool install piper-tts
-
 EOF
 
 missing=0
-for cmd in node npm ffmpeg vhs; do
+for cmd in node npm ffmpeg; do
   if command -v "$cmd" >/dev/null 2>&1; then
     echo "ok: $cmd"
   else
-    if [[ "$cmd" == "vhs" ]] && docker info >/dev/null 2>&1; then
-      echo "optional: vhs (not needed when Docker is default)"
-    else
-      echo "missing: $cmd"
-      missing=1
-    fi
+    echo "missing: $cmd"
+    missing=1
   fi
 done
+if command -v vhs >/dev/null 2>&1; then
+  echo "ok: vhs"
+elif docker info >/dev/null 2>&1; then
+  echo "optional: vhs (not needed when Docker is default)"
+else
+  echo "missing: vhs or docker (need one for terminal recording)"
+  missing=1
+fi
 if command -v ttyd >/dev/null 2>&1 || [[ -x "$HOME/.local/bin/ttyd" ]]; then
   echo "ok: ttyd"
 else
-  echo "missing: ttyd"
-  missing=1
-fi
-if command -v piper >/dev/null 2>&1 || [[ -x "$HOME/.local/bin/piper" ]]; then
-  echo "ok: piper"
-else
-  echo "missing: piper"
-  missing=1
+  echo "optional: ttyd (only for --native VHS)"
 fi
 if command -v google-chrome-stable >/dev/null 2>&1; then
   echo "ok: google-chrome-stable"
@@ -181,8 +163,12 @@ fi
 if docker info >/dev/null 2>&1; then
   echo "ok: docker"
 else
-  echo "missing: docker (default for silent + narrated VHS; start Docker Desktop or install Docker Engine)"
+  echo "missing: docker (default for VHS; start Docker Desktop or install Docker Engine)"
   missing=1
+fi
+
+if [[ -z "${AZURE_SPEECH_KEY:-}" || -z "${AZURE_SPEECH_REGION:-}" ]]; then
+  echo "note: AZURE_SPEECH_KEY / AZURE_SPEECH_REGION not set (required for narrated renders)"
 fi
 
 if ((missing)); then
@@ -192,4 +178,4 @@ if ((missing)); then
 fi
 
 echo ""
-echo "Dependencies look good. Run: npm run playback:setup"
+echo "Dependencies look good. Configure Azure Speech in .env, then: npm run video:render"

@@ -1,11 +1,12 @@
-# HITT terminal videos (VHS + Playback)
+# HITT terminal videos (VHS + Azure Speech)
 
 On-demand terminal recordings for selected [HITT use cases](../hitt/use-cases.json).
 
-| Pipeline | Tooling | Output |
-|----------|---------|--------|
-| **Silent** | [VHS](https://github.com/charmbracelet/vhs) `.tape` files | MP4 + GIF |
-| **Narrated** | [playback-cli](https://github.com/philsherry/playback) YAML tapes | MP4 + GIF + VTT/SRT captions + voiceover |
+| Stage | Tooling | Output |
+|-------|---------|--------|
+| **Terminal** | [VHS](https://github.com/charmbracelet/vhs) (Docker by default) | `terminal.mp4` |
+| **Narration** | [Azure Speech](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/) | `segments/*.wav` |
+| **Final** | ffmpeg mux + captions | MP4, GIF, VTT, SRT |
 
 Videos are **not** rendered on commit — run a render script locally when you want new assets.
 
@@ -13,47 +14,35 @@ Videos are **not** rendered on commit — run a render script locally when you w
 
 | Path | Purpose |
 |------|---------|
-| `docs/videos/*.tape` | Silent VHS tapes (legacy / quick renders) |
-| `docs/videos/playback/<id>/` | **Playback** source — `tape.yaml` + `meta.yaml` per use case |
-| `docs/videos/playback/_template/` | Copy this when adding a new narrated use case |
-| `docs/videos/playback/voices/` | Piper ONNX models (downloaded by setup script) |
+| `docs/videos/scripts/<id>/script.yaml` | Director script — steps, commands, narration |
+| `docs/videos/scripts/_template/` | Copy when adding a new use case video |
 | `docs/videos/demo/` | Offline demo helpers (`hitt.sh` mock, sample `hitt.conf`, fixtures) |
-| `docs/assets/videos/` | Silent VHS output (MP4/GIF) |
-| `docs/assets/videos/playback/<id>/` | Playback output (MP4, GIF, captions, segments) |
-| `docs/hitt/use-cases.json` | Canonical manifest — `video` + `video.playback` per use case |
-| `scripts/render-videos.sh` | Silent VHS render |
-| `scripts/render-playback.sh` | Narrated playback render |
-| `scripts/setup-playback.sh` | One-time playback dependency + voice setup |
-| `scripts/download-playback-voice.sh` | Download Piper voice models by name |
+| `docs/assets/videos/<id>/` | Render output (MP4, GIF, captions, segments) |
+| `azure/voices.yaml` | Azure Speech voice catalogue |
+| `scripts/video/render.mjs` | Full pipeline orchestrator |
+| `scripts/video/run-vhs.sh` | VHS runner (Docker or native) |
 | `scripts/vhs-docker-lib.sh` | Shared Docker VHS helpers |
-| `scripts/vhs-docker-shim.sh` | PATH shim so playback-cli runs VHS in Docker |
-| `scripts/install-ubuntu-wsl-deps.sh` | Ubuntu 24.04 / WSL2 dependency install helper |
-| `docs/videos/SETUP-ubuntu-wsl.md` | Full WSL2 setup guide |
-| `playback.config.mjs` | Playback output paths and default voice |
-| `voices.yaml` | Piper voice catalogue and synthesis tuning (repo root) |
+| `docs/hitt/use-cases.json` | Canonical manifest — `video` per use case |
 
 ## Manifest (`use-cases.json`)
 
-Every use case has:
+Every use case may have:
 
 ```json
 "video": {
   "enabled": false,
-  "tape": "<use-case-id>.tape",
-  "playback": {
-    "dir": "<use-case-id>",
-    "enabled": false
-  }
+  "script": "info-cluster-status",
+  "voice": "azure_ryan_chat"
 }
 ```
 
 | Field | Meaning |
 |-------|---------|
-| `video.enabled` | Include in `./scripts/render-videos.sh` when no IDs passed |
-| `video.playback.enabled` | Include in `./scripts/render-playback.sh` when no IDs passed |
-| `video.playback.dir` | Directory under `docs/videos/playback/` (usually same as use case `id`) |
+| `video.enabled` | Include in `npm run video:render` when no IDs passed |
+| `video.script` | Directory under `docs/videos/scripts/` (defaults to use case `id`) |
+| `video.voice` | Key from `azure/voices.yaml` (overrides script default) |
 
-**Pilot use cases** (both silent + playback enabled): `download-hitt`, `info-cluster-status`, `hitt-config-change`.
+**Pilot use cases** (`video.enabled: true`): `download-hitt`, `info-cluster-status`, `hitt-config-change`.
 
 After JSON changes, regenerate bundled help data:
 
@@ -63,158 +52,142 @@ powershell -NoProfile -ExecutionPolicy Bypass -File docs\hitt\update-bundled-dat
 
 ---
 
-## Narrated videos (Playback) — recommended
+## Setup (once per machine)
 
-One command rebuilds terminal video, **piper-tts voiceover**, and **captions**, with timing synced automatically.
+**Ubuntu 24.04 on WSL2:** see **[SETUP-ubuntu-wsl.md](SETUP-ubuntu-wsl.md)**.
 
-### Setup (once per machine)
+### Azure Speech credentials
 
-**Ubuntu 24.04 on WSL2:** see **[SETUP-ubuntu-wsl.md](SETUP-ubuntu-wsl.md)** (recommended). Quick path:
+Create a Speech resource in Azure Portal, then configure credentials (never commit keys):
+
+```bash
+cp .env.example .env
+# Edit .env — set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION
+```
+
+Or export directly:
+
+```bash
+export AZURE_SPEECH_KEY="..."
+export AZURE_SPEECH_REGION="uksouth"
+```
+
+### Dependencies
 
 ```bash
 # Inside WSL — clone under ~/ not /mnt/c
 bash scripts/install-ubuntu-wsl-deps.sh --install
 cd ~/dev/github/helix-tools
-chmod +x scripts/*.sh docs/videos/demo/hitt.sh
+chmod +x scripts/video/run-vhs.sh docs/videos/demo/hitt.sh
 npm install
-npm run playback:setup
 ```
 
-Or install dependencies manually (same guide), then from repo root:
-
-```bash
-chmod +x scripts/setup-playback.sh scripts/render-playback.sh scripts/download-playback-voice.sh
-npm run playback:setup
-```
-
-Installs `playback-cli`, checks **Docker** (default VHS), `ffmpeg`, and `piper`, applies the ffmpeg patch, and downloads the default Piper voice.
-
-### Download another voice
-
-```bash
-chmod +x scripts/download-playback-voice.sh   # once
-
-./scripts/download-playback-voice.sh --list
-./scripts/download-playback-voice.sh alan
-npm run playback:voice -- alan alba
-```
-
-Then set `voices: [alan]` in the tape’s `meta.yaml` and re-render.
-
-Built-in names: `alan`, `alba`, `northern_english_male`, `southern_english_female`, `aru_09`. Catalogue and Piper tuning live in [`voices.yaml`](../../voices.yaml) at the repo root; download with `scripts/download-playback-voice.sh`.
-
-`piper` from `uv tool install piper-tts` is usually in `~/.local/bin`. The render scripts add that to `PATH` automatically.
-
-**Linux/WSL:** `playback-cli` defaults to Homebrew `ffmpeg-full`; this repo patches it on `npm install` to use system `ffmpeg`/`ffprobe` from `/usr/bin` (or `PLAYBACK_FFMPEG_BIN`). Re-run `npm install` if you see `ffprobe ENOENT` under `/usr/local/opt/ffmpeg-full`.
-
-### Render
-
-VHS terminal capture uses **Docker by default** (via a PATH shim). TTS and mux still run on the host (`piper`, `ffmpeg`).
-
-```bash
-# Validate YAML without recording
-npm run playback:validate -- info-cluster-status
-
-# Full pipeline (Docker VHS + TTS + captions + mux)
-npm run playback:render -- info-cluster-status
-npm run playback:render -- download-hitt hitt-config-change
-
-# All use cases with video.playback.enabled == true
-npm run playback:render
-
-# Terminal only (no narration) — useful while editing commands
-npm run playback:vhs-only -- info-cluster-status
-
-# Native VHS on the host instead of Docker
-npm run playback:render -- --native info-cluster-status
-```
-
-Output: `docs/assets/videos/playback/<id>/<id>.mp4`, `.gif`, `.vtt`, `.srt`.
-
-### Timing tweaks
-
-If narration overlaps or feels rushed:
-
-```bash
-# Audit pause values against synthesized audio
-./scripts/render-playback.sh --audit info-cluster-status
-
-# Auto-fix shortfalls in tape.yaml
-./scripts/render-playback.sh --audit-fix info-cluster-status
-```
-
-Optional visual editor (install separately):
-
-```bash
-go install github.com/philsherry/playback/tui/cmd/playback-tui@latest
-playback-tui docs/videos/playback/info-cluster-status
-```
-
-### Add a narrated use case
-
-1. Copy `docs/videos/playback/_template/` → `docs/videos/playback/<id>/`.
-2. Edit `tape.yaml` (commands + `narration` fields) and `meta.yaml` (title, tags, `vhsCwd: "."`).
-3. Set `"playback": { "dir": "<id>", "enabled": true }` in `use-cases.json`.
-4. Regenerate `use-cases-data.js`.
-5. `npm run playback:render -- <id>`.
-
-Use `docs/videos/demo/` mocks when a live cluster is not available. Set `vhsCwd: "."` in `meta.yaml` so paths like `docs/videos/demo` resolve from the repo root.
-
-**Playback YAML rule:** `command` / `commands` strings must not contain double quotes — use single quotes for shell arguments (e.g. `bash hitt.sh -m 'info cluster'`).
-
-**Caption length:** keep each `narration` field to **~25 words or fewer** (playback warns above that limit — long text is hard to read as burned-in captions).
-
-**Shell:** playback defaults to **zsh**; set `vhs.shell: bash` in `meta.yaml` on WSL/Linux or you get `execvp failed` in the recording.
+Requires: **Node 22+**, **Docker** (default VHS), **ffmpeg**, and Azure Speech credentials for narrated renders.
 
 ---
 
-## Silent videos (VHS only)
+## Render
 
-For quick terminal captures without narration, use the VHS `.tape` files under `docs/videos/`.
-
-### Prerequisites
-
-**Docker** is the default for VHS in both silent and narrated pipelines. Install [Docker Desktop](https://docs.docker.com/desktop/) with WSL integration, or Docker Engine inside WSL.
-
-Host tools still required for narrated videos: **Node 22+**, **ffmpeg**, **piper**, and Piper voice models.
-
-For **`--native`** (host VHS without Docker), see [SETUP-ubuntu-wsl.md](SETUP-ubuntu-wsl.md) — requires `vhs`, `ttyd`, and a Chromium-based browser.
-
-### Local rendering
+VHS terminal capture uses **Docker by default**. Azure TTS and ffmpeg run on the host.
 
 ```bash
-chmod +x scripts/render-videos.sh docs/videos/demo/hitt.sh   # once
+# Validate YAML without recording
+npm run video:validate -- info-cluster-status
 
-# Default — VHS in Docker (WSL, Linux, Windows)
-./scripts/render-videos.sh                           # all enabled use cases
-./scripts/render-videos.sh info-cluster-status       # one use case
+# Full pipeline (Azure TTS + Docker VHS + captions + mux)
+npm run video:render -- info-cluster-status
+npm run video:render -- download-hitt hitt-config-change
 
-# Native VHS on the host (requires vhs + ttyd + browser)
-./scripts/render-videos.sh --native info-cluster-status
+# All use cases with video.enabled == true
+npm run video:render
+
+# Partial stages
+npm run video:tts -- info-cluster-status    # narration WAV only
+npm run video:vhs -- info-cluster-status    # terminal recording only
+
+# Native VHS on the host instead of Docker
+node scripts/video/render.mjs --native info-cluster-status
 ```
 
-The script resolves tape files from the manifest, runs VHS, and prints paths under `docs/assets/videos/`.
+Output: `docs/assets/videos/<id>/<id>.mp4`, `.gif`, `.vtt`, `.srt`.
 
-## Troubleshooting (silent VHS)
+### Voices
+
+Edit `azure/voices.yaml` or set `voice:` in `script.yaml` / `use-cases.json`. Built-in keys:
+
+| Key | Azure voice |
+|-----|-------------|
+| `azure_ryan_chat` | `en-GB-RyanNeural` (chat style) — default |
+| `azure_ryan` | `en-GB-RyanNeural` |
+| `azure_sonia` | `en-GB-SoniaNeural` (cheerful) |
+| `azure_libby` | `en-GB-LibbyNeural` |
+
+---
+
+## Add a narrated use case
+
+1. Copy `docs/videos/scripts/_template/` → `docs/videos/scripts/<id>/`.
+2. Edit `script.yaml` (commands + `narration` fields).
+3. Set `"video": { "enabled": true, "script": "<id>", "voice": "azure_ryan_chat" }` in `use-cases.json`.
+4. Regenerate `use-cases-data.js`.
+5. `npm run video:render -- <id>`.
+
+Use `docs/videos/demo/` mocks when a live cluster is not available.
+
+**Script rules:**
+
+- `command` / `commands` strings must not contain double quotes — use single quotes for shell arguments (e.g. `bash hitt.sh -m 'info cluster'`).
+- Multi-word HITT option values need single quotes inside the command string.
+- Keep each `narration` field to **~25 words or fewer** (validator warns above that limit).
+
+**Step types:**
+
+| Fields | Effect |
+|--------|--------|
+| `hide` + `commands` + `show` | Hidden setup, then reveal terminal |
+| `comment` | Visible `#` title line |
+| `narration` | Azure voiceover (timing drives VHS pauses) |
+| `command` | Typed and executed after narration |
+| `pauseAfter` | Extra ms after command output (or after narration-only step) |
+
+---
+
+## Troubleshooting
 
 ### Docker not available
 
-Start Docker Desktop (enable WSL integration) or install Docker Engine in WSL, then re-run. Or use native VHS:
+Start Docker Desktop (enable WSL integration) or install Docker Engine in WSL. Or use native VHS:
 
 ```bash
-./scripts/render-videos.sh --native info-cluster-status
+node scripts/video/render.mjs --native info-cluster-status
 ```
 
-### Hangs after `Set TypingSpeed` / Ctrl+C does nothing (`--native` on Windows)
+### ffmpeg / WAV errors on WSL
 
-This is a **known native Windows issue**: VHS depends on `ttyd`, which often fails to spawn the terminal on Windows 11 / Git Bash. The process appears stuck and may ignore Ctrl+C; a stale `ttyd.exe` can block later runs.
+If ffmpeg fails with `Invalid data found when processing input` and the path shows `C:\Users\...`, Windows ffmpeg is being picked up via WSL interop. Install Linux ffmpeg:
 
-**Fix:** omit `--native` so Docker is used (default), or run from **WSL** with Docker.
+```bash
+sudo apt install -y ffmpeg
+which ffmpeg   # should be /usr/bin/ffmpeg
+```
 
-**If you must use native on Windows:**
+The pipeline prefers `/usr/bin/ffmpeg` automatically on WSL. Override with `FFMPEG_BIN` / `FFPROBE_BIN` if needed.
 
-- Kill stale processes: `taskkill //F //IM ttyd.exe` (and close any Edge/Chrome tab opened by ttyd)
-- Try [ttyd 1.7.3](https://github.com/tsl0922/ttyd/releases/tag/1.7.3) or an MSVC build — see [vhs#437](https://github.com/charmbracelet/vhs/issues/437), [vhs#631](https://github.com/charmbracelet/vhs/issues/631)
+After fixing ffmpeg, delete stale segments and re-render so WAV files are rewritten:
+
+```bash
+rm -rf docs/assets/videos/info-cluster-status/segments
+npm run video:render -- info-cluster-status
+```
+
+
+Check `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` match your Speech resource. Run `npm run video:tts -- info-cluster-status` to isolate TTS.
+
+### Hangs after `Set TypingSpeed` (native VHS on Windows)
+
+Known native Windows issue with `ttyd`. **Fix:** use Docker (default) or run from **WSL**.
+
+---
 
 ## Committing generated assets
 
@@ -225,21 +198,7 @@ git add docs/assets/videos/
 git commit -m "docs(videos): add <use-case-id> terminal recordings"
 ```
 
-Binary files are stored in the repo (not Git LFS) for this phase.
-
-## Adding a new tape
-
-1. Set `"enabled": true` (optional) and ensure `"tape": "<id>.tape"` in the manifest.
-2. Create `docs/videos/<id>.tape` with:
-   - `Output docs/assets/videos/<id>.mp4` and `.gif`
-   - `Source "docs/videos/_settings.tape"` for shared terminal styling (or copy those `Set` lines)
-   - Hidden setup (`Hide` / `Show`) for `cd`, mock env — avoid `clear` and `vi` (can hang in VHS)
-   - Commands aligned with the use case’s `commands[]` in the manifest
-3. Use **double quotes** for multi-word HITT option values (e.g. `-m "info cluster"`).
-4. Use `docs/videos/demo/` mocks when a live cluster or Jenkins is not available.
-5. Regenerate `use-cases-data.js` if you changed the manifest.
-
 ## Deferred
 
-- GitHub Actions workflow for CI rendering and auto-commit
+- GitHub Actions workflow for CI rendering
 - Embedding videos in the HITT help site (`docs/hitt/index.html`, `app.js`)

@@ -1,0 +1,29 @@
+id: hitt-config-change
+title: Change HITT configuration
+locale: en-GB
+voice: azure_ryan_chat
+
+vhs:
+  shell: bash
+
+steps:
+  - hide: true
+    commands:
+      - cp -f docs/videos/demo/sample-hitt.conf docs/videos/demo/hitt.conf
+      - chmod +x docs/videos/demo/hitt.sh
+    show: true
+
+  - comment: "# Change HITT configuration (hitt-config-change)"
+
+  - narration: >
+      HITT settings live in hitt.conf. Edit the file, or delete it and
+      re-run HITT to use the setup wizard again.
+    pauseAfter: 400
+
+  - narration: Option one — review or edit hitt.conf in your editor.
+    command: cat docs/videos/demo/hitt.conf
+    pauseAfter: 500
+
+  - narration: Option two — delete hitt.conf and run post-hp to reconfigure.
+    command: rm -f docs/videos/demo/hitt.conf && bash docs/videos/demo/hitt.sh -m post-hp
+    pauseAfter: 500

@@ -1,0 +1,24 @@
+# Azure Speech voices for HITT use-case videos.
+#
+# Set voice in script.yaml or override per use case in use-cases.json (video.voice).
+#
+# Requires environment variables:
+#   AZURE_SPEECH_KEY     — Speech resource key
+#   AZURE_SPEECH_REGION  — e.g. uksouth, westeurope
+
+default: azure_ryan_chat
+
+voices:
+  azure_ryan_chat:
+    voice: en-GB-RyanNeural
+    style: chat
+
+  azure_ryan:
+    voice: en-GB-RyanNeural
+
+  azure_sonia:
+    voice: en-GB-SoniaNeural
+    style: cheerful
+
+  azure_libby:
+    voice: en-GB-LibbyNeural
