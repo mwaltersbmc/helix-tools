@@ -826,10 +826,33 @@ checkHelixLoggingDeployed() {
 }
 
 checkEFKClusterHealth() {
-  EFK_ELASTIC_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c "curl -sk -X GET https://elastic:${HELIX_LOGGING_PASSWORD_URI}@${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}:9200/_cluster/health")
-  EFK_ELASTIC_STATUS=$(echo "${EFK_ELASTIC_JSON}" | ${JQ_BIN} -r '.status')
-  if ! echo "${EFK_ELASTIC_STATUS}" | grep -q green ; then
-    logError "113" "Helix Logging Elasticsearch problem. Check the '${EFK_ELASTIC_SERVICENAME}' pods in the '${HELIX_LOGGING_NAMESPACE}' namespace."
+  local efk_json efk_status efk_tmp
+
+  if [[ -z "${FTS_ELASTIC_POD}" ]]; then
+    logError "113" "Helix Logging Elasticsearch pod for '${EFK_ELASTIC_SERVICENAME}' not found in '${HP_NAMESPACE}'."
+    return
+  fi
+
+  efk_tmp="${HITT_ERR_FILE:-hitterrors.log}.efk-health"
+  if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -i "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- \
+    sh -c "curl -sf -sk -X GET https://elastic:${HELIX_LOGGING_PASSWORD_URI}@${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}:9200/_cluster/health" \
+    >"${efk_tmp}" 2>>"${HITT_ERR_FILE}"; then
+    rm -f "${efk_tmp}"
+    logError "113" "Unable to check Helix Logging Elasticsearch in pod '${FTS_ELASTIC_POD}'. Check the '${EFK_ELASTIC_SERVICENAME}' pods in the '${HELIX_LOGGING_NAMESPACE}' namespace."
+    return
+  fi
+
+  efk_json=$(<"${efk_tmp}")
+  rm -f "${efk_tmp}"
+  efk_status=$(echo "${efk_json}" | ${JQ_BIN} -r '.status // empty' 2>>"${HITT_ERR_FILE}")
+
+  if [[ -z "${efk_status}" ]]; then
+    logError "113" "Unable to read Helix Logging Elasticsearch health from pod '${FTS_ELASTIC_POD}'. Check the '${EFK_ELASTIC_SERVICENAME}' pods in the '${HELIX_LOGGING_NAMESPACE}' namespace."
+    return
+  fi
+
+  if [[ "${efk_status}" != "green" ]]; then
+    logError "113" "Helix Logging Elasticsearch problem (status '${efk_status}'). Check the '${EFK_ELASTIC_SERVICENAME}' pods in the '${HELIX_LOGGING_NAMESPACE}' namespace."
   else
     logMessage "Helix Logging Elasticsearch '${EFK_ELASTIC_SERVICENAME}.${HELIX_LOGGING_NAMESPACE}' appears healthy." 1
   fi
@@ -1357,9 +1380,33 @@ checkServiceDetails() {
 }
 
 checkFTSElasticStatus() {
-  FTS_ELASTIC_STATUS=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -ti "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- sh -c "curl -sk -u \"${LOG_ELASTICSEARCH_USERNAME}:${LOG_ELASTICSEARCH_PASSWORD}\" -X GET https://localhost:9200/_cluster/health?pretty | grep status")
-  if ! echo "${FTS_ELASTIC_STATUS}" | grep -q green ; then
-    logError "125" "FTS Elasticsearch problem. Check the ${FTS_ELASTIC_SERVICENAME} pods in Helix Platform namespace."
+  local fts_json fts_status fts_tmp
+
+  if [[ -z "${FTS_ELASTIC_POD}" ]]; then
+    logError "125" "FTS Elasticsearch pod for '${FTS_ELASTIC_SERVICENAME}' not found in '${HP_NAMESPACE}'."
+    return
+  fi
+
+  fts_tmp="${HITT_ERR_FILE:-hitterrors.log}.fts-health"
+  if ! ${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec -i "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- \
+    sh -c "curl -sf -sk -u \"${LOG_ELASTICSEARCH_USERNAME}:${LOG_ELASTICSEARCH_PASSWORD}\" -X GET https://localhost:9200/_cluster/health" \
+    >"${fts_tmp}" 2>>"${HITT_ERR_FILE}"; then
+    rm -f "${fts_tmp}"
+    logError "125" "Unable to check FTS Elasticsearch in pod '${FTS_ELASTIC_POD}'. Check the ${FTS_ELASTIC_SERVICENAME} pods in the Helix Platform namespace."
+    return
+  fi
+
+  fts_json=$(<"${fts_tmp}")
+  rm -f "${fts_tmp}"
+  fts_status=$(echo "${fts_json}" | ${JQ_BIN} -r '.status // empty' 2>>"${HITT_ERR_FILE}")
+
+  if [[ -z "${fts_status}" ]]; then
+    logError "125" "Unable to read FTS Elasticsearch health from pod '${FTS_ELASTIC_POD}'. Check the ${FTS_ELASTIC_SERVICENAME} pods in the Helix Platform namespace."
+    return
+  fi
+
+  if [[ "${fts_status}" != "green" ]]; then
+    logError "125" "FTS Elasticsearch problem (status '${fts_status}'). Check the ${FTS_ELASTIC_SERVICENAME} pods in the Helix Platform namespace."
   else
     logMessage "FTS Elasticsearch '${FTS_ELASTIC_SERVICENAME}' appears healthy." 1
   fi
@@ -8587,7 +8634,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260902-02"
+HITT_BUILD_VERSION="20260907-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
