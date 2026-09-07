@@ -13,18 +13,25 @@ import {
 export { validateWav, probeDurationMs, resolveMediaPath, OUTPUT_SAMPLE_RATE } from './media.mjs';
 
 function buildSingleSegmentTrack(ffmpeg, event, outputPath, durationSec) {
-  const totalSamples = Math.round(durationSec * OUTPUT_SAMPLE_RATE);
   runMedia(
     ffmpeg,
     [
+      '-f',
+      'lavfi',
+      '-t',
+      String(durationSec),
+      '-i',
+      `anullsrc=r=${OUTPUT_SAMPLE_RATE}:cl=mono`,
       '-i',
       event.wavPath,
-      '-af',
-      `aresample=${OUTPUT_SAMPLE_RATE},adelay=${event.startMs}|${event.startMs},apad=whole_len=${totalSamples}`,
+      '-filter_complex',
+      `[1:a]aresample=${OUTPUT_SAMPLE_RATE},adelay=${event.startMs}|${event.startMs}[n];[0:a][n]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]`,
+      '-map',
+      '[aout]',
       '-ar',
       String(OUTPUT_SAMPLE_RATE),
-      '-ac',
-      '1',
+      '-t',
+      String(durationSec),
       '-y',
       outputPath,
     ],
@@ -36,10 +43,10 @@ function buildMultiSegmentTrack(ffmpeg, events, outputPath, durationSec) {
   const args = [
     '-f',
     'lavfi',
-    '-i',
-    `anullsrc=r=${OUTPUT_SAMPLE_RATE}:cl=mono`,
     '-t',
     String(durationSec),
+    '-i',
+    `anullsrc=r=${OUTPUT_SAMPLE_RATE}:cl=mono`,
   ];
 
   for (const event of events) {
@@ -58,7 +65,19 @@ function buildMultiSegmentTrack(ffmpeg, events, outputPath, durationSec) {
 
   runMedia(
     ffmpeg,
-    [...args, '-filter_complex', filter, '-map', '[aout]', '-ar', String(OUTPUT_SAMPLE_RATE), '-y', outputPath],
+    [
+      ...args,
+      '-filter_complex',
+      filter,
+      '-map',
+      '[aout]',
+      '-ar',
+      String(OUTPUT_SAMPLE_RATE),
+      '-t',
+      String(durationSec),
+      '-y',
+      outputPath,
+    ],
     `ffmpeg: mix ${events.length} narration segments`,
   );
 }

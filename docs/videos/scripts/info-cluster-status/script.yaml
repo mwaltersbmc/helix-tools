@@ -1,5 +1,5 @@
 id: info-cluster-status
-title: Cluster resource summary
+title: Show cluster resource summary by node
 locale: en-GB
 voice: azure_ryan_chat
 
@@ -11,11 +11,14 @@ steps:
     commands:
       - cp -f docs/videos/demo/sample-hitt.conf docs/videos/demo/hitt.conf
       - chmod +x docs/videos/demo/hitt.sh
+      - cd docs/videos/demo
     show: true
 
   - narration: >
-      Use the 'info cluster' command to show the cluster node CPU, memory, and
-      pod resource usage summary.
-    comment: "# Cluster resource summary (info-cluster-status)"
+      Use the 'info cluster' command to show a summary by node of CPU, memory, and
+      pod resource usage.
+    comment: "# Show cluster resource summary by node:"
     command: ./hitt.sh -m 'info cluster'
-    pauseAfter: 500
+  - narration: >
+      The output also includes allocated and available memory and details of any pod out-of-memory events.
+    pauseAfter: 5000

@@ -6,6 +6,8 @@ const DEFAULTS = {
   pauseAfterCommandMs: 500,
   pauseAfterOutputMs: 800,
   commentPauseMs: 500,
+  /** Pause after `clear` during Hide so the buffer is empty before Show. */
+  clearBeforeShowMs: 200,
 };
 
 function typingDurationMs(text, typingSpeedMs) {
@@ -70,7 +72,10 @@ export function buildTimeline(script, synthesizedSegments, settings = {}) {
       pushSleep(opts.commentPauseMs);
     }
 
-    if (narration) {
+    const hasCommand = Boolean(step.command);
+    const hasNarration = Boolean(narration);
+
+    if (hasNarration && !hasCommand) {
       audioEvents.push({
         startMs: cursorMs,
         durationMs: narration.durationMs,
@@ -78,15 +83,34 @@ export function buildTimeline(script, synthesizedSegments, settings = {}) {
         wavPath: narration.wavPath,
         stepIndex: index,
       });
-      pushSleep(narration.durationMs + opts.pauseAfterNarrationMs);
+      const tailMs = step.pauseAfter ?? step.pause ?? opts.pauseAfterNarrationMs;
+      pushSleep(narration.durationMs + tailMs);
     }
 
-    if (step.command) {
-      cursorMs += pushType(step.command);
+    if (hasCommand) {
+      const commandStartMs = cursorMs;
+      if (hasNarration) {
+        audioEvents.push({
+          startMs: commandStartMs,
+          durationMs: narration.durationMs,
+          text: narration.text,
+          wavPath: narration.wavPath,
+          stepIndex: index,
+        });
+      }
+      const typingMs = pushType(step.command);
+      cursorMs += typingMs;
       pushEnter();
       const outputWait = step.pauseAfter ?? step.pause ?? opts.pauseAfterOutputMs;
       pushSleep(outputWait);
-    } else if (step.pauseAfter ?? step.pause) {
+      if (hasNarration) {
+        const elapsed = typingMs + outputWait;
+        const required = narration.durationMs + opts.pauseAfterNarrationMs;
+        if (elapsed < required) {
+          pushSleep(required - elapsed);
+        }
+      }
+    } else if (!hasNarration && (step.pauseAfter ?? step.pause)) {
       pushSleep(step.pauseAfter ?? step.pause);
     }
   }
@@ -96,6 +120,7 @@ export function buildTimeline(script, synthesizedSegments, settings = {}) {
     audioEvents,
     vhsEvents,
     totalDurationMs: cursorMs,
+    timing: opts,
   };
 }
 
@@ -120,7 +145,9 @@ export function audioTimelineEndMs(audioEvents) {
 }
 
 export function renderVhsTape(id, timeline, assetDir) {
-  const { vhs, vhsEvents } = timeline;
+  const { vhs, vhsEvents, timing = {} } = timeline;
+  const clearSleepMs = timing.clearBeforeShowMs ?? DEFAULTS.clearBeforeShowMs;
+  const clearCommand = vhs.clearCommand || 'clear';
   const lines = [];
   const outBase = relFromRepo(assetDir);
 
@@ -144,6 +171,14 @@ export function renderVhsTape(id, timeline, assetDir) {
         hidden = true;
         break;
       case 'show':
+        // VHS Hide stops frame capture but leaves text in the buffer; clear before Show.
+        if (hidden) {
+          lines.push(`Type "${escapeTape(clearCommand)}"`);
+          lines.push('Enter');
+          if (clearSleepMs > 0) {
+            lines.push(`Sleep ${sleepMs(clearSleepMs)}`);
+          }
+        }
         lines.push('Show');
         hidden = false;
         break;

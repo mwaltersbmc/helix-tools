@@ -1,11 +1,30 @@
-Kubernetes control plane: v1.28.4
-OpenShift version: 4.14.12
 
-Node summary (demo output — no live cluster required for this recording):
+Welcome to the Helix IS Triage Tool (build 20260820-01) - Fri Sep  4 05:31:00 AM CDT 2026.
 
-NAME           CPU (alloc/used)   MEM (alloc/used)   PODS (run/bad)   STATUS
-worker-01      8 / 42%            32Gi / 61%         45 / 0           Ready
-worker-02      8 / 38%            32Gi / 55%         41 / 0           Ready
-worker-03      8 / 51%            32Gi / 68%         52 / 1           Ready
+Using config file 'hitt.conf'.
 
-Metrics from metrics-server when available. See README-info-mode.md for full details.
+Checking KUBECONFIG file...
+
+Running in info mode...
+
+Gathering cluster information...
+Kubernetes version:              v1.33.5
+OpenShift version:               n/a
+
+--------------------------------------------------------------------------------
+Node summary
+NODE NAME                  NODE TYPE      ALLOCATABLE (CPU/MEM)  ALLOCATED REQ (CPU/MEM)  EPHEMERAL STORAGE (TOTAL/USED)  ACTUAL USAGE  NODE STATUS/CONDITIONS  PODS (RUN/BAD/CRASH)  OOM KILLS  CONTAINER RUNTIME
+vs-ak8s02-hlxcussp-cl2-01  control-plane  32 / 125.7Gi           15.8 / 77.9Gi (47.8Gi)   121.0Gi / 79.9Gi                20% / 55%     Healthy                 78/0/0                1          containerd://2.1.4
+vs-ak8s02-hlxcussp-cl2-02  control-plane  32 / 125.7Gi           18.4 / 79.5Gi (46.2Gi)   121.0Gi / 92.2Gi                14% / 55%     Healthy                 100/0/0               0          containerd://2.1.4
+vs-ak8s02-hlxcussp-cl2-03  control-plane  32 / 125.7Gi           18.1 / 84.4Gi (41.2Gi)   121.0Gi / 94.3Gi                21% / 50%     Healthy                 95/0/0                0          containerd://2.1.4
+vs-ak8s02-hlxcussp-cl2-04  worker         32 / 125.7Gi           18.2 / 83.3Gi (42.3Gi)   121.0Gi / 97.5Gi                20% / 58%     Healthy                 100/0/0               1          containerd://2.1.4
+vs-ak8s02-hlxcussp-cl2-05  worker         32 / 125.7Gi           20.1 / 79.0Gi (46.7Gi)   121.0Gi / 101.2Gi               17% / 50%     Healthy                 71/0/0                0          containerd://2.1.4
+vs-ak8s02-hlxcussp-cl2-06  worker         32 / 125.7Gi           13.3 / 80.3Gi (45.4Gi)   121.0Gi / 99.2Gi                8% / 42%      Healthy                 52/0/0                0          containerd://2.1.4
+vs-ak8s02-hlxcussp-cl2-07  worker         32 / 125.7Gi           17.3 / 82.8Gi (42.9Gi)   121.0Gi / 86.8Gi                13% / 61%     Healthy                 84/0/1                0          containerd://2.1.4
+vs-ak8s02-hlxcussp-cl2-08  worker         32 / 125.7Gi           3.3 / 7.5Gi (118.1Gi)    121.0Gi / 73.2Gi                11% / 13%     Healthy                 19/0/0                0          containerd://2.1.4
+
+--------------------------------------------------------------------------------
+OOM-killed pods
+POD NAME                         CONTAINER NAME  NAMESPACE    NODE NAME
+platformplugin-578dcddc89-ffffq  platformplugin  mrw-02-is    vs-ak8s02-hlxcussp-cl2-01
+ans-7fd7f4f9bd-8n684             ans             itom-yellow  vs-ak8s02-hlxcussp-cl2-04

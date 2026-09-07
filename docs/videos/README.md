@@ -144,10 +144,10 @@ Use `docs/videos/demo/` mocks when a live cluster is not available.
 
 | Fields | Effect |
 |--------|--------|
-| `hide` + `commands` + `show` | Hidden setup, then reveal terminal |
-| `comment` | Visible `#` title line |
-| `narration` | Azure voiceover (timing drives VHS pauses) |
-| `command` | Typed and executed after narration |
+| `hide` + `commands` + `show` | Hidden setup, then reveal terminal (tape auto-runs `clear` before `Show` — VHS Hide only stops recording, not the buffer) |
+| `comment` | Visible `#` title line (before command) |
+| `narration` | Azure voiceover — plays **with** the step `command` when both are set |
+| `command` | Typed and executed; narration starts when typing begins |
 | `pauseAfter` | Extra ms after command output (or after narration-only step) |
 
 ---
