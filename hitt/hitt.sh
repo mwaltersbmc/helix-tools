@@ -501,6 +501,94 @@ logDescribePod() {
   ${KUBECTL_BIN} -n "${1}" describe pod "${2}" > "k8s-desc-pod-${1}-${2}.log" 2>>${HITT_ERR_FILE}
 }
 
+discoverPlatformPodsJSON() {
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pods -o json 2>>"${HITT_ERR_FILE}" \
+    | ${JQ_BIN} -c '
+        [.items[]
+          | select(.metadata.name | test("^platform-(fts|user|int|sr)-[0-9]+$"))
+          | {
+              pod: .metadata.name,
+              role: (.metadata.name | capture("^platform-(?<r>fts|user|int|sr)-").r),
+              index: (.metadata.name | capture("-(?<n>[0-9]+)$").n | tonumber),
+              k8s_ready: (
+                [.status.containerStatuses[]? | select(.name=="platform") | .ready][0] // false
+              )
+            }
+        ]
+        | sort_by(.role, .index)
+      '
+}
+
+# Probe /arapi/readiness on each platform-*-n pod; sets PLATFORM_PODS_JSON.
+checkPlatformPodsReadiness() {
+  local pods_json row pod ready readiness http_code
+
+  [[ -n "${IS_NAMESPACE:-}" ]] || logError "999" "IS_NAMESPACE is not set in hitt.conf." 1
+  pods_json=$(discoverPlatformPodsJSON) || logError "999" "Unable to list platform pods in '${IS_NAMESPACE}'." 1
+  PLATFORM_PODS_JSON='[]'
+
+  while IFS= read -r row; do
+    [[ -z "${row}" ]] && continue
+    pod=$(${JQ_BIN} -r '.pod' <<<"${row}")
+    ready=$(${JQ_BIN} -r '.k8s_ready' <<<"${row}")
+    readiness="skipped"
+    http_code=""
+
+    if [[ "${ready}" == "true" ]]; then
+      http_code=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" exec "${pod}" -c "${AR_DRIVER_CONTAINER}" -- \
+        curl -s -w '%{http_code}' http://localhost:46100/arapi/readiness -o /dev/null 2>>"${HITT_ERR_FILE}") || http_code=""
+      if [[ "${http_code}" == "200" ]]; then
+        readiness="ready"
+      else
+        readiness="not ready"
+      fi
+    fi
+
+    PLATFORM_PODS_JSON=$(${JQ_BIN} -nc \
+      --argjson arr "${PLATFORM_PODS_JSON}" \
+      --argjson row "${row}" \
+      --arg readiness "${readiness}" \
+      --arg http_code "${http_code}" \
+      '$arr + [ $row + {
+        readiness: $readiness,
+        http_code: (if $http_code == "" then null else $http_code end)
+      }]')
+  done < <(${JQ_BIN} -c '.[]' <<<"${pods_json}")
+}
+
+# Print Name / K8S Status / AR Status from PLATFORM_PODS_JSON (or optional $1 JSON).
+printPlatformPodsTable() {
+  local pods_json="${1:-${PLATFORM_PODS_JSON:-[]}}"
+  local raw formatted header rest
+
+  if [[ -z "${pods_json}" || "${pods_json}" == "[]" ]]; then
+    logMessage "No platform pods found." 1
+    return 0
+  fi
+
+  raw=$(${JQ_BIN} -r '
+    .[]
+    | [
+        .pod,
+        (if .k8s_ready then "ready" else "not ready" end),
+        (.readiness // "n/a")
+      ]
+    | @tsv
+  ' <<<"${pods_json}" 2>>"${HITT_ERR_FILE}") || return 1
+
+  raw=$'Name\tK8s Status\tAR Status\n'"${raw}"
+
+  if formatted=$(printf '%s\n' "${raw}" | column -t -s $'\t' 2>/dev/null); then
+    header="${formatted%%$'\n'*}"
+    rest="${formatted#*$'\n'}"
+    printf '%b\n' "${BOLD}${header}${NORMAL}"
+    [[ -n "${rest}" ]] && printf '%s\n' "${rest}"
+  else
+    printf '%b\n' "${BOLD}Name\tK8s Status\tAR Status${NORMAL}"
+    printf '%s\n' "${raw#*$'\n'}"
+  fi
+}
+
 getVersions() {
   isOpenShift
   logMessage "Kubernetes version '${K8S_VERSION}'."
@@ -764,7 +852,6 @@ setVarsFromPlatform() {
       #logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
     fi
   done
-
 }
 
 getRSSODetails() {
@@ -1410,6 +1497,36 @@ checkFTSElasticStatus() {
   else
     logMessage "FTS Elasticsearch '${FTS_ELASTIC_SERVICENAME}' appears healthy." 1
   fi
+}
+
+# Returns 0 when platform-fts pod exists and the platform container is Ready.
+platformPodReady() {
+  local pod_name="${1}"
+  local container_name="${2}"
+  [[ -z "${IS_NAMESPACE:-}" || -z "${pod_name:-}" || -z "${container_name:-}" ]] && return 1
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get pod "${pod_name}" \
+    -o "jsonpath={.status.containerStatuses[?(@.name=='${container_name}')].ready}" \
+    2>>"${HITT_ERR_FILE}" | grep -q '^true$'
+}
+
+# Run driver in platform-fts-0.
+# $1 = driver script
+# Returns 0 when kubectl exec and driver succeed, 1 otherwise (no logError — caller decides).
+runARDriver() {
+  local driver_script="$1"
+  AR_DRIVER_OUTPUT=""
+
+  if [[ -z "${IS_NAMESPACE:-}" ]]; then
+    return 1
+  fi
+  if [[ -z "${driver_script}" ]]; then
+    return 1
+  fi
+  if ! platformPodReady "${AR_DRIVER_POD}" ${AR_DRIVER_CONTAINER}; then
+    return 1
+  fi
+
+  AR_DRIVER_OUTPUT=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" exec -i "${AR_DRIVER_POD}" -c "${AR_DRIVER_CONTAINER}" -- env LD_LIBRARY_PATH=/opt/bmc/ARSystem/bin /opt/bmc/ARSystem/bin/driver <<<"${driver_script}")
 }
 
 ensureISPlatformCache() {
@@ -5638,6 +5755,7 @@ showUtilHelp() { # utility mode help
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
+    \tcheckplatformpods | List IS platform pods with K8s and AR Server readiness (table). Same check as post-is / upgrade-is.
     \tcheckpat \t| Validate Docker Hub username and PAT. Args: [USERNAME] [PAT] — omit both to use bmc-dtrhub from HP namespace or be prompted.
     \timagels \t| List tags for a container image repository (requires skopeo). Args: IMAGE — name under docker.io/bmchelix/ or full registry/host/path/repo.
     \tcheckrbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Use -v for each permission checked. Legacy alias: authcheck (= checkrbac hitt).
@@ -8100,6 +8218,17 @@ checkGenConfigOutput() {
     logError "274" "Could not map sed expression '#${expr_num}' to a pipeline parameter — review HELIX_GENERATE_CONFIG.log."
   fi
 }
+
+checkPlatformPodsState() {
+  local not_ready_pods
+  checkPlatformPodsReadiness
+  not_ready_pods=$(${JQ_BIN} -r '[.[] | select(.readiness != "ready") | .pod] | join(", ")' \
+    <<<"${PLATFORM_PODS_JSON}" 2>>"${HITT_ERR_FILE}")
+  if [[ -n "${not_ready_pods}" ]]; then
+    logError "282" "AR Server not ready in pods - '${not_ready_pods}'"
+  fi
+}
+
 #End functions
 
 # MAIN Start
@@ -8432,6 +8561,10 @@ if [ "${MODE}" == "utility" ]; then
       # USERNAME and PAT optional — offers bmc-dtrhub credentials from HP_NAMESPACE, then prompts
       validateDockerIOPat "${UTILARGS[1]:-}" "${UTILARGS[2]:-}"
       ;;
+    checkplatformpods)
+      checkPlatformPodsReadiness
+      printPlatformPodsTable
+      ;;
     help)
       showUtilHelp
       ;;
@@ -8620,6 +8753,8 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
 fi
 
 if [[ ("${MODE}" == "post-is" || "${MODE}" == "upgrade-is") ]]; then
+  logStatus "Checking IS platform pods..."
+  checkPlatformPodsState
   logPlatformFTSStartTime
   logStatus "Checking Helix IS platform-admin-ext service..."
   checkPlatformAdminExtSvc
@@ -8634,7 +8769,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260907-01"
+HITT_BUILD_VERSION="20260909-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8684,6 +8819,8 @@ ERROR_ARRAY=()
 WARN_ARRAY=()
 JENKINS_CREDENTIALS=""
 OPENSHIFT=0
+AR_DRIVER_POD=platform-fts-0
+AR_DRIVER_CONTAINER=platform
 SSLPOKE_PAYLOAD="
 yv66vgAAADcA+AoARQBWCQBXAFgHAFkKAFoAWxIAAABfCgBgAGEIAGIIAGMKAFcAZAoAZQBmCgAM
 AGcHAGgIAGkKAFcAaggAawkAVwBsEgABAG4HAG8KABIAcAoAAwBxCgAMAHIHAHMKAAwAdAcAdQoA
@@ -10153,6 +10290,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The GITEA_ADMIN_PASS value set in the deployment-engine-config.env file contains invalid characters.\",
     \"impact\": \"Jenkins pipelines will fail when checking out code from gitea.\",
     \"remediation\": \"Update the GITEA_ADMIN_PASS value in the deployment-engine-config.env file and re-run the deployment-engine.sh script.\"
+  },
+  {
+    \"id\": \"282\",
+    \"cause\": \"The AR server in the named pods is not running/ready for use.\",
+    \"impact\": \"Some applications/services may not work as expected or return errors.\",
+    \"remediation\": \"Check the logs in the named pods for possible issues.\"
   }
 ]"
 

@@ -701,6 +701,25 @@ window.HITT_USE_CASES = {
       }
     },
     {
+      "id": "utility-checkplatformpods",
+      "topicId": "helix-is-mgmt",
+      "order": 22,
+      "title": "I want to check the status of the IS platform pods",
+      "commands": [
+        "bash hitt.sh -u checkplatformpods"
+      ],
+      "notes": [
+        "Prints a table of each Helix IS platform pod: pod name, whether the platform container is ready in Kubernetes (K8s Status), and whether the AR Server readiness check passed inside the pod (AR Status).",
+        "Pods that are not Kubernetes-ready show AR Status as skipped — HITT does not run the in-pod check until the container is ready.",
+        "The same check runs automatically during post-is and upgrade-is when Helix IS is deployed."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#checkplatformpods",
+      "video": {
+        "enabled": false,
+        "script": "utility-checkplatformpods"
+      }
+    },
+    {
       "id": "fix-addcert",
       "topicId": "helix-is-mgmt",
       "order": 28,
