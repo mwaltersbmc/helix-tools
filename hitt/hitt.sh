@@ -695,6 +695,10 @@ setHPVersionImageTags() {
       TCTL_REST_VER=1695
       ADE_INFRA_CLIENT_IMAGE_TAG=26201-v692-ade-infra-clients-alpine
       ;;
+    26.3.01)
+      TCTL_REST_VER=1722
+      ADE_INFRA_CLIENT_IMAGE_TAG=26301-v838-ade-infra-clients-alpine
+      ;;
     *)
       ;;
   esac
@@ -714,6 +718,7 @@ _IS_DB_VERSION_MAP=(
   "25.4.01:216"
   "26.1.01:236"
   "26.2.01:237"
+  "26.3.01:999"
 )
 
 lookupISDBVersion() {
@@ -2280,7 +2285,6 @@ validateISDetails() {
       if [ "${CURRENT_VER:0:5}" -lt "${TARGET_VER:0:5}" ] && [ "${IS_PIPELINE_MODE}" != "UPGRADE" ]; then
         logError "213" "${IS_PIPELINE_MODE_LABEL} should be 'UPGRADE' but is set to '${IS_PIPELINE_MODE}'."
       fi
-
 
       # removed until I can figure out combos
       #+ CURRENT_VER=202330410400
@@ -3867,7 +3871,6 @@ getPipelineValuesJSON() {
     println json"
   runJenkinsScript "${SCRIPT}"
 }
-
 
 getPipelineDefaults() {
   SCRIPT="import groovy.json.JsonOutput
@@ -8800,7 +8803,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260910-01"
+HITT_BUILD_VERSION="20260910-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
