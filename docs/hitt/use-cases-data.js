@@ -701,22 +701,22 @@ window.HITT_USE_CASES = {
       }
     },
     {
-      "id": "utility-checkplatformpods",
+      "id": "utility-check-arservers",
       "topicId": "helix-is-mgmt",
       "order": 22,
       "title": "I want to check the status of the IS platform pods",
       "commands": [
-        "bash hitt.sh -u checkplatformpods"
+        "bash hitt.sh -u \"check arservers\""
       ],
       "notes": [
         "Prints a table of each Helix IS platform pod: pod name, whether the platform container is ready in Kubernetes (K8s Status), and whether the AR Server readiness check passed inside the pod (AR Status).",
         "Pods that are not Kubernetes-ready show AR Status as skipped — HITT does not run the in-pod check until the container is ready.",
         "The same check runs automatically during post-is and upgrade-is when Helix IS is deployed."
       ],
-      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#checkplatformpods",
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#check-arservers",
       "video": {
         "enabled": false,
-        "script": "utility-checkplatformpods"
+        "script": "utility-check-arservers"
       }
     },
     {
@@ -1111,12 +1111,12 @@ window.HITT_USE_CASES = {
       "order": 28,
       "title": "I want to validate my Docker Hub Personal Access Token (PAT)",
       "commands": [
-        "bash hitt.sh -u checkpat",
-        "bash hitt.sh -u \"checkpat DOCKERHUB_USERNAME YOUR_PAT\"",
-        "bash hitt.sh -u \"checkpat DOCKERHUB_USERNAME\""
+        "bash hitt.sh -u \"check pat\"",
+        "bash hitt.sh -u \"check pat DOCKERHUB_USERNAME YOUR_PAT\"",
+        "bash hitt.sh -u \"check pat DOCKERHUB_USERNAME\""
       ],
       "notes": [
-        "Utility mode (-u) with checkpat requests a Docker Hub registry token and verifies the PAT has pull scope for a private BMC Helix image repository under your Docker Hub user.",
+        "Utility mode (-u) with check pat requests a Docker Hub registry token and verifies the PAT has pull scope for a private BMC Helix image repository under your Docker Hub user.",
         "With no arguments, HITT offers Helix Platform registry credentials from your configured Helix Platform namespace, then prompts if needed.",
         "If you omit only the PAT on the command line, HITT prompts for it interactively (hidden input)."
       ],

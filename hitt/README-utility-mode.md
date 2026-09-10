@@ -17,10 +17,10 @@ When the command has spaces or multiple words, pass the whole thing in **double 
 | `get fields` | Lists fields on one form using its **Schema ID** from `get forms`. Args: **SCHEMAID** [**KEYWORD**]. Omit the keyword to list all fields; add a keyword to filter by field name. |
 | `sql` | Runs a custom AR SQL query via the IS REST API and prints the full JSON response. Args: **SQL_QUERY** (put the entire query inside the quoted `-u` string). |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
-| `checkplatformpods` | Lists each Helix IS **platform** pod with **K8s Status** (platform container ready) and **AR Status** (AR Server readiness inside the pod). Pods not Kubernetes-ready show AR Status as **skipped**. |
-| `checkpat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit both args to offer credentials from the **bmc-dtrhub** secret in your Helix Platform namespace; omit **PAT** only to be prompted (hidden). |
+| `check arservers` | Lists each Helix IS **platform** pod with **K8s Status** (platform container ready) and **AR Status** (AR Server readiness inside the pod). Pods not Kubernetes-ready show AR Status as **skipped**. |
+| `check pat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit both args to offer credentials from the **bmc-dtrhub** secret in your Helix Platform namespace; omit **PAT** only to be prompted (hidden). |
+| `check rbac [hitt\|deploy\|all]` | Validates Kubernetes RBAC for the account HITT uses. **hitt** (default): triage/read checks plus fix-mode writes. **deploy**: shared reads plus install/upgrade permissions in your Helix namespaces. **all**: union of both. |
 | `imagels` | Lists tags available in a container image repository using **skopeo**. Args: **IMAGE** — short name (assumes `docker.io/bmchelix/`) or full **registry/host/path/repository** path. Requires **skopeo** and **`skopeo login`** to the registry host. |
-| `checkrbac [hitt\|deploy\|all]` | Validates Kubernetes RBAC for the account HITT uses. **hitt** (default): triage/read checks plus fix-mode writes. **deploy**: shared reads plus install/upgrade permissions in your Helix namespaces. **all**: union of both. |
 | `help` | Prints this summary (built into HITT). |
 
 ## Usage
@@ -57,12 +57,12 @@ bash hitt.sh -u "sql select [Login Name],[Full Name] from [User] where [Login Na
 bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
 
 # IS platform pod status (Kubernetes + AR Server readiness)
-bash hitt.sh -u checkplatformpods
+bash hitt.sh -u "check arservers"
 
 # Validate Docker Hub PAT
-bash hitt.sh -u checkpat
-bash hitt.sh -u "checkpat mydockerhubuser"
-bash hitt.sh -u "checkpat mydockerhubuser dckr_pat_xxxxxxxx"
+bash hitt.sh -u "check pat"
+bash hitt.sh -u "check pat mydockerhubuser"
+bash hitt.sh -u "check pat mydockerhubuser dckr_pat_xxxxxxxx"
 
 # List tags for a BMC Helix image on Docker Hub
 bash hitt.sh -u "imagels ars"
@@ -72,10 +72,10 @@ skopeo login harbor.example.com
 bash hitt.sh -u "imagels harbor.example.com/bmchelix/ars"
 
 # Kubernetes RBAC audit
-bash hitt.sh -u checkrbac
-bash hitt.sh -u "checkrbac hitt"
-bash hitt.sh -u "checkrbac deploy"
-bash hitt.sh -u "checkrbac all"
+bash hitt.sh -u "check rbac"
+bash hitt.sh -u "check rbac hitt"
+bash hitt.sh -u "check rbac deploy"
+bash hitt.sh -u "check rbac all"
 
 bash hitt.sh -u help
 ```
@@ -173,7 +173,7 @@ If the query fails, HITT reports an error with the message from the IS REST API 
 
 Generates a DBID string from the values provided. **DB_TYPE** is one of `mssql`, `oracle`, or `postgres`.
 
-### `checkplatformpods`
+### `check arservers`
 
 Checks every Helix IS **platform** pod in your configured Helix IS namespace and prints a table:
 
@@ -186,10 +186,10 @@ Checks every Helix IS **platform** pod in your configured Helix IS namespace and
 This is the same check HITT runs during **post-is** and **upgrade-is** mode. If any pod with a ready container fails the AR readiness check, those pod names are reported as errors in the HITT summary.
 
 ```bash
-bash hitt.sh -u checkplatformpods
+bash hitt.sh -u "check arservers"
 ```
 
-### `checkpat [USERNAME] [PAT]`
+### `check pat [USERNAME] [PAT]`
 
 Calls Docker Hub’s token service with **USERNAME** and **PAT** to verify pull access for the **`bmchelix`** repository. On success you see a confirmation; on failure, HITT explains that the token may be limited to public-repo read-only and should be recreated with the correct access (see Docker Hub / EPD documentation).
 
@@ -221,7 +221,7 @@ bash hitt.sh -u "imagels my-registry.example.com/bmchelix/ars"
 
 If the repository is missing or you are not logged in, HITT reports an error.
 
-### `checkrbac [hitt|deploy|all]`
+### `check rbac [hitt|deploy|all]`
 
 Checks whether the account HITT uses has the permissions HITT and Helix deployment need.
 

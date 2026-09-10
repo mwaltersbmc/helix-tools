@@ -533,7 +533,7 @@ checkPlatformPodsReadiness() {
     ready=$(${JQ_BIN} -r '.k8s_ready' <<<"${row}")
     readiness="skipped"
     http_code=""
-
+    [[ "${MODE}" == "utility" ]] && logMessage "Checking AR Server in pod - ${pod}..."
     if [[ "${ready}" == "true" ]]; then
       http_code=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" exec "${pod}" -c "${AR_DRIVER_CONTAINER}" -- \
         curl -s -w '%{http_code}' http://localhost:46100/arapi/readiness -o /dev/null 2>>"${HITT_ERR_FILE}") || http_code=""
@@ -5716,6 +5716,84 @@ logPlatformFTSStartTime() {
   fi
 }
 
+utilGetFields() {
+  initISAdminREST
+  if [ -z "${KEYWORD}" ]; then
+    JSON=$(runARRESTSQL "select [fieldName],[fieldId] from [AR System Metadata: field] where [schemaId] = '${SCHEMAID}'")
+    ERR_MSG="No fields found for form with schemaId ${SCHEMAID}."
+  else
+    JSON=$(runARRESTSQL "select [fieldName],[fieldId] from [AR System Metadata: field] where [schemaId] = '${SCHEMAID}' and [fieldName] like '%${KEYWORD}%'")
+    ERR_MSG="No fields found with '${KEYWORD}' in their name for schemaId ${SCHEMAID}."
+  fi
+  NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
+  if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
+    logError "999" "AR SQL query response did not include a row count." 1
+  fi
+  if [[ "${NUM_ROWS}" -eq 0 ]]; then
+    logError "999" "${ERR_MSG}" 1
+  fi
+  if [[ "${NUM_ROWS}" -gt 100 ]]; then
+    logError "999" "${NUM_ROWS} fields found - please add a keyword." 1
+  fi
+  logStatus "Found ${NUM_ROWS} fields:"
+  echo "${JSON}" | ${JQ_BIN} -r '
+    "\u001b[1mField Name\tField ID\u001b[0m",
+    (.rows[] | [.[]] | @tsv)
+  ' | column -t -s $'\t'
+}
+
+utilGetForms() {
+  initISAdminREST
+  JSON=$(runARRESTSQL "select [name],[Schema ID],[schemaType],[nextId],[overlayProp] from [AR System Metadata: arschema] where [name] like '%${KEYWORD}%'")
+  NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
+  if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
+    logError "999" "AR SQL query response did not include a row count." 1
+  fi
+  if [[ "${NUM_ROWS}" -eq 0 ]]; then
+    logError "999" "No forms with '${KEYWORD}' in their name found." 1
+  fi
+  STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}':"
+  if [[ "${NUM_ROWS}" -gt 100 ]]; then
+    # check for an exact match
+    local EXACT_ROWS
+    JSON=$(runARRESTSQL "select [name],[Schema ID],[schemaType],[nextId],[overlayProp] from [AR System Metadata: arschema] where [name] = '${KEYWORD}'")
+    EXACT_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
+    if [[ "${EXACT_ROWS}" -eq 1 ]]; then
+      STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}' including one exact match. Please use a more specific keyword to see others."
+    else
+      logError "999" "${NUM_ROWS} forms found with '${KEYWORD}' in their name - please use a more specific keyword." 1
+    fi
+  fi
+  logStatus "${STATUS_MSG}"
+  echo "${JSON}" | ${JQ_BIN} -r '
+    ([.columns[].label] | map("\u001b[1m" + . + "\u001b[0m")),
+    (.rows[]
+      | .[2] |= (
+          if . == 1 then "regular"
+          elif . == 2 then "join"
+          elif . == 3 then "view"
+          elif . == 4 then "display-only"
+          elif . == 5 then "vendor"
+          elif . == 6 then "placeholder"
+          else "unknown" end
+        )
+      | .[4] |= (
+          if . == 0 then "unmodified"
+          elif . == 1 then "overlaid"
+          elif . == 2 then "overlay"
+          elif . == 4 then "custom"
+          else "unknown" end
+        )
+    )
+    | @tsv
+  ' | column -t -s $'\t'
+  exit
+  echo "${JSON}" | ${JQ_BIN} -r '
+    "\u001b[1mForm Name\tSchema ID\u001b[0m",
+    (.rows[] | [.[]] | @tsv)
+  ' | column -t -s $'\t'
+}
+
 showFixHelp() { # fix mode help
   echo "HITT fix mode options - see https://bit.ly/hittfix"
   echo .
@@ -5755,10 +5833,10 @@ showUtilHelp() { # utility mode help
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
-    \tcheckplatformpods | List IS platform pods with K8s and AR Server readiness (table). Same check as post-is / upgrade-is.
-    \tcheckpat \t| Validate Docker Hub username and PAT. Args: [USERNAME] [PAT] — omit both to use bmc-dtrhub from HP namespace or be prompted.
+    \tcheck rbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Use -v for each permission checked.
+    \tcheck pat \t| Validate Docker Hub username and PAT. Args: [USERNAME] [PAT] — omit both to use bmc-dtrhub from HP namespace or be prompted.
+    \tcheck arservers | List IS platform pods with K8s and AR Server readiness (table). Same check as post-is / upgrade-is.
     \timagels \t| List tags for a container image repository (requires skopeo). Args: IMAGE — name under docker.io/bmchelix/ or full registry/host/path/repo.
-    \tcheckrbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Use -v for each permission checked. Legacy alias: authcheck (= checkrbac hitt).
     \thelp \t\t| Show this list.
     "
 }
@@ -6373,55 +6451,7 @@ parseUtilGet() {
       if ((${#UTILARGS[@]} > 3)); then
         KEYWORD="${UTILARGS[*]:2}"   # or "${UTILARGS[@]:2}" with IFS=' '
       fi
-      initISAdminREST
-      JSON=$(runARRESTSQL "select [name],[Schema ID],[schemaType],[nextId],[overlayProp] from [AR System Metadata: arschema] where [name] like '%${KEYWORD}%'")
-      NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
-      if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
-        logError "999" "AR SQL query response did not include a row count." 1
-      fi
-      if [[ "${NUM_ROWS}" -eq 0 ]]; then
-        logError "999" "No forms with '${KEYWORD}' in their name found." 1
-      fi
-      STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}':"
-      if [[ "${NUM_ROWS}" -gt 100 ]]; then
-        # check for an exact match
-        local EXACT_ROWS
-        JSON=$(runARRESTSQL "select [name],[Schema ID],[schemaType],[nextId],[overlayProp] from [AR System Metadata: arschema] where [name] = '${KEYWORD}'")
-        EXACT_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
-        if [[ "${EXACT_ROWS}" -eq 1 ]]; then
-          STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}' including one exact match. Please use a more specific keyword to see others."
-        else
-          logError "999" "${NUM_ROWS} forms found with '${KEYWORD}' in their name - please use a more specific keyword." 1
-        fi
-      fi
-      logStatus "${STATUS_MSG}"
-      echo "${JSON}" | ${JQ_BIN} -r '
-        ([.columns[].label] | map("\u001b[1m" + . + "\u001b[0m")),
-        (.rows[]
-          | .[2] |= (
-              if . == 1 then "regular"
-              elif . == 2 then "join"
-              elif . == 3 then "view"
-              elif . == 4 then "display-only"
-              elif . == 5 then "vendor"
-              elif . == 6 then "placeholder"
-              else "unknown" end
-            )
-          | .[4] |= (
-              if . == 0 then "unmodified"
-              elif . == 1 then "overlaid"
-              elif . == 2 then "overlay"
-              elif . == 4 then "custom"
-              else "unknown" end
-            )
-        )
-        | @tsv
-      ' | column -t -s $'\t'
-      exit
-      echo "${JSON}" | ${JQ_BIN} -r '
-        "\u001b[1mForm Name\tSchema ID\u001b[0m",
-        (.rows[] | [.[]] | @tsv)
-      ' | column -t -s $'\t'
+      utilGetForms
       ;;
     fields)
       if [ ${#UTILARGS[@]} -lt 3 ] ; then
@@ -6435,34 +6465,40 @@ parseUtilGet() {
       if ((${#UTILARGS[@]} > 4)); then
         KEYWORD="${UTILARGS[*]:3}"
       fi
-      initISAdminREST
-      if [ -z "${KEYWORD}" ]; then
-        JSON=$(runARRESTSQL "select [fieldName],[fieldId] from [AR System Metadata: field] where [schemaId] = '${SCHEMAID}'")
-        ERR_MSG="No fields found for form with schemaId ${SCHEMAID}."
-      else
-        JSON=$(runARRESTSQL "select [fieldName],[fieldId] from [AR System Metadata: field] where [schemaId] = '${SCHEMAID}' and [fieldName] like '%${KEYWORD}%'")
-        ERR_MSG="No fields found with '${KEYWORD}' in their name for schemaId ${SCHEMAID}."
-      fi
-      NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
-      if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
-        logError "999" "AR SQL query response did not include a row count." 1
-      fi
-      if [[ "${NUM_ROWS}" -eq 0 ]]; then
-        logError "999" "${ERR_MSG}" 1
-      fi
-      if [[ "${NUM_ROWS}" -gt 100 ]]; then
-        logError "999" "${NUM_ROWS} fields found - please add a keyword." 1
-      fi
-      logStatus "Found ${NUM_ROWS} fields:"
-      echo "${JSON}" | ${JQ_BIN} -r '
-        "\u001b[1mField Name\tField ID\u001b[0m",
-        (.rows[] | [.[]] | @tsv)
-      ' | column -t -s $'\t'
-
+      utilGetFields
       ;;
     *)
      logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option. Please check for an updated HITT."
      ;;
+  esac
+}
+
+parseUtilCheck() {
+  if [[ -z "${UTILARGS[1]:-}" ]]; then
+    logError "999" "Usage: bash $0 -u \"check <rbac|pat|arservers> [options]\"" 1
+  fi
+  case "${UTILARGS[1]}" in
+    rbac)
+      profile="${UTILARGS[2]:-hitt}"
+      case "${profile}" in
+        hitt|deploy|all)
+          validateHittK8sPermissions "${profile}" || exit 1
+          ;;
+        *)
+          logError "999" "Usage: bash $0 -u \"check rbac [hitt|deploy|all]\" (default: hitt)." 1
+          ;;
+      esac
+      ;;
+    pat)
+      validateDockerIOPat "${UTILARGS[2]:-}" "${UTILARGS[3]:-}"
+      ;;
+    arserver|arservers)
+      checkPlatformPodsReadiness
+      printPlatformPodsTable
+      ;;
+    *)
+      logError "999" "'${UTILARGS[1]}' is not a valid utility mode check option. Please check for an updated HITT."
+      ;;
   esac
 }
 
@@ -8518,19 +8554,17 @@ if [ "${MODE}" == "utility" ]; then
   read -r -a UTILARGS <<< "${UTILOPTS}"
   logStatus "Running HITT in utility mode '${UTILARGS[0]}'..."
   case "${UTILARGS[0]}" in
+    check)
+      parseUtilCheck
+      ;;
     checkrbac|authcheck)
+      logMessage "Note: '${UTILARGS[0]}' is deprecated — use 'check rbac'." 1
       if [[ "${UTILARGS[0]}" == "authcheck" ]]; then
-        logMessage "Note: 'authcheck' is deprecated — use 'checkrbac hitt'." 1
+        UTILARGS=(check rbac hitt)
+      else
+        UTILARGS=(check rbac "${UTILARGS[1]:-hitt}")
       fi
-      profile="${UTILARGS[1]:-hitt}"
-      case "${profile}" in
-        hitt|deploy|all)
-          validateHittK8sPermissions "${profile}" || exit 1
-          ;;
-        *)
-          logError "999" "Usage: bash $0 -u \"checkrbac [hitt|deploy|all]\" (default: hitt)." 1
-          ;;
-      esac
+      parseUtilCheck
       ;;
     get)
       parseUtilGet
@@ -8558,12 +8592,9 @@ if [ "${MODE}" == "utility" ]; then
       parseUtilSQL
       ;;
     checkpat)
-      # USERNAME and PAT optional — offers bmc-dtrhub credentials from HP_NAMESPACE, then prompts
-      validateDockerIOPat "${UTILARGS[1]:-}" "${UTILARGS[2]:-}"
-      ;;
-    checkplatformpods)
-      checkPlatformPodsReadiness
-      printPlatformPodsTable
+      logMessage "Note: 'checkpat' is deprecated — use 'check pat'." 1
+      UTILARGS=(check pat "${UTILARGS[1]:-}" "${UTILARGS[2]:-}")
+      parseUtilCheck
       ;;
     help)
       showUtilHelp
@@ -8769,7 +8800,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260909-01"
+HITT_BUILD_VERSION="20260910-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
