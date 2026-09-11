@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260911-01`**
+**Latest build `20260911-02`**
 
 The **Helix IS Triage Tool (HITT)** is a command-line helper for BMC Helix on-premises deployments. It can check your environment, fix common setup problems, work with the **HELIX_ONPREM_DEPLOYMENT** pipeline, and gather information for troubleshooting or support.
 
@@ -29,7 +29,7 @@ curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/db
 - [Config overrides](#config-overrides)
 - [Build version (developers)](#build-version-developers-git-clone-only)
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, addcert, Jenkins, license, …)
-- [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `get arlicense`, `gendbid`, `imagels`, `check pat`, `check rbac`, `check arservers`)
+- [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `get arlicense`, `gendbid`, `imagels`, `check pat`, `check rbac`, `check arservers`, `check liveness`, `check readiness`)
 - [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` / `delete` for **HELIX_ONPREM_DEPLOYMENT**
 - [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info node`, `info helix`, `info ingress`, `info dbversions`, `info full`
 

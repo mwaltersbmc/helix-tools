@@ -1,6 +1,6 @@
 # HITT Utility Mode
 
-**Utility mode** (`-u`) provides small helpers for Helix deployments: DBID and license type, JWT, IS platform pod status, secret decode, ConfigMap export, AR form/field search, custom SQL queries, generated DBID, Docker Hub PAT check, and container image tag listing.
+**Utility mode** (`-u`) provides small helpers for Helix deployments: DBID and license type, JWT, IS platform pod status, pod liveness/readiness probe checks, secret decode, ConfigMap export, AR form/field search, custom SQL queries, generated DBID, Docker Hub PAT check, and container image tag listing.
 
 When the command has spaces or multiple words, pass the whole thing in **double quotes**.
 
@@ -18,6 +18,8 @@ When the command has spaces or multiple words, pass the whole thing in **double 
 | `sql` | Runs a custom AR SQL query via the IS REST API and prints the full JSON response. Args: **SQL_QUERY** (put the entire query inside the quoted `-u` string). |
 | `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
 | `check arservers` | Lists each Helix IS **platform** pod with **K8s Status** (platform container ready) and **AR Status** (AR Server readiness inside the pod). Pods not Kubernetes-ready show AR Status as **skipped**. |
+| `check liveness` | Runs the pod’s **liveness** probe URL and prints the response. Args: **PODNAME**. HITT finds the pod in your Helix IS, Helix Platform, or Deployment Engine namespace (prompts if the name exists in more than one). |
+| `check readiness` | Same as **check liveness**, but uses the pod’s **readiness** probe. Args: **PODNAME**. |
 | `check pat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit both args to offer credentials from the **bmc-dtrhub** secret in your Helix Platform namespace; omit **PAT** only to be prompted (hidden). |
 | `check rbac [hitt\|deploy\|all]` | Validates Kubernetes RBAC for the account HITT uses. **hitt** (default): triage/read checks plus fix-mode writes. **deploy**: shared reads plus install/upgrade permissions in your Helix namespaces. **all**: union of both. |
 | `imagels` | Lists tags available in a container image repository using **skopeo**. Args: **IMAGE** — short name (assumes `docker.io/bmchelix/`) or full **registry/host/path/repository** path. Requires **skopeo** and **`skopeo login`** to the registry host. |
@@ -58,6 +60,10 @@ bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
 
 # IS platform pod status (Kubernetes + AR Server readiness)
 bash hitt.sh -u "check arservers"
+
+# Run a pod liveness or readiness probe and show the response
+bash hitt.sh -u "check readiness midtier-int-85486987d7-z22tt"
+bash hitt.sh -u "check liveness platform-fts-0"
 
 # Validate Docker Hub PAT
 bash hitt.sh -u "check pat"
@@ -187,6 +193,21 @@ This is the same check HITT runs during **post-is** and **upgrade-is** mode. If 
 
 ```bash
 bash hitt.sh -u "check arservers"
+```
+
+### `check liveness PODNAME` / `check readiness PODNAME`
+
+Runs the same HTTP check configured on the pod’s **liveness** or **readiness** probe and prints what comes back — useful when a pod is not becoming ready and you want to see the probe response yourself.
+
+HITT looks for **PODNAME** in your configured **Helix IS**, **Helix Platform**, and **Deployment Engine** namespaces. If the name appears in more than one namespace, you are asked to choose. If the pod has more than one container, you are asked which container’s probe to use.
+
+The request is sent from the cluster (using the **platform-fts-0** pod). HITT shows the probe URL, then the response. JSON responses are formatted for readability. If the response body is empty, HITT prints the HTTP status code instead.
+
+Only **httpGet** probes are supported at this time.
+
+```bash
+bash hitt.sh -u "check readiness midtier-int-85486987d7-z22tt"
+bash hitt.sh -u "check liveness platform-fts-0"
 ```
 
 ### `check pat [USERNAME] [PAT]`

@@ -628,8 +628,8 @@ window.HITT_USE_CASES = {
     },
     {
       "id": "utility-dbid",
-      "topicId": "helix-is-mgmt",
-      "order": 10,
+      "topicId": "helix-system-info",
+      "order": 25,
       "title": "I want the current IS database ID (DBID) from the cluster",
       "commands": [
         "bash hitt.sh -u \"get dbid\""
@@ -645,8 +645,8 @@ window.HITT_USE_CASES = {
     },
     {
       "id": "info-dbversions",
-      "topicId": "helix-is-mgmt",
-      "order": 12,
+      "topicId": "helix-system-info",
+      "order": 27,
       "title": "I want to see the dbVersion for each Helix Service Management release",
       "commands": [
         "bash hitt.sh -m \"info dbversions\""
@@ -664,8 +664,8 @@ window.HITT_USE_CASES = {
     },
     {
       "id": "utility-get-arlicense",
-      "topicId": "helix-is-mgmt",
-      "order": 15,
+      "topicId": "helix-system-info",
+      "order": 30,
       "title": "I want to see the current IS server license type",
       "commands": [
         "bash hitt.sh -u \"get arlicense\""
@@ -673,7 +673,7 @@ window.HITT_USE_CASES = {
       "notes": [
         "Requires a running Helix IS deployment.",
         "Shows the license type from the IS Server (for example AR Server for a permanent license, or a temporary type before a full license is applied).",
-        "To apply a license key, use fix mode arlicense — see the apply AR license use case in this section."
+        "To apply a license key, use fix mode arlicense — see the apply AR license use case under Helix IS Management Options."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-arlicense",
       "video": {
@@ -683,8 +683,8 @@ window.HITT_USE_CASES = {
     },
     {
       "id": "utility-jwt",
-      "topicId": "helix-is-mgmt",
-      "order": 20,
+      "topicId": "helix-system-info",
+      "order": 35,
       "title": "I want an AR-JWT token for the IS REST API",
       "commands": [
         "bash hitt.sh -u \"get jwt\"",
@@ -702,8 +702,8 @@ window.HITT_USE_CASES = {
     },
     {
       "id": "utility-check-arservers",
-      "topicId": "helix-is-mgmt",
-      "order": 22,
+      "topicId": "helix-system-info",
+      "order": 40,
       "title": "I want to check the status of the IS platform pods",
       "commands": [
         "bash hitt.sh -u \"check arservers\""
@@ -717,6 +717,26 @@ window.HITT_USE_CASES = {
       "video": {
         "enabled": false,
         "script": "utility-check-arservers"
+      }
+    },
+    {
+      "id": "utility-check-probe",
+      "topicId": "helix-system-info",
+      "order": 45,
+      "title": "I want to see the output of a pod's readiness or liveness probe",
+      "commands": [
+        "bash hitt.sh -u \"check readiness PODNAME\"",
+        "bash hitt.sh -u \"check liveness PODNAME\""
+      ],
+      "notes": [
+        "Replace PODNAME with the pod you are troubleshooting. HITT finds it in your Helix IS, Helix Platform, or Deployment Engine namespace and runs the probe URL from inside the cluster.",
+        "You see the probe URL, then the response. JSON is shown in a readable format; if the body is empty, the HTTP status code is shown instead.",
+        "If the pod name exists in more than one namespace, or the pod has more than one container, HITT asks you to choose."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#check-liveness-podname--check-readiness-podname",
+      "video": {
+        "enabled": false,
+        "script": "utility-check-probe"
       }
     },
     {
@@ -872,7 +892,7 @@ window.HITT_USE_CASES = {
       "id": "info-helix-namespaces",
       "topicId": "helix-system-info",
       "order": 15,
-      "title": "I want to see the helix namespaces in my cluster",
+      "title": "I want to see the Helix namespaces and application versions in my cluster",
       "commands": [
         "bash hitt.sh -m \"info helix\""
       ],

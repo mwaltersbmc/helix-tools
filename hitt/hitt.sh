@@ -519,6 +519,227 @@ discoverPlatformPodsJSON() {
       '
 }
 
+getProbeFromJSON() {
+  local probe_type="${1}"
+  local pod_json="${2}"
+  local container_name="${3}"
+  echo "${pod_json}" | ${JQ_BIN} --arg name "${container_name}" --arg type "${probe_type}" \
+    '.spec.containers[] | select(.name == $name) | .[($type + "Probe")] // empty'
+}
+
+# Echo namespace for pod_name by searching IS_NAMESPACE, HP_NAMESPACE, CDE_NAMESPACE.
+resolvePodNamespace() {
+  local pod_name="${1}"
+  local -a distinct_ns=()
+  local -a pod_ns_matches=()
+  local ns d seen
+
+  [[ -n "${pod_name}" ]] || return 1
+
+  for ns in "${IS_NAMESPACE}" "${HP_NAMESPACE}" "${CDE_NAMESPACE}"; do
+    [[ -z "${ns}" ]] && continue
+    seen=0
+    for d in "${distinct_ns[@]}"; do
+      if [[ "${d}" == "${ns}" ]]; then
+        seen=1
+        break
+      fi
+    done
+    [[ "${seen}" -eq 1 ]] && continue
+    distinct_ns+=("${ns}")
+  done
+
+  for ns in "${distinct_ns[@]}"; do
+    if ${KUBECTL_BIN} get pod "${pod_name}" -n "${ns}" &>/dev/null; then
+      pod_ns_matches+=("${ns}")
+    fi
+  done
+
+  case ${#pod_ns_matches[@]} in
+    0)
+      return 1
+      ;;
+    1)
+      echo "${pod_ns_matches[0]}"
+      ;;
+    *)
+      if [[ "${QUIET}" == "1" ]]; then
+        logError "999" "Pod '${pod_name}' exists in more than one configured namespace; omit -q to choose interactively." 1
+      fi
+      logStatus "Pod '${pod_name}' exists in multiple namespaces — select namespace:" 1
+      selectFromArray pod_ns_matches
+      ;;
+  esac
+}
+
+checkPodProbe()
+{
+  local probe_type="${1}"
+  local pod_name="${2}"
+  local pod_namespace container_array container_name pod_json probe_json
+
+  pod_namespace=$(resolvePodNamespace "${pod_name}") || \
+    logError "999" "Pod '${pod_name}' not found in IS, HP, or CDE namespace." 1
+  logMessage "Pod '${pod_name}' in namespace '${pod_namespace}'." 1
+
+  pod_json=$(getPodJSON "${pod_name}" "${pod_namespace}")
+  if [ "${pod_json}" == "" ]; then
+    logError "999" "Failed to get details of pod '${pod_name}' in the '${pod_namespace}' namespace." 1
+  fi
+
+  readarray -t container_array < <(${JQ_BIN} -r '.spec.containers[].name' <<< "${pod_json}")
+  if [ "${#container_array[@]}" -gt 1 ]; then
+    logStatus "Use ${probe_type}Probe from which container in the '${pod_name}' pod?"
+    container_name=$(selectFromArray container_array)
+  else
+    container_name="${container_array[0]}"
+  fi
+
+  if [[ -z "${container_name:-}" ]]; then
+    logError "999" "Pod '${pod_name}' has no containers." 1
+  fi
+  if ! echo "${pod_json}" | ${JQ_BIN} -e --arg name "${container_name}" --arg type "${probe_type}" \
+    '.spec.containers[] | select(.name == $name) | .[($type + "Probe")] | select(. != null)' \
+    >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    logError "999" "Container '${container_name}' in pod '${pod_name}' does not have a ${probe_type}Probe." 1
+  fi
+
+  probe_json=$(getProbeFromJSON "${probe_type}" "${pod_json}" "${container_name}")
+
+  if ! echo "${probe_json}" | ${JQ_BIN} -e '.httpGet' >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    echo "${probe_json}"
+    logError "999" "HITT only supports httpGet probes at this time." 1
+  fi
+
+  local http_details probe_url timeout
+  if ! http_details=$(parseProbeJSON "${probe_json}" "${pod_json}" "${container_name}"); then
+    logError "999" "Could not parse httpGet probe for container '${container_name}' in pod '${pod_name}'." 1
+  fi
+
+  probe_url=$(${JQ_BIN} -r '"\(.scheme)://\(.host):\(.port)\(.path)"' <<<"${http_details}")
+  logMessage "${probe_type}Probe target: ${probe_url}" 1
+
+  if ! platformPodReady "${CURL_POD}" "${CURL_CONTAINER}"; then
+    logError "999" "Curl pod '${CURL_POD}' (container '${CURL_CONTAINER}') is not ready in '${IS_NAMESPACE}'." 1
+  fi
+
+  timeout=$(${JQ_BIN} -r '.timeoutSeconds // 10' <<<"${probe_json}")
+  if ! curlProbeHttp "${http_details}" "${timeout}"; then
+    logError "999" "Failed to run curl for ${probe_type}Probe from ${CURL_POD}/${CURL_CONTAINER}." 1
+  fi
+}
+
+# Parse probe JSON for httpGet. Prints one JSON object on stdout; return 1 on failure.
+# $1 probe_json  $2 pod_json  $3 container_name
+parseProbeJSON() {
+  local probe_json="${1}"
+  local pod_json="${2}"
+  local container_name="${3}"
+  local pod_ip ports_json out
+
+  pod_ip=$(${JQ_BIN} -r '.status.podIP // empty' <<<"${pod_json}" 2>>"${HITT_ERR_FILE}")
+  ports_json=$(${JQ_BIN} -c --arg cname "${container_name}" \
+    '[.spec.containers[] | select(.name == $cname) | .ports[]? | {name, containerPort}]' \
+    <<<"${pod_json}" 2>>"${HITT_ERR_FILE}")
+  [[ -n "${ports_json}" ]] || ports_json='[]'
+
+  out=$(echo "${probe_json}" | ${JQ_BIN} -c \
+    --arg pod_ip "${pod_ip}" \
+    --argjson ports "${ports_json}" \
+    '
+    .httpGet as $hg |
+    ($hg.scheme // "HTTP" | ascii_downcase) as $scheme |
+    ($hg.path // "/") as $path |
+    ($hg.host // "") as $host_raw |
+    (if $host_raw != "" then $host_raw elif $pod_ip != "" then $pod_ip else null end) as $host |
+    ($hg.port) as $port_raw |
+    (if ($port_raw | type) == "number" then $port_raw
+     else
+       ([$ports[] | select(.name == $port_raw) | .containerPort][0]) // null
+     end) as $port |
+    if $host == null or $port == null then empty
+    else {
+      scheme: $scheme,
+      host: $host,
+      port: $port,
+      path: (if ($path | startswith("/")) then $path else "/" + $path end),
+      headers: ($hg.httpHeaders // [] | map({name, value}))
+    }
+    end
+  ' 2>>"${HITT_ERR_FILE}") || return 1
+
+  [[ -n "${out}" ]] || return 1
+  echo "${out}"
+}
+
+# Print a curl response body; pretty-print with jq when the body is valid JSON.
+# When body is empty or null, print $2 (http_code) if provided.
+printCurlResponseBody() {
+  local body="${1}"
+  local http_code="${2:-}"
+
+  if [[ -z "${body}" || "${body}" == "null" ]]; then
+    [[ -n "${http_code}" ]] && printf '%s\n' "${http_code}"
+    return 0
+  fi
+  if ${JQ_BIN} -e . <<<"${body}" >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    ${JQ_BIN} . <<<"${body}"
+  else
+    printf '%s\n' "${body}"
+  fi
+}
+
+# Run curl against a parsed httpGet probe from CURL_POD / CURL_CONTAINER.
+# $1 = http_details JSON from parseProbeJSON
+# $2 = curl --max-time seconds (default 10)
+curlProbeHttp() {
+  local http_details="${1}"
+  local timeout="${2:-10}"
+  local scheme host port path url raw http_code body curl_insecure=""
+  local -a curl_header_args=()
+
+  [[ -n "${IS_NAMESPACE:-}" && -n "${http_details}" ]] || return 1
+  [[ -n "${CURL_POD:-}" && -n "${CURL_CONTAINER:-}" ]] || return 1
+
+  if ! platformPodReady "${CURL_POD}" "${CURL_CONTAINER}"; then
+    return 1
+  fi
+
+  scheme=$(${JQ_BIN} -r '.scheme // "http"' <<<"${http_details}")
+  host=$(${JQ_BIN} -r '.host' <<<"${http_details}")
+  port=$(${JQ_BIN} -r '.port' <<<"${http_details}")
+  path=$(${JQ_BIN} -r '.path // "/"' <<<"${http_details}")
+  url="${scheme}://${host}:${port}${path}"
+
+  [[ "${scheme}" == "https" ]] && curl_insecure="-k"
+
+  while IFS= read -r line; do
+    [[ -n "${line}" ]] && curl_header_args+=(-H "${line}")
+  done < <(${JQ_BIN} -r '.headers[]? | "\(.name): \(.value)"' <<<"${http_details}")
+
+  raw=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" exec "${CURL_POD}" -c "${CURL_CONTAINER}" -- \
+    curl -sS ${curl_insecure} --max-time "${timeout}" \
+    "${curl_header_args[@]}" \
+    -w 'HITT_HTTP_CODE:%{http_code}' \
+    "${url}" 2>>"${HITT_ERR_FILE}") || return 1
+
+  http_code=$(sed -n 's/.*HITT_HTTP_CODE:\([0-9]*\)$/\1/p' <<<"${raw}")
+  body=$(sed 's/HITT_HTTP_CODE:[0-9]*$//' <<<"${raw}")
+
+  logMessage "HTTP ${http_code}" 1
+  printCurlResponseBody "${body}" "${http_code}"
+}
+
+getPodJSON()
+{
+  local pod_json pod_name pod_namespace
+  pod_name="${1}"
+  pod_namespace="${2}"
+  pod_json=$(${KUBECTL_BIN} -n "${pod_namespace}" get pod "${pod_name}" -o json 2>>"${HITT_ERR_FILE}")
+  [[ "${pod_json}" == "" ]] && return
+  echo "${pod_json}"
+}
+
 # Probe /arapi/readiness on each platform-*-n pod; sets PLATFORM_PODS_JSON.
 checkPlatformPodsReadiness() {
   local pods_json row pod ready readiness http_code
@@ -5842,6 +6063,7 @@ showUtilHelp() { # utility mode help
     \tcheck rbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Use -v for each permission checked.
     \tcheck pat \t| Validate Docker Hub username and PAT. Args: [USERNAME] [PAT] — omit both to use bmc-dtrhub from HP namespace or be prompted.
     \tcheck arservers | List IS platform pods with K8s and AR Server readiness (table). Same check as post-is / upgrade-is.
+    \tcheck liveness|readiness | Run a pod httpGet probe and print the response. Args: PODNAME (namespace resolved from Helix IS, Platform, or Deployment Engine).
     \timagels \t| List tags for a container image repository (requires skopeo). Args: IMAGE — name under docker.io/bmchelix/ or full registry/host/path/repo.
     \thelp \t\t| Show this list.
     "
@@ -6481,7 +6703,7 @@ parseUtilGet() {
 
 parseUtilCheck() {
   if [[ -z "${UTILARGS[1]:-}" ]]; then
-    logError "999" "Usage: bash $0 -u \"check <rbac|pat|arservers> [options]\"" 1
+    logError "999" "Usage: bash $0 -u \"check <rbac|pat|arservers|liveness|readiness> [options]\"" 1
   fi
   case "${UTILARGS[1]}" in
     rbac)
@@ -6501,6 +6723,10 @@ parseUtilCheck() {
     arserver|arservers)
       checkPlatformPodsReadiness
       printPlatformPodsTable
+      ;;
+    liveness|readiness)
+      [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check liveness|readiness PODNAME\"" 1
+      checkPodProbe "${UTILARGS[1]}" "${UTILARGS[2]:-}"
       ;;
     *)
       logError "999" "'${UTILARGS[1]}' is not a valid utility mode check option. Please check for an updated HITT."
@@ -8806,7 +9032,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260911-01"
+HITT_BUILD_VERSION="20260911-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
@@ -8840,6 +9066,8 @@ VERBOSITY=0
 : "${QUIET=0}"
 : "${SKIP_UPDATE_CHECK=0}"
 : "${DISABLE_PROXY=0}"
+: "${CURL_POD:=platform-fts-0}"
+: "${CURL_CONTAINER:=platform}"
 BOLD=$'\e[1m'
 NORMAL=$'\e[0m'
 RED=$'\e[31m'
