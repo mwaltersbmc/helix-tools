@@ -266,7 +266,7 @@ logMessage() {
   else
     MSG_LEVEL=${2}
   fi
-  [[ ${MSG_LEVEL} -le ${VERBOSITY} ]] && [[ "${QUIET}" == "0" ]] && echo -e "\t${1}"
+  [[ ${MSG_LEVEL} -le ${VERBOSITY} ]] && [[ "${QUIET}" == "0" ]] && echo -e "  - ${1}"
 }
 
 # Second arg optional: pass 1 to print even when QUIET=1 (otherwise only prints when QUIET=0).
@@ -536,7 +536,7 @@ checkPlatformPodsReadiness() {
     [[ "${MODE}" == "utility" ]] && logMessage "Checking AR Server in pod - ${pod}..."
     if [[ "${ready}" == "true" ]]; then
       http_code=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" exec "${pod}" -c "${AR_DRIVER_CONTAINER}" -- \
-        curl -s -w '%{http_code}' http://localhost:46100/arapi/readiness -o /dev/null 2>>"${HITT_ERR_FILE}") || http_code=""
+        curl -s -w '%{http_code}' --max-time 10 http://localhost:46100/arapi/readiness -o /dev/null 2>>"${HITT_ERR_FILE}") || http_code=""
       if [[ "${http_code}" == "200" ]]; then
         readiness="ready"
       else
@@ -3347,6 +3347,7 @@ checkISDockerLogin() {
   SKIP_REGISTRY=0
   IS_HARBOR_REGISTRY_HOSTNAME=$(echo "${IS_HARBOR_REGISTRY_HOST%%/*}")
   getRegistryDetailsFromIS
+
   if [ "${MODE}" == "post-is" ]; then
     if [ "${SKIP_REGISTRY}" == "1" ]; then
       logError "189" "Failed to get IS registry details - skipping checks."
@@ -3371,8 +3372,10 @@ checkISDockerLogin() {
       LOG_MSG="'docker ps' command returned an error"
     fi
     logWarning "022" "${LOG_MSG} - skipping registry credentials check."
-    return
+    SKIP_REGISTRY=1
   fi
+
+  [[ "${SKIP_REGISTRY}" == "1" ]] && return
   if docker login "${IS_SECRET_HARBOR_REGISTRY_HOST}" -u "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" -p "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" > /dev/null 2>&1 ; then
     logMessage "IMAGE_REGISTRY credentials are valid - docker login to '${IS_SECRET_HARBOR_REGISTRY_HOST}' was successful." 1
   else
@@ -8803,7 +8806,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260910-02"
+HITT_BUILD_VERSION="20260911-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
