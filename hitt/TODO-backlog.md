@@ -4,6 +4,12 @@ Future improvements captured from reviews — not scheduled for immediate work.
 
 ---
 
+## `use-util-pod` — temporary troubleshooting pod
+
+Status: **backlog** — see [TODO-use-util-pod.md](TODO-use-util-pod.md) for the reference Pod YAML and implementation checklist (util pod with `lp0lz` image for in-cluster `curl`, `CURL_POD`, probe checks).
+
+---
+
 ## `discoverIngressControllerDetails` — fallback chain and error handling
 
 Status: **backlog**
