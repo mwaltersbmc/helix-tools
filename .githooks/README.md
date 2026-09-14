@@ -20,6 +20,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | Step | Script | Skip |
 |------|--------|------|
 | Secret scan (staged diff only) | `gitleaks protect --staged` | `SKIP_GITLEAKS=1 git commit ...` |
+| Embed `docs/hitt/use-cases.json` in `hitt/hitt.sh` when JSON is staged | `pre-commit-hitt-use-cases` | `SKIP_HITT_USE_CASES_HOOK=1 git commit ...` |
 | HITT `HITT_BUILD_VERSION` bump when `hitt/hitt.sh` is staged | `pre-commit-hitt-version` | `SKIP_HITT_VERSION_HOOK=1 git commit ...` |
 | HITT `hitt.sh.sha256` refresh when `hitt/hitt.sh` is staged | `pre-commit-hitt-sha256` | `SKIP_HITT_SHA256_HOOK=1 git commit ...` |
 

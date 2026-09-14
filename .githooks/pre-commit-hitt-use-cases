@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Embed docs/hitt/use-cases.json into hitt/hitt.sh when the JSON is staged.
+# Runs before pre-commit-hitt-version / pre-commit-hitt-sha256.
+# Disable for one commit: SKIP_HITT_USE_CASES_HOOK=1 git commit ...
+set -euo pipefail
+[[ "${SKIP_HITT_USE_CASES_HOOK:-0}" == "1" ]] && exit 0
+
+ROOT=$(git rev-parse --show-toplevel)
+USE_CASES_JSON="${ROOT}/docs/hitt/use-cases.json"
+EMBED_SCRIPT="${ROOT}/scripts/embed-hitt-use-cases.sh"
+[[ -f "${USE_CASES_JSON}" ]] || exit 0
+[[ -x "${EMBED_SCRIPT}" ]] || {
+  echo "pre-commit: missing executable ${EMBED_SCRIPT}" >&2
+  exit 1
+}
+
+if git diff --cached --quiet -- docs/hitt/use-cases.json; then
+  exit 0
+fi
+
+"${EMBED_SCRIPT}"
+git add hitt/hitt.sh
+
+exit 0

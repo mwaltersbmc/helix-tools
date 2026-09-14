@@ -31,7 +31,8 @@ install_gitleaks_linux() {
 
 cd "$REPO_ROOT"
 
-chmod +x .githooks/pre-commit .githooks/pre-commit-hitt-version .githooks/pre-commit-hitt-sha256
+chmod +x .githooks/pre-commit .githooks/pre-commit-hitt-use-cases .githooks/pre-commit-hitt-version .githooks/pre-commit-hitt-sha256
+chmod +x scripts/embed-hitt-use-cases.sh
 
 echo "==> Setting git core.hooksPath to .githooks (local config) ..."
 git config core.hooksPath .githooks
@@ -55,7 +56,8 @@ fi
 echo ""
 echo "Git hooks enabled. Pre-commit runs:"
 echo "  1. gitleaks protect --staged  (SKIP_GITLEAKS=1 to bypass)"
-echo "  2. HITT build version bump when hitt/hitt.sh is staged  (SKIP_HITT_VERSION_HOOK=1 to bypass)"
-echo "  3. HITT sha256 checksum when hitt/hitt.sh is staged  (SKIP_HITT_SHA256_HOOK=1 to bypass)"
+echo "  2. HITT use-cases embed when docs/hitt/use-cases.json is staged  (SKIP_HITT_USE_CASES_HOOK=1 to bypass)"
+echo "  3. HITT build version bump when hitt/hitt.sh is staged  (SKIP_HITT_VERSION_HOOK=1 to bypass)"
+echo "  4. HITT sha256 checksum when hitt/hitt.sh is staged  (SKIP_HITT_SHA256_HOOK=1 to bypass)"
 echo ""
 echo "Test: gitleaks detect --source . --config .gitleaks.toml --no-git"

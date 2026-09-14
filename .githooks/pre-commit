@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Repository pre-commit hook (configure: git config core.hooksPath .githooks)
 #
-# 1. gitleaks protect --staged  (skip: SKIP_GITLEAKS=1)
-# 2. HITT build version bump     (skip: SKIP_HITT_VERSION_HOOK=1)
-# 3. HITT sha256 checksum        (skip: SKIP_HITT_SHA256_HOOK=1)
+# 1. gitleaks protect --staged       (skip: SKIP_GITLEAKS=1)
+# 2. HITT use-cases embed            (skip: SKIP_HITT_USE_CASES_HOOK=1)
+# 3. HITT build version bump         (skip: SKIP_HITT_VERSION_HOOK=1)
+# 4. HITT sha256 checksum            (skip: SKIP_HITT_SHA256_HOOK=1)
 set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
@@ -33,6 +34,10 @@ run_gitleaks() {
 }
 
 run_gitleaks
+
+if [[ -x "${ROOT}/.githooks/pre-commit-hitt-use-cases" ]]; then
+  "${ROOT}/.githooks/pre-commit-hitt-use-cases"
+fi
 
 if [[ -x "${ROOT}/.githooks/pre-commit-hitt-version" ]]; then
   "${ROOT}/.githooks/pre-commit-hitt-version"

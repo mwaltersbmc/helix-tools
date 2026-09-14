@@ -1,0 +1,45 @@
+name: HITT use cases embed
+
+on:
+  pull_request:
+    paths:
+      - docs/hitt/use-cases.json
+      - hitt/hitt.sh
+  push:
+    branches:
+      - main
+    paths:
+      - docs/hitt/use-cases.json
+      - hitt/hitt.sh
+
+permissions:
+  contents: write
+
+jobs:
+  hitt-use-cases:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify or update embedded use cases
+        id: embed
+        run: |
+          set -euo pipefail
+          chmod +x scripts/embed-hitt-use-cases.sh
+          if bash scripts/embed-hitt-use-cases.sh --check; then
+            echo "status=ok" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "status=stale" >> "${GITHUB_OUTPUT}"
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            bash scripts/embed-hitt-use-cases.sh
+            exit 0
+          fi
+          exit 1
+
+      - name: Commit embed update on main
+        if: steps.embed.outputs.status == 'stale' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(hitt): embed use-cases.json in hitt.sh"
+          file_pattern: hitt/hitt.sh
