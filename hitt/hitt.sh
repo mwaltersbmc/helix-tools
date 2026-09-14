@@ -3878,16 +3878,32 @@ hittScriptPath() {
   echo "${resolved}"
 }
 
-# $1 = path to new hitt.sh content. Backs up current script to .bak and replaces it.
+hittUpdateActionFile() {
+  local dir
+  dir=$(dirname "$(hittScriptPath)")
+  echo "${dir}/.hitt-update-action"
+}
+
+hittRequestUpdateAction() {
+  printf '%s\n' "${1}" >"$(hittUpdateActionFile)"
+}
+
+# $1 = path to new hitt.sh content. Backs up current script to .bak and replaces it atomically.
 hittInstallDownloadedScript() {
   local new_script="${1}"
-  local target
+  local target staging
 
   [[ -f "${new_script}" ]] || return 1
   target=$(hittScriptPath)
+  staging="${target}.staging.$$"
+  sed 's/\r$//' "${new_script}" >"${staging}" || return 1
+  chmod a+x "${staging}"
+  if ! bash -n "${staging}" 2>>"${HITT_ERR_FILE}"; then
+    rm -f "${staging}"
+    return 1
+  fi
   cp "${target}" "${target}.bak"
-  cp "${new_script}" "${target}"
-  chmod a+x "${target}"
+  mv -f "${staging}" "${target}"
 }
 
 hittParseBuildVersionFromFile() {
@@ -3968,18 +3984,20 @@ checkForNewHITT() {
       case "${choice}" in
         "Update HITT and rerun")
           logMessage "HITT updated to ${remote_build_version:-latest}. Re-running..." 1
-          SKIP_UPDATE_CHECK=1 exec bash "${HITT_INVOCATION[@]}"
+          hittRequestUpdateAction rerun
           ;;
         "Update HITT and stop")
           logMessage "HITT updated to ${remote_build_version:-latest}. Backup saved as ${target}.bak" 1
           logMessage "Re-run with: bash ${target}" 1
-          exit 0
+          hittRequestUpdateAction stop
           ;;
       esac
+      return 0
       ;;
     "Exit HITT")
       rm -f "${remote_tmp}"
-      exit 0
+      hittRequestUpdateAction quit
+      return 0
       ;;
     *)
       rm -f "${remote_tmp}"
@@ -8747,6 +8765,9 @@ else
 fi
 
 checkForNewHITT
+if [[ -f "$(hittUpdateActionFile)" ]]; then
+  return 0
+fi
 checkCLITools
 
 # Make Jenkins credentials URL safe
@@ -9201,7 +9222,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260914-02"
+HITT_BUILD_VERSION="20260914-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -10930,4 +10951,18 @@ if [ ${CREATE_LOGS} -eq 1 ]; then
   main 2>&1 | tee "${HITT_LOG_FILE}"
 else
   main
+fi
+
+_hitt_update_action_file=$(hittUpdateActionFile)
+if [[ -f "${_hitt_update_action_file}" ]]; then
+  HITT_UPDATE_ACTION=$(head -1 "${_hitt_update_action_file}")
+  rm -f "${_hitt_update_action_file}"
+  case "${HITT_UPDATE_ACTION}" in
+    stop|quit)
+      exit 0
+      ;;
+    rerun)
+      SKIP_UPDATE_CHECK=1 exec bash "${HITT_INVOCATION[@]}"
+      ;;
+  esac
 fi
