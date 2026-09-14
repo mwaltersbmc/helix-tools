@@ -297,7 +297,7 @@ usage() {
     echo "OR"
     echo "bash $0 -m pre-is      - run pre-installation checks"
     echo "OR"
-    echo "bash $0 -m upgrade-is - run pre-upgrade pipeline validation checks"
+    echo "bash $0 -m upgrade-is  - run pre-upgrade pipeline validation checks"
     echo "OR"
     echo "bash $0 -m post-is     - run post-installation checks"
     echo "OR"
@@ -6344,10 +6344,10 @@ showGeneralHelp() {
   echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
   echo
   echo "Mode-specific help:"
-  echo "  bash $0 -h fix         - fix mode options"
+  echo "  bash $0 -h fix         - fix mode options (-f)"
   echo "  bash $0 -h info        - info mode options"
-  echo "  bash $0 -h utility     - utility mode options"
-  echo "  bash $0 -h pipeline    - pipeline mode options"
+  echo "  bash $0 -h utility     - utility mode options (-u)"
+  echo "  bash $0 -h pipeline    - pipeline mode options (-k)"
   echo "  bash $0 -h consolelog  - Deployment Engine log options (-o)"
   echo "  bash $0 -h tctl        - tctl mode options (-t)"
   echo "  bash $0 -h override    - config override options"
@@ -9222,7 +9222,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260914-03"
+HITT_BUILD_VERSION="20260914-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9360,1406 +9360,1409 @@ AAAABAABAEIAAwBUAAAAAgBVANkAAAASAAIAjgCKANgACQDyAPUA8wAZAFwAAAA4AAkAXQABAF4A
 XQABAG0AXQABAIMAXQABAIUAXQABAIkAXQABAJAAXQABAJEAXQABAJMAXQABAKE="
 #MSG_PAYLOAD=""
 #ALL_MSGS_JSON=$(echo "${MSG_PAYLOAD}" | ${BASE64_BIN} -d | zcat 2>/dev/null)
-ALL_MSGS_JSON="[
+# Error message catalog for HITT -e / hittmsgs.log.
+read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
+[
   {
-    \"id\": \"001\",
-    \"cause\": \"The kubectl command used to list namespaces in the cluster did not return the expected list of namespace names.\",
-    \"impact\": \"Some later tests to validate the namespaces will not be run.\",
-    \"remediation\": \"Verify the output by running kubectl get ns at the command prompt and check with cluster admins if additional permissions are needed.\"
+    "id": "001",
+    "cause": "The kubectl command used to list namespaces in the cluster did not return the expected list of namespace names.",
+    "impact": "Some later tests to validate the namespaces will not be run.",
+    "remediation": "Verify the output by running kubectl get ns at the command prompt and check with cluster admins if additional permissions are needed."
   },
   {
-    \"id\": \"002\",
-    \"cause\": \"The DEPLOYMENT_SIZE used for the Helix Platform is expected to be one of itsmcompact/itsmsmall/itsmxlarge if the Platform is only providing the common services used by Helix Service Management. Other options are valid if additional ITOM components, such as BHOM or BHCO, are in use or planned.\",
-    \"impact\": \"Additional cluster resources may be used if the sizing is incorrect.\",
-    \"remediation\": \"Confirm the Helix Platform sizing choice and redeploy if a change is required.\"
+    "id": "002",
+    "cause": "The DEPLOYMENT_SIZE used for the Helix Platform is expected to be one of itsmcompact/itsmsmall/itsmxlarge if the Platform is only providing the common services used by Helix Service Management. Other options are valid if additional ITOM components, such as BHOM or BHCO, are in use or planned.",
+    "impact": "Additional cluster resources may be used if the sizing is incorrect.",
+    "remediation": "Confirm the Helix Platform sizing choice and redeploy if a change is required."
   },
   {
-    \"id\": \"003\",
-    \"cause\": \"Helix Logging is not installed but the option to enable the log shipper is set in the bmc-helix-logging.config file.\",
-    \"impact\": \"Helix Platform pod log output will include a lot of errors reporting that fluent-bit is not available which makes it difficult to use for troubleshooting.\",
-    \"remediation\": \"Install Helix Logging or set the ENABLE_LOG_SHIPPER_IN_PODS option to false in helix-on-prem-deployment-manager/configs/bmc-helix-logging.config file and redeploy.\"
+    "id": "003",
+    "cause": "Helix Logging is not installed but the option to enable the log shipper is set in the bmc-helix-logging.config file.",
+    "impact": "Helix Platform pod log output will include a lot of errors reporting that fluent-bit is not available which makes it difficult to use for troubleshooting.",
+    "remediation": "Install Helix Logging or set the ENABLE_LOG_SHIPPER_IN_PODS option to false in helix-on-prem-deployment-manager/configs/bmc-helix-logging.config file and redeploy."
   },
   {
-    \"id\": \"004\",
-    \"cause\": \"The Tenant value in the RSSO realm created for Helix Service Management is recommended to be set to the tenant ID using the name.number format.\",
-    \"impact\": \"Other values are valid but you must use this as the TENANT_DOMAIN in the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline. If these values are different there will be issues with Helix Service Management apps logins.\",
-    \"remediation\": \"Use the recommended name.number format or ensure that the same value is used as the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline TENANT_DOMAIN value.\"
+    "id": "004",
+    "cause": "The Tenant value in the RSSO realm created for Helix Service Management is recommended to be set to the tenant ID using the name.number format.",
+    "impact": "Other values are valid but you must use this as the TENANT_DOMAIN in the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline. If these values are different there will be issues with Helix Service Management apps logins.",
+    "remediation": "Use the recommended name.number format or ensure that the same value is used as the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline TENANT_DOMAIN value."
   },
   {
-    \"id\": \"005\",
-    \"cause\": \"The Helix Portal alias is not present in the Helix Service Management RSSO realm. This alias is added during the Jenkins HELIX_ITSM_INTEROPS pipeline run.\",
-    \"impact\": \"The alias is not present until the Jenkins HELIX_ITSM_INTEROPS pipeline is run but, if it is missing after this, there will be errors when logging in.\",
-    \"remediation\": \"If the alias has been removed after the Jenkins HELIX_ITSM_INTEROPS pipeline has been run, add the portal FQDN to the Applications Domain in the Helix Service Management SSO realm.\"
+    "id": "005",
+    "cause": "The Helix Portal alias is not present in the Helix Service Management RSSO realm. This alias is added during the Jenkins HELIX_ITSM_INTEROPS pipeline run.",
+    "impact": "The alias is not present until the Jenkins HELIX_ITSM_INTEROPS pipeline is run but, if it is missing after this, there will be errors when logging in.",
+    "remediation": "If the alias has been removed after the Jenkins HELIX_ITSM_INTEROPS pipeline has been run, add the portal FQDN to the Applications Domain in the Helix Service Management SSO realm."
   },
   {
-    \"id\": \"006\",
-    \"cause\": \"The last build of the HELIX_ONPREM_DEPLOYMENT pipeline, or one of the deployment pipelines it runs, was not successful.\",
-    \"impact\": \"The problematic pipeline may not have completed all the stages necessary to deploy the Helix Service Management products.\",
-    \"remediation\": \"Review the pipeline console output in Jenkins, or the log files in the HITT directory, to try and identify the cause. Other HITT errors are likely to help with this.\"
+    "id": "006",
+    "cause": "The last build of the HELIX_ONPREM_DEPLOYMENT pipeline, or one of the deployment pipelines it runs, was not successful.",
+    "impact": "The problematic pipeline may not have completed all the stages necessary to deploy the Helix Service Management products.",
+    "remediation": "Review the pipeline console output in Jenkins, or the log files in the HITT directory, to try and identify the cause. Other HITT errors are likely to help with this."
   },
   {
-    \"id\": \"007\",
-    \"cause\": \"The Helix Service Management deployment size is M or above which means that platform-int pods will be created. By default, these pods do not run the normalization plugin which may be called by some types of activity.\",
-    \"impact\": \"API calls to the platform-int pods which invoke the Atrium normalization engine plugin will fail with an error such as ERROR (8760): Cannot establish a network connection to the AR System Plug-In server; platform-int-0.platform-int:9555\",
-    \"remediation\": \"Select the ENABLE_PLATFORM_INT_NORMALIZATION option to enable the plugin for the platform-int pods. If deployment is complete see KA000405995 for changes to the ENABLE_AR_SERVICES variable in the platform-int statefulset.\"
+    "id": "007",
+    "cause": "The Helix Service Management deployment size is M or above which means that platform-int pods will be created. By default, these pods do not run the normalization plugin which may be called by some types of activity.",
+    "impact": "API calls to the platform-int pods which invoke the Atrium normalization engine plugin will fail with an error such as ERROR (8760): Cannot establish a network connection to the AR System Plug-In server; platform-int-0.platform-int:9555",
+    "remediation": "Select the ENABLE_PLATFORM_INT_NORMALIZATION option to enable the plugin for the platform-int pods. If deployment is complete see KA000405995 for changes to the ENABLE_AR_SERVICES variable in the platform-int statefulset."
   },
   {
-    \"id\": \"008\",
-    \"cause\": \"The CUSTOM_BINARY_PATH option in the HELIX_ONPREM_DEPLOYMENT pipeline is selected but this is rarely required.\",
-    \"impact\": \"Deployment may fail unless the CUSTOM_BINARY_PATH is a valid path that provides the expected binary files.\",
-    \"remediation\": \"Deselect the CUSTOM_BINARY_PATH option unless you are certain that it is required.\"
+    "id": "008",
+    "cause": "The CUSTOM_BINARY_PATH option in the HELIX_ONPREM_DEPLOYMENT pipeline is selected but this is rarely required.",
+    "impact": "Deployment may fail unless the CUSTOM_BINARY_PATH is a valid path that provides the expected binary files.",
+    "remediation": "Deselect the CUSTOM_BINARY_PATH option unless you are certain that it is required."
   },
   {
-    \"id\": \"009\",
-    \"cause\": \"The IS_CLOUD option is selected which will cause public cloud systems to provision an external load balancer.\",
-    \"impact\": \"This setting is used with public cloud providers to automatically provision a load balancer for the environment.\",
-    \"remediation\": \"The option may be valid if you want your cloud provider to create a load balancer for you.\"
+    "id": "009",
+    "cause": "The IS_CLOUD option is selected which will cause public cloud systems to provision an external load balancer.",
+    "impact": "This setting is used with public cloud providers to automatically provision a load balancer for the environment.",
+    "remediation": "The option may be valid if you want your cloud provider to create a load balancer for you."
   },
   {
-    \"id\": \"010\",
-    \"cause\": \"The ROUTE_ENABLED and/or ROUTE_TLS_ENABLED options are selected but it is documented that they should be left unselected.\",
-    \"impact\": \"These options are not valid for onprem use and should not be selected.\",
-    \"remediation\": \"Deselect the options.\"
+    "id": "010",
+    "cause": "The ROUTE_ENABLED and/or ROUTE_TLS_ENABLED options are selected but it is documented that they should be left unselected.",
+    "impact": "These options are not valid for onprem use and should not be selected.",
+    "remediation": "Deselect the options."
   },
   {
-    \"id\": \"011\",
-    \"cause\": \"The kubectl get ingressclasses command to list ingressclasses in the cluster did not work as expected.\",
-    \"impact\": \"Some later tests to validate ingresses will not be run.\",
-    \"remediation\": \"Verify the output by running kubectl get ingressclasses at the command prompt and check with cluster admins if additional permissions are needed.\"
+    "id": "011",
+    "cause": "The kubectl get ingressclasses command to list ingressclasses in the cluster did not work as expected.",
+    "impact": "Some later tests to validate ingresses will not be run.",
+    "remediation": "Verify the output by running kubectl get ingressclasses at the command prompt and check with cluster admins if additional permissions are needed."
   },
   {
-    \"id\": \"012\",
-    \"cause\": \"The HELIX_ITSM_INSIGHTS application is selected for installation but the ITSM Insights services are not installed in the Helix Platform.\",
-    \"impact\": \"The ITSM Insights application will not work.\",
-    \"remediation\": \"Deselect the HELIX_ITSM_INSIGHTS option or install ITSM Insights services in the Helix Platform.\"
+    "id": "012",
+    "cause": "The HELIX_ITSM_INSIGHTS application is selected for installation but the ITSM Insights services are not installed in the Helix Platform.",
+    "impact": "The ITSM Insights application will not work.",
+    "remediation": "Deselect the HELIX_ITSM_INSIGHTS option or install ITSM Insights services in the Helix Platform."
   },
   {
-    \"id\": \"013\",
-    \"cause\": \"The option to integrate ITSM Insights with the Helix Platform is selected but HELIX_ITSM_INSIGHTS is not selected to install the application.\",
-    \"impact\": \"A link to launch ITSM Insights will be added to the Helix Portal but the application will be not installed.\",
-    \"remediation\": \"Select, or deselect, both BMC_HELIX_ITSM_INSIGHTS and HELIX_ITSM_INSIGHTS depending on whether ITSM Insights is required.\"
+    "id": "013",
+    "cause": "The option to integrate ITSM Insights with the Helix Platform is selected but HELIX_ITSM_INSIGHTS is not selected to install the application.",
+    "impact": "A link to launch ITSM Insights will be added to the Helix Portal but the application will be not installed.",
+    "remediation": "Select, or deselect, both BMC_HELIX_ITSM_INSIGHTS and HELIX_ITSM_INSIGHTS depending on whether ITSM Insights is required."
   },
   {
-    \"id\": \"014\",
-    \"cause\": \"The option to enable the Support Assistant fpackager sidecar containers is not selected. This is required for Support Assistant to be able to access Helix Service Management application logs.\",
-    \"impact\": \"Support Assistant Tool will not be able to access application logs.\",
-    \"remediation\": \"Select the SIDECAR_SUPPORT_ASSISTANT_FPACK option.\"
+    "id": "014",
+    "cause": "The option to enable the Support Assistant fpackager sidecar containers is not selected. This is required for Support Assistant to be able to access Helix Service Management application logs.",
+    "impact": "Support Assistant Tool will not be able to access application logs.",
+    "remediation": "Select the SIDECAR_SUPPORT_ASSISTANT_FPACK option."
   },
   {
-    \"id\": \"015\",
-    \"cause\": \"The option to create the role and rolebinding required for the Support Assistant Tool is not selected.\",
-    \"impact\": \"Support Assistant Tool will not be able to access application logs unless the steps to create them manually are followed.\",
-    \"remediation\": \"Select the SUPPORT_ASSISTANT_CREATE_ROLE or see the product documentation for steps to create the role and rolebinding manually.\"
+    "id": "015",
+    "cause": "The option to create the role and rolebinding required for the Support Assistant Tool is not selected.",
+    "impact": "Support Assistant Tool will not be able to access application logs unless the steps to create them manually are followed.",
+    "remediation": "Select the SUPPORT_ASSISTANT_CREATE_ROLE or see the product documentation for steps to create the role and rolebinding manually."
   },
   {
-    \"id\": \"016\",
-    \"cause\": \"The option to deploy the fluent-bit sidecar pods is enabled but Helix Logging is not installed.\",
-    \"impact\": \"The fluent-bit sidecars will be created but will not send the logs they monitor to the Helix Logging Elasticsearch for viewing via Kibana.\",
-    \"remediation\": \"Deselect the SIDECAR_FLUENTBIT option unless you plan to install Helix Logging later.\"
+    "id": "016",
+    "cause": "The option to deploy the fluent-bit sidecar pods is enabled but Helix Logging is not installed.",
+    "impact": "The fluent-bit sidecars will be created but will not send the logs they monitor to the Helix Logging Elasticsearch for viewing via Kibana.",
+    "remediation": "Deselect the SIDECAR_FLUENTBIT option unless you plan to install Helix Logging later."
   },
   {
-    \"id\": \"017\",
-    \"cause\": \"The cacerts Java keystore file was not attached to the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline. Most customers are expected to attach this file.\",
-    \"impact\": \"If custom CA signed certificates are in use the deployment will fail.\",
-    \"remediation\": \"Attach the cacerts with your custom CA certificate chain added using the CACERTS_FILE option in Jenkins. This may not be necessary if using certificates purchased direct from Digicert.\"
+    "id": "017",
+    "cause": "The cacerts Java keystore file was not attached to the Jenkins HELIX_ONPREM_DEPLOYMENT pipeline. Most customers are expected to attach this file.",
+    "impact": "If custom CA signed certificates are in use the deployment will fail.",
+    "remediation": "Attach the cacerts with your custom CA certificate chain added using the CACERTS_FILE option in Jenkins. This may not be necessary if using certificates purchased direct from Digicert."
   },
   {
-    \"id\": \"018\",
-    \"cause\": \"The FTS_ELASTICSEARCH_HOSTNAME value is an IP address rather than the recommended servicename.namespace format.\",
-    \"impact\": \"An IP address is valid if the service has been exposed but it is recommended to use the servicename.namespace format.\",
-    \"remediation\": \"Either servicename.namespace or an IP address is valid but the former avoids having to add an externalIP to the service used for FTS.\"
+    "id": "018",
+    "cause": "The FTS_ELASTICSEARCH_HOSTNAME value is an IP address rather than the recommended servicename.namespace format.",
+    "impact": "An IP address is valid if the service has been exposed but it is recommended to use the servicename.namespace format.",
+    "remediation": "Either servicename.namespace or an IP address is valid but the former avoids having to add an externalIP to the service used for FTS."
   },
   {
-    \"id\": \"019\",
-    \"cause\": \"The value is an IP address rather than the recommended servicename.namespace format.\",
-    \"impact\": \"An IP address is valid if the service has been exposed but it is recommended to use the servicename.namespace format.\",
-    \"remediation\": \"Either servicename.namespace or an IP address is valid but the former avoids having to add an externalIP to the service.\"
+    "id": "019",
+    "cause": "The value is an IP address rather than the recommended servicename.namespace format.",
+    "impact": "An IP address is valid if the service has been exposed but it is recommended to use the servicename.namespace format.",
+    "remediation": "Either servicename.namespace or an IP address is valid but the former avoids having to add an externalIP to the service."
   },
   {
-    \"id\": \"020\",
-    \"cause\": \"The IS server does not have a permanent license.\",
-    \"impact\": \"If not already completed, the HELIX_SMARTAPPS_DEPLOY and HELIX_ITSM_INTEROPS pipelines may fail as the temporary 3 day server license has expired.\",
-    \"remediation\": \"The temporary IS server license, valid for three days from the first time the server is started, has expired. Apply a valid server license.\"
+    "id": "020",
+    "cause": "The IS server does not have a permanent license.",
+    "impact": "If not already completed, the HELIX_SMARTAPPS_DEPLOY and HELIX_ITSM_INTEROPS pipelines may fail as the temporary 3 day server license has expired.",
+    "remediation": "The temporary IS server license, valid for three days from the first time the server is started, has expired. Apply a valid server license."
   },
   {
-    \"id\": \"021\",
-    \"cause\": \"Either or both the AR_DB_USER and AR_DB_PASSWORD values are blank.\",
-    \"impact\": \"This will cause a fresh installation to fail and prevent HITT from running some later checks.\",
-    \"remediation\": \"Set the values in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+    "id": "021",
+    "cause": "Either or both the AR_DB_USER and AR_DB_PASSWORD values are blank.",
+    "impact": "This will cause a fresh installation to fail and prevent HITT from running some later checks.",
+    "remediation": "Set the values in the HELIX_ONPREM_DEPLOYMENT pipeline."
   },
   {
-    \"id\": \"022\",
-    \"cause\": \"Either the docker command was not found or docker login to the IMAGE_REGISTRY_HOST failed.\",
-    \"impact\": \"The registry server credentials will not be validated.\",
-    \"remediation\": \"Run the docker login command from the command prompt and resolve the error to enable the checks.\"
+    "id": "022",
+    "cause": "Either the docker command was not found or docker login to the IMAGE_REGISTRY_HOST failed.",
+    "impact": "The registry server credentials will not be validated.",
+    "remediation": "Run the docker login command from the command prompt and resolve the error to enable the checks."
   },
   {
-    \"id\": \"023\",
-    \"cause\": \"The platform-admin-ext service in the Helix Service Management namespace does not have an externalIP assigned.\",
-    \"impact\": \"Developer Studio and other AR API clients will not be able to connect to the system. Upgrades will fail as they require this type of connectivity.\",
-    \"remediation\": \"See the post installation configuration steps in the documentation for steps to expose an externalIP or set the PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the pipeline.\"
+    "id": "023",
+    "cause": "The platform-admin-ext service in the Helix Service Management namespace does not have an externalIP assigned.",
+    "impact": "Developer Studio and other AR API clients will not be able to connect to the system. Upgrades will fail as they require this type of connectivity.",
+    "remediation": "See the post installation configuration steps in the documentation for steps to expose an externalIP or set the PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the pipeline."
   },
   {
-    \"id\": \"024\",
-    \"cause\": \"The AR_DB_CASE_SENSITIVE option is selected but the database type is not Postgres and/or the DATABASE_RESTORE option is not selected. This option is only valid when the pipeline is used to restore a Postgres database.\",
-    \"impact\": \"For MSSQL/Oracle databases this option is always ignored and the case-sensitivity of the system is determined by the database dump that was restored. For Postgres the option controls which dump is restored by the pipeline, it is ignored unless DATABASE_RESTORE is also selected.\",
-    \"remediation\": \"Ensure you have selected the correct options, or restored the appropriate database dump, to achieve the required case-sensitivity for your system.\"
+    "id": "024",
+    "cause": "The AR_DB_CASE_SENSITIVE option is selected but the database type is not Postgres and/or the DATABASE_RESTORE option is not selected. This option is only valid when the pipeline is used to restore a Postgres database.",
+    "impact": "For MSSQL/Oracle databases this option is always ignored and the case-sensitivity of the system is determined by the database dump that was restored. For Postgres the option controls which dump is restored by the pipeline, it is ignored unless DATABASE_RESTORE is also selected.",
+    "remediation": "Ensure you have selected the correct options, or restored the appropriate database dump, to achieve the required case-sensitivity for your system."
   },
   {
-    \"id\": \"025\",
-    \"cause\": \"The platform-admin-ext service does not have an external IP address assigned.\",
-    \"impact\": \"Connectivity via the service for AR API clients such as Developer Studio will not be possible and upgrades will fail.\",
-    \"remediation\": \"Use the steps in the 'Performing the post-installation configurations' documentation to add an externalIP to the service.\"
+    "id": "025",
+    "cause": "The platform-admin-ext service does not have an external IP address assigned.",
+    "impact": "Connectivity via the service for AR API clients such as Developer Studio will not be possible and upgrades will fail.",
+    "remediation": "Use the steps in the 'Performing the post-installation configurations' documentation to add an externalIP to the service."
   },
   {
-    \"id\": \"026\",
-    \"cause\": \"The platform-admin-ext service is not one of the expected types of ClusterIP or NodePort.\",
-    \"impact\": \"Connectivity via the service for AR API clients such as Developer Studio may not be possible and upgrades may fail.\",
-    \"remediation\": \"Review the platform-admin-ext service configuration in the cluster and revert any customisations.\"
+    "id": "026",
+    "cause": "The platform-admin-ext service is not one of the expected types of ClusterIP or NodePort.",
+    "impact": "Connectivity via the service for AR API clients such as Developer Studio may not be possible and upgrades may fail.",
+    "remediation": "Review the platform-admin-ext service configuration in the cluster and revert any customisations."
   },
   {
-    \"id\": \"027\",
-    \"cause\": \"The DATABASE_HOST_NAME is not reachable from this system on the DB_PORT.\",
-    \"impact\": \"Later checks to validate the database will not be run and deployment will fail if either of the values are wrong.\",
-    \"remediation\": \"This is expected if there is no connectivity to the database server from this system, otherwise verify the DATABASE_HOST_NAME/DB_PORT values.\"
+    "id": "027",
+    "cause": "The DATABASE_HOST_NAME is not reachable from this system on the DB_PORT.",
+    "impact": "Later checks to validate the database will not be run and deployment will fail if either of the values are wrong.",
+    "remediation": "This is expected if there is no connectivity to the database server from this system, otherwise verify the DATABASE_HOST_NAME/DB_PORT values."
   },
   {
-    \"id\": \"028\",
-    \"cause\": \"A command to extract and save the kubeconfig file from the Jenkins kubeconfig credential failed to return the expected result.\",
-    \"impact\": \"A check to confirm that it is a valid kubeconfig file for the cluster will not be run.\",
-    \"remediation\": \"Confirm the kubeconfig credential exists and has a valid file attached.\"
+    "id": "028",
+    "cause": "A command to extract and save the kubeconfig file from the Jenkins kubeconfig credential failed to return the expected result.",
+    "impact": "A check to confirm that it is a valid kubeconfig file for the cluster will not be run.",
+    "remediation": "Confirm the kubeconfig credential exists and has a valid file attached."
   },
   {
-    \"id\": \"029\",
-    \"cause\": \"Ansible command was not found on the path of the user running HITT.\",
-    \"impact\": \"Checks to validate the ansible version and dependencies will not be run and Helix Service Management deployment will not be possible.\",
-    \"remediation\": \"Run the Deployment Engine setup script or install the recommended version of ansible using the OS package manager.\"
+    "id": "029",
+    "cause": "Ansible command was not found on the path of the user running HITT.",
+    "impact": "Checks to validate the ansible version and dependencies will not be run and Helix Service Management deployment will not be possible.",
+    "remediation": "Run the Deployment Engine setup script or install the recommended version of ansible using the OS package manager."
   },
   {
-    \"id\": \"030\",
-    \"cause\": \"HITT 'pre-is' mode is used to validate the environment and HELIX_ONPREM_DEPLOYMENT pipeline values before deployment but the pipeline operation is not the expected value of 'FRESH'.\",
-    \"impact\": \"HITT checks may return incorrect results.\",
-    \"remediation\": \"Confirm the pipeline operation is correct and review any warnings/errors carefully as the results may be unreliable.\"
+    "id": "030",
+    "cause": "HITT 'pre-is' mode is used to validate the environment and HELIX_ONPREM_DEPLOYMENT pipeline values before deployment but the pipeline operation is not the expected value of 'FRESH'.",
+    "impact": "HITT checks may return incorrect results.",
+    "remediation": "Confirm the pipeline operation is correct and review any warnings/errors carefully as the results may be unreliable."
   },
   {
-    \"id\": \"031\",
-    \"cause\": \"The IS_DATABASE_ALWAYS_ON option is only applicable when the DB_TYPE is 'mssql'.  It has no effect for other database types.\",
-    \"impact\": \"The setting will be ignored.\",
-    \"remediation\": \"Deselect the IS_DATABASE_ALWAYS_ON option.\"
+    "id": "031",
+    "cause": "The IS_DATABASE_ALWAYS_ON option is only applicable when the DB_TYPE is 'mssql'.  It has no effect for other database types.",
+    "impact": "The setting will be ignored.",
+    "remediation": "Deselect the IS_DATABASE_ALWAYS_ON option."
   },
   {
-    \"id\": \"032\",
-    \"cause\": \"When the IS_DATABASE_ALWAYS_ON option is selected you must be using an MSSQL AlwaysOn database system.\",
-    \"impact\": \"If the database is not an MSSQL AlwaysOn system then deployment will fail.\",
-    \"remediation\": \"Confirm the IS database is an MSSQL AlwaysOn system and that the other DB options refer to the AlwaysOn listener.\"
+    "id": "032",
+    "cause": "When the IS_DATABASE_ALWAYS_ON option is selected you must be using an MSSQL AlwaysOn database system.",
+    "impact": "If the database is not an MSSQL AlwaysOn system then deployment will fail.",
+    "remediation": "Confirm the IS database is an MSSQL AlwaysOn system and that the other DB options refer to the AlwaysOn listener."
   },
   {
-    \"id\": \"033\",
-    \"cause\": \"The ENABLE_PLATFORM_INT_NORMALIZATION option is ignored from 23.3.03 onwards as there is a dedicated normalization engine pod.\",
-    \"impact\": \"The selected option has no effect.\",
-    \"remediation\": \"The selected option has no effect.\"
+    "id": "033",
+    "cause": "The ENABLE_PLATFORM_INT_NORMALIZATION option is ignored from 23.3.03 onwards as there is a dedicated normalization engine pod.",
+    "impact": "The selected option has no effect.",
+    "remediation": "The selected option has no effect."
   },
   {
-    \"id\": \"034\",
-    \"cause\": \"There are Kubernetes resourcequotas defined for the named namespace.\",
-    \"impact\": \"If the quotas are too low deployments may fail.\",
-    \"remediation\": \"Review the resourcequotas and verify that they are high enough for the planned deployment.\"
+    "id": "034",
+    "cause": "There are Kubernetes resourcequotas defined for the named namespace.",
+    "impact": "If the quotas are too low deployments may fail.",
+    "remediation": "Review the resourcequotas and verify that they are high enough for the planned deployment."
   },
   {
-    \"id\": \"035\",
-    \"cause\": \"The HITT script is being run by the root user.\",
-    \"impact\": \"Some HITT checks may fail as they are expected to be run by the git user.\",
-    \"remediation\": \"Run the HITT script as the git user.\"
+    "id": "035",
+    "cause": "The HITT script is being run by the root user.",
+    "impact": "Some HITT checks may fail as they are expected to be run by the git user.",
+    "remediation": "Run the HITT script as the git user."
   },
   {
-    \"id\": \"036\",
-    \"cause\": \"The 'ansible-galaxy' command was not found but this is required to check that the community.general collection is installed.\",
-    \"impact\": \"If the collection is not installed deployment will fail.\",
-    \"remediation\": \"Install the 'ansible-galaxy' command to enable the checks or ensure that the community.general collection is installed.\"
+    "id": "036",
+    "cause": "The 'ansible-galaxy' command was not found but this is required to check that the community.general collection is installed.",
+    "impact": "If the collection is not installed deployment will fail.",
+    "remediation": "Install the 'ansible-galaxy' command to enable the checks or ensure that the community.general collection is installed."
   },
   {
-    \"id\": \"037\",
-    \"cause\": \"The Helix Portal alias is present in the Helix Service Management RSSO realm. This alias is added during the Jenkins HELIX_ITSM_INTEROPS pipeline run.\",
-    \"impact\": \"The alias is not expected to be present until the Jenkins HELIX_ITSM_INTEROPS pipeline is run.\",
-    \"remediation\": \"If the Jenkins HELIX_ITSM_INTEROPS pipeline has not been run, remove the portal alias from the Applications Domains in the Helix Service Management SSO realm.\"
+    "id": "037",
+    "cause": "The Helix Portal alias is present in the Helix Service Management RSSO realm. This alias is added during the Jenkins HELIX_ITSM_INTEROPS pipeline run.",
+    "impact": "The alias is not expected to be present until the Jenkins HELIX_ITSM_INTEROPS pipeline is run.",
+    "remediation": "If the Jenkins HELIX_ITSM_INTEROPS pipeline has not been run, remove the portal alias from the Applications Domains in the Helix Service Management SSO realm."
   },
   {
-    \"id\": \"038\",
-    \"cause\": \"The Linux 'ssphass' command was not found.\",
-    \"impact\": \"The password value set in the Jenkins credentials will not be validated.\",
-    \"remediation\": \"Please install 'sshpass' or make sure it is on the path of the user running the HITT script.\"
+    "id": "038",
+    "cause": "The Linux 'ssphass' command was not found.",
+    "impact": "The password value set in the Jenkins credentials will not be validated.",
+    "remediation": "Please install 'sshpass' or make sure it is on the path of the user running the HITT script."
   },
   {
-    \"id\": \"039\",
-    \"cause\": \"The Linux 'ssh-keygen' command was not found.\",
-    \"impact\": \"Checks to test that passwordless ssh is set up correctly will not be run.\",
-    \"remediation\": \"Please install 'ssh-keygen' or make sure it is on the path of the user running the HITT script.\"
+    "id": "039",
+    "cause": "The Linux 'ssh-keygen' command was not found.",
+    "impact": "Checks to test that passwordless ssh is set up correctly will not be run.",
+    "remediation": "Please install 'ssh-keygen' or make sure it is on the path of the user running the HITT script."
   },
   {
-    \"id\": \"040\",
-    \"cause\": \"This is a FRESH deployment using Postgres and the option to allow the pipeline to restore the databas dump is not selected.\",
-    \"impact\": \"The database dump must be restored manually before deployment if the DATABASE_RESTORE option is not selected.\",
-    \"remediation\": \"Ensure that the database dump has been restored OR select the DATABASE_RESTORE option to allow the pipeline to do it.\"
+    "id": "040",
+    "cause": "This is a FRESH deployment using Postgres and the option to allow the pipeline to restore the databas dump is not selected.",
+    "impact": "The database dump must be restored manually before deployment if the DATABASE_RESTORE option is not selected.",
+    "remediation": "Ensure that the database dump has been restored OR select the DATABASE_RESTORE option to allow the pipeline to do it."
   },
   {
-    \"id\": \"041\",
-    \"cause\": \"The named Helix Platform tenant has not been activated.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline may encounter issues.\",
-    \"remediation\": \"Use the link in the activation email or login to set the first user password and activate the tenant.\"
+    "id": "041",
+    "cause": "The named Helix Platform tenant has not been activated.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline may encounter issues.",
+    "remediation": "Use the link in the activation email or login to set the first user password and activate the tenant."
   },
   {
-    \"id\": \"042\",
-    \"cause\": \"The OS_RESTRICTED_SCC option is not selected but the cluster type is OpenShift.\",
-    \"impact\": \"Pods will may be blocked from starting and deployment will fail.\",
-    \"remediation\": \"Check if the cluster uses restricted SCCs and select the option if required.\"
+    "id": "042",
+    "cause": "The OS_RESTRICTED_SCC option is not selected but the cluster type is OpenShift.",
+    "impact": "Pods will may be blocked from starting and deployment will fail.",
+    "remediation": "Check if the cluster uses restricted SCCs and select the option if required."
   },
   {
-    \"id\": \"043\",
-    \"cause\": \"The named alias is not accessible from this system using a curl command.\",
-    \"impact\": \"Deployment may fail as some aliases, RESTAPI for example, are used by the pipeline scripts.\",
-    \"remediation\": \"Make sure the aliases are correctly set up and accessible - check firewall settings etc.\"
+    "id": "043",
+    "cause": "The named alias is not accessible from this system using a curl command.",
+    "impact": "Deployment may fail as some aliases, RESTAPI for example, are used by the pipeline scripts.",
+    "remediation": "Make sure the aliases are correctly set up and accessible - check firewall settings etc."
   },
   {
-    \"id\": \"044\",
-    \"cause\": \"The platform-fts pod took longer than expected to become ready.\",
-    \"impact\": \"This may indicate poor latency between the pod and the IS database system or some other performance issue.\",
-    \"remediation\": \"Check the db latency or contact BMC Support if you observe performance related issues.\"
-  },
-    {
-    \"id\": \"045\",
-    \"cause\": \"'PasswordAuthentication no' appears to be set in the /etc/ssh/sshd_config file.\",
-    \"impact\": \"Checks to validate the git user password set in Jenkins credentials cannot be run and pipelines may fail.\",
-    \"remediation\": \"Check the /etc/ssh/sshd_config file and comment out 'PasswordAuthentication no' or set the value to yes.\"
+    "id": "044",
+    "cause": "The platform-fts pod took longer than expected to become ready.",
+    "impact": "This may indicate poor latency between the pod and the IS database system or some other performance issue.",
+    "remediation": "Check the db latency or contact BMC Support if you observe performance related issues."
   },
     {
-    \"id\": \"046\",
-    \"cause\": \"The cacerts file for the named application was not found.\",
-    \"impact\": \"Checks to validate the certificates have not been run and deployment failures or application issues may result.\",
-    \"remediation\": \"Provide the required certificates as detailed in the product documentation.\"
+    "id": "045",
+    "cause": "'PasswordAuthentication no' appears to be set in the /etc/ssh/sshd_config file.",
+    "impact": "Checks to validate the git user password set in Jenkins credentials cannot be run and pipelines may fail.",
+    "remediation": "Check the /etc/ssh/sshd_config file and comment out 'PasswordAuthentication no' or set the value to yes."
   },
+    {
+    "id": "046",
+    "cause": "The cacerts file for the named application was not found.",
+    "impact": "Checks to validate the certificates have not been run and deployment failures or application issues may result.",
+    "remediation": "Provide the required certificates as detailed in the product documentation."
+  },
   {
-    \"id\": \"047\",
-    \"cause\": \"DB_JDBC_URL is set which requires port 6200 on the DB server to be accessible if using RAC.\",
-    \"impact\": \"Platform pods will not start.\",
-    \"remediation\": \"Make sure the ONS port (6200) is open for connections from Kubernetes.\"
+    "id": "047",
+    "cause": "DB_JDBC_URL is set which requires port 6200 on the DB server to be accessible if using RAC.",
+    "impact": "Platform pods will not start.",
+    "remediation": "Make sure the ONS port (6200) is open for connections from Kubernetes."
   },
   {
-    \"id\": \"048\",
-    \"cause\": \"RSSO Service URL is set - this is not usually required.\",
-    \"impact\": \"Application logins may fail if the Service URL is not valid.\",
-    \"remediation\": \"Confirm the Service URL is required and, if so, that it is valid for the environment.\"
+    "id": "048",
+    "cause": "RSSO Service URL is set - this is not usually required.",
+    "impact": "Application logins may fail if the Service URL is not valid.",
+    "remediation": "Confirm the Service URL is required and, if so, that it is valid for the environment."
   },
   {
-    \"id\": \"049\",
-    \"cause\": \"The AR_SERVER_ALIAS value in the HELIX_ONPREM_DEPLOYMENT pipeline differs from the value currently deployed in the cluster.\",
-    \"impact\": \"The upgrade may change application URLs or fail if the alias change is not intended.\",
-    \"remediation\": \"Confirm the pipeline AR_SERVER_ALIAS is correct for the upgrade, or align it with the deployed value before running the pipeline.\"
+    "id": "049",
+    "cause": "The AR_SERVER_ALIAS value in the HELIX_ONPREM_DEPLOYMENT pipeline differs from the value currently deployed in the cluster.",
+    "impact": "The upgrade may change application URLs or fail if the alias change is not intended.",
+    "remediation": "Confirm the pipeline AR_SERVER_ALIAS is correct for the upgrade, or align it with the deployed value before running the pipeline."
   },
   {
-    \"id\": \"050\",
-    \"cause\": \"The PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the HELIX_ONPREM_DEPLOYMENT pipeline differs from the externalIPs on the platform-admin-ext service in the cluster.\",
-    \"impact\": \"The upgrade may reconfigure platform admin access or fail if the external IP change is not intended.\",
-    \"remediation\": \"Confirm the pipeline PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is correct for the upgrade, or align it with the platform-admin-ext service externalIPs before running the pipeline.\"
+    "id": "050",
+    "cause": "The PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the HELIX_ONPREM_DEPLOYMENT pipeline differs from the externalIPs on the platform-admin-ext service in the cluster.",
+    "impact": "The upgrade may reconfigure platform admin access or fail if the external IP change is not intended.",
+    "remediation": "Confirm the pipeline PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is correct for the upgrade, or align it with the platform-admin-ext service externalIPs before running the pipeline."
   },
   {
-    \"id\": \"051\",
-    \"cause\": \"The named pods do not have their expected readiness or liveness probes configured.\",
-    \"impact\": \"Troubleshooting behaviour may be unpredictable as the applicaction state in the pod is unknown.\",
-    \"remediation\": \"Review the pod configuration and status before relying on the reported status of the application.\"
+    "id": "051",
+    "cause": "The named pods do not have their expected readiness or liveness probes configured.",
+    "impact": "Troubleshooting behaviour may be unpredictable as the applicaction state in the pod is unknown.",
+    "remediation": "Review the pod configuration and status before relying on the reported status of the application."
   },
   {
-    \"id\": \"100\",
-    \"cause\": \"The hitt.conf file exists but is missing some required values.\",
-    \"impact\": \"The HITT script cannot run with an incomplete configuration.\",
-    \"remediation\": \"Edit the hitt.conf file and enter the missing values or delete the file and rerun the script to be prompted for them.\"
+    "id": "100",
+    "cause": "The hitt.conf file exists but is missing some required values.",
+    "impact": "The HITT script cannot run with an incomplete configuration.",
+    "remediation": "Edit the hitt.conf file and enter the missing values or delete the file and rerun the script to be prompted for them."
   },
   {
-    \"id\": \"101\",
-    \"cause\": \"The wrong version of a required tool is installed. HITT requires a specific version, or later, of this tool to run.\",
-    \"impact\": \"The HITT script cannot run with the currently installed version.\",
-    \"remediation\": \"Install the required version.\"
+    "id": "101",
+    "cause": "The wrong version of a required tool is installed. HITT requires a specific version, or later, of this tool to run.",
+    "impact": "The HITT script cannot run with the currently installed version.",
+    "remediation": "Install the required version."
   },
   {
-    \"id\": \"102\",
-    \"cause\": \"At least one pod in the namespace is not in a ready state.\",
-    \"impact\": \"Installation may fail if one of the pods that the applications depend on are not ready.\",
-    \"remediation\": \"Check the namespace to understand why the reported pod is not ready. Note there are some cronjob pods which run every few minutes and seeing one of these in a ContainerCreating state is not likely to cause a problem.\"
+    "id": "102",
+    "cause": "At least one pod in the namespace is not in a ready state.",
+    "impact": "Installation may fail if one of the pods that the applications depend on are not ready.",
+    "remediation": "Check the namespace to understand why the reported pod is not ready. Note there are some cronjob pods which run every few minutes and seeing one of these in a ContainerCreating state is not likely to cause a problem."
   },
   {
-    \"id\": \"103\",
-    \"cause\": \"The deployment scripts for this version of Helix Service Management use 'kubectl version --short=true' commands but the the '--short' flag has been removed from the installed version of kubectl.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Install version 1.27 of kubectl on the Deployment Engine.\"
+    "id": "103",
+    "cause": "The deployment scripts for this version of Helix Service Management use 'kubectl version --short=true' commands but the the '--short' flag has been removed from the installed version of kubectl.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Install version 1.27 of kubectl on the Deployment Engine."
   },
   {
-    \"id\": \"104\",
-    \"cause\": \"The product option named in the error message has been selected but it depends on another product which has not been selected.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Review the product documentation and make sure that all dependent options are also selected.\"
+    "id": "104",
+    "cause": "The product option named in the error message has been selected but it depends on another product which has not been selected.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Review the product documentation and make sure that all dependent options are also selected."
   },
   {
-    \"id\": \"105\",
-    \"cause\": \"One of command line tools that HITT requires to run has not been found.\",
-    \"impact\": \"HITT cannot run without this command line tool.\",
-    \"remediation\": \"Install the missing tool or update the hitt.conf file with the full path to the tool it is already installed.\"
+    "id": "105",
+    "cause": "One of command line tools that HITT requires to run has not been found.",
+    "impact": "HITT cannot run without this command line tool.",
+    "remediation": "Install the missing tool or update the hitt.conf file with the full path to the tool it is already installed."
   },
   {
-    \"id\": \"106\",
-    \"cause\": \"One of the Helix namespaces cannot be found in the cluster.\",
-    \"impact\": \"HITT requires valid namespaces names to be able to run.\",
-    \"remediation\": \"Create the namespace or set the correct value in the hitt.conf file.\"
+    "id": "106",
+    "cause": "One of the Helix namespaces cannot be found in the cluster.",
+    "impact": "HITT requires valid namespaces names to be able to run.",
+    "remediation": "Create the namespace or set the correct value in the hitt.conf file."
   },
   {
-    \"id\": \"107\",
-    \"cause\": \"A check used to validate the namespace type failed to find the expected components in the namespace.\",
-    \"impact\": \"HITT requires valid namespaces names to be able to run.\",
-    \"remediation\": \"Update the hitt.conf file with the correct name for the namespace.\"
+    "id": "107",
+    "cause": "A check used to validate the namespace type failed to find the expected components in the namespace.",
+    "impact": "HITT requires valid namespaces names to be able to run.",
+    "remediation": "Update the hitt.conf file with the correct name for the namespace."
   },
   {
-    \"id\": \"108\",
-    \"cause\": \"The HELIX_GENERATE_CONFIG pipeline must have been run to create the image registry secret specified in the IMAGESECRET_NAME value.\",
-    \"impact\": \"Some checks will not be run and HITT results will be imcomplete.\",
-    \"remediation\": \"Populate the values in the HELIX_ONPREM_DEPLOYMENT pipeline and build it with the HELIX_GENERATE_CONFIG option selected.\"
+    "id": "108",
+    "cause": "The HELIX_GENERATE_CONFIG pipeline must have been run to create the image registry secret specified in the IMAGESECRET_NAME value.",
+    "impact": "Some checks will not be run and HITT results will be imcomplete.",
+    "remediation": "Populate the values in the HELIX_ONPREM_DEPLOYMENT pipeline and build it with the HELIX_GENERATE_CONFIG option selected."
   },
   {
-    \"id\": \"109\",
-    \"cause\": \"An unknown version of the Helix Service Management applications has been found.\",
-    \"impact\": \"HITT is unable to run as it does not know which checks are valid for this version.\",
-    \"remediation\": \"Check the HITT website for an update that supports this version.\"
+    "id": "109",
+    "cause": "An unknown version of the Helix Service Management applications has been found.",
+    "impact": "HITT is unable to run as it does not know which checks are valid for this version.",
+    "remediation": "Check the HITT website for an update that supports this version."
   },
   {
-    \"id\": \"110\",
-    \"cause\": \"The value of the named infra.config setting in the Helix Platform is the same as the alias that will be used for the Helix Service Management MidTier.\",
-    \"impact\": \"Installation will complete but the MidTier will not be usable due to the conflict.\",
-    \"remediation\": \"Either redeploy the Helix Platform with a different value or change one/both of the CUSTOMER_SERVICE and ENVIRONMENT values to make the MidTier alias different to the LB_HOST.\"
+    "id": "110",
+    "cause": "The value of the named infra.config setting in the Helix Platform is the same as the alias that will be used for the Helix Service Management MidTier.",
+    "impact": "Installation will complete but the MidTier will not be usable due to the conflict.",
+    "remediation": "Either redeploy the Helix Platform with a different value or change one/both of the CUSTOMER_SERVICE and ENVIRONMENT values to make the MidTier alias different to the LB_HOST."
   },
   {
-    \"id\": \"111\",
-    \"cause\": \"This version of the Helix Platform uses a new credentials service which must be installed, or the use of disabled in the TMS deployment, before the HELIX_ITSM_INTEROPS pipeline can be run.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail due to the missing/misconfigured service.\",
-    \"remediation\": \"See https://community.bmc.com/s/article/Helix-ITSM-OnPrem-HELIX-ITSM-INTEROPS-pipeline-fails-with-INTERNAL-SERVER-ERROR-when-using-Helix-Platform-24-2\"
+    "id": "111",
+    "cause": "This version of the Helix Platform uses a new credentials service which must be installed, or the use of disabled in the TMS deployment, before the HELIX_ITSM_INTEROPS pipeline can be run.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail due to the missing/misconfigured service.",
+    "remediation": "See https://community.bmc.com/s/article/Helix-ITSM-OnPrem-HELIX-ITSM-INTEROPS-pipeline-fails-with-INTERNAL-SERVER-ERROR-when-using-Helix-Platform-24-2"
   },
   {
-    \"id\": \"112\",
-    \"cause\": \"The RSSO system did not return the expected admin token.\",
-    \"impact\": \"HITT is unable to continue without the RSSO admin token which is needed to read values from the Helix Platform.\",
-    \"remediation\": \"Resolve the issue reported in the message and rerun the HITT script.\"
+    "id": "112",
+    "cause": "The RSSO system did not return the expected admin token.",
+    "impact": "HITT is unable to continue without the RSSO admin token which is needed to read values from the Helix Platform.",
+    "remediation": "Resolve the issue reported in the message and rerun the HITT script."
   },
   {
-    \"id\": \"113\",
-    \"cause\": \"The Helix Logging Elasticsearch system did not return the expected 'green' response to a health check query.\",
-    \"impact\": \"Helix Logging may not be functional but this will not prevent the installation of Helix Service Management.\",
-    \"remediation\": \"Helix Service Management may be installed but the problem should be investigated.\"
+    "id": "113",
+    "cause": "The Helix Logging Elasticsearch system did not return the expected 'green' response to a health check query.",
+    "impact": "Helix Logging may not be functional but this will not prevent the installation of Helix Service Management.",
+    "remediation": "Helix Service Management may be installed but the problem should be investigated."
   },
   {
-    \"id\": \"114\",
-    \"cause\": \"No valid tenants were found in the Helix Platform.\",
-    \"impact\": \"HITT cannot continue without the tenant details.\",
-    \"remediation\": \"Review the Helix Platform deployment.log for issues and use the tctl command to verify the tenant status.\"
+    "id": "114",
+    "cause": "No valid tenants were found in the Helix Platform.",
+    "impact": "HITT cannot continue without the tenant details.",
+    "remediation": "Review the Helix Platform deployment.log for issues and use the tctl command to verify the tenant status."
   },
   {
-    \"id\": \"115\",
-    \"cause\": \"The sealtctl Kubernetes job used to read the tenant details from the Helix Platform failed to run.\",
-    \"impact\": \"HITT cannot continue without the tenant details which are needed for later checks.\",
-    \"remediation\": \"Review the Helix Platform pods for issues and use the tctl command to verify the tenant status.\"
+    "id": "115",
+    "cause": "The sealtctl Kubernetes job used to read the tenant details from the Helix Platform failed to run.",
+    "impact": "HITT cannot continue without the tenant details which are needed for later checks.",
+    "remediation": "Review the Helix Platform pods for issues and use the tctl command to verify the tenant status."
   },
   {
-    \"id\": \"116\",
-    \"cause\": \"The expected realm name was not found under the SAAS_TENANT in SSO.\",
-    \"impact\": \"HITT cannot continue without a valid realm to use for checks.\",
-    \"remediation\": \"Make sure that the realm was created for the SAAS_TENANT and that the IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values in the hitt.conf file are correct.\"
+    "id": "116",
+    "cause": "The expected realm name was not found under the SAAS_TENANT in SSO.",
+    "impact": "HITT cannot continue without a valid realm to use for checks.",
+    "remediation": "Make sure that the realm was created for the SAAS_TENANT and that the IS_CUSTOMER_SERVICE and IS_ENVIRONMENT values in the hitt.conf file are correct."
   },
   {
-    \"id\": \"117\",
-    \"cause\": \"The Helix Service Management realm was found under the Helix Platform tenant in SSO when it should be configured for the SAAS_TENANT.\",
-    \"impact\": \"Helix Service Management logins will fail.\",
-    \"remediation\": \"Delete the realm under the Helix Platform tenant and create it for the SAAS_TENANT.\"
+    "id": "117",
+    "cause": "The Helix Service Management realm was found under the Helix Platform tenant in SSO when it should be configured for the SAAS_TENANT.",
+    "impact": "Helix Service Management logins will fail.",
+    "remediation": "Delete the realm under the Helix Platform tenant and create it for the SAAS_TENANT."
   },
   {
-    \"id\": \"118\",
-    \"cause\": \"The arHost value for the realm is not the expected value of platform-user-ext.HELIX-IS-NAMESPACE.\",
-    \"impact\": \"Helix Service Management logins will fail.\",
-    \"remediation\": \"Correct the arHost value to the expected value.\"
+    "id": "118",
+    "cause": "The arHost value for the realm is not the expected value of platform-user-ext.HELIX-IS-NAMESPACE.",
+    "impact": "Helix Service Management logins will fail.",
+    "remediation": "Correct the arHost value to the expected value."
   },
   {
-    \"id\": \"119\",
-    \"cause\": \"The arPort value for the realm is not the required value.\",
-    \"impact\": \"Helix Service Management logins will fail.\",
-    \"remediation\": \"Correct the arPort value in the realm Authentication page to 46262.\"
+    "id": "119",
+    "cause": "The arPort value for the realm is not the required value.",
+    "impact": "Helix Service Management logins will fail.",
+    "remediation": "Correct the arPort value in the realm Authentication page to 46262."
   },
   {
-    \"id\": \"120\",
-    \"cause\": \"One of the Helix Service Management aliases is missing from the Application Domains list in the realm.\",
-    \"impact\": \"The missing service will not be usable.\",
-    \"remediation\": \"Add the missing alias to the Application Domains list in the realm.\"
+    "id": "120",
+    "cause": "One of the Helix Service Management aliases is missing from the Application Domains list in the realm.",
+    "impact": "The missing service will not be usable.",
+    "remediation": "Add the missing alias to the Application Domains list in the realm."
   },
   {
-    \"id\": \"121\",
-    \"cause\": \"Jenkins credentials objects have a scope setting which should be set to 'GLOBAL' but this object has a different value.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins browse to Manage Jenkins -> Credentials, select the object named in the error message -> Update, and change the Scope to 'Global' via the drop down menu.\"
+    "id": "121",
+    "cause": "Jenkins credentials objects have a scope setting which should be set to 'GLOBAL' but this object has a different value.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins browse to Manage Jenkins -> Credentials, select the object named in the error message -> Update, and change the Scope to 'Global' via the drop down menu."
   },
   {
-    \"id\": \"122\",
-    \"cause\": \"A DNS entry for the specified alias was not found or the use of the 'host' command to validate the alias failed.\",
-    \"impact\": \"Installation may fail and the application accessed via the alias may not be accessible.\",
-    \"remediation\": \"Add the missing alias to DNS if needed or check the output of the command 'host alias' to see what the error was.\"
+    "id": "122",
+    "cause": "A DNS entry for the specified alias was not found or the use of the 'host' command to validate the alias failed.",
+    "impact": "Installation may fail and the application accessed via the alias may not be accessible.",
+    "remediation": "Add the missing alias to DNS if needed or check the output of the command 'host alias' to see what the error was."
   },
   {
-    \"id\": \"123\",
-    \"cause\": \"The sealtcl Kubernetes job used to confirm that the required ARSERVICES are installed in the Helix Platform failed to return the expected response.\",
-    \"impact\": \"If the Helix Platform was installed with ARSERVICES=no the HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"If the Helix Platform was installed with ARSERVICES=yes in the deployment.config file this error can be ignored, otherwise you should update the Helix Platform to install them.\"
+    "id": "123",
+    "cause": "The sealtcl Kubernetes job used to confirm that the required ARSERVICES are installed in the Helix Platform failed to return the expected response.",
+    "impact": "If the Helix Platform was installed with ARSERVICES=no the HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "If the Helix Platform was installed with ARSERVICES=yes in the deployment.config file this error can be ignored, otherwise you should update the Helix Platform to install them."
   },
   {
-    \"id\": \"124\",
-    \"cause\": \"The required ITSM services are not installed in the Helix Platform, likely because of an invalid setting in the deployment.config.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Rerun the Helix Platform deployment-manager.sh script with the setting named in the error set to yes to install the missing services.\"
+    "id": "124",
+    "cause": "The required ITSM services are not installed in the Helix Platform, likely because of an invalid setting in the deployment.config.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Rerun the Helix Platform deployment-manager.sh script with the setting named in the error set to yes to install the missing services."
   },
   {
-    \"id\": \"125\",
-    \"cause\": \"The Helix Platform service used provide FTS indexing has not returned the expected response to health check.\",
-    \"impact\": \"The Helix Service Management platform-* pods will not be able to start and installation will fail or the applications will be unavailable.\",
-    \"remediation\": \"Check the status of the pods providing the service and address any issues.\"
+    "id": "125",
+    "cause": "The Helix Platform service used provide FTS indexing has not returned the expected response to health check.",
+    "impact": "The Helix Service Management platform-* pods will not be able to start and installation will fail or the applications will be unavailable.",
+    "remediation": "Check the status of the pods providing the service and address any issues."
   },
   {
-    \"id\": \"126\",
-    \"cause\": \"A running Jenkins server was not found at the URL shown.\",
-    \"impact\": \"Jenkins data and configuration tests cannot be run.\",
-    \"remediation\": \"Confirm that Jenkins is running and that the related settings in the hitt.conf file are correct.\"
+    "id": "126",
+    "cause": "A running Jenkins server was not found at the URL shown.",
+    "impact": "Jenkins data and configuration tests cannot be run.",
+    "remediation": "Confirm that Jenkins is running and that the related settings in the hitt.conf file are correct."
   },
   {
-    \"id\": \"127\",
-    \"cause\": \"The Jenkins server requires authentication but HITT was not able to login using the credentials in the hitt.conf file.\",
-    \"impact\": \"Jenkins data and configuration tests cannot be run.\",
-    \"remediation\": \"Review the Jenkins settings in the hitt.conf file and update them if needed.  Remember to enclose the password in double quotes to avoid problems with special characters.\"
+    "id": "127",
+    "cause": "The Jenkins server requires authentication but HITT was not able to login using the credentials in the hitt.conf file.",
+    "impact": "Jenkins data and configuration tests cannot be run.",
+    "remediation": "Review the Jenkins settings in the hitt.conf file and update them if needed.  Remember to enclose the password in double quotes to avoid problems with special characters."
   },
   {
-    \"id\": \"128\",
-    \"cause\": \"One or both of the CUSTOMER_SERVICE/ENVIRONMENT values in the HELIX_ONPREM_DEPLOYMENT pipeline are blank.\",
-    \"impact\": \"HITT cannot continue without the missing values.\",
-    \"remediation\": \"Rebuild the HELIX_ONPREM_DEPLOYMENT pipeline, enter the missing values, then rerun HITT.\"
+    "id": "128",
+    "cause": "One or both of the CUSTOMER_SERVICE/ENVIRONMENT values in the HELIX_ONPREM_DEPLOYMENT pipeline are blank.",
+    "impact": "HITT cannot continue without the missing values.",
+    "remediation": "Rebuild the HELIX_ONPREM_DEPLOYMENT pipeline, enter the missing values, then rerun HITT."
   },
   {
-    \"id\": \"129\",
-    \"cause\": \"The git command to clone the CUSTOMER_CONFIGS repository failed to run as expected.\",
-    \"impact\": \"Some checks which validate data from the CUSTOMER_CONFIGS repo will not be run.\",
-    \"remediation\": \"Run the 'git clone path_to_customer_configs_repo' command manually and resolve any problems reported before rerunning HITT.\"
+    "id": "129",
+    "cause": "The git command to clone the CUSTOMER_CONFIGS repository failed to run as expected.",
+    "impact": "Some checks which validate data from the CUSTOMER_CONFIGS repo will not be run.",
+    "remediation": "Run the 'git clone path_to_customer_configs_repo' command manually and resolve any problems reported before rerunning HITT."
   },
   {
-    \"id\": \"130\",
-    \"cause\": \"The input configuration file created by the HELIX_GENERATE_CONFIG pipeline was not found in the CUSTOMER_CONFIGS git repository.\",
-    \"impact\": \"Some later checks to validate values in the input configuration file will not be run.\",
-    \"remediation\": \"Ensure that the HELIX_GENERATE_CONFIG pipeline has been run to create the input configuration file.\"
+    "id": "130",
+    "cause": "The input configuration file created by the HELIX_GENERATE_CONFIG pipeline was not found in the CUSTOMER_CONFIGS git repository.",
+    "impact": "Some later checks to validate values in the input configuration file will not be run.",
+    "remediation": "Ensure that the HELIX_GENERATE_CONFIG pipeline has been run to create the input configuration file."
   },
   {
-    \"id\": \"131\",
-    \"cause\": \"A required value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank.\",
-    \"impact\": \"Helix Service Management deployment may fail.\",
-    \"remediation\": \"Rebuild the HELIX_ONPREM_DEPLOYMENT pipeline, enter the missing values, then rerun HITT.\"
+    "id": "131",
+    "cause": "A required value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank.",
+    "impact": "Helix Service Management deployment may fail.",
+    "remediation": "Rebuild the HELIX_ONPREM_DEPLOYMENT pipeline, enter the missing values, then rerun HITT."
   },
   {
-    \"id\": \"132\",
-    \"cause\": \"The TENANT_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT pipeline is not the same as the Tenant value in the SSO realm.\",
-    \"impact\": \"Helix Service Management logins will fail.\",
-    \"remediation\": \"Correct the TENANT_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT so that it matches the Tenant value in the SSO realm.\"
+    "id": "132",
+    "cause": "The TENANT_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT pipeline is not the same as the Tenant value in the SSO realm.",
+    "impact": "Helix Service Management logins will fail.",
+    "remediation": "Correct the TENANT_DOMAIN value in the HELIX_ONPREM_DEPLOYMENT so that it matches the Tenant value in the SSO realm."
   },
   {
-    \"id\": \"133\",
-    \"cause\": \"The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match that used by the Helix Platform.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Correct the RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+    "id": "133",
+    "cause": "The RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match that used by the Helix Platform.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Correct the RSSO_URL value in the HELIX_ONPREM_DEPLOYMENT pipeline."
   },
   {
-    \"id\": \"134\",
-    \"cause\": \"The AR_SERVER_APP_SERVICE_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Shorten the value to no more than maximum.\"
+    "id": "134",
+    "cause": "The AR_SERVER_APP_SERVICE_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Shorten the value to no more than maximum."
   },
   {
-    \"id\": \"135\",
-    \"cause\": \"The password value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.  The maximum length is 20 characters.\",
-    \"impact\": \"Helix Service Management deployment may fail.\",
-    \"remediation\": \"Shorten the value to no more than 20 characters.\"
+    "id": "135",
+    "cause": "The password value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.  The maximum length is 20 characters.",
+    "impact": "Helix Service Management deployment may fail.",
+    "remediation": "Shorten the value to no more than 20 characters."
   },
   {
-    \"id\": \"136\",
-    \"cause\": \"The AR_SERVER_MIDTIER_SERVICE_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.\",
-    \"impact\": \"Helix Service Management deployment may fail.\",
-    \"remediation\": \"Shorten the value to no more than 20 characters.\"
+    "id": "136",
+    "cause": "The AR_SERVER_MIDTIER_SERVICE_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.",
+    "impact": "Helix Service Management deployment may fail.",
+    "remediation": "Shorten the value to no more than 20 characters."
   },
   {
-    \"id\": \"137\",
-    \"cause\": \"The value of the named parameter in the HELIX_ONPREM_DEPLOYMENT pipeline is not a context in the kubeconfig file.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Update the value to the correct context. Use 'kubectl config get-contexts' to list valid options.\"
+    "id": "137",
+    "cause": "The value of the named parameter in the HELIX_ONPREM_DEPLOYMENT pipeline is not a context in the kubeconfig file.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Update the value to the correct context. Use 'kubectl config get-contexts' to list valid options."
   },
   {
-    \"id\": \"138\",
-    \"cause\": \"The IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match the IS_NAMESPACE set in the hitt.conf file.\",
-    \"impact\": \"Some HITT checks may be invalid or fail.\",
-    \"remediation\": \"Set the correct IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline or update the hitt.conf file.\"
+    "id": "138",
+    "cause": "The IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match the IS_NAMESPACE set in the hitt.conf file.",
+    "impact": "Some HITT checks may be invalid or fail.",
+    "remediation": "Set the correct IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline or update the hitt.conf file."
   },
   {
-    \"id\": \"139\",
-    \"cause\": \"The IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Use a namespace name that is no longer than the value in the message.\"
+    "id": "139",
+    "cause": "The IS_NAMESPACE value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Use a namespace name that is no longer than the value in the message."
   },
   {
-    \"id\": \"140\",
-    \"cause\": \"The CUSTOMER_SERVICE and/or ENVIRONMENT values in the HELIX_ONPREM_DEPLOYMENT pipeline do not match those set in the hitt.conf file.\",
-    \"impact\": \"Some HITT checks may be invalid or fail.\",
-    \"remediation\": \"Set the correct values in the HELIX_ONPREM_DEPLOYMENT pipeline, or update the hitt.conf file, and rerun HITT.\"
+    "id": "140",
+    "cause": "The CUSTOMER_SERVICE and/or ENVIRONMENT values in the HELIX_ONPREM_DEPLOYMENT pipeline do not match those set in the hitt.conf file.",
+    "impact": "Some HITT checks may be invalid or fail.",
+    "remediation": "Set the correct values in the HELIX_ONPREM_DEPLOYMENT pipeline, or update the hitt.conf file, and rerun HITT."
   },
   {
-    \"id\": \"141\",
-    \"cause\": \"The INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank or is not a valid ingressclass in the cluster.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Set the correct INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+    "id": "141",
+    "cause": "The INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank or is not a valid ingressclass in the cluster.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Set the correct INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline."
   },
   {
-    \"id\": \"142\",
-    \"cause\": \"The value of the named parameter in the HELIX_ONPREM_DEPLOYMENT pipeline is different to the DOMAIN used for the Helix Platform.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Helix Service Management and Helix Platform are expected to use the same domain. Correct the value in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+    "id": "142",
+    "cause": "The value of the named parameter in the HELIX_ONPREM_DEPLOYMENT pipeline is different to the DOMAIN used for the Helix Platform.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Helix Service Management and Helix Platform are expected to use the same domain. Correct the value in the HELIX_ONPREM_DEPLOYMENT pipeline."
   },
   {
-    \"id\": \"143\",
-    \"cause\": \"For onprem deployments the only valid option for the INPUT_CONFIG_METHOD in the HELIX_ONPREM_DEPLOYMENT pipeline is 'Generate_Input_File'.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Set INPUT_CONFIG_METHOD in the HELIX_ONPREM_DEPLOYMENT pipeline to 'Generate_Input_File'.\"
+    "id": "143",
+    "cause": "For onprem deployments the only valid option for the INPUT_CONFIG_METHOD in the HELIX_ONPREM_DEPLOYMENT pipeline is 'Generate_Input_File'.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Set INPUT_CONFIG_METHOD in the HELIX_ONPREM_DEPLOYMENT pipeline to 'Generate_Input_File'."
   },
   {
-    \"id\": \"144\",
-    \"cause\": \"The HELM_NODE value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank but should be set to a valid node name.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Set the HELM_NODE to a valid value as detailed in the BMC documentation.\"
+    "id": "144",
+    "cause": "The HELM_NODE value in the HELIX_ONPREM_DEPLOYMENT pipeline is blank but should be set to a valid node name.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Set the HELM_NODE to a valid value as detailed in the BMC documentation."
   },
   {
-    \"id\": \"145\",
-    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT pipeline value for HELM_NODE is not a valid node in Jenkins.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Set the HELM_NODE to a valid value as detailed in the BMC documentation.\"
+    "id": "145",
+    "cause": "The HELIX_ONPREM_DEPLOYMENT pipeline value for HELM_NODE is not a valid node in Jenkins.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Set the HELM_NODE to a valid value as detailed in the BMC documentation."
   },
   {
-    \"id\": \"146\",
-    \"cause\": \"For onprem deployment the only valid option for the REGISTRY_TYPE in the HELIX_ONPREM_DEPLOYMENT pipeline is 'DTR'.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Set the REGISTRY_TYPE in the HELIX_ONPREM_DEPLOYMENT pipeline to 'DTR'.\"
+    "id": "146",
+    "cause": "For onprem deployment the only valid option for the REGISTRY_TYPE in the HELIX_ONPREM_DEPLOYMENT pipeline is 'DTR'.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Set the REGISTRY_TYPE in the HELIX_ONPREM_DEPLOYMENT pipeline to 'DTR'."
   },
   {
-    \"id\": \"147\",
-    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT pipelines deploy some containers in the Helix Platform namespace which requires that the HARBOR_REGISTRY_HOST and IMAGE_REGISTRY_HOST are the same.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Use the same value for the HARBOR_REGISTRY_HOST in the HELIX_ONPREM_DEPLOYMENT pipeline as the Helix Platform IMAGE_REGISTRY_HOST.\"
+    "id": "147",
+    "cause": "The HELIX_ONPREM_DEPLOYMENT pipelines deploy some containers in the Helix Platform namespace which requires that the HARBOR_REGISTRY_HOST and IMAGE_REGISTRY_HOST are the same.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Use the same value for the HARBOR_REGISTRY_HOST in the HELIX_ONPREM_DEPLOYMENT pipeline as the Helix Platform IMAGE_REGISTRY_HOST."
   },
   {
-    \"id\": \"148\",
-    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT pipeline value for the IMAGE_REGISTRY_USERNAME is different to the value used for the Helix Platform which will cause problems with the HELIX_ITSM_INTEROPS pipeline.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Use the same value for the IMAGE_REGISTRY_USERNAME in the HELIX_ONPREM_DEPLOYMENT pipeline as set in the Helix Platform infra.config file.\"
+    "id": "148",
+    "cause": "The HELIX_ONPREM_DEPLOYMENT pipeline value for the IMAGE_REGISTRY_USERNAME is different to the value used for the Helix Platform which will cause problems with the HELIX_ITSM_INTEROPS pipeline.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Use the same value for the IMAGE_REGISTRY_USERNAME in the HELIX_ONPREM_DEPLOYMENT pipeline as set in the Helix Platform infra.config file."
   },
   {
-    \"id\": \"149\",
-    \"cause\": \"The DB_SSL_ENABLED option in the HELIX_ONPREM_DEPLOYMENT pipeline is selected but this is not currently supported for onprem use.\",
-    \"impact\": \"Helix Service Management deployment may fail.\",
-    \"remediation\": \"Deselect the DB_SSL_ENABLED option in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+    "id": "149",
+    "cause": "The DB_SSL_ENABLED option in the HELIX_ONPREM_DEPLOYMENT pipeline is selected but this is not currently supported for onprem use.",
+    "impact": "Helix Service Management deployment may fail.",
+    "remediation": "Deselect the DB_SSL_ENABLED option in the HELIX_ONPREM_DEPLOYMENT pipeline."
   },
   {
-    \"id\": \"150\",
-    \"cause\": \"The named global pipeline library should have a 'Default version' of 'master' but it is set to something else.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins browse to Manage Jenkins -> System, find the pipeline library and change the 'Default version' to 'master'.\"
+    "id": "150",
+    "cause": "The named global pipeline library should have a 'Default version' of 'master' but it is set to something else.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins browse to Manage Jenkins -> System, find the pipeline library and change the 'Default version' to 'master'."
   },
   {
-    \"id\": \"151\",
-    \"cause\": \"The LOGS_ELASTICSEARCH_TLS option in the HELIX_ONPREM_DEPLOYMENT pipeline is not selected but this is required.\",
-    \"impact\": \"Logs will not be sent to the Helix Logging system.\",
-    \"remediation\": \"Select the LOGS_ELASTICSEARCH_TLS option in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+    "id": "151",
+    "cause": "The LOGS_ELASTICSEARCH_TLS option in the HELIX_ONPREM_DEPLOYMENT pipeline is not selected but this is required.",
+    "impact": "Logs will not be sent to the Helix Logging system.",
+    "remediation": "Select the LOGS_ELASTICSEARCH_TLS option in the HELIX_ONPREM_DEPLOYMENT pipeline."
   },
   {
-    \"id\": \"152\",
-    \"cause\": \"The LOGS_ELASTICSEARCH_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline must match the KIBANA_PASSWORD set in the Helix Platform secrets.txt.\",
-    \"impact\": \"Logs will not be sent to the Helix Logging system.\",
-    \"remediation\": \"Set the LOGS_ELASTICSEARCH_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline to the same value as the KIBANA_PASSWORD set in the Helix Platform secrets.txt and efk-elasticsearch-kibana secret.\"
+    "id": "152",
+    "cause": "The LOGS_ELASTICSEARCH_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline must match the KIBANA_PASSWORD set in the Helix Platform secrets.txt.",
+    "impact": "Logs will not be sent to the Helix Logging system.",
+    "remediation": "Set the LOGS_ELASTICSEARCH_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline to the same value as the KIBANA_PASSWORD set in the Helix Platform secrets.txt and efk-elasticsearch-kibana secret."
   },
   {
-    \"id\": \"153\",
-    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT pipeline value for the IMAGE_REGISTRY_PASSWORD is different to the value used for the Helix Platform which will cause problems with the HELIX_ITSM_INTEROPS pipeline.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Use the same value for the IMAGE_REGISTRY_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline as set in the Helix Platform secrets.txt file.\"
+    "id": "153",
+    "cause": "The HELIX_ONPREM_DEPLOYMENT pipeline value for the IMAGE_REGISTRY_PASSWORD is different to the value used for the Helix Platform which will cause problems with the HELIX_ITSM_INTEROPS pipeline.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Use the same value for the IMAGE_REGISTRY_PASSWORD in the HELIX_ONPREM_DEPLOYMENT pipeline as set in the Helix Platform secrets.txt file."
   },
   {
-    \"id\": \"154\",
-    \"cause\": \"The VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME in the HELIX_ONPREM_DEPLOYMENT pipeline are the same or blank when they must be set to different values.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Set VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME to different values.\"
+    "id": "154",
+    "cause": "The VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME in the HELIX_ONPREM_DEPLOYMENT pipeline are the same or blank when they must be set to different values.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Set VC_RKM_USER_NAME and VC_PROXY_USER_LOGIN_NAME to different values."
   },
   {
-    \"id\": \"155\",
-    \"cause\": \"The PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the HELIX_ONPREM_DEPLOYMENT pipeline should be blank, or one or more, comma separated IP addresses enclosed in square brackets.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Set the PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value to the correct format - for example [192.1.2.100]\"
+    "id": "155",
+    "cause": "The PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the HELIX_ONPREM_DEPLOYMENT pipeline should be blank, or one or more, comma separated IP addresses enclosed in square brackets.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Set the PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value to the correct format - for example [192.1.2.100]"
   },
   {
-    \"id\": \"156\",
-    \"cause\": \"The RSSO_ADMIN_USER value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match the value found in the Helix Platform rsso-admin-tas secret.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Set value of RSSO_ADMIN_USER in the HELIX_ONPREM_DEPLOYMENT pipeline to that used in the Helix Platform.\"
+    "id": "156",
+    "cause": "The RSSO_ADMIN_USER value in the HELIX_ONPREM_DEPLOYMENT pipeline does not match the value found in the Helix Platform rsso-admin-tas secret.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Set value of RSSO_ADMIN_USER in the HELIX_ONPREM_DEPLOYMENT pipeline to that used in the Helix Platform."
   },
   {
-    \"id\": \"157\",
-    \"cause\": \"The value of HELIX_PLATFORM_NAMESPACE in the HELIX_ONPREM_DEPLOYMENT pipeline is not the name of the Helix Platform namespace.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Correct the value of HELIX_PLATFORM_NAMESPACE and set it to the name of the Helix Platform namespace.\"
+    "id": "157",
+    "cause": "The value of HELIX_PLATFORM_NAMESPACE in the HELIX_ONPREM_DEPLOYMENT pipeline is not the name of the Helix Platform namespace.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Correct the value of HELIX_PLATFORM_NAMESPACE and set it to the name of the Helix Platform namespace."
   },
   {
-    \"id\": \"158\",
-    \"cause\": \"The HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline must be the same as the TENANT_NAME/COMPANY_NAME in the Helix Platform infra.config file.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Change the HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline to that of the Helix Platform TENANT_NAME/COMPANY_NAME.\"
+    "id": "158",
+    "cause": "The HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline must be the same as the TENANT_NAME/COMPANY_NAME in the Helix Platform infra.config file.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Change the HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline to that of the Helix Platform TENANT_NAME/COMPANY_NAME."
   },
   {
-    \"id\": \"159\",
-    \"cause\": \"The named cacerts object required by the Helix applications is missing.\",
-    \"impact\": \"Helix applications will be inaccessible.\",
-    \"remediation\": \"Recreate the cacerts object using the process detailed in the product documentation.\"
+    "id": "159",
+    "cause": "The named cacerts object required by the Helix applications is missing.",
+    "impact": "Helix applications will be inaccessible.",
+    "remediation": "Recreate the cacerts object using the process detailed in the product documentation."
   },
   {
-    \"id\": \"160\",
-    \"cause\": \"The named cacerts object does not contain the Java keystore in a file named 'cacerts'.\",
-    \"impact\": \"Helix applications will be inaccessible.\",
-    \"remediation\": \"Recreate the cacerts object using the process detailed in the product documentation and ensure that the Java keystore file is named 'cacerts'.\"
+    "id": "160",
+    "cause": "The named cacerts object does not contain the Java keystore in a file named 'cacerts'.",
+    "impact": "Helix applications will be inaccessible.",
+    "remediation": "Recreate the cacerts object using the process detailed in the product documentation and ensure that the Java keystore file is named 'cacerts'."
   },
   {
-    \"id\": \"161\",
-    \"cause\": \"The cacerts file in the named object must be a Java keystore and not any other type of certificate file.\",
-    \"impact\": \"Helix applications will be inaccessible.\",
-    \"remediation\": \"Recreate the cacerts object using the process detailed in the product documentation and ensure that the cacerts file is a Java keystore.\"
+    "id": "161",
+    "cause": "The cacerts file in the named object must be a Java keystore and not any other type of certificate file.",
+    "impact": "Helix applications will be inaccessible.",
+    "remediation": "Recreate the cacerts object using the process detailed in the product documentation and ensure that the cacerts file is a Java keystore."
   },
   {
-    \"id\": \"162\",
-    \"cause\": \"The cacerts file in the cacerts secret in the Helix Service Management namespace must contain the certificate used to the access the FTS Elasticsearch system.\",
-    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
-    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation.\"
+    "id": "162",
+    "cause": "The cacerts file in the cacerts secret in the Helix Service Management namespace must contain the certificate used to the access the FTS Elasticsearch system.",
+    "impact": "The Helix Service Management platform pods will not be able to start and the applications will not be accessible.",
+    "remediation": "Recreate the cacerts secret using the process detailed in the product documentation."
   },
   {
-    \"id\": \"163\",
-    \"cause\": \"The cacerts file in the cacerts secret in the Helix Service Management namespace must contain the certificate chain that allows access to the Helix Platform applications such as RSSO.\",
-    \"impact\": \"The Helix Service Management applications will not be accessible.\",
-    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation and ensure the Helix Platform certificate chain is included.\"
+    "id": "163",
+    "cause": "The cacerts file in the cacerts secret in the Helix Service Management namespace must contain the certificate chain that allows access to the Helix Platform applications such as RSSO.",
+    "impact": "The Helix Service Management applications will not be accessible.",
+    "remediation": "Recreate the cacerts secret using the process detailed in the product documentation and ensure the Helix Platform certificate chain is included."
   },
   {
-    \"id\": \"164\",
-    \"cause\": \"The certificate chain required to validate the connection to the named alias are is present in the cacerts file used for the Helix Service Management deployment.\",
-    \"impact\": \"The Helix Service Management applications accessed via the alias will not be accessible.\",
-    \"remediation\": \"Recreate the cacerts secret using the process detailed in the product documentation and ensure the required certificate chain is included.\"
+    "id": "164",
+    "cause": "The certificate chain required to validate the connection to the named alias are is present in the cacerts file used for the Helix Service Management deployment.",
+    "impact": "The Helix Service Management applications accessed via the alias will not be accessible.",
+    "remediation": "Recreate the cacerts secret using the process detailed in the product documentation and ensure the required certificate chain is included."
   },
   {
-    \"id\": \"165\",
-    \"cause\": \"The IP address entered as the FTS_ELASTICSEARCH_HOSTNAME has not been found as an externalIP for any service in the Helix Platform namespace.\",
-    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
-    \"remediation\": \"Verify that the correct IP address has been used and that the service is exposed, or use the recommended service.namespace format for the value.\"
+    "id": "165",
+    "cause": "The IP address entered as the FTS_ELASTICSEARCH_HOSTNAME has not been found as an externalIP for any service in the Helix Platform namespace.",
+    "impact": "The Helix Service Management platform pods will not be able to start and the applications will not be accessible.",
+    "remediation": "Verify that the correct IP address has been used and that the service is exposed, or use the recommended service.namespace format for the value."
   },
   {
-    \"id\": \"166\",
-    \"cause\": \"The IP address entered for the FTS_ELASTICSEARCH_HOSTNAME does not appear to connect to the expected Elasticsearch system in the Helix Platform.\",
-    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
-    \"remediation\": \"Verify that the correct IP address has been entered or use the recommended service.namespace format for the value.\"
+    "id": "166",
+    "cause": "The IP address entered for the FTS_ELASTICSEARCH_HOSTNAME does not appear to connect to the expected Elasticsearch system in the Helix Platform.",
+    "impact": "The Helix Service Management platform pods will not be able to start and the applications will not be accessible.",
+    "remediation": "Verify that the correct IP address has been entered or use the recommended service.namespace format for the value."
   },
   {
-    \"id\": \"167\",
-    \"cause\": \"The value entered for the FTS_ELASTICSEARCH_HOSTNAME does not appear to connect to the expected Elasticsearch system.\",
-    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
-    \"remediation\": \"Verify that the correct IP address has been entered or use the recommended service.namespace format for the value.\"
+    "id": "167",
+    "cause": "The value entered for the FTS_ELASTICSEARCH_HOSTNAME does not appear to connect to the expected Elasticsearch system.",
+    "impact": "The Helix Service Management platform pods will not be able to start and the applications will not be accessible.",
+    "remediation": "Verify that the correct IP address has been entered or use the recommended service.namespace format for the value."
   },
   {
-    \"id\": \"168\",
-    \"cause\": \"The value entered for the FTS_ELASTICSEARCH_HOSTNAME is not the expected service.namespace indicated in the message.\",
-    \"impact\": \"The Helix Service Management platform pods will not be able to start and the applications will not be accessible.\",
-    \"remediation\": \"Update the FTS_ELASTICSEARCH_HOSTNAME value to the correct value.\"
+    "id": "168",
+    "cause": "The value entered for the FTS_ELASTICSEARCH_HOSTNAME is not the expected service.namespace indicated in the message.",
+    "impact": "The Helix Service Management platform pods will not be able to start and the applications will not be accessible.",
+    "remediation": "Update the FTS_ELASTICSEARCH_HOSTNAME value to the correct value."
   },
   {
-    \"id\": \"169\",
-    \"cause\": \"The IP address entered for the reported parameter has not been found as an externalIP for any service in the Helix Platform namespace.\",
-    \"impact\": \"The Helix Service Management platform pods may not be able to start and the applications may not be accessible.\",
-    \"remediation\": \"Verify that the correct IP address has been used and that the service is exposed, or use the recommended service.namespace format for the value.\"
+    "id": "169",
+    "cause": "The IP address entered for the reported parameter has not been found as an externalIP for any service in the Helix Platform namespace.",
+    "impact": "The Helix Service Management platform pods may not be able to start and the applications may not be accessible.",
+    "remediation": "Verify that the correct IP address has been used and that the service is exposed, or use the recommended service.namespace format for the value."
   },
   {
-    \"id\": \"170\",
-    \"cause\": \"An attempt to validate that the IP address provided connects to an Elasticsearch server did not return the expected results.\",
-    \"impact\": \"The Helix Service Management platform pods may not be able to start and the applications may not be accessible.\",
-    \"remediation\": \"Verify that the correct IP address has been used and that the Elasticsearch service is running.\"
+    "id": "170",
+    "cause": "An attempt to validate that the IP address provided connects to an Elasticsearch server did not return the expected results.",
+    "impact": "The Helix Service Management platform pods may not be able to start and the applications may not be accessible.",
+    "remediation": "Verify that the correct IP address has been used and that the Elasticsearch service is running."
   },
   {
-    \"id\": \"171\",
-    \"cause\": \"The Jenkins global pipeline library configuration named in the message does not have the correct value for the 'Load implicitly' option.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins browse to Manage Jenkins -> System, find the pipeline library and set the 'Load implicitly' option as detailed in the message.\"
+    "id": "171",
+    "cause": "The Jenkins global pipeline library configuration named in the message does not have the correct value for the 'Load implicitly' option.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins browse to Manage Jenkins -> System, find the pipeline library and set the 'Load implicitly' option as detailed in the message."
   },
   {
-    \"id\": \"172\",
-    \"cause\": \"The value entered for the LOGS_ELASTICSEARCH_HOSTNAME is not the expected service.namespace indicated in the message.\",
-    \"impact\": \"Helix Service Management logs will not be sent to Helix Logging.\",
-    \"remediation\": \"Update the LOGS_ELASTICSEARCH_HOSTNAME value to the correct value.\"
+    "id": "172",
+    "cause": "The value entered for the LOGS_ELASTICSEARCH_HOSTNAME is not the expected service.namespace indicated in the message.",
+    "impact": "Helix Service Management logs will not be sent to Helix Logging.",
+    "remediation": "Update the LOGS_ELASTICSEARCH_HOSTNAME value to the correct value."
   },
   {
-    \"id\": \"173\",
-    \"cause\": \"The FTS_ELASTICSEARCH_PORT must be 9200.\",
-    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be inaccessible.\",
-    \"remediation\": \"Set the value to 9200.\"
+    "id": "173",
+    "cause": "The FTS_ELASTICSEARCH_PORT must be 9200.",
+    "impact": "The Helix Service Management platform pods will not start and the applications will be inaccessible.",
+    "remediation": "Set the value to 9200."
   },
   {
-    \"id\": \"174\",
-    \"cause\": \"The FTS_ELASTICSEARCH_SECURE option must be selected.\",
-    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be inaccessible.\",
-    \"remediation\": \"Select the value.\"
+    "id": "174",
+    "cause": "The FTS_ELASTICSEARCH_SECURE option must be selected.",
+    "impact": "The Helix Service Management platform pods will not start and the applications will be inaccessible.",
+    "remediation": "Select the value."
   },
   {
-    \"id\": \"175\",
-    \"cause\": \"The FTS_ELASTICSEARCH_USER_PASSWORD value does not match the value set in the Helix Platform.\",
-    \"impact\": \"The Helix Service Management platform pods will not start and the applications will be inaccessible.\",
-    \"remediation\": \"Set the value to the correct password.\"
+    "id": "175",
+    "cause": "The FTS_ELASTICSEARCH_USER_PASSWORD value does not match the value set in the Helix Platform.",
+    "impact": "The Helix Service Management platform pods will not start and the applications will be inaccessible.",
+    "remediation": "Set the value to the correct password."
   },
   {
-    \"id\": \"176\",
-    \"cause\": \"An attempt to login to the Helix Service Management apps via the RESTAPI failed.\",
-    \"impact\": \"Some IS configuration checks will be skipped.\",
-    \"remediation\": \"Check that the hannah_admin user is enabled and that the correct password is stored in the atriumwebsvc secret. If the password contains %, &, +, or other reserved form characters, use a current HITT build that URL-encodes the login request (curl --data-urlencode).\"
+    "id": "176",
+    "cause": "An attempt to login to the Helix Service Management apps via the RESTAPI failed.",
+    "impact": "Some IS configuration checks will be skipped.",
+    "remediation": "Check that the hannah_admin user is enabled and that the correct password is stored in the atriumwebsvc secret. If the password contains %, &, +, or other reserved form characters, use a current HITT build that URL-encodes the login request (curl --data-urlencode)."
   },
   {
-    \"id\": \"177\",
-    \"cause\": \"The fpackager sidecar containers used by the Support Assistant Tool to access pod logs have not been found.\",
-    \"impact\": \"The Support Assistant Tool will not be able to access application logs.\",
-    \"remediation\": \"Select the SIDECAR_SUPPORT_ASSISTANT_FPACK option to enable during deployment or when running the HELIX_ONPREM_DEPLOYMENT pipeline in service mode.\"
+    "id": "177",
+    "cause": "The fpackager sidecar containers used by the Support Assistant Tool to access pod logs have not been found.",
+    "impact": "The Support Assistant Tool will not be able to access application logs.",
+    "remediation": "Select the SIDECAR_SUPPORT_ASSISTANT_FPACK option to enable during deployment or when running the HELIX_ONPREM_DEPLOYMENT pipeline in service mode."
   },
   {
-    \"id\": \"178\",
-    \"cause\": \"The role or rolebinding reported in the message has not been found in the Helix Service Management namespace.\",
-    \"impact\": \"The Support Assistant Tool will not be able to access application logs.\",
-    \"remediation\": \"Use the SUPPORT_ASSISTANT_CREATE_ROLE option in the HELIX_ONPREM_DEPLOYMENT pipeline or follow the steps in the product documentation to create the role/rolebinding manually.\"
+    "id": "178",
+    "cause": "The role or rolebinding reported in the message has not been found in the Helix Service Management namespace.",
+    "impact": "The Support Assistant Tool will not be able to access application logs.",
+    "remediation": "Use the SUPPORT_ASSISTANT_CREATE_ROLE option in the HELIX_ONPREM_DEPLOYMENT pipeline or follow the steps in the product documentation to create the role/rolebinding manually."
   },
   {
-    \"id\": \"179\",
-    \"cause\": \"The Jenkins global pipeline library configuration named in the message does not have the correct value for the 'Retrieval method' option.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins browse to Manage Jenkins -> System, find the pipeline library and set the 'Retrieval method' to 'Modern SCM'.\"
+    "id": "179",
+    "cause": "The Jenkins global pipeline library configuration named in the message does not have the correct value for the 'Retrieval method' option.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins browse to Manage Jenkins -> System, find the pipeline library and set the 'Retrieval method' to 'Modern SCM'."
   },
   {
-    \"id\": \"180\",
-    \"cause\": \"An attempt to connect to the database using the pipeline values failed. Additional error details may have been included in the main HITT output.\",
-    \"impact\": \"Later database checks will not be run and deployment may fail if there is an issue with the database of pipeline values.\",
-    \"remediation\": \"Use the additional error details to make changes to resolve the issue.\"
+    "id": "180",
+    "cause": "An attempt to connect to the database using the pipeline values failed. Additional error details may have been included in the main HITT output.",
+    "impact": "Later database checks will not be run and deployment may fail if there is an issue with the database of pipeline values.",
+    "remediation": "Use the additional error details to make changes to resolve the issue."
   },
   {
-    \"id\": \"181\",
-    \"cause\": \"Different versions of the Helix Service Management database are identified using the currDbVersion value in the control table. The discovered value is not the expected one for this version of Helix Service Management.\",
-    \"impact\": \"Helix Service Management deployment will fail or the server will not start.\",
-    \"remediation\": \"If this is a fresh install verify that the correct database dump was restored. If this is an upgrade issue please contact BMC Support.\"
+    "id": "181",
+    "cause": "Different versions of the Helix Service Management database are identified using the currDbVersion value in the control table. The discovered value is not the expected one for this version of Helix Service Management.",
+    "impact": "Helix Service Management deployment will fail or the server will not start.",
+    "remediation": "If this is a fresh install verify that the correct database dump was restored. If this is an upgrade issue please contact BMC Support."
   },
   {
-    \"id\": \"182\",
-    \"cause\": \"When using an MSSQL database for the Helix Service Management applications it is required to create several synonyms but the one named in the error is missing.\",
-    \"impact\": \"Helix Service Management deployment may fail.\",
-    \"remediation\": \"Create the missing synonym as detailed in the product documentation.\"
+    "id": "182",
+    "cause": "When using an MSSQL database for the Helix Service Management applications it is required to create several synonyms but the one named in the error is missing.",
+    "impact": "Helix Service Management deployment may fail.",
+    "remediation": "Create the missing synonym as detailed in the product documentation."
   },
   {
-    \"id\": \"183\",
-    \"cause\": \"The Jenkins credentials object named in the message has a blank password value when it should be set to the password of the named user.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and update the credential to add the missing password.\"
+    "id": "183",
+    "cause": "The Jenkins credentials object named in the message has a blank password value when it should be set to the password of the named user.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins go to Manage Jenkins -> Credentials and update the credential to add the missing password."
   },
   {
-    \"id\": \"184\",
-    \"cause\": \"The HITT script makes extensive use of the kubectl command but was not able to run it successfully.\",
-    \"impact\": \"The HITT script cannot continue without a working kubectl.\",
-    \"remediation\": \"Make sure that kubectl works as expected for the git user and that commands such as 'kubectl version' return results.\"
+    "id": "184",
+    "cause": "The HITT script makes extensive use of the kubectl command but was not able to run it successfully.",
+    "impact": "The HITT script cannot continue without a working kubectl.",
+    "remediation": "Make sure that kubectl works as expected for the git user and that commands such as 'kubectl version' return results."
   },
   {
-    \"id\": \"185\",
-    \"cause\": \"A KUBECONFIG environment variable is set and references a non-default file.  Commands run by the pipelines during deployment may not inherit this environment variable and will not work as expected.\",
-    \"impact\": \"Helix Service Management deployment may fail.\",
-    \"remediation\": \"Copy a valid kubeconfig file to the location reported in the error message.\"
+    "id": "185",
+    "cause": "A KUBECONFIG environment variable is set and references a non-default file.  Commands run by the pipelines during deployment may not inherit this environment variable and will not work as expected.",
+    "impact": "Helix Service Management deployment may fail.",
+    "remediation": "Copy a valid kubeconfig file to the location reported in the error message."
   },
   {
-    \"id\": \"186\",
-    \"cause\": \"Commands run during the Helix Service Management deployment require a valid kubeconfig file in ~/.kube/config but this was not found.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Copy a valid kubeconfig file to the location reported in the error message.\"
+    "id": "186",
+    "cause": "Commands run during the Helix Service Management deployment require a valid kubeconfig file in ~/.kube/config but this was not found.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Copy a valid kubeconfig file to the location reported in the error message."
   },
   {
-    \"id\": \"187\",
-    \"cause\": \"A 'kubectl get secret' command failed to return the expected results.\",
-    \"impact\": \"Some later checks will not run and deployment may fail.\",
-    \"remediation\": \"Run the 'kubectl get secret' command for the secret and namespace in the error message and resolve any issues reported.\"
+    "id": "187",
+    "cause": "A 'kubectl get secret' command failed to return the expected results.",
+    "impact": "Some later checks will not run and deployment may fail.",
+    "remediation": "Run the 'kubectl get secret' command for the secret and namespace in the error message and resolve any issues reported."
   },
   {
-    \"id\": \"188\",
-    \"cause\": \"An attempt to ping the IS database server from a pod failed to return the expected results.  More details may be included in the main HITT output.\",
-    \"impact\": \"The cluster to IS database server latency has not been tested.\",
-    \"remediation\": \"This test may fail due to security restrictions in the cluster and is for information only.\"
+    "id": "188",
+    "cause": "An attempt to ping the IS database server from a pod failed to return the expected results.  More details may be included in the main HITT output.",
+    "impact": "The cluster to IS database server latency has not been tested.",
+    "remediation": "This test may fail due to security restrictions in the cluster and is for information only."
   },
   {
-    \"id\": \"189\",
-    \"cause\": \"A 'kubectl get secret' command failed to return the expected results.\",
-    \"impact\": \"Some later checks will not be run.\",
-    \"remediation\": \"Run the 'kubectl get secret' command for the secret and namespace in the error message and resolve any issues reported.\"
+    "id": "189",
+    "cause": "A 'kubectl get secret' command failed to return the expected results.",
+    "impact": "Some later checks will not be run.",
+    "remediation": "Run the 'kubectl get secret' command for the secret and namespace in the error message and resolve any issues reported."
   },
   {
-    \"id\": \"190\",
-    \"cause\": \"The registry server parameter reported in the error message does not match what is currently set in the registry secret in the Helix IS namespace.\",
-    \"impact\": \"The pipeline operation may fail.\",
-    \"remediation\": \"Verify the value with that in the secret.\"
+    "id": "190",
+    "cause": "The registry server parameter reported in the error message does not match what is currently set in the registry secret in the Helix IS namespace.",
+    "impact": "The pipeline operation may fail.",
+    "remediation": "Verify the value with that in the secret."
   },
   {
-    \"id\": \"191\",
-    \"cause\": \"The Jenkins pipeline parameter named in the message includes a dollar symbol which will lead to parsing errors.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Update the value of the named parameter and remove the dollar symbol.\"
+    "id": "191",
+    "cause": "The Jenkins pipeline parameter named in the message includes a dollar symbol which will lead to parsing errors.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Update the value of the named parameter and remove the dollar symbol."
   },
   {
-    \"id\": \"192\",
-    \"cause\": \"The HITT script attempted a 'docker login' to the registry server using the credentials in the IMAGESECRET_NAME secret but failed.\",
-    \"impact\": \"Helix Service Management deployment may fail if the credentials are invalid.\",
-    \"remediation\": \"Verify the credentials in the IMAGESECRET_NAME secret in the Helix Service Management namespace. This is expected if the registry server is not accessible from this system.\"
+    "id": "192",
+    "cause": "The HITT script attempted a 'docker login' to the registry server using the credentials in the IMAGESECRET_NAME secret but failed.",
+    "impact": "Helix Service Management deployment may fail if the credentials are invalid.",
+    "remediation": "Verify the credentials in the IMAGESECRET_NAME secret in the Helix Service Management namespace. This is expected if the registry server is not accessible from this system."
   },
   {
-    \"id\": \"193\",
-    \"cause\": \"The HELIX_ONPREM_DEPLOYMENT process uses several Jenkins nodes to perform product installation but one, or more, of these is not available.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins go to Manage Jenkins -> Nodes and enable the offline node(s). This may indicate an ssh or git credentials password issue. See the product documentation for full details.\"
+    "id": "193",
+    "cause": "The HELIX_ONPREM_DEPLOYMENT process uses several Jenkins nodes to perform product installation but one, or more, of these is not available.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins go to Manage Jenkins -> Nodes and enable the offline node(s). This may indicate an ssh or git credentials password issue. See the product documentation for full details."
   },
   {
-    \"id\": \"194\",
-    \"cause\": \"There are no Jenkins nodes with the label named in the error message but one is required by the deployment pipelines.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins go to Manage Jenkins -> Nodes and ensure that there is a node with this label. This is usually the node named after the Deployment Engine hostname. See the product documentation for full details.\"
+    "id": "194",
+    "cause": "There are no Jenkins nodes with the label named in the error message but one is required by the deployment pipelines.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins go to Manage Jenkins -> Nodes and ensure that there is a node with this label. This is usually the node named after the Deployment Engine hostname. See the product documentation for full details."
   },
   {
-    \"id\": \"195\",
-    \"cause\": \"The named plugin is required but missing from Jenkins.\",
-    \"impact\": \"Helix Service Management deployment may fail.\",
-    \"remediation\": \"In Jenkins go to Manage Jenkins -> Plugins -> Available Plugins and install the missing plugin.\"
+    "id": "195",
+    "cause": "The named plugin is required but missing from Jenkins.",
+    "impact": "Helix Service Management deployment may fail.",
+    "remediation": "In Jenkins go to Manage Jenkins -> Plugins -> Available Plugins and install the missing plugin."
   },
   {
-    \"id\": \"196\",
-    \"cause\": \"The named credentials item is required but missing from Jenkins.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and create the missing item. See the product documentation for full details.\"
+    "id": "196",
+    "cause": "The named credentials item is required but missing from Jenkins.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins go to Manage Jenkins -> Credentials and create the missing item. See the product documentation for full details."
   },
   {
-    \"id\": \"197\",
-    \"cause\": \"Unable to verify the file in the Jenkins KUBECONFIG credential. It is expected to contain a valid kubeconfig file but it is missing or is not valid for the cluster.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and update the KUBECONFIG credential with a valid file. See the product documentation for full details.\"
+    "id": "197",
+    "cause": "Unable to verify the file in the Jenkins KUBECONFIG credential. It is expected to contain a valid kubeconfig file but it is missing or is not valid for the cluster.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins go to Manage Jenkins -> Credentials and update the KUBECONFIG credential with a valid file. See the product documentation for full details."
   },
   {
-    \"id\": \"198\",
-    \"cause\": \"Several different credentials objects must exist in Jenkins before the HELIX_ONPREM_DEPLOYMENT pipeline can be used to deploy the products but one, or more, are missing.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"In Jenkins go to Manage Jenkins -> Credentials and add the missing items. See the product documentation for full details.\"
+    "id": "198",
+    "cause": "Several different credentials objects must exist in Jenkins before the HELIX_ONPREM_DEPLOYMENT pipeline can be used to deploy the products but one, or more, are missing.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "In Jenkins go to Manage Jenkins -> Credentials and add the missing items. See the product documentation for full details."
   },
   {
-    \"id\": \"199\",
-    \"cause\": \"The command to list namespaces in the cluster did not return the expected results needed to provide a list to select from.\",
-    \"impact\": \"HITT cannot run until the hitt.conf file is updated.\",
-    \"remediation\": \"Update the hitt.conf file and set the namespace names.\"
+    "id": "199",
+    "cause": "The command to list namespaces in the cluster did not return the expected results needed to provide a list to select from.",
+    "impact": "HITT cannot run until the hitt.conf file is updated.",
+    "remediation": "Update the hitt.conf file and set the namespace names."
   },
   {
-    \"id\": \"200\",
-    \"cause\": \"You must specify the mode to use when running HITT.\",
-    \"impact\": \"HITT requires a mode to run.\",
-    \"remediation\": \"Specify the mode on the command line.\"
+    "id": "200",
+    "cause": "You must specify the mode to use when running HITT.",
+    "impact": "HITT requires a mode to run.",
+    "remediation": "Specify the mode on the command line."
   },
   {
-    \"id\": \"201\",
-    \"cause\": \"The Helix Platform and Helix IS namespaces are set to the same value in the hitt.conf file.\",
-    \"impact\": \"Helix Platform and Helix IS are not certified in the same namespace.\",
-    \"remediation\": \"Use separate namespaces and update the hitt.conf file.\"
+    "id": "201",
+    "cause": "The Helix Platform and Helix IS namespaces are set to the same value in the hitt.conf file.",
+    "impact": "Helix Platform and Helix IS are not certified in the same namespace.",
+    "remediation": "Use separate namespaces and update the hitt.conf file."
   },
   {
-    \"id\": \"202\",
-    \"cause\": \"HITT failed to find an existing job to provide the tctl client image name and no TCTL_REST_VER mapping exists for the Helix Platform version.\",
-    \"impact\": \"Some later checks will not be run.\",
-    \"remediation\": \"Ensure tenant onboarding or a tctl job exists in the Helix Platform namespace, or use a Helix Platform version supported by HITT.\"
+    "id": "202",
+    "cause": "HITT failed to find an existing job to provide the tctl client image name and no TCTL_REST_VER mapping exists for the Helix Platform version.",
+    "impact": "Some later checks will not be run.",
+    "remediation": "Ensure tenant onboarding or a tctl job exists in the Helix Platform namespace, or use a Helix Platform version supported by HITT."
   },
   {
-    \"id\": \"203\",
-    \"cause\": \"HITT failed to find the name of the container image that provides the tctl client.\",
-    \"impact\": \"Some later checks will not be run.\",
-    \"remediation\": \"No workaround available.\"
+    "id": "203",
+    "cause": "HITT failed to find the name of the container image that provides the tctl client.",
+    "impact": "Some later checks will not be run.",
+    "remediation": "No workaround available."
   },
   {
-    \"id\": \"204\",
-    \"cause\": \"The job used to run tctl commands did not complete in the expected time for some reason.\",
-    \"impact\": \"Some later checks will not be run.\",
-    \"remediation\": \"Check the tctlseal job/pod events and logs to understand and resolve the issue.\"
+    "id": "204",
+    "cause": "The job used to run tctl commands did not complete in the expected time for some reason.",
+    "impact": "Some later checks will not be run.",
+    "remediation": "Check the tctlseal job/pod events and logs to understand and resolve the issue."
   },
   {
-    \"id\": \"205\",
-    \"cause\": \"BMC_HELIX_ITSM_INSIGHTS is selected to integrate with the Helix Platform but ITSM Insights is not installed in the Helix Platform.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Deselect BMC_HELIX_ITSM_INSIGHTS or install ITSM Insights in the Helix Platform before deployment of Helix Service Management.\"
+    "id": "205",
+    "cause": "BMC_HELIX_ITSM_INSIGHTS is selected to integrate with the Helix Platform but ITSM Insights is not installed in the Helix Platform.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Deselect BMC_HELIX_ITSM_INSIGHTS or install ITSM Insights in the Helix Platform before deployment of Helix Service Management."
   },
   {
-    \"id\": \"206\",
-    \"cause\": \"When using HITT's tctl mode you must remember to enclose the command options in double quotes as in the message.\",
-    \"impact\": \"HITT will not run the tctl command.\",
-    \"remediation\": \"Enclose the tctl commands in double quotes.\"
+    "id": "206",
+    "cause": "When using HITT's tctl mode you must remember to enclose the command options in double quotes as in the message.",
+    "impact": "HITT will not run the tctl command.",
+    "remediation": "Enclose the tctl commands in double quotes."
   },
   {
-    \"id\": \"207\",
-    \"cause\": \"The Java version used by HITT is older than that required to use the jenkins-cli.jar command line client.\",
-    \"impact\": \"Checks that use the jenkins-cli client will fail.\",
-    \"remediation\": \"Update the Java used by HITT to the version indicated in the error message.\"
+    "id": "207",
+    "cause": "The Java version used by HITT is older than that required to use the jenkins-cli.jar command line client.",
+    "impact": "Checks that use the jenkins-cli client will fail.",
+    "remediation": "Update the Java used by HITT to the version indicated in the error message."
   },
   {
-    \"id\": \"208\",
-    \"cause\": \"The currently installed version of ansible is not supported for this release of the Helix Service Management deployment pipelines.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Review the product documentation and install the supported version of ansible.\"
+    "id": "208",
+    "cause": "The currently installed version of ansible is not supported for this release of the Helix Service Management deployment pipelines.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Review the product documentation and install the supported version of ansible."
   },
   {
-    \"id\": \"209\",
-    \"cause\": \"The 'jmespath' module required by the Helix Service Management deployment scripts does not appear to be installed for the python version that ansible is using.\",
-    \"impact\": \"Helix Service Management deployment will fail.\",
-    \"remediation\": \"Install 'jmespath' for the python instance that Jenkins is using.\"
+    "id": "209",
+    "cause": "The 'jmespath' module required by the Helix Service Management deployment scripts does not appear to be installed for the python version that ansible is using.",
+    "impact": "Helix Service Management deployment will fail.",
+    "remediation": "Install 'jmespath' for the python instance that Jenkins is using."
   },
   {
-    \"id\": \"210\",
-    \"cause\": \"The ansible configuration file should have been updated by the Deployment Engine setup script but it is missing, or does not contain the expected settings.\",
-    \"impact\": \"Helix Service Management deployment may fail.\",
-    \"remediation\": \"Verify that the setup script ran as expected or contact BMC Support for further details.\"
+    "id": "210",
+    "cause": "The ansible configuration file should have been updated by the Deployment Engine setup script but it is missing, or does not contain the expected settings.",
+    "impact": "Helix Service Management deployment may fail.",
+    "remediation": "Verify that the setup script ran as expected or contact BMC Support for further details."
   },
   {
-    \"id\": \"211\",
-    \"cause\": \"This value should be the ID of a Jenkins credentials object containing the OS user/password used by the pipeline to access the git repository files.\",
-    \"impact\": \"The HELIX_ONPREM_DEPLOYMENT pipeline will fail.\",
-    \"remediation\": \"Set the value to the correct credentials ID - usually 'github'.\"
+    "id": "211",
+    "cause": "This value should be the ID of a Jenkins credentials object containing the OS user/password used by the pipeline to access the git repository files.",
+    "impact": "The HELIX_ONPREM_DEPLOYMENT pipeline will fail.",
+    "remediation": "Set the value to the correct credentials ID - usually 'github'."
   },
   {
-    \"id\": \"212\",
-    \"cause\": \"The SMARTREPORTING_DB_PASSWORD value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long, it must be 28 characters or less.\",
-    \"impact\": \"The HELIX_SMARTREPORTING_DEPLOY pipeline will fail.\",
-    \"remediation\": \"Change the SMARTREPORTING_DB_PASSWORD to one that is 28 characters or less.\"
+    "id": "212",
+    "cause": "The SMARTREPORTING_DB_PASSWORD value in the HELIX_ONPREM_DEPLOYMENT pipeline is too long, it must be 28 characters or less.",
+    "impact": "The HELIX_SMARTREPORTING_DEPLOY pipeline will fail.",
+    "remediation": "Change the SMARTREPORTING_DB_PASSWORD to one that is 28 characters or less."
   },
   {
-    \"id\": \"213\",
-    \"cause\": \"The pipeine is running an UPGRADE or UPDATE but the SOURCE_VERSION or PLATFORM_HELM_VERSION are invalid for the chosen mode.\",
-    \"impact\": \"The UPGRADE/UPDATE will fail.\",
-    \"remediation\": \"Review the product documentation and verify the SOURCE_VERSION and PLATFORM_HELM_VERSION values.\"
+    "id": "213",
+    "cause": "The pipeine is running an UPGRADE or UPDATE but the SOURCE_VERSION or PLATFORM_HELM_VERSION are invalid for the chosen mode.",
+    "impact": "The UPGRADE/UPDATE will fail.",
+    "remediation": "Review the product documentation and verify the SOURCE_VERSION and PLATFORM_HELM_VERSION values."
   },
   {
-    \"id\": \"214\",
-    \"cause\": \"The password entered for CACERTS_SSL_TRUSTSTORE_PASSWORD is not valid for the cacerts file attached to the pipeline or stored in the cacerts secret.\",
-    \"impact\": \"Platform pods will be unable to start.\",
-    \"remediation\": \"Set CACERTS_SSL_TRUSTSTORE_PASSWORD to the correct password or leave it blank to use the default.\"
+    "id": "214",
+    "cause": "The password entered for CACERTS_SSL_TRUSTSTORE_PASSWORD is not valid for the cacerts file attached to the pipeline or stored in the cacerts secret.",
+    "impact": "Platform pods will be unable to start.",
+    "remediation": "Set CACERTS_SSL_TRUSTSTORE_PASSWORD to the correct password or leave it blank to use the default."
   },
   {
-    \"id\": \"215\",
-    \"cause\": \"The named global pipeline libraries were not found in Jenkins.\",
-    \"impact\": \"Pipeline execution will fail.\",
-    \"remediation\": \"Add the missing libraries and ensure they are created as 'Global Trusted Pipeline Libraries' and not 'Global Untrusted Pipeline Libraries'.\"
+    "id": "215",
+    "cause": "The named global pipeline libraries were not found in Jenkins.",
+    "impact": "Pipeline execution will fail.",
+    "remediation": "Add the missing libraries and ensure they are created as 'Global Trusted Pipeline Libraries' and not 'Global Untrusted Pipeline Libraries'."
   },
   {
-    \"id\": \"216\",
-    \"cause\": \"The command 'ansible --version' that is used to determine the Ansible version did not return results in the expected format.\",
-    \"impact\": \"Some checks to validate ansible will not be run.\",
-    \"remediation\": \"Review the output of the 'ansible --version' command and make sure that you are using a supported version.\"
+    "id": "216",
+    "cause": "The command 'ansible --version' that is used to determine the Ansible version did not return results in the expected format.",
+    "impact": "Some checks to validate ansible will not be run.",
+    "remediation": "Review the output of the 'ansible --version' command and make sure that you are using a supported version."
   },
   {
-    \"id\": \"217\",
-    \"cause\": \"The DB_JDBC_URL parameter is set but this is only supported when DB_TYPE is oracle.\",
-    \"impact\": \"The HELIX_SMARTAPPS_DEPLOY pipeline will fail at the catalog-data-upgrade stage.\",
-    \"remediation\": \"Remove the value from the DB_JDBC_URL parameter.\"
+    "id": "217",
+    "cause": "The DB_JDBC_URL parameter is set but this is only supported when DB_TYPE is oracle.",
+    "impact": "The HELIX_SMARTAPPS_DEPLOY pipeline will fail at the catalog-data-upgrade stage.",
+    "remediation": "Remove the value from the DB_JDBC_URL parameter."
   },
   {
-    \"id\": \"218\",
-    \"cause\": \"The named hostname alias was not found in the Helix certificate returned by the load balancer.\",
-    \"impact\": \"Deployment may fail.\",
-    \"remediation\": \"Check the Helix certificate and make sure that all required Helix hostname aliases are present as SAN entries, or use a wildcard.\"
+    "id": "218",
+    "cause": "The named hostname alias was not found in the Helix certificate returned by the load balancer.",
+    "impact": "Deployment may fail.",
+    "remediation": "Check the Helix certificate and make sure that all required Helix hostname aliases are present as SAN entries, or use a wildcard."
   },
   {
-    \"id\": \"219\",
-    \"cause\": \"The hitt.conf file has a value set for the JENKINS_PASSWORD but the JENKINS_USERNAME value is blank.\",
-    \"impact\": \"HITT cannot continue.\",
-    \"remediation\": \"Please set, or clear, the JENKINS_PASSWORD and JENKINS_USERNAME values in the hitt.conf file.\"
+    "id": "219",
+    "cause": "The hitt.conf file has a value set for the JENKINS_PASSWORD but the JENKINS_USERNAME value is blank.",
+    "impact": "HITT cannot continue.",
+    "remediation": "Please set, or clear, the JENKINS_PASSWORD and JENKINS_USERNAME values in the hitt.conf file."
   },
   {
-    \"id\": \"220\",
-    \"cause\": \"The CHECKOUT_USING_USER value must be set - the expected value is 'github'.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Set the CHECKOUT_USING_USER value to 'github'.\"
+    "id": "220",
+    "cause": "The CHECKOUT_USING_USER value must be set - the expected value is 'github'.",
+    "impact": "Deployment will fail.",
+    "remediation": "Set the CHECKOUT_USING_USER value to 'github'."
   },
   {
-    \"id\": \"221\",
-    \"cause\": \"The GIT_REPO_DIR value must be set using the expected format of 'ssh://<Jenkins server host name>/home/git/git_repo'.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Set the GIT_REPO_DIR to the correct value.\"
+    "id": "221",
+    "cause": "The GIT_REPO_DIR value must be set using the expected format of 'ssh://<Jenkins server host name>/home/git/git_repo'.",
+    "impact": "Deployment will fail.",
+    "remediation": "Set the GIT_REPO_DIR to the correct value."
   },
   {
-    \"id\": \"222\",
-    \"cause\": \"The GIT_USER_HOME_DIR value is not a valid directory path.  Check the output of the command 'file <value of GIT_USER_HOME_DIR>'.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Set the GIT_USER_HOME_DIR to the correct value.\"
+    "id": "222",
+    "cause": "The GIT_USER_HOME_DIR value is not a valid directory path.  Check the output of the command 'file <value of GIT_USER_HOME_DIR>'.",
+    "impact": "Deployment will fail.",
+    "remediation": "Set the GIT_USER_HOME_DIR to the correct value."
   },
   {
-    \"id\": \"223\",
-    \"cause\": \"The Helix Platform 24.4.00.001 hotfix has not been installed.\",
-    \"impact\": \"Helix applications may become unavailable due to defects DRRE3-7571 & DRRE3-7638.\",
-    \"remediation\": \"Review the product documentation and download and install the hotfix.\"
+    "id": "223",
+    "cause": "The Helix Platform 24.4.00.001 hotfix has not been installed.",
+    "impact": "Helix applications may become unavailable due to defects DRRE3-7571 & DRRE3-7638.",
+    "remediation": "Review the product documentation and download and install the hotfix."
   },
   {
-    \"id\": \"224\",
-    \"cause\": \"The directory referenced in the GIT_REPO_DIR value is not accessible or does not exist.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Review the product documentation and set the correct value.\"
+    "id": "224",
+    "cause": "The directory referenced in the GIT_REPO_DIR value is not accessible or does not exist.",
+    "impact": "Deployment will fail.",
+    "remediation": "Review the product documentation and set the correct value."
   },
   {
-    \"id\": \"225\",
-    \"cause\": \"The 'ansible-galaxy' community.general collection is not installed.\",
-    \"impact\": \"If the collection is not installed deployment will fail.\",
-    \"remediation\": \"Install the ansible community.general collection using the command 'ansible-galaxy collection install community.general'.\"
+    "id": "225",
+    "cause": "The 'ansible-galaxy' community.general collection is not installed.",
+    "impact": "If the collection is not installed deployment will fail.",
+    "remediation": "Install the ansible community.general collection using the command 'ansible-galaxy collection install community.general'."
   },
   {
-    \"id\": \"226\",
-    \"cause\": \"The value of the GIT_REPO_DIR parameter should not have a forward slash as the last character.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Remove the trailing forward slash '/'.\"
+    "id": "226",
+    "cause": "The value of the GIT_REPO_DIR parameter should not have a forward slash as the last character.",
+    "impact": "Deployment will fail.",
+    "remediation": "Remove the trailing forward slash '/'."
   },
   {
-    \"id\": \"227\",
-    \"cause\": \"HITT was unable to create a file in the current directory.\",
-    \"impact\": \"HITT cannot run.\",
-    \"remediation\": \"Make sure you have permissions to create files in the current directory.\"
+    "id": "227",
+    "cause": "HITT was unable to create a file in the current directory.",
+    "impact": "HITT cannot run.",
+    "remediation": "Make sure you have permissions to create files in the current directory."
   },
   {
-    \"id\": \"228\",
-    \"cause\": \"HITT attempted to update the '.hitt.conf' file but it is not writable by the current user.\",
-    \"impact\": \"HITT cannot run.\",
-    \"remediation\": \"Delete the '.hitt.conf' file.\"
+    "id": "228",
+    "cause": "HITT attempted to update the '.hitt.conf' file but it is not writable by the current user.",
+    "impact": "HITT cannot run.",
+    "remediation": "Delete the '.hitt.conf' file."
   },
   {
-    \"id\": \"229\",
-    \"cause\": \"The Helix Platform alias named in the message should not be present in the list of Application Domains of the SSO realm for ITSM aliases.\",
-    \"impact\": \"Invalid configuration.\",
-    \"remediation\": \"Delete the named alias from the SSO realm Application Domains.\"
+    "id": "229",
+    "cause": "The Helix Platform alias named in the message should not be present in the list of Application Domains of the SSO realm for ITSM aliases.",
+    "impact": "Invalid configuration.",
+    "remediation": "Delete the named alias from the SSO realm Application Domains."
   },
   {
-    \"id\": \"230\",
-    \"cause\": \"One or more of the Jenkins credentials have different passwords when they should all be set to the password of the git user.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Run 'bash hitt.sh -j' to display the passwords and then, in Jenkins go to Manage Jenkins->Credentials, and update those that have the wrong value.\"
+    "id": "230",
+    "cause": "One or more of the Jenkins credentials have different passwords when they should all be set to the password of the git user.",
+    "impact": "Deployment will fail.",
+    "remediation": "Run 'bash hitt.sh -j' to display the passwords and then, in Jenkins go to Manage Jenkins->Credentials, and update those that have the wrong value."
   },
   {
-    \"id\": \"231\",
-    \"cause\": \"The password set for the git user in the Jenkins credentials is not correct. Run 'bash hitt.sh -j' to display the values.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Update the password for the ansible/ansible_host/github credentials in Jenkins and set it to that of the git user.\"
+    "id": "231",
+    "cause": "The password set for the git user in the Jenkins credentials is not correct. Run 'bash hitt.sh -j' to display the values.",
+    "impact": "Deployment will fail.",
+    "remediation": "Update the password for the ansible/ansible_host/github credentials in Jenkins and set it to that of the git user."
   },
   {
-    \"id\": \"232\",
-    \"cause\": \"The Tenant value in the RSSO realm for ITSM is null when it should be set to the Helix Platform tenant name.id.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Set the RSSO realm Tenant option to the correct value.\"
+    "id": "232",
+    "cause": "The Tenant value in the RSSO realm for ITSM is null when it should be set to the Helix Platform tenant name.id.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Set the RSSO realm Tenant option to the correct value."
   },
   {
-    \"id\": \"233\",
-    \"cause\": \"The 'Remote Repository' value for the named global pipeline library is invalid - it should begin with 'ssh://<GIT_USER>@'.\",
-    \"impact\": \"Pipeline builds will fail.\",
-    \"remediation\": \"Browse to Manage Jenkins -> System and update the pipeline library definition with the correct value as per the BMC docs.\"
+    "id": "233",
+    "cause": "The 'Remote Repository' value for the named global pipeline library is invalid - it should begin with 'ssh://<GIT_USER>@'.",
+    "impact": "Pipeline builds will fail.",
+    "remediation": "Browse to Manage Jenkins -> System and update the pipeline library definition with the correct value as per the BMC docs."
   },
   {
-    \"id\": \"234\",
-    \"cause\": \"The directory in the 'Remote Repository' value for the named global pipeline library is invalid. Please make sure the path is correct.\",
-    \"impact\": \"Pipeline builds will fail.\",
-    \"remediation\": \"Browse to Manage Jenkins -> System and update the pipeline library definition with the correct path to the .git directory.\"
+    "id": "234",
+    "cause": "The directory in the 'Remote Repository' value for the named global pipeline library is invalid. Please make sure the path is correct.",
+    "impact": "Pipeline builds will fail.",
+    "remediation": "Browse to Manage Jenkins -> System and update the pipeline library definition with the correct path to the .git directory."
   },
   {
-    \"id\": \"235\",
-    \"cause\": \"The ~/.ssh directory does not exist but is required for ssh connections.\",
-    \"impact\": \"Pipeline builds will fail.\",
-    \"remediation\": \"Refer to the Helix Service Management product docs for steps to set up and configure ssh for the git and jenkins users.\"
+    "id": "235",
+    "cause": "The ~/.ssh directory does not exist but is required for ssh connections.",
+    "impact": "Pipeline builds will fail.",
+    "remediation": "Refer to the Helix Service Management product docs for steps to set up and configure ssh for the git and jenkins users."
   },
   {
-    \"id\": \"236\",
-    \"cause\": \"An attempt to use ssh to connect as git from a Jenkins script failed.\",
-    \"impact\": \"Pipeline builds will fail.\",
-    \"remediation\": \"Make sure that the jenkins user can ssh to the git user without being prompted for a password or other inputs.\"
+    "id": "236",
+    "cause": "An attempt to use ssh to connect as git from a Jenkins script failed.",
+    "impact": "Pipeline builds will fail.",
+    "remediation": "Make sure that the jenkins user can ssh to the git user without being prompted for a password or other inputs."
   },
   {
-    \"id\": \"237\",
-    \"cause\": \"Passwordless ssh for the git user is not set up correctly.\",
-    \"impact\": \"Pipeline builds will fail.\",
-    \"remediation\": \"Make sure that the git user can ssh to the git user without being prompted for a password or other inputs.\"
+    "id": "237",
+    "cause": "Passwordless ssh for the git user is not set up correctly.",
+    "impact": "Pipeline builds will fail.",
+    "remediation": "Make sure that the git user can ssh to the git user without being prompted for a password or other inputs."
   },
   {
-    \"id\": \"238\",
-    \"cause\": \"The script named in the message has not been approved.\",
-    \"impact\": \"Pipeline builds will fail.\",
-    \"remediation\": \"Review the console output of the HELIX_ONPREM_DEPLOYMENT pipeline and look for the option to approve the missing script.\"
+    "id": "238",
+    "cause": "The script named in the message has not been approved.",
+    "impact": "Pipeline builds will fail.",
+    "remediation": "Review the console output of the HELIX_ONPREM_DEPLOYMENT pipeline and look for the option to approve the missing script."
   },
   {
-    \"id\": \"239\",
-    \"cause\": \"One of the required command line tools is not installed or found on the path of the git user.\",
-    \"impact\": \"Pipeline builds will fail.\",
-    \"remediation\": \"Install the missing packages or make sure that they are available on the path of the git user.\"
+    "id": "239",
+    "cause": "One of the required command line tools is not installed or found on the path of the git user.",
+    "impact": "Pipeline builds will fail.",
+    "remediation": "Install the missing packages or make sure that they are available on the path of the git user."
   },
   {
-    \"id\": \"240\",
-    \"cause\": \"The value of the DB_PORT parameter must be the port number of the database but it is not in the expected format.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Set the DB_PORT value to the correct number.\"
+    "id": "240",
+    "cause": "The value of the DB_PORT parameter must be the port number of the database but it is not in the expected format.",
+    "impact": "Deployment will fail.",
+    "remediation": "Set the DB_PORT value to the correct number."
   },
   {
-    \"id\": \"241\",
-    \"cause\": \"HELIX_FULL_STACK_UPGRADE is not selected but it is required when the pipeline operation is UPGRADE.\",
-    \"impact\": \"The upgrade will fail.\",
-    \"remediation\": \"Select the HELIX_FULL_STACK_UPGRADE option if you are upgrading.\"
+    "id": "241",
+    "cause": "HELIX_FULL_STACK_UPGRADE is not selected but it is required when the pipeline operation is UPGRADE.",
+    "impact": "The upgrade will fail.",
+    "remediation": "Select the HELIX_FULL_STACK_UPGRADE option if you are upgrading."
   },
   {
-    \"id\": \"242\",
-    \"cause\": \"The HELIX_FULL_STACK_UPGRADE option should not be selected when the pipeline operation is UPDATE.\",
-    \"impact\": \"The update will fail.\",
-    \"remediation\": \"Deselect the HELIX_FULL_STACK_UPGRADE option when the pipeline operation is UPDATE.\"
+    "id": "242",
+    "cause": "The HELIX_FULL_STACK_UPGRADE option should not be selected when the pipeline operation is UPDATE.",
+    "impact": "The update will fail.",
+    "remediation": "Deselect the HELIX_FULL_STACK_UPGRADE option when the pipeline operation is UPDATE."
   },
   {
-    \"id\": \"243\",
-    \"cause\": \"The IMAGESECRET_NAME pipeline parameter cannot be blank.\",
-    \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
-    \"remediation\": \"Enter a value for the IMAGESECRET_NAME which will be used as the name of the registry credentials secret in the Helix Service Management namespace.\"
+    "id": "243",
+    "cause": "The IMAGESECRET_NAME pipeline parameter cannot be blank.",
+    "impact": "The HELIX_GENERATE_CONFIG pipeline will fail.",
+    "remediation": "Enter a value for the IMAGESECRET_NAME which will be used as the name of the registry credentials secret in the Helix Service Management namespace."
   },
   {
-    \"id\": \"244\",
-    \"cause\": \"The GIT_USER_HOME_DIR value must be a path name beginning with a forward slash.\",
-    \"impact\": \"The HELIX_ONPREM_DEPLOYMENT pipeline will fail.\",
-    \"remediation\": \"Change the GIT_USER_HOME_DIR value to an absolute path - for example '/home/git'.\"
+    "id": "244",
+    "cause": "The GIT_USER_HOME_DIR value must be a path name beginning with a forward slash.",
+    "impact": "The HELIX_ONPREM_DEPLOYMENT pipeline will fail.",
+    "remediation": "Change the GIT_USER_HOME_DIR value to an absolute path - for example '/home/git'."
   },
   {
-    \"id\": \"245\",
-    \"cause\": \"Either or both of the named pipeline parameters are blank.\",
-    \"impact\": \"Deployment will fail and some HITT checks have been skipped.\",
-    \"remediation\": \"Set the missing values in the HELIX_ONPREM_DEPLOYMENT pipeline.\"
+    "id": "245",
+    "cause": "Either or both of the named pipeline parameters are blank.",
+    "impact": "Deployment will fail and some HITT checks have been skipped.",
+    "remediation": "Set the missing values in the HELIX_ONPREM_DEPLOYMENT pipeline."
   },
   {
-    \"id\": \"246\",
-    \"cause\": \"The 'Project Repository' value for the named Global Pipeline Library does not reference the expected .git directory.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Set the correct 'Project Repository' value for the named Global Pipeline Library.\"
+    "id": "246",
+    "cause": "The 'Project Repository' value for the named Global Pipeline Library does not reference the expected .git directory.",
+    "impact": "Deployment will fail.",
+    "remediation": "Set the correct 'Project Repository' value for the named Global Pipeline Library."
   },
   {
-    \"id\": \"247\",
-    \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
-    \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
-    \"remediation\": \"Review permissions on the files/directories noted in the error.\"
+    "id": "247",
+    "cause": "One or more of the SSH setup tests identified a permissions issue.",
+    "impact": "Jenkins and the deployment pipelines will likely fail.",
+    "remediation": "Review permissions on the files/directories noted in the error."
   },
   {
-    \"id\": \"248\",
-    \"cause\": \"There are one or more trailing spaces at the end of the named value.\",
-    \"impact\": \"Deployment pipelines will fail.\",
-    \"remediation\": \"Go to Manage Jenkins->System and remove the trailing spaces.\"
+    "id": "248",
+    "cause": "There are one or more trailing spaces at the end of the named value.",
+    "impact": "Deployment pipelines will fail.",
+    "remediation": "Go to Manage Jenkins->System and remove the trailing spaces."
   },
   {
-    \"id\": \"249\",
-    \"cause\": \"One or more of the SSH setup tests identified a permissions issue.\",
-    \"impact\": \"Jenkins and the deployment pipelines will likely fail.\",
-    \"remediation\": \"Review permissions on the files/directories noted in the error.\"
+    "id": "249",
+    "cause": "One or more of the SSH setup tests identified a permissions issue.",
+    "impact": "Jenkins and the deployment pipelines will likely fail.",
+    "remediation": "Review permissions on the files/directories noted in the error."
   },
   {
-    \"id\": \"250\",
-    \"cause\": \"The value of the RSSO_ADMIN_PASSWORD does not match the Helix Platform RSSO password.\",
-    \"impact\": \"HELIX_ONPREM_DEPLOYMENT pipeline will fail at the RSSO validation stage.\",
-    \"remediation\": \"Update the RSSO_ADMIN_PASSWORD to the correct value.\"
+    "id": "250",
+    "cause": "The value of the RSSO_ADMIN_PASSWORD does not match the Helix Platform RSSO password.",
+    "impact": "HELIX_ONPREM_DEPLOYMENT pipeline will fail at the RSSO validation stage.",
+    "remediation": "Update the RSSO_ADMIN_PASSWORD to the correct value."
   },
   {
-    \"id\": \"251\",
-    \"cause\": \"The cluster context value is present in the kubeconfig but failed to return values from the cluster.\",
-    \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
-    \"remediation\": \"Validate the context and cluster permissions it has assigned.\"
+    "id": "251",
+    "cause": "The cluster context value is present in the kubeconfig but failed to return values from the cluster.",
+    "impact": "The HELIX_GENERATE_CONFIG pipeline will fail.",
+    "remediation": "Validate the context and cluster permissions it has assigned."
   },
   {
-    \"id\": \"252\",
-    \"cause\": \"The IMAGESECRET_NAME value is set to the same name as a BMC provided secret.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Change the name you provided for IMAGESECRET_NAME.\"
+    "id": "252",
+    "cause": "The IMAGESECRET_NAME value is set to the same name as a BMC provided secret.",
+    "impact": "Deployment will fail.",
+    "remediation": "Change the name you provided for IMAGESECRET_NAME."
   },
   {
-    \"id\": \"253\",
-    \"cause\": \"Jenkins and GITEA are running as containers so the CONTAINERIZED_DE must be selected.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Select the CONTAINERIZED_DE option.\"
+    "id": "253",
+    "cause": "Jenkins and GITEA are running as containers so the CONTAINERIZED_DE must be selected.",
+    "impact": "Deployment will fail.",
+    "remediation": "Select the CONTAINERIZED_DE option."
   },
   {
-    \"id\": \"254\",
-    \"cause\": \"The CONTAINERIZED_DE option should only be selected when Jenkins/GITEA are running in containers.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Deselect the CONTAINERIZED_DE option.\"
+    "id": "254",
+    "cause": "The CONTAINERIZED_DE option should only be selected when Jenkins/GITEA are running in containers.",
+    "impact": "Deployment will fail.",
+    "remediation": "Deselect the CONTAINERIZED_DE option."
   },
   {
-    \"id\": \"255\",
-    \"cause\": \"GIT_USER_HOME_DIR value must be '/home/jenkins' when Jenkins/GITEA are containerized.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Set the GIT_USER_HOME_DIR value to'/home/jenkins'.\"
+    "id": "255",
+    "cause": "GIT_USER_HOME_DIR value must be '/home/jenkins' when Jenkins/GITEA are containerized.",
+    "impact": "Deployment will fail.",
+    "remediation": "Set the GIT_USER_HOME_DIR value to'/home/jenkins'."
   },
   {
-    \"id\": \"256\",
-    \"cause\": \"GIT_REPO_DIR value is not valie when Jenkins/GITEA are containerized.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Set the GIT_REPO_DIR value to suggested value.\"
+    "id": "256",
+    "cause": "GIT_REPO_DIR value is not valie when Jenkins/GITEA are containerized.",
+    "impact": "Deployment will fail.",
+    "remediation": "Set the GIT_REPO_DIR value to suggested value."
   },
   {
-    \"id\": \"257\",
-    \"cause\": \"The custom_cacert.pem file used during the Helix Platform deployment does not appear to contain the certificates needed for the Service Management aliases.\",
-    \"impact\": \"HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Validate the custom_cacerts.pem and follow the docs to update the system.\"
+    "id": "257",
+    "cause": "The custom_cacert.pem file used during the Helix Platform deployment does not appear to contain the certificates needed for the Service Management aliases.",
+    "impact": "HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Validate the custom_cacerts.pem and follow the docs to update the system."
   },
   {
-    \"id\": \"258\",
-    \"cause\": \"The value of the named parameter is not valid. It must consist of lower case alphanumeric characters or '-'.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Update the value to a valid string.\"
+    "id": "258",
+    "cause": "The value of the named parameter is not valid. It must consist of lower case alphanumeric characters or '-'.",
+    "impact": "Deployment will fail.",
+    "remediation": "Update the value to a valid string."
   },
   {
-    \"id\": \"259\",
-    \"cause\": \"The same pipeline library name is configured under both Global Trusted Libraries and Global Untrusted Libraries in Jenkins.\",
-    \"impact\": \"Library resolution is ambiguous and may not match the intended trusted/untrusted behavior.\",
-    \"remediation\": \"Remove the library from one of the two global lists so it is defined in only Global Trusted Libraries or only Global Untrusted Libraries.\"
+    "id": "259",
+    "cause": "The same pipeline library name is configured under both Global Trusted Libraries and Global Untrusted Libraries in Jenkins.",
+    "impact": "Library resolution is ambiguous and may not match the intended trusted/untrusted behavior.",
+    "remediation": "Remove the library from one of the two global lists so it is defined in only Global Trusted Libraries or only Global Untrusted Libraries."
   },
   {
-    \"id\": \"260\",
-    \"cause\": \"The same library name appears more than once under Global Trusted Libraries in Jenkins.\",
-    \"impact\": \"Pipeline shared library configuration is invalid.\",
-    \"remediation\": \"Edit Jenkins global configuration and delete duplicate Global Trusted Library entries with the same name.\"
+    "id": "260",
+    "cause": "The same library name appears more than once under Global Trusted Libraries in Jenkins.",
+    "impact": "Pipeline shared library configuration is invalid.",
+    "remediation": "Edit Jenkins global configuration and delete duplicate Global Trusted Library entries with the same name."
   },
   {
-    \"id\": \"261\",
-    \"cause\": \"The same library name appears more than once under Global Untrusted Libraries in Jenkins.\",
-    \"impact\": \"Pipeline shared library configuration is invalid.\",
-    \"remediation\": \"Edit Jenkins global configuration and delete duplicate Global Untrusted Library entries with the same name.\"
+    "id": "261",
+    "cause": "The same library name appears more than once under Global Untrusted Libraries in Jenkins.",
+    "impact": "Pipeline shared library configuration is invalid.",
+    "remediation": "Edit Jenkins global configuration and delete duplicate Global Untrusted Library entries with the same name."
   },
   {
-    \"id\": \"262\",
-    \"cause\": \"The Helix Platform is a CORE mode deployment with no tenant services.\",
-    \"impact\": \"tctl commands are not applicable and will not work.\",
-    \"remediation\": \"No Helix Platform tenant features are installed.\"
+    "id": "262",
+    "cause": "The Helix Platform is a CORE mode deployment with no tenant services.",
+    "impact": "tctl commands are not applicable and will not work.",
+    "remediation": "No Helix Platform tenant features are installed."
   },
   {
-    \"id\": \"263\",
-    \"cause\": \"CUSTOM_BINARY_PATH is selected but this is not supported when Jenkins is running in a pod.\",
-    \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
-    \"remediation\": \"Deselect the CUSTOM_BINARY_PATH option.\"
+    "id": "263",
+    "cause": "CUSTOM_BINARY_PATH is selected but this is not supported when Jenkins is running in a pod.",
+    "impact": "The HELIX_GENERATE_CONFIG pipeline will fail.",
+    "remediation": "Deselect the CUSTOM_BINARY_PATH option."
   },
   {
-    \"id\": \"264\",
-    \"cause\": \"RSSO_URL value does not start with 'https://'.\",
-    \"impact\": \"The HELIX_GENERATE_CONFIG pipeline will fail.\",
-    \"remediation\": \"Update the value and add the missing prefix.\"
+    "id": "264",
+    "cause": "RSSO_URL value does not start with 'https://'.",
+    "impact": "The HELIX_GENERATE_CONFIG pipeline will fail.",
+    "remediation": "Update the value and add the missing prefix."
   },
   {
-    \"id\": \"265\",
-    \"cause\": \"The RSSO Backchannel Service URL is set but does not match the URL of the SSO server.\",
-    \"impact\": \"Application logins will likely fail.\",
-    \"remediation\": \"Correct the Service URL value or remove it unless it is actually required.\"
+    "id": "265",
+    "cause": "The RSSO Backchannel Service URL is set but does not match the URL of the SSO server.",
+    "impact": "Application logins will likely fail.",
+    "remediation": "Correct the Service URL value or remove it unless it is actually required."
   },
   {
-    \"id\": \"266\",
-    \"cause\": \"The IngressClass name configured for Helix could not be read from the cluster.\",
-    \"impact\": \"HITT cannot report ingress controller details for info mode.\",
-    \"remediation\": \"Check the INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline and confirm the IngressClass exists in the cluster.\"
+    "id": "266",
+    "cause": "The IngressClass name configured for Helix could not be read from the cluster.",
+    "impact": "HITT cannot report ingress controller details for info mode.",
+    "remediation": "Check the INGRESS_CLASS value in the HELIX_ONPREM_DEPLOYMENT pipeline and confirm the IngressClass exists in the cluster."
   },
   {
-    \"id\": \"267\",
-    \"cause\": \"HITT could not list Deployments and DaemonSets while looking for the ingress controller.\",
-    \"impact\": \"Ingress controller details cannot be shown.\",
-    \"remediation\": \"Check cluster access and permissions to list workloads in all namespaces.\"
+    "id": "267",
+    "cause": "HITT could not list Deployments and DaemonSets while looking for the ingress controller.",
+    "impact": "Ingress controller details cannot be shown.",
+    "remediation": "Check cluster access and permissions to list workloads in all namespaces."
   },
   {
-    \"id\": \"269\",
-    \"cause\": \"The currDbVersion found in the control table is not valid or missing.\",
-    \"impact\": \"IS Platform pods will fail to start.\",
-    \"remediation\": \"Verify that the IS database contains valid data.\"
+    "id": "269",
+    "cause": "The currDbVersion found in the control table is not valid or missing.",
+    "impact": "IS Platform pods will fail to start.",
+    "remediation": "Verify that the IS database contains valid data."
   },
   {
-    \"id\": \"270\",
-    \"cause\": \"HITT could not read Kubernetes node details from the cluster.\",
-    \"impact\": \"The info cluster node table cannot be shown.\",
-    \"remediation\": \"Check kubeconfig, cluster reachability, and permissions to list nodes.\"
+    "id": "270",
+    "cause": "HITT could not read Kubernetes node details from the cluster.",
+    "impact": "The info cluster node table cannot be shown.",
+    "remediation": "Check kubeconfig, cluster reachability, and permissions to list nodes."
   },
   {
-    \"id\": \"271\",
-    \"cause\": \"The selected node name was not found or is not accessible.\",
-    \"impact\": \"The info node pod table cannot be shown.\",
-    \"remediation\": \"Check the node name, kubeconfig, and permissions to get nodes.\"
+    "id": "271",
+    "cause": "The selected node name was not found or is not accessible.",
+    "impact": "The info node pod table cannot be shown.",
+    "remediation": "Check the node name, kubeconfig, and permissions to get nodes."
   },
   {
-    \"id\": \"272\",
-    \"cause\": \"HITT could not read pods scheduled on the selected node.\",
-    \"impact\": \"The info node pod table cannot be shown.\",
-    \"remediation\": \"Check permissions to list pods in all namespaces.\"
+    "id": "272",
+    "cause": "HITT could not read pods scheduled on the selected node.",
+    "impact": "The info node pod table cannot be shown.",
+    "remediation": "Check permissions to list pods in all namespaces."
   },
   {
-    \"id\": \"273\",
-    \"cause\": \"No Kubernetes nodes were returned by the cluster.\",
-    \"impact\": \"Interactive info node selection cannot run.\",
-    \"remediation\": \"Check cluster access and permissions to list nodes, or pass the node name on the command line.\"
+    "id": "273",
+    "cause": "No Kubernetes nodes were returned by the cluster.",
+    "impact": "Interactive info node selection cannot run.",
+    "remediation": "Check cluster access and permissions to list nodes, or pass the node name on the command line."
   },
   {
-    \"id\": \"274\",
-    \"cause\": \"An error occurred processing the pipeline input values.\",
-    \"impact\": \"Deployment will fail.\",
-    \"remediation\": \"Check the value of the named parameter for invalid special characters such as /.\"
+    "id": "274",
+    "cause": "An error occurred processing the pipeline input values.",
+    "impact": "Deployment will fail.",
+    "remediation": "Check the value of the named parameter for invalid special characters such as /."
   },
   {
-    \"id\": \"275\",
-    \"cause\": \"Execute permission on the SYS.DBMS_LOB tables is required but not allowed.\",
-    \"impact\": \"IS platform-fts-0 pod will not become ready and deployment will fail.\",
-    \"remediation\": \"Grant execute permission on the SYS.DBMS_LOB tables for the ARAdmin user.\"
+    "id": "275",
+    "cause": "Execute permission on the SYS.DBMS_LOB tables is required but not allowed.",
+    "impact": "IS platform-fts-0 pod will not become ready and deployment will fail.",
+    "remediation": "Grant execute permission on the SYS.DBMS_LOB tables for the ARAdmin user."
   },
   {
-    \"id\": \"276\",
-    \"cause\": \"The JSON file named in the tctl -f option was not found.\",
-    \"impact\": \"HITT will not run the tctl command.\",
-    \"remediation\": \"Check the file path in the -t command and ensure the file exists.\"
+    "id": "276",
+    "cause": "The JSON file named in the tctl -f option was not found.",
+    "impact": "HITT will not run the tctl command.",
+    "remediation": "Check the file path in the -t command and ensure the file exists."
   },
   {
-    \"id\": \"277\",
-    \"cause\": \"The JSON file named in the tctl -f option is not valid JSON.\",
-    \"impact\": \"HITT will not run the tctl command.\",
-    \"remediation\": \"Fix the file contents so it is valid JSON.\"
+    "id": "277",
+    "cause": "The JSON file named in the tctl -f option is not valid JSON.",
+    "impact": "HITT will not run the tctl command.",
+    "remediation": "Fix the file contents so it is valid JSON."
   },
   {
-    \"id\": \"278\",
-    \"cause\": \"HITT could not find a standard tctl job and is using a derived tctlrest image instead.\",
-    \"impact\": \"The tctl command should still run but the image may not match the cluster if the version mapping is wrong.\",
-    \"remediation\": \"Ensure tenantonboarding or a tctl registration job exists in the Helix Platform namespace, or verify TCTL_REST_VER for your Helix Platform version.\"
+    "id": "278",
+    "cause": "HITT could not find a standard tctl job and is using a derived tctlrest image instead.",
+    "impact": "The tctl command should still run but the image may not match the cluster if the version mapping is wrong.",
+    "remediation": "Ensure tenantonboarding or a tctl registration job exists in the Helix Platform namespace, or verify TCTL_REST_VER for your Helix Platform version."
   },
   {
-    \"id\": \"279\",
-    \"cause\": \"The kube-controller's terminated-pod-gc-threshold setting is lower than the required value.\",
-    \"impact\": \"Reading the logs of long running jobs will fail as the pods will be deleted as soon as they complete, leading to pipeline timeouts.\",
-    \"remediation\": \"Contact the cluster administrator and request the terminated-pod-gc-threshold be increased to at least 100.\"
+    "id": "279",
+    "cause": "The kube-controller's terminated-pod-gc-threshold setting is lower than the required value.",
+    "impact": "Reading the logs of long running jobs will fail as the pods will be deleted as soon as they complete, leading to pipeline timeouts.",
+    "remediation": "Contact the cluster administrator and request the terminated-pod-gc-threshold be increased to at least 100."
   },
   {
-    \"id\": \"280\",
-    \"cause\": \"The HELIX_PLATFORM_CUSTOMER_NAME matches multiple tenants.\",
-    \"impact\": \"The HELIX_ITSM_INTEROPS pipeline will fail.\",
-    \"remediation\": \"Change the HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline to the numeric value of the TENANT_ID.\"
+    "id": "280",
+    "cause": "The HELIX_PLATFORM_CUSTOMER_NAME matches multiple tenants.",
+    "impact": "The HELIX_ITSM_INTEROPS pipeline will fail.",
+    "remediation": "Change the HELIX_PLATFORM_CUSTOMER_NAME value in the HELIX_ONPREM_DEPLOYMENT pipeline to the numeric value of the TENANT_ID."
   },
   {
-    \"id\": \"281\",
-    \"cause\": \"The GITEA_ADMIN_PASS value set in the deployment-engine-config.env file contains invalid characters.\",
-    \"impact\": \"Jenkins pipelines will fail when checking out code from gitea.\",
-    \"remediation\": \"Update the GITEA_ADMIN_PASS value in the deployment-engine-config.env file and re-run the deployment-engine.sh script.\"
+    "id": "281",
+    "cause": "The GITEA_ADMIN_PASS value set in the deployment-engine-config.env file contains invalid characters.",
+    "impact": "Jenkins pipelines will fail when checking out code from gitea.",
+    "remediation": "Update the GITEA_ADMIN_PASS value in the deployment-engine-config.env file and re-run the deployment-engine.sh script."
   },
   {
-    \"id\": \"282\",
-    \"cause\": \"The AR server in the named pods is not running/ready for use.\",
-    \"impact\": \"Some applications/services may not work as expected or return errors.\",
-    \"remediation\": \"Check the logs in the named pods for possible issues.\"
+    "id": "282",
+    "cause": "The AR server in the named pods is not running/ready for use.",
+    "impact": "Some applications/services may not work as expected or return errors.",
+    "remediation": "Check the logs in the named pods for possible issues."
   }
-]"
+]
+ALL_MSGS_JSON_EOF
 
 if [ ! -t 1 ]; then
   REDIRECT=1
