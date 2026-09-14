@@ -73,6 +73,7 @@
       ],
       "notes": [
         "Optional: curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz in the same directory to enable database validation (see README).",
+        "Optional: download hitt.sh.sha256 from the same folder on GitHub and run sha256sum -c hitt.sh.sha256 to confirm the script was not altered in transit.",
         "Run as the git user on the Deployment Engine where Jenkins is installed."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README.md#quick-start",

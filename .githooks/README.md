@@ -21,6 +21,7 @@ export PATH="$HOME/.local/bin:$PATH"
 |------|--------|------|
 | Secret scan (staged diff only) | `gitleaks protect --staged` | `SKIP_GITLEAKS=1 git commit ...` |
 | HITT `HITT_BUILD_VERSION` bump when `hitt/hitt.sh` is staged | `pre-commit-hitt-version` | `SKIP_HITT_VERSION_HOOK=1 git commit ...` |
+| HITT `hitt.sh.sha256` refresh when `hitt/hitt.sh` is staged | `pre-commit-hitt-sha256` | `SKIP_HITT_SHA256_HOOK=1 git commit ...` |
 
 Configuration: [`.gitleaks.toml`](../.gitleaks.toml) (extends gitleaks default rules + repo allowlists for BMC doc defaults).
 

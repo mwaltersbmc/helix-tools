@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Regenerate hitt/hitt.sh.sha256 when hitt/hitt.sh is staged for this commit.
+# Runs after pre-commit-hitt-version (which may also change hitt.sh).
+# Disable for one commit: SKIP_HITT_SHA256_HOOK=1 git commit ...
+set -euo pipefail
+[[ "${SKIP_HITT_SHA256_HOOK:-0}" == "1" ]] && exit 0
+
+ROOT=$(git rev-parse --show-toplevel)
+HITT_DIR="${ROOT}/hitt"
+HITT_SH="${HITT_DIR}/hitt.sh"
+[[ -f "${HITT_SH}" ]] || exit 0
+
+if git diff --cached --quiet -- hitt/hitt.sh; then
+  exit 0
+fi
+
+if ! command -v sha256sum >/dev/null 2>&1; then
+  echo "pre-commit: sha256sum is not installed or not on PATH." >&2
+  exit 1
+fi
+
+( cd "${HITT_DIR}" && sha256sum hitt.sh > hitt.sh.sha256 )
+git add hitt/hitt.sh.sha256
+
+exit 0

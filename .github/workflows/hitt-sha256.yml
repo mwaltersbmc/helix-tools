@@ -1,0 +1,48 @@
+name: HITT sha256
+
+on:
+  pull_request:
+    paths:
+      - hitt/hitt.sh
+      - hitt/hitt.sh.sha256
+  push:
+    branches:
+      - main
+    paths:
+      - hitt/hitt.sh
+      - hitt/hitt.sh.sha256
+
+permissions:
+  contents: write
+
+jobs:
+  hitt-sha256:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify or update hitt.sh.sha256
+        id: checksum
+        run: |
+          set -euo pipefail
+          cd hitt
+          sha256sum hitt.sh > hitt.sh.sha256.expected
+          if sha256sum -c hitt.sh.sha256; then
+            echo "status=ok" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "status=stale" >> "${GITHUB_OUTPUT}"
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            cp hitt.sh.sha256.expected hitt.sh.sha256
+            exit 0
+          fi
+          echo "::error::hitt/hitt.sh.sha256 is out of date. Regenerate with: (cd hitt && sha256sum hitt.sh > hitt.sh.sha256)" >&2
+          diff -u hitt.sh.sha256 hitt.sh.sha256.expected || true
+          exit 1
+
+      - name: Commit checksum update on main
+        if: steps.checksum.outputs.status == 'stale' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(hitt): update hitt.sh.sha256"
+          file_pattern: hitt/hitt.sh.sha256

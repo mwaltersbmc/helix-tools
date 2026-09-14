@@ -16,6 +16,15 @@ mkdir hitt && cd hitt && curl -skO https://raw.githubusercontent.com/mwaltersbmc
 curl -skO https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/dbjars.tgz   # Optional, enables DB validation
 ```
 
+**Optional — verify the download** (recommended before first use on a production system):
+
+```bash
+curl -fsSL -o hitt.sh.sha256 https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh.sha256
+sha256sum -c hitt.sh.sha256
+```
+
+`sha256sum -c` should report `hitt.sh: OK`. The checksum file is updated in the repository whenever `hitt.sh` changes.
+
 - [Features & Modes](#features--modes)
 - [Configuration](#configuration)
 - [Proxy Support](#proxy-support)
