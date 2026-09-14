@@ -8645,6 +8645,24 @@ checkPlatformPodsState() {
   fi
 }
 
+checkPodsForMissingProbes() {
+  local ns="${1}"
+  local -a pod_names=()
+
+  [[ -n "${ns}" ]] || return
+  readarray -t pod_names < <(${KUBECTL_BIN} -n "${ns}" get pods -o json 2>/dev/null \
+    | ${JQ_BIN} -r '
+        .items[]
+        | select(.status.phase == "Running")
+        | select(any(.spec.containers[]; .readinessProbe == null or .livenessProbe == null))
+        | .metadata.name
+      ' | sort -u)
+
+  if ((${#pod_names[@]} > 0)); then
+    logWarning "051" "Pods in the '${ns}' namespace have containers missing readiness or liveness probes: ${pod_names[*]}"
+  fi
+}
+
 #End functions
 
 # MAIN Start
@@ -9085,6 +9103,7 @@ checkClusterConfig
 logK8sNodeDetails
 logMessage "Gathering Helix Platform namespace information..."
 checkHPNamespace "${HP_NAMESPACE}"
+checkPodsForMissingProbes "${HP_NAMESPACE}"
 logPods ${HP_NAMESPACE}
 logEvents ${HP_NAMESPACE}
 if [ "${MODE}" != "post-hp" ]; then
@@ -9165,6 +9184,7 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
 fi
 
 if [[ ("${MODE}" == "post-is" || "${MODE}" == "upgrade-is") ]]; then
+  checkPodsForMissingProbes "${IS_NAMESPACE}"
   logStatus "Checking IS platform pods..."
   checkPlatformPodsState
   logPlatformFTSStartTime
@@ -9181,7 +9201,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260914-01"
+HITT_BUILD_VERSION="20260914-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9619,6 +9639,12 @@ ALL_MSGS_JSON="[
     \"cause\": \"The PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS value in the HELIX_ONPREM_DEPLOYMENT pipeline differs from the externalIPs on the platform-admin-ext service in the cluster.\",
     \"impact\": \"The upgrade may reconfigure platform admin access or fail if the external IP change is not intended.\",
     \"remediation\": \"Confirm the pipeline PLATFORM_ADMIN_PLATFORM_EXTERNAL_IPS is correct for the upgrade, or align it with the platform-admin-ext service externalIPs before running the pipeline.\"
+  },
+  {
+    \"id\": \"051\",
+    \"cause\": \"The named pods do not have their expected readiness or liveness probes configured.\",
+    \"impact\": \"Troubleshooting behaviour may be unpredictable as the applicaction state in the pod is unknown.\",
+    \"remediation\": \"Review the pod configuration and status before relying on the reported status of the application.\"
   },
   {
     \"id\": \"100\",
