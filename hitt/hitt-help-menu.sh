@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Prototype: menu-driven HITT help from docs/hitt/use-cases.json
-# May be integrated into hitt.sh later (e.g. bash hitt.sh -u help or -h usecases).
+# Standalone menu-driven HITT help from docs/hitt/use-cases.json.
+# Prefer: bash hitt.sh -h usecases  (embedded JSON, no repo clone required).
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

@@ -310,6 +310,7 @@ usage() {
     echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
     echo
     echo -e "${BOLD}Interactive help page with HITT use-cases available at https://bit.ly/hitthelp${NORMAL}"
+    echo -e "Or run: ${BOLD}bash $0 -h usecases${NORMAL}"
     echo
     exit 1
 }
@@ -6325,6 +6326,191 @@ showOverrideHelp() { # config override options help
   echo "Example: bash hitt.sh -m pre-is -H my-hp-ns -I my-is-ns -C myservice -E prod"
 }
 
+hittUseCasesJq() {
+  ${JQ_BIN} "$@" <<< "${HITT_USE_CASES_JSON}"
+}
+
+hittUseCasesRequireJson() {
+  if [[ -z "${HITT_USE_CASES_JSON:-}" ]]; then
+    echo -e "${BOLD}ERROR:${NORMAL} embedded use-case data is missing from hitt.sh." >&2
+    exit 1
+  fi
+  if ! hittUseCasesJq -e '.topics and .useCases' >/dev/null 2>&1; then
+    echo -e "${BOLD}ERROR:${NORMAL} embedded use-case data is invalid." >&2
+    exit 1
+  fi
+}
+
+hittUseCasesLoadTopics() {
+  local -a ids=() titles=()
+  local id title
+
+  HITT_UC_TOPIC_IDS=()
+  HITT_UC_TOPIC_TITLES=()
+  while IFS=$'\t' read -r id title; do
+    id=${id//$'\r'/}
+    title=${title//$'\r'/}
+    [[ -n "${id}" ]] || continue
+    ids+=("${id}")
+    titles+=("${title}")
+  done < <(hittUseCasesJq -r '.topics | sort_by(.order)[] | [.id, .title] | @tsv')
+
+  HITT_UC_TOPIC_IDS=("${ids[@]}")
+  HITT_UC_TOPIC_TITLES=("${titles[@]}")
+}
+
+hittUseCasesLoadUseCases() {
+  local topic_id="${1}"
+  local -a ids=() titles=()
+  local id title
+
+  HITT_UC_IDS=()
+  HITT_UC_TITLES=()
+  while IFS=$'\t' read -r id title; do
+    id=${id//$'\r'/}
+    title=${title//$'\r'/}
+    [[ -n "${id}" ]] || continue
+    ids+=("${id}")
+    titles+=("${title}")
+  done < <(hittUseCasesJq -r --arg tid "${topic_id}" \
+    '.useCases | map(select(.topicId == $tid)) | sort_by(.order)[] | [.id, .title] | @tsv')
+
+  HITT_UC_IDS=("${ids[@]}")
+  HITT_UC_TITLES=("${titles[@]}")
+}
+
+hittUseCasesShowDetail() {
+  local use_case_id="${1}"
+  local title see_also
+
+  title=$(hittUseCasesJq -r --arg id "${use_case_id}" \
+    '.useCases[] | select(.id == $id) | .title')
+  title=${title//$'\r'/}
+  [[ -n "${title}" && "${title}" != "null" ]] || {
+    echo "Use case not found: ${use_case_id}" >&2
+    return 1
+  }
+
+  echo
+  echo "================================================================"
+  echo "${title}"
+  echo "================================================================"
+  echo
+
+  if hittUseCasesJq -e --arg id "${use_case_id}" \
+    '.useCases[] | select(.id == $id) | (.commands | length) > 0' >/dev/null; then
+    echo "Commands:"
+    hittUseCasesJq -r --arg id "${use_case_id}" \
+      '.useCases[] | select(.id == $id) | .commands[]' \
+      | while IFS= read -r cmd; do
+          cmd=${cmd//$'\r'/}
+          echo "  ${cmd}"
+        done
+    echo
+  fi
+
+  if hittUseCasesJq -e --arg id "${use_case_id}" \
+    '.useCases[] | select(.id == $id) | (.notes | length) > 0' >/dev/null; then
+    echo "Notes:"
+    hittUseCasesJq -r --arg id "${use_case_id}" \
+      '.useCases[] | select(.id == $id) | .notes[]' \
+      | while IFS= read -r note; do
+          note=${note//$'\r'/}
+          echo "  - ${note}"
+        done
+    echo
+  fi
+
+  see_also=$(hittUseCasesJq -r --arg id "${use_case_id}" \
+    '.useCases[] | select(.id == $id) | .seeAlso // empty')
+  see_also=${see_also//$'\r'/}
+  if [[ -n "${see_also}" ]]; then
+    echo "See also:"
+    echo "  ${see_also}"
+    echo
+  fi
+
+  read -r -s -n 1 -p "Press Enter to return to use cases or q to quit... " reply
+  echo
+  if [[ "${reply}" == "q" || "${reply}" == "Q" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+hittUseCasesMenuUseCases() {
+  local topic_id="${1}"
+  local topic_title="${2}"
+  local -a menu_labels=()
+  local choice uc_count i
+
+  while true; do
+    hittUseCasesLoadUseCases "${topic_id}"
+    uc_count=${#HITT_UC_TITLES[@]}
+    if ((${uc_count} == 0)); then
+      echo "No use cases for topic: ${topic_title}" >&2
+      read -r -p "Press Enter to return to topics... "
+      return 0
+    fi
+
+    menu_labels=("${HITT_UC_TITLES[@]}" "Back to topics")
+    echo
+    echo "${BOLD}${topic_title} — choose a use case:${NORMAL}"
+    choice=$(selectFromArray menu_labels column)
+    if [[ "${choice}" == "Back to topics" ]]; then
+      return 0
+    fi
+    for i in "${!HITT_UC_TITLES[@]}"; do
+      if [[ "${HITT_UC_TITLES[$i]}" == "${choice}" ]]; then
+        hittUseCasesShowDetail "${HITT_UC_IDS[$i]}" || exit 0
+        break
+      fi
+    done
+  done
+}
+
+hittUseCasesMenuTopics() {
+  local -a menu_labels=()
+  local choice topic_count i
+
+  while true; do
+    hittUseCasesLoadTopics
+    topic_count=${#HITT_UC_TOPIC_TITLES[@]}
+    ((${topic_count} > 0)) || {
+      echo "No topics found in use-cases data." >&2
+      return 1
+    }
+
+    menu_labels=("${HITT_UC_TOPIC_TITLES[@]}" "Quit")
+    echo
+    echo "${BOLD}HITT use cases — choose a topic:${NORMAL}"
+    choice=$(selectFromArray menu_labels column)
+    if [[ "${choice}" == "Quit" ]]; then
+      return 0
+    fi
+    for i in "${!HITT_UC_TOPIC_TITLES[@]}"; do
+      if [[ "${HITT_UC_TOPIC_TITLES[$i]}" == "${choice}" ]]; then
+        hittUseCasesMenuUseCases "${HITT_UC_TOPIC_IDS[$i]}" "${choice}"
+        break
+      fi
+    done
+  done
+}
+
+hittUseCasesInteractive() {
+  local tool_name
+
+  if [[ ! -t 0 ]]; then
+    echo -e "${BOLD}ERROR:${NORMAL} interactive terminal required for use-case menu." >&2
+    exit 1
+  fi
+  hittUseCasesRequireJson
+  tool_name=$(hittUseCasesJq -r '.meta.tool // "HITT"')
+  tool_name=${tool_name//$'\r'/}
+  echo "${BOLD}${tool_name} — interactive use-case guide${NORMAL}"
+  hittUseCasesMenuTopics
+}
+
 showGeneralHelp() {
   echo ""
   echo -e "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
@@ -6351,8 +6537,10 @@ showGeneralHelp() {
   echo "  bash $0 -h consolelog  - Deployment Engine log options (-o)"
   echo "  bash $0 -h tctl        - tctl mode options (-t)"
   echo "  bash $0 -h override    - config override options"
+  echo "  bash $0 -h usecases    - interactive use-case menu"
   echo
   echo -e "${BOLD}Interactive help page with HITT use-cases available at https://bit.ly/hitthelp${NORMAL}"
+  echo -e "Or run: ${BOLD}bash $0 -h usecases${NORMAL}"
   echo
 }
 
@@ -6382,8 +6570,11 @@ showHittHelp() {
     override)
       showOverrideHelp
       ;;
+    usecases|use-cases|usecase|use-case)
+      hittUseCasesInteractive
+      ;;
     *)
-      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, consolelog, tctl, override)."
+      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, consolelog, tctl, override, usecases)."
       showGeneralHelp
       exit 1
       ;;
@@ -9222,7 +9413,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260914-06"
+HITT_BUILD_VERSION="20260914-07"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
