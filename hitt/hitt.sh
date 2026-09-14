@@ -1222,7 +1222,24 @@ checkPlatformSSL() {
 
 selectFromArray() {
   local ARRAY_REF="${1}[@]"
+  local layout="${2:-}"
   local options=("${!ARRAY_REF}")
+  local i reply
+
+  if [[ "${layout}" == "column" ]]; then
+    # Menu on stderr — stdout is captured when called as choice=$(selectFromArray ...)
+    for i in "${!options[@]}"; do
+      printf '  %d) %s\n' "$((i + 1))" "${options[$i]}" >&2
+    done
+    while true; do
+      read -r -p "Select a valid option (1-${#options[@]}): " reply
+      if [[ "${reply}" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#options[@]} )); then
+        echo "${options[$((reply - 1))]}"
+        return 0
+      fi
+      echo "Error: '${reply}' is not a valid choice." >&2
+    done
+  fi
 
   # PS3 is the prompt displayed by the select command
   local OLD_PS3="${PS3}"
@@ -3802,41 +3819,172 @@ checkJenkinsCredentials() {
   done
 }
 
+# Return 0 when url responds with HTTP 200 to a HEAD request (follow redirects).
+hittRemoteUrlOk() {
+  local url="${1}"
+  [[ -n "${url}" ]] || return 1
+  [[ "$(${CURL_BIN} -o /dev/null --silent -ILw '%{http_code}' --connect-timeout 10 "${url}")" == "200" ]]
+}
+
+hittSha256OfFile() {
+  local file="${1}"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${file}" 2>>"${HITT_ERR_FILE}" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "${file}" 2>>"${HITT_ERR_FILE}" | awk '{print $1}'
+  else
+    ${OPENSSL_BIN} dgst -sha256 "${file}" 2>>"${HITT_ERR_FILE}" | awk '{print $NF}'
+  fi
+}
+
+# Verify file against the published hitt.sh.sha256 (hash  filename format).
+hittVerifyPublishedSha256() {
+  local file="${1}"
+  local sha256_url="${2}"
+  local sha_tmp expected actual
+
+  [[ -n "${file}" && -n "${sha256_url}" ]] || return 1
+  sha_tmp=$(mktemp) || return 1
+  if ! ${CURL_BIN} -fsSL "${sha256_url}" --connect-timeout 10 -o "${sha_tmp}" 2>>"${HITT_ERR_FILE}"; then
+    rm -f "${sha_tmp}"
+    return 1
+  fi
+  expected=$(awk '{print $1}' "${sha_tmp}")
+  actual=$(hittSha256OfFile "${file}")
+  rm -f "${sha_tmp}"
+  [[ -n "${expected}" && -n "${actual}" && "${expected}" == "${actual}" ]]
+}
+
+hittScriptPath() {
+  local target="${1:-$0}"
+  local resolved
+
+  if command -v readlink >/dev/null 2>&1; then
+    resolved=$(readlink -f "${target}" 2>/dev/null || true)
+    if [[ -n "${resolved}" ]]; then
+      echo "${resolved}"
+      return 0
+    fi
+  fi
+  if command -v realpath >/dev/null 2>&1; then
+    resolved=$(realpath "${target}" 2>/dev/null || true)
+    if [[ -n "${resolved}" ]]; then
+      echo "${resolved}"
+      return 0
+    fi
+  fi
+  resolved="$(cd "$(dirname "${target}")" && pwd)/$(basename "${target}")"
+  echo "${resolved}"
+}
+
+# $1 = path to new hitt.sh content. Backs up current script to .bak and replaces it.
+hittInstallDownloadedScript() {
+  local new_script="${1}"
+  local target
+
+  [[ -f "${new_script}" ]] || return 1
+  target=$(hittScriptPath)
+  cp "${target}" "${target}.bak"
+  cp "${new_script}" "${target}"
+  chmod a+x "${target}"
+}
+
+hittParseBuildVersionFromFile() {
+  local file="${1}"
+  local remote_line val
+
+  remote_line=$(grep -m1 -E '^HITT_BUILD_VERSION=' "${file}" 2>/dev/null || true)
+  remote_line=${remote_line//$'\r'/}
+  [[ -n "${remote_line}" ]] || return 1
+  val=${remote_line#HITT_BUILD_VERSION=}
+  val=${val#\"}
+  val=${val%\"}
+  val=${val#\'}
+  val=${val%\'}
+  if [[ "${val}" =~ ^[0-9]{8}-[0-9]{1,2}$ ]]; then
+    echo "${val}"
+  fi
+}
+
 checkForNewHITT() {
+  local remote_tmp local_sha remote_sha remote_build_version
+  local -a update_menu choice target
+
   [[ "${SKIP_UPDATE_CHECK}" == "1" ]] && return
-  if [ "$(${CURL_BIN} -o /dev/null --silent -Iw '%{http_code}' --connect-timeout 10 "${HITT_URL}")" != "200" ]; then
+  [[ -n "${HITT_URL:-}" ]] || return
+  hittRemoteUrlOk "${HITT_URL}" || return
+
+  remote_tmp=$(mktemp) || return
+  if ! ${CURL_BIN} -fsSL "${HITT_URL}" --connect-timeout 10 -o "${remote_tmp}" 2>>"${HITT_ERR_FILE}"; then
+    rm -f "${remote_tmp}"
     return
   fi
-  REMOTE_TMP=$(mktemp) || return
-  if ! ${CURL_BIN} -sL "${HITT_URL}" --connect-timeout 10 -o "${REMOTE_TMP}"; then
-    rm -f "${REMOTE_TMP}"
+
+  local_sha=$(hittSha256OfFile "$0")
+  remote_sha=$(hittSha256OfFile "${remote_tmp}")
+  [[ -n "${local_sha}" && -n "${remote_sha}" ]] || {
+    rm -f "${remote_tmp}"
+    return
+  }
+  [[ "${local_sha}" != "${remote_sha}" ]] || {
+    rm -f "${remote_tmp}"
+    return
+  }
+
+  remote_build_version=$(hittParseBuildVersionFromFile "${remote_tmp}" || true)
+  if [[ -n "${remote_build_version}" ]]; then
+    logStatus "${GREEN}An updated version of HITT is available (${remote_build_version}).${NORMAL}"
+  else
+    logStatus "${GREEN}An updated version of HITT is available.${NORMAL}"
+  fi
+  logStatus "Update manually by running:\n${YELLOW}curl -skO ${HITT_URL}${NORMAL}\n${BOLD}or select from menu:${NORMAL}"
+
+  if [[ ! -t 0 ]]; then
+    rm -f "${remote_tmp}"
     return
   fi
-  REMOTE_MD5=$(md5sum "${REMOTE_TMP}" | awk '{print $1}')
-  remote_line=$(grep -m1 -E '^HITT_BUILD_VERSION=' "${REMOTE_TMP}" || true)
-  rm -f "${REMOTE_TMP}"
-  REMOTE_HITT_BUILD_VERSION=""
-  if [[ -n "${remote_line}" ]]; then
-    val=${remote_line#HITT_BUILD_VERSION=}
-    val=${val#\"}
-    val=${val%\"}
-    val=${val#\'}
-    val=${val%\'}
-    if [[ "${val}" =~ ^[0-9]{8}-[0-9]{1,2}$ ]]; then
-      REMOTE_HITT_BUILD_VERSION="${val}"
-    fi
-  fi
-  LOCAL_MD5=$(md5sum $0 | awk '{print $1}')
-  if [ "${REMOTE_MD5}" != "${LOCAL_MD5}" ]; then
-    if [[ -n "${REMOTE_HITT_BUILD_VERSION}" ]]; then
-      logStatus "${GREEN}An updated version of HITT is available (${REMOTE_HITT_BUILD_VERSION}) - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -skO ${HITT_URL}${NORMAL}"
-    else
-      logStatus "${GREEN}An updated version of HITT is available - please see https://bit.ly/gethitt or update by running:\n${YELLOW}curl -skO ${HITT_URL}${NORMAL}"
-    fi
-    echo
-    read -r -s -n1 -t3 -p"Press any key to continue or Ctrl+C to cancel..."
-    echo
-  fi
+
+  update_menu=(
+    "Update HITT and rerun"
+    "Update HITT and stop"
+    "Continue without updating HITT"
+    "Exit HITT"
+  )
+  choice=$(selectFromArray update_menu column)
+
+  case "${choice}" in
+    "Update HITT and rerun"|"Update HITT and stop")
+      if ! hittVerifyPublishedSha256 "${remote_tmp}" "${HITT_SHA256_URL}"; then
+        rm -f "${remote_tmp}"
+        logError "999" "Downloaded HITT failed sha256 verification — update aborted." 1
+      fi
+      if ! hittInstallDownloadedScript "${remote_tmp}"; then
+        rm -f "${remote_tmp}"
+        logError "999" "Failed to install updated HITT." 1
+      fi
+      rm -f "${remote_tmp}"
+      target=$(hittScriptPath)
+      case "${choice}" in
+        "Update HITT and rerun")
+          logMessage "HITT updated to ${remote_build_version:-latest}. Re-running..." 1
+          SKIP_UPDATE_CHECK=1 exec bash "${HITT_INVOCATION[@]}"
+          ;;
+        "Update HITT and stop")
+          logMessage "HITT updated to ${remote_build_version:-latest}. Backup saved as ${target}.bak" 1
+          logMessage "Re-run with: bash ${target}" 1
+          exit 0
+          ;;
+      esac
+      ;;
+    "Exit HITT")
+      rm -f "${remote_tmp}"
+      exit 0
+      ;;
+    *)
+      rm -f "${remote_tmp}"
+      ;;
+  esac
 }
 
 unpackSSLPoke() {
@@ -8592,8 +8740,9 @@ if [ -n "${JENKINS_USERNAME}" ]; then
   JENKINS_CREDENTIALS="${JENKINS_USERNAME}:${JENKINS_PASSWORD}@"
 fi
 
-# Build JENKINS_URL
+# Build JENKINS_URL (credentials embedded for curl) and JENKINS_LOG_URL (no credentials — for logs/UI).
 JENKINS_URL="${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}:${JENKINS_PORT}"
+JENKINS_LOG_URL="${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}:${JENKINS_PORT}"
 if [ "${JENKINS_PROTOCOL}" == "https" ] && [ "${JENKINS_PORT}" == "443" ]; then
   JENKINS_URL="${JENKINS_PROTOCOL}://${JENKINS_CREDENTIALS}${JENKINS_HOSTNAME}"
   JENKINS_LOG_URL="${JENKINS_PROTOCOL}://${JENKINS_HOSTNAME}"
@@ -9032,9 +9181,10 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260911-02"
+HITT_BUILD_VERSION="20260914-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
+HITT_SHA256_URL="${HITT_URL}.sha256"
 SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
 LONG_HOSTNAME=$(hostname --long 2>/dev/null || hostname)
 GIT_USER=$(whoami)
@@ -10567,6 +10717,8 @@ ALL_MSGS_JSON="[
 if [ ! -t 1 ]; then
   REDIRECT=1
 fi
+
+HITT_INVOCATION=( "$0" "$@" )
 
 while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
   case "${options}" in
