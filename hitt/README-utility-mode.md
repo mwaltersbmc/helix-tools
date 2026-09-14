@@ -258,5 +258,5 @@ Namespace-scoped rules use your Helix Platform, Helix IS, Deployment Engine, and
 
 - [README-fix-mode.md](README-fix-mode.md) — **`-f` fix mode** (cacerts, Jenkins, license apply, etc.)
 - [README-pipeline-mode.md](README-pipeline-mode.md) — **`-k` pipeline mode**
-- [README-info-mode.md](README-info-mode.md) — **`-m info`**
+- [README-info-mode.md](README-info-mode.md) — **`-i`**
 - Step-by-step use cases: https://bit.ly/hitthelp

@@ -54,5 +54,5 @@ Function: `discoverIngressControllerDetails` in `hitt.sh` (~6685).
 
 - Cluster with valid `INGRESS_CLASS` in configmap — discovery matches expected controller.
 - Configmap with `INGRESS_CLASS` missing/empty — verify behaviour after fix (warning or explicit failure, not silent `nginx`).
-- `bash hitt.sh -m info` and `bash hitt.sh -m info ingress` — human report and `info.json` ingress fields consistent.
+- `bash hitt.sh -i` and `bash hitt.sh -i ingress` — human report and `info.json` ingress fields consistent.
 - No-arg call `discoverIngressControllerDetails` (if exposed or tested in isolation) — uses `HP_INGRESS_CLASS` when set.

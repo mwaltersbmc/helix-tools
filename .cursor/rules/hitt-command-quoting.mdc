@@ -7,23 +7,24 @@ alwaysApply: true
 
 When documenting, suggesting, or generating **HITT** (`hitt.sh`) command examples, any option whose value is **more than one word** must be enclosed in **double quotes**.
 
-Applies to (among others): `-m`, `-f`, `-k`, `-u`, `-t`.
+Applies to (among others): `-i`, `-f`, `-k`, `-u`, `-t`.
 
 ```bash
 # ✅ GOOD
-bash hitt.sh -m "info ingress"
-bash hitt.sh -m "info full"
+bash hitt.sh -i ingress
+bash hitt.sh -i full
+bash hitt.sh -i "node my-node-name"
 bash hitt.sh -f "jenkins kubeconfig"
 bash hitt.sh -k "get lastsuccessful"
 bash hitt.sh -u "get secret my-secret helix-is"
 bash hitt.sh -t "get tenant"
 
-# ❌ BAD — shell splits the value; info sub-commands silently default to full
-bash hitt.sh -m info ingress
+# ❌ BAD — shell splits the value; stray arguments or wrong sub-command
+bash hitt.sh -i node my-node-name
 bash hitt.sh -f jenkins kubeconfig
 bash hitt.sh -u get secret my-secret
 ```
 
-Single-word values do not require quotes: `-m post-hp`, `-f sat`, `-m info` (defaults sub-command to `full`).
+Single-word values do not require quotes: `-m post-hp`, `-f sat`, `-i cluster`, `-i full` (or bare `-i` defaults sub-command to `full`).
 
 When editing `docs/hitt/use-cases.json`, `README*.md`, help text in `hitt.sh`, or error messages, follow this convention consistently.

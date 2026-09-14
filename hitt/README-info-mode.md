@@ -1,22 +1,22 @@
 # HITT Info Mode
 
-**Info mode** (`-m info`) displays read-only summaries about a Helix environment. It is **under active development** — sub-commands and output may change between HITT builds.
+**Info mode** (`-i`) displays read-only summaries about a Helix environment. It is **under active development** — sub-commands and output may change between HITT builds.
 
-When `-m` takes multiple words, enclose the whole value in **double quotes**:
+When `-i` takes multiple words, enclose the whole value in **double quotes**:
 
 ```bash
-bash hitt.sh -m "info cluster"
-bash hitt.sh -m "info node <node-name>"
-bash hitt.sh -m "info helix"
-bash hitt.sh -m "info ingress"
-bash hitt.sh -m "info dbversions"
-bash hitt.sh -m "info full"
-bash hitt.sh -m "info help"
+bash hitt.sh -i cluster
+bash hitt.sh -i "node <node-name>"
+bash hitt.sh -i helix
+bash hitt.sh -i ingress
+bash hitt.sh -i dbversions
+bash hitt.sh -i full
+bash hitt.sh -i help
 ```
 
-If you omit the sub-command (`bash hitt.sh -m info`), HITT defaults to **`full`**.
+If you omit the sub-command (`bash hitt.sh -i`), HITT defaults to **`full`**.
 
-Built-in summary: `bash hitt.sh -m "info help"`
+Built-in summary: `bash hitt.sh -i help` or `bash hitt.sh -h info`
 
 ## Sub-commands
 
@@ -33,7 +33,7 @@ Built-in summary: `bash hitt.sh -m "info help"`
 ## `cluster` — node summary table
 
 ```bash
-bash hitt.sh -m "info cluster"
+bash hitt.sh -i cluster
 ```
 
 Displays a table summarising cluster node resources.
@@ -60,8 +60,8 @@ Displays a table summarising cluster node resources.
 ## `node` — per-pod resource usage
 
 ```bash
-bash hitt.sh -m "info node"
-bash hitt.sh -m "info node vs-ak8s02-hlxcussp-cl2-04"
+bash hitt.sh -i node
+bash hitt.sh -i "node vs-ak8s02-hlxcussp-cl2-04"
 ```
 
 If you omit the node name, HITT lists cluster nodes and prompts you to **select one** interactively.
@@ -85,10 +85,10 @@ Lists every pod scheduled on the named node, sorted by namespace and name.
 ## `helix` — Helix namespace scan
 
 ```bash
-bash hitt.sh -m "info helix"
+bash hitt.sh -i helix
 ```
 
-Scans **every namespace** in the cluster and prints Helix-related namespaces grouped by product. Use this for a quick map of where Helix is installed (for example on a shared cluster). It does **not** run the interactive prompts or full summary from **`info full`**.
+Scans **every namespace** in the cluster and prints Helix-related namespaces grouped by product. Use this for a quick map of where Helix is installed (for example on a shared cluster). It does **not** run the interactive prompts or full summary from **`full`**.
 
 | Section | What you see |
 |---------|----------------|
@@ -114,12 +114,12 @@ Helix Logging
 
 - Sections with no matching namespaces are omitted.
 - Version may show as **unknown** when HITT cannot read a version for that namespace.
-- Standalone (non-containerized) Deployment Engine on the cluster host is **not** listed — use **`info full`** when the Deployment Engine is not running in the cluster.
+- Standalone (non-containerized) Deployment Engine on the cluster host is **not** listed — use **`full`** when the Deployment Engine is not running in the cluster.
 
 ## `ingress` — ingress controller summary
 
 ```bash
-bash hitt.sh -m "info ingress"
+bash hitt.sh -i ingress
 ```
 
 Resolves the ingress controller workload for the **INGRESS_CLASS** value from Helix Platform configuration, then prints:
@@ -140,9 +140,9 @@ Resolves the ingress controller workload for the **INGRESS_CLASS** value from He
 ## `dbversion` / `dbversions` — Helix IS database version reference
 
 ```bash
-bash hitt.sh -m "info dbversions"
+bash hitt.sh -i dbversions
 # or
-bash hitt.sh -m "info dbversion"
+bash hitt.sh -i dbversion
 ```
 
 Prints a tab-separated table of Helix IS releases and the **expected database version** HITT uses when validating your database during deployment checks:
@@ -165,17 +165,17 @@ IS_VERSION      IS_DB_VERSION
 ## `full` — Helix environment summary
 
 ```bash
-bash hitt.sh -m "info full"
+bash hitt.sh -i full
 # same as:
-bash hitt.sh -m info
+bash hitt.sh -i
 ```
 
 Collects and prints a **BMC Helix Environment Summary**, including:
 
 - Client OS and tool versions (cluster and Helm clients)
 - Cluster Kubernetes / OpenShift version
-- **Node summary** (same table as `info cluster`)
-- **Ingress controller** (same fields as `info ingress`)
+- **Node summary** (same table as `cluster`)
+- **Ingress controller** (same fields as `ingress`)
 - Helix Platform (namespace, version, tenants, services)
 - Helix Logging (namespace, version)
 - Deployment Engine (Jenkins URL, version, pipeline Helm version)

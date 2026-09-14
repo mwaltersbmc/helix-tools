@@ -650,7 +650,7 @@ window.HITT_USE_CASES = {
       "order": 27,
       "title": "I want to see the dbVersion for each Helix Service Management release",
       "commands": [
-        "bash hitt.sh -m \"info dbversions\""
+        "bash hitt.sh -i dbversions"
       ],
       "notes": [
         "Prints a tab-separated table of Helix IS release and expected database version (currDbVersion) — the values HITT uses when checking your database during deployment.",
@@ -857,11 +857,11 @@ window.HITT_USE_CASES = {
       "order": 10,
       "title": "I want to see information about my cluster resources",
       "commands": [
-        "bash hitt.sh -m \"info cluster\""
+        "bash hitt.sh -i cluster"
       ],
       "notes": [
         "Prints Kubernetes/OpenShift version and a node summary table: allocatable CPU (cores) and memory (Gi), allocated pod resource requests from Running pods only (CPU in cores, memory in Gi) with remaining allocatable memory in parentheses, total and actually used ephemeral storage from kubelet stats (Gi), actual usage percentages (when metrics-server is available), node health/conditions, pod run/bad/crash counts, OOM kills, and container runtime.",
-        "Info mode is under development; use bash hitt.sh -m \"info help\" or README-info-mode.md for full environment summary (info full) and other options."
+        "Info mode is under development; use bash hitt.sh -i help or README-info-mode.md for full environment summary (-i full) and other options."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md",
       "video": {
@@ -876,8 +876,8 @@ window.HITT_USE_CASES = {
       "order": 12,
       "title": "I want to see pod resource usage on a specific node",
       "commands": [
-        "bash hitt.sh -m \"info node\"",
-        "bash hitt.sh -m \"info node <node-name>\""
+        "bash hitt.sh -i node",
+        "bash hitt.sh -i \"node <node-name>\""
       ],
       "notes": [
         "Lists pods scheduled on a node with requests, limits, current CPU/memory usage (when metrics-server is available), and actual ephemeral storage used from kubelet stats.",
@@ -895,12 +895,12 @@ window.HITT_USE_CASES = {
       "order": 15,
       "title": "I want to see the Helix namespaces and application versions in my cluster",
       "commands": [
-        "bash hitt.sh -m \"info helix\""
+        "bash hitt.sh -i helix"
       ],
       "notes": [
         "Scans all namespaces and lists Helix Platform, Helix IS, containerized Deployment Engine, and Helix Logging namespaces.",
         "Shows a version per namespace when HITT can read one from the cluster. Helix Logging lists the namespace name only.",
-        "Lightweight alternative to info full — no interactive prompts and no info.json."
+        "Lightweight alternative to -i full — no interactive prompts and no info.json."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md#helix--helix-namespace-scan",
       "video": {
@@ -914,13 +914,13 @@ window.HITT_USE_CASES = {
       "order": 20,
       "title": "I want to display information about my Helix environment",
       "commands": [
-        "bash hitt.sh -m \"info full\"",
-        "bash hitt.sh -m info"
+        "bash hitt.sh -i full",
+        "bash hitt.sh -i"
       ],
       "notes": [
         "Prints a BMC Helix Environment Summary: client/cluster versions, node table, ingress controller, Helix Platform (tenants and services), Helix Logging, Deployment Engine (Jenkins), and Helix Service Management when IS is deployed.",
         "Also writes info.json in the current directory. Expect interactive prompts (environment type, live system, tenant, logging namespace when multiple exist).",
-        "Use double quotes when -m has multiple words (e.g. bash hitt.sh -m \"info full\"). Single-word bash hitt.sh -m info is equivalent and does not require quotes.",
+        "Use double quotes when -i has multiple words (e.g. bash hitt.sh -i \"node my-node\"). Bare bash hitt.sh -i defaults to full.",
         "Info mode is under development — see README-info-mode.md."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md",
@@ -1309,10 +1309,10 @@ window.HITT_USE_CASES = {
         "bash hitt.sh -f help",
         "bash hitt.sh -u help",
         "bash hitt.sh -k help",
-        "bash hitt.sh -m \"info help\""
+        "bash hitt.sh -i help"
       ],
       "notes": [
-        "Each command prints the built-in summary for that mode: fix (-f), utility (-u), pipeline (-k), and info (-m info).",
+        "Each command prints the built-in summary for that mode: fix (-f), utility (-u), pipeline (-k), and info (-i help).",
         "Fix mode covers targeted changes such as cacerts, Jenkins credentials, and licensing. Utility mode covers helpers such as get secret, get jwt, and get dbid.",
         "The same summaries are available with bash hitt.sh -h fix, -h utility, -h pipeline, and -h info."
       ],

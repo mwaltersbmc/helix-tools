@@ -6290,12 +6290,25 @@ showTctlHelp() { # tctl mode help
   echo "Successful job logs show HTTP Response Status 2xx. On failure, the full job log is printed."
 }
 
+hittNormalizeInfoArgs() {
+  if [[ ${#INFOARGS[@]} -eq 0 ]]; then
+    INFOARGS=(full)
+  fi
+  if [[ "${INFOARGS[0]:-}" == "dbversion" ]]; then
+    INFOARGS[0]=dbversions
+  fi
+  if [[ "${INFOARGS[0]:-}" == "dbversions" ]]; then
+    QUIET=1
+    SKIP_UPDATE_CHECK=1
+  fi
+}
+
 showInfoHelp() { # info mode help
   echo "HITT info mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
   echo .
-  echo 'Usage: bash hitt.sh -m "info <subcommand>"'
-  echo '       bash hitt.sh -m "info node [node-name]"'
-  echo "Multi-word -m values must be double-quoted (e.g. bash hitt.sh -m \"info ingress\")."
+  echo 'Usage: bash hitt.sh -i <subcommand>'
+  echo '       bash hitt.sh -i "node [node-name]"'
+  echo "Multi-word -i values must be double-quoted (e.g. bash hitt.sh -i \"node my-node-name\")."
   echo -e "
     \tcluster \t| Kubernetes/OpenShift version and node resource summary table (allocatable, requested, usage, status).
     \tnode [NAME]\t| Per-pod resource table for one node (requests, limits, current usage, ephemeral storage). Omit NAME to choose from a menu.
@@ -6305,7 +6318,7 @@ showInfoHelp() { # info mode help
     \tfull \t\t| Full BMC Helix Environment Summary on the console and info.json.
     \thelp \t\t| Show this list.
     "
-  echo "Default sub-command when omitted: full"
+  echo "Default sub-command when omitted: bash hitt.sh -i  or  bash hitt.sh -i full"
   echo "Note: info mode is under development; sub-commands and output may change."
 }
 
@@ -6531,7 +6544,7 @@ showGeneralHelp() {
   echo
   echo "Mode-specific help:"
   echo "  bash $0 -h fix         - fix mode options (-f)"
-  echo "  bash $0 -h info        - info mode options"
+  echo "  bash $0 -h info        - info mode options (-i)"
   echo "  bash $0 -h utility     - utility mode options (-u)"
   echo "  bash $0 -h pipeline    - pipeline mode options (-k)"
   echo "  bash $0 -h consolelog  - Deployment Engine log options (-o)"
@@ -7630,7 +7643,7 @@ discoverIngressControllerDetails() {
   return 0
 }
 
-# Human-readable info summary only (-m info): section headers, aligned labels, tctl tables via column.
+# Human-readable info summary only (-i): section headers, aligned labels, tctl tables via column.
 hittInfoPrintSection() {
   echo ""
   echo "--------------------------------------------------------------------------------"
@@ -8885,7 +8898,7 @@ logStatus "Checking KUBECONFIG file..."
 checkKubeconfig
 
 # config file checks
-if [ ! -f "${HITT_CONFIG_FILE}" ] && [[ "${MODEARGS[0]:-}" == "info" && "${MODEARGS[1]:-}" =~ ^(helix|cluster|node|dbversions)$ ]]; then
+if [ ! -f "${HITT_CONFIG_FILE}" ] && [[ "${MODE}" == "info" && "${INFOARGS[0]:-}" =~ ^(helix|cluster|node|dbversions)$ ]]; then
   # info helix, info cluster, info node, and info dbversions do not require hitt.conf
   SKIP_UPDATE_CHECK=1
 elif [ ! -f "${HITT_CONFIG_FILE}" ]; then
@@ -9220,7 +9233,7 @@ fi
 if [ "${MODE}" == "info" ]; then
   checkToolVersion kubectl
   logStatus "Running in info mode..."
-  case "${MODEARGS[1]}" in
+  case "${INFOARGS[0]}" in
     cluster)
       QUIET=1
       logStatus "Gathering cluster information..." 1
@@ -9237,7 +9250,7 @@ if [ "${MODE}" == "info" ]; then
       ;;
     node)
       QUIET=1
-      INFO_NODE_NAME="${MODEARGS[2]:-}"
+      INFO_NODE_NAME="${INFOARGS[1]:-}"
       if [[ -z "${INFO_NODE_NAME}" ]]; then
         NODE_ARRAY=($(${KUBECTL_BIN} get nodes --no-headers -o custom-columns=':metadata.name' 2>>"${HITT_ERR_FILE}"))
         if [[ ${#NODE_ARRAY[@]} -eq 0 ]]; then
@@ -9277,7 +9290,7 @@ if [ "${MODE}" == "info" ]; then
       showInfoHelp
       ;;
     *)
-      logError "999" "'${MODEARGS[1]}' is not a valid info mode option (try: cluster, node, helix, ingress, dbversion, dbversions, full, help). Please check for an updated HITT." 1
+      logError "999" "'${INFOARGS[0]}' is not a valid info mode option (try: cluster, node, helix, ingress, dbversion, dbversions, full, help). Please check for an updated HITT." 1
       ;;
   esac
   exit
@@ -9413,7 +9426,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260914-07"
+HITT_BUILD_VERSION="20260914-08"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -11485,7 +11498,7 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
       "order": 27,
       "title": "I want to see the dbVersion for each Helix Service Management release",
       "commands": [
-        "bash hitt.sh -m \"info dbversions\""
+        "bash hitt.sh -i dbversions"
       ],
       "notes": [
         "Prints a tab-separated table of Helix IS release and expected database version (currDbVersion) — the values HITT uses when checking your database during deployment.",
@@ -11648,11 +11661,11 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
       "order": 10,
       "title": "I want to see information about my cluster resources",
       "commands": [
-        "bash hitt.sh -m \"info cluster\""
+        "bash hitt.sh -i cluster"
       ],
       "notes": [
         "Prints Kubernetes/OpenShift version and a node summary table: allocatable CPU (cores) and memory (Gi), allocated pod resource requests from Running pods only (CPU in cores, memory in Gi) with remaining allocatable memory in parentheses, total and actually used ephemeral storage from kubelet stats (Gi), actual usage percentages (when metrics-server is available), node health/conditions, pod run/bad/crash counts, OOM kills, and container runtime.",
-        "Info mode is under development; use bash hitt.sh -m \"info help\" or README-info-mode.md for full environment summary (info full) and other options."
+        "Info mode is under development; use bash hitt.sh -i help or README-info-mode.md for full environment summary (-i full) and other options."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
     },
@@ -11662,8 +11675,8 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
       "order": 12,
       "title": "I want to see pod resource usage on a specific node",
       "commands": [
-        "bash hitt.sh -m \"info node\"",
-        "bash hitt.sh -m \"info node <node-name>\""
+        "bash hitt.sh -i node",
+        "bash hitt.sh -i \"node <node-name>\""
       ],
       "notes": [
         "Lists pods scheduled on a node with requests, limits, current CPU/memory usage (when metrics-server is available), and actual ephemeral storage used from kubelet stats.",
@@ -11677,12 +11690,12 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
       "order": 15,
       "title": "I want to see the Helix namespaces and application versions in my cluster",
       "commands": [
-        "bash hitt.sh -m \"info helix\""
+        "bash hitt.sh -i helix"
       ],
       "notes": [
         "Scans all namespaces and lists Helix Platform, Helix IS, containerized Deployment Engine, and Helix Logging namespaces.",
         "Shows a version per namespace when HITT can read one from the cluster. Helix Logging lists the namespace name only.",
-        "Lightweight alternative to info full — no interactive prompts and no info.json."
+        "Lightweight alternative to -i full — no interactive prompts and no info.json."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md#helix--helix-namespace-scan"
     },
@@ -11692,13 +11705,13 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
       "order": 20,
       "title": "I want to display information about my Helix environment",
       "commands": [
-        "bash hitt.sh -m \"info full\"",
-        "bash hitt.sh -m info"
+        "bash hitt.sh -i full",
+        "bash hitt.sh -i"
       ],
       "notes": [
         "Prints a BMC Helix Environment Summary: client/cluster versions, node table, ingress controller, Helix Platform (tenants and services), Helix Logging, Deployment Engine (Jenkins), and Helix Service Management when IS is deployed.",
         "Also writes info.json in the current directory. Expect interactive prompts (environment type, live system, tenant, logging namespace when multiple exist).",
-        "Use double quotes when -m has multiple words (e.g. bash hitt.sh -m \"info full\"). Single-word bash hitt.sh -m info is equivalent and does not require quotes.",
+        "Use double quotes when -i has multiple words (e.g. bash hitt.sh -i \"node my-node\"). Bare bash hitt.sh -i defaults to full.",
         "Info mode is under development — see README-info-mode.md."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md"
@@ -12007,10 +12020,10 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
         "bash hitt.sh -f help",
         "bash hitt.sh -u help",
         "bash hitt.sh -k help",
-        "bash hitt.sh -m \"info help\""
+        "bash hitt.sh -i help"
       ],
       "notes": [
-        "Each command prints the built-in summary for that mode: fix (-f), utility (-u), pipeline (-k), and info (-m info).",
+        "Each command prints the built-in summary for that mode: fix (-f), utility (-u), pipeline (-k), and info (-i help).",
         "Fix mode covers targeted changes such as cacerts, Jenkins credentials, and licensing. Utility mode covers helpers such as get secret, get jwt, and get dbid.",
         "The same summaries are available with bash hitt.sh -h fix, -h utility, -h pipeline, and -h info."
       ],
@@ -12056,7 +12069,7 @@ fi
 
 HITT_INVOCATION=( "$0" "$@" )
 
-while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
+while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
   case "${options}" in
     b)
       BUNDLE_ID="${OPTARG}"
@@ -12113,6 +12126,19 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
       CONF_OVERRIDE=1
       HP_NAMESPACE_OVERRIDE="${OPTARG}"
       ;;
+    i)
+      MODE=info
+      if [[ -n "${OPTARG}" ]]; then
+        NEXT_VAL="${!OPTIND}"
+        if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
+          logError "999" "When using INFO mode commands with options you must enclose them in double quotes - eg: bash $0 -i \"node my-node-name\"" 1
+        fi
+        read -r -a INFOARGS <<< "${OPTARG}"
+      else
+        INFOARGS=()
+      fi
+      hittNormalizeInfoArgs
+      ;;
     I)
       CONF_OVERRIDE=1
       IS_NAMESPACE_OVERRIDE="${OPTARG}"
@@ -12141,20 +12167,16 @@ while getopts "b:c:C:dD:e:E:f:ghH:I:jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
     m)
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "When using mode (-m) commands with multiple words you must enclose them in double quotes - eg: bash $0 -m \"info ingress\"" 1
+        if [[ "${OPTARG}" == "info" ]]; then
+          logError "999" "Info mode uses -i: eg: bash $0 -i ${NEXT_VAL}" 1
+        fi
+        logError "999" "When using mode (-m) commands with multiple words you must enclose them in double quotes - eg: bash $0 -m \"post-is\"" 1
       fi
-      # Parse UTILOPTS to array
       read -r -a MODEARGS <<< "${OPTARG}"
       MODE="${MODEARGS[0]}"
-      if [ "${MODE}" == "info" ] && [ "${#MODEARGS[@]}" -eq 1 ]; then
-        MODEARGS+=("full")
-      fi
-      if [[ "${MODEARGS[1]:-}" == "dbversion" ]]; then
-        MODEARGS[1]="dbversions"
-      fi
-      if [[ "${MODE}" == "info" && "${MODEARGS[1]:-}" == "dbversions" ]]; then
-        QUIET=1
-        SKIP_UPDATE_CHECK=1
+      if [ "${MODE}" == "info" ]; then
+        INFOARGS=("${MODEARGS[@]:1}")
+        hittNormalizeInfoArgs
       fi
       ;;
     o)
@@ -12227,7 +12249,7 @@ if [[ "${MSG_LOOKUP_CANDIDATE}" == "1" ]] && ! isHittActionRun; then
   exit 0
 fi
 
-if [[ "${MODE}" == "info" && "${MODEARGS[1]:-}" == "dbversions" ]]; then
+if [[ "${MODE}" == "info" && "${INFOARGS[0]:-}" == "dbversions" ]]; then
   printISDBVersionTable
   exit 0
 fi

@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260914-07`**
+**Latest build `20260914-08`**
 
 The **Helix IS Triage Tool (HITT)** is a command-line helper for BMC Helix on-premises deployments. It can check your environment, fix common setup problems, work with the **HELIX_ONPREM_DEPLOYMENT** pipeline, and gather information for troubleshooting or support.
 
@@ -7,7 +7,7 @@ The **Helix IS Triage Tool (HITT)** is a command-line helper for BMC Helix on-pr
 - **Targeted fixes** — apply common corrections in fix mode (`-f`): certificates, SSO realm, Jenkins credentials and libraries, licenses, Support Assistant roles, and related items.
 - **Pipeline helpers** — export, prefill, queue, and manage the **HELIX_ONPREM_DEPLOYMENT** pipeline from saved settings (`get`, `kickstart`, `build`, `delete`), including kickstart from an existing Helix Platform install.
 - **Everyday utilities** — decode secrets, fetch JWTs and DBIDs, query AR forms, validate Docker Hub tokens, list image tags, and more (`-u` utility mode).
-- **Environment overview** — summarize cluster, Helix namespaces, ingress, and the full Helix stack (`-m info`), plus an interactive use-case guide at https://bit.ly/hitthelp.
+- **Environment overview** — summarize cluster, Helix namespaces, ingress, and the full Helix stack (`-i`), plus an interactive use-case guide at https://bit.ly/hitthelp.
 
 ### Quick Start ###
 
@@ -40,13 +40,13 @@ sha256sum -c hitt.sh.sha256
 - [Fix mode](README-fix-mode.md) (`-f`) — targeted fixes (cacerts, addcert, Jenkins, license, …)
 - [Utility mode](README-utility-mode.md) (`-u`) — helpers (`get secret`, `get jwt`, `get dbid`, `get arlicense`, `gendbid`, `imagels`, `check pat`, `check rbac`, `check arservers`, `check liveness`, `check readiness`)
 - [Pipeline mode](README-pipeline-mode.md) (`-k`) — `get` / `build` / `kickstart` / `delete` for **HELIX_ONPREM_DEPLOYMENT**
-- [Info mode](README-info-mode.md) (`-m info`) — environment summaries (**under development**): `info cluster`, `info node`, `info helix`, `info ingress`, `info dbversions`, `info full`
+- [Info mode](README-info-mode.md) (`-i`) — environment summaries (**under development**): `cluster`, `node`, `helix`, `ingress`, `dbversions`, `full`
 
-Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h consolelog`, `bash hitt.sh -h info`, `bash hitt.sh -h tctl`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, `bash hitt.sh -o help`, `bash hitt.sh -t help`, or `bash hitt.sh -m "info help"` from within each mode.
+Built-in summaries: `bash hitt.sh -h` (general help), `bash hitt.sh -h fix`, `bash hitt.sh -h utility`, `bash hitt.sh -h pipeline`, `bash hitt.sh -h consolelog`, `bash hitt.sh -h info`, `bash hitt.sh -h tctl`, and `bash hitt.sh -h override`. You can also run `bash hitt.sh -f help`, `bash hitt.sh -u help`, `bash hitt.sh -k help`, `bash hitt.sh -o help`, `bash hitt.sh -t help`, or `bash hitt.sh -i help` from within each mode.
 
-**Info ingress** (`bash hitt.sh -m "info ingress"`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires **HITT configuration** with the Helix Platform namespace set. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
+**Info ingress** (`bash hitt.sh -i ingress`) — read-only ingress controller summary for the Helix **`INGRESS_CLASS`**: workload type, namespace, workload name, and controller image. Requires **HITT configuration** with the Helix Platform namespace set. See [README-info-mode.md](README-info-mode.md#ingress--ingress-controller-summary).
 
-**Quoting:** HITT options whose values contain spaces must be double-quoted (e.g. `-m "info ingress"`, `-f "jenkins kubeconfig"`, `-u "get jwt"`). See [README-info-mode.md](README-info-mode.md) for info mode examples.
+**Quoting:** HITT options whose values contain spaces must be double-quoted (e.g. `-i "node my-node"`, `-f "jenkins kubeconfig"`, `-u "get jwt"`). See [README-info-mode.md](README-info-mode.md) for info mode examples.
 
 ## Features & Modes
 
