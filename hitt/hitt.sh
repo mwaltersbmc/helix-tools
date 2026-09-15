@@ -1257,8 +1257,8 @@ selectFromArray() {
   done
 }
 
-deleteTCTLJob() {
-  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" delete job "${SEALTCTL}" --wait=true > /dev/null 2>&1
+deleteTCTLPod() {
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" delete pod "${HITT_TCTL_POD}" --wait=true > /dev/null 2>&1
 }
 
 parseTctlCommand() {
@@ -1295,7 +1295,7 @@ parseTctlCommand() {
 getTCTLOutput() {
   TCTL_OUTPUT=""
   local tctl_pod_logs tctl_response_string tctl_status_code=""
-  tctl_pod_logs=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} 2>/dev/null)
+  tctl_pod_logs=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs pod/"${HITT_TCTL_POD}" 2>/dev/null)
   tctl_response_string=$(echo "${tctl_pod_logs}" | grep "^HTTP Response" | head -1)
   if [[ "${tctl_response_string}" =~ ([0-9]{3}) ]]; then
     tctl_status_code="${BASH_REMATCH[1]}"
@@ -1303,9 +1303,9 @@ getTCTLOutput() {
   if [[ ! "${tctl_status_code}" =~ ^2[0-9]{2}$ ]]; then
     TCTL_OUTPUT="${tctl_pod_logs}"
     if [[ -n "${tctl_status_code}" ]]; then
-      logError "115" "tctl job failed (HTTP Response Status: ${tctl_status_code})."
+      logError "115" "tctl pod failed (HTTP Response Status: ${tctl_status_code})."
     else
-      logError "115" "tctl job failed - no HTTP Response Status in job logs."
+      logError "115" "tctl pod failed - no HTTP Response Status in pod logs."
     fi
     if [[ "${QUIET}" == "0" ]] && [[ -n "${tctl_pod_logs}" ]]; then
       echo "${tctl_pod_logs}" | sed 's/^/        /'
@@ -1380,19 +1380,19 @@ resolveTCTLImage() {
   return 1
 }
 
-waitForTCTLJob() {
-  # timeout e.g. 90s — return 0 when job Complete, 1 when Failed or timed out
+waitForTCTLPod() {
+  # timeout e.g. 90s — return 0 when pod Succeeded, 1 when Failed or timed out
   local timeout="${1:-90s}" wp wf
-  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=complete "job/${SEALTCTL}" --timeout="${timeout}" >/dev/null 2>&1 &
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=jsonpath='{.status.phase}'=Succeeded "pod/${HITT_TCTL_POD}" --timeout="${timeout}" >/dev/null 2>&1 &
   wp=$!
-  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=condition=failed "job/${SEALTCTL}" --timeout="${timeout}" >/dev/null 2>&1 &
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" wait --for=jsonpath='{.status.phase}'=Failed "pod/${HITT_TCTL_POD}" --timeout="${timeout}" >/dev/null 2>&1 &
   wf=$!
   wait -n "${wp}" "${wf}" 2>/dev/null || true
   kill "${wp}" "${wf}" 2>/dev/null || true
   wait "${wp}" "${wf}" 2>/dev/null || true
 
-  if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${SEALTCTL}" \
-      -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null | grep -q True; then
+  if [[ "$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pod "${HITT_TCTL_POD}" \
+      -o jsonpath='{.status.phase}' 2>/dev/null)" == "Succeeded" ]]; then
     return 0
   fi
   return 1
@@ -1407,77 +1407,69 @@ deployTCTL() {
     logError "203" "Unable to determine the tctl client image."
     return 1
   fi
-  logMessage "Deploying '${SEALTCTL}' job and waiting for it to complete..."
+  deleteTCTLPod
+  logMessage "Deploying '${HITT_TCTL_POD}' pod and waiting for it to complete..."
   ${JQ_BIN} -n \
     --arg ns "${HP_NAMESPACE}" \
-    --arg name "${SEALTCTL}" \
+    --arg name "${HITT_TCTL_POD}" \
     --arg image "${TCTL_IMAGE}" \
     --arg command "${TCTL_COMMAND}" \
     --argjson file_used "${TCTL_FILE_USED:-0}" \
     --arg json "${TCTL_FILE_JSON:-}" \
     '{
-      apiVersion: "batch/v1",
-      kind: "Job",
+      apiVersion: "v1",
+      kind: "Pod",
       metadata: {labels: {app: $name}, name: $name, namespace: $ns},
       spec: {
-        backoffLimit: 1,
-        completions: 1,
-        parallelism: 1,
-        template: {
-          metadata: {labels: {app: $name}},
-          spec: {
-            containers: [{
-              name: $name,
-              image: $image,
-              imagePullPolicy: "IfNotPresent",
-              env: (
-                [
-                  {name: "SERVICE_PORT", value: "8000"},
-                  {name: "APP_URL", value: "http://tms:8000"},
-                  {name: "CLIENT_ID", value: "123"},
-                  {name: "CLIENT_SECRET", value: "123"},
-                  {name: "RSSO_URL", valueFrom: {configMapKeyRef: {key: "rssourl", name: "rsso-admin-tas"}}},
-                  {name: "COMMAND", value: $command}
-                ]
-                + if $file_used == 1 then
-                    [{name: "FLAG", value: "-v"}, {name: "JSON_VALUE", value: $json}]
-                  else
-                    []
-                  end
-              ),
-              securityContext: {
-                allowPrivilegeEscalation: false,
-                capabilities: {drop: ["ALL"]},
-                runAsNonRoot: true,
-                seccompProfile: {type: "RuntimeDefault"}
-              },
-              resources: {
-                limits: {cpu: "512m", memory: "512Mi"},
-                requests: {cpu: "256m", memory: "256Mi"}
-              }
-            }],
-            restartPolicy: "Never",
-            imagePullSecrets: [{name: "bmc-dtrhub"}]
+        restartPolicy: "Never",
+        imagePullSecrets: [{name: "bmc-dtrhub"}],
+        containers: [{
+          name: $name,
+          image: $image,
+          imagePullPolicy: "IfNotPresent",
+          env: (
+            [
+              {name: "SERVICE_PORT", value: "8000"},
+              {name: "APP_URL", value: "http://tms:8000"},
+              {name: "CLIENT_ID", value: "123"},
+              {name: "CLIENT_SECRET", value: "123"},
+              {name: "RSSO_URL", valueFrom: {configMapKeyRef: {key: "rssourl", name: "rsso-admin-tas"}}},
+              {name: "COMMAND", value: $command}
+            ]
+            + if $file_used == 1 then
+                [{name: "FLAG", value: "-v"}, {name: "JSON_VALUE", value: $json}]
+              else
+                []
+              end
+          ),
+          securityContext: {
+            allowPrivilegeEscalation: false,
+            capabilities: {drop: ["ALL"]},
+            runAsNonRoot: true,
+            seccompProfile: {type: "RuntimeDefault"}
+          },
+          resources: {
+            limits: {cpu: "512m", memory: "512Mi"},
+            requests: {cpu: "256m", memory: "256Mi"}
           }
-        }
+        }]
       }
     }' | ${KUBECTL_BIN} -n "${HP_NAMESPACE}" apply -f - >/dev/null
 
-  # Wait for job to complete or fail (not only Complete — avoids full timeout on pod error)
-  if ! waitForTCTLJob 90s; then
-    debugTCTLJob
-    if ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get job "${SEALTCTL}" \
-        -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null | grep -q True; then
-      logError "204" "tctl job ${SEALTCTL} failed."
+  if ! waitForTCTLPod 90s; then
+    debugTCTLPod
+    if [[ "$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pod "${HITT_TCTL_POD}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null)" == "Failed" ]]; then
+      logError "204" "tctl pod ${HITT_TCTL_POD} failed."
     else
-      logError "204" "Timed out waiting for job ${SEALTCTL} to complete."
+      logError "204" "Timed out waiting for pod ${HITT_TCTL_POD} to complete."
     fi
     return 1
   fi
   return 0
 }
 
-# Extract JSON body from sealtctl job pod logs (tctl prints a "Response: {...}" block for -o json).
+# Extract JSON body from hitt-tctl pod logs (tctl prints a "Response: {...}" block for -o json).
 extractTctlJsonFromLogText() {
   awk '
       /Response: *\{/ {
@@ -1496,15 +1488,11 @@ extractTctlJsonFromLogText() {
     ' 2>/dev/null
 }
 
-debugTCTLJob() {
-  echo -e "\nJob description:" >sealtctl.log
-  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" describe job/"${SEALTCTL}" 2>/dev/null >>sealtctl.log
-  echo -e "\nGet pods:" >>sealtctl.log
-  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pods --selector=job-name="${SEALTCTL}" 2>/dev/null >>sealtctl.log
-  echo -e "\nDescribe pods:" >>sealtctl.log
-  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" describe pods --selector=job-name="${SEALTCTL}" 2>/dev/null >>sealtctl.log
-  echo -e "\nJob logs:" >>sealtctl.log
-  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs job/${SEALTCTL} 2>/dev/null >>sealtctl.log
+debugTCTLPod() {
+  echo -e "\nPod description:" >hitt-tctl.log
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" describe pod/"${HITT_TCTL_POD}" 2>/dev/null >>hitt-tctl.log
+  echo -e "\nPod logs:" >>hitt-tctl.log
+  ${KUBECTL_BIN} -n "${HP_NAMESPACE}" logs pod/"${HITT_TCTL_POD}" 2>/dev/null >>hitt-tctl.log
 }
 
 getRealmDetails() {
@@ -1689,7 +1677,7 @@ checkServiceDetails() {
     logMessage "Helix Platform CORE deployment for ITSM - skipping ARSERVICES checks..."
     return
   fi
-  deleteTCTLJob
+  deleteTCTLPod
   if ! deployTCTL "get service"; then
     logError "123" "Failed to get Helix Platform ARSERVICES status."
     return
@@ -1707,7 +1695,7 @@ checkServiceDetails() {
     logMessage "ITSM Insights services found in Helix Platform." 1
     ITSM_INSIGHTS=0
   fi
-  deleteTCTLJob
+  deleteTCTLPod
 }
 
 checkFTSElasticStatus() {
@@ -5271,10 +5259,10 @@ fixSSORealm() {
   getTenantDetails
   HP_TENANT_ID="${HP_TENANT#*.}"
   if [ "${HP_SM_PLATFORM_CORE}"  == "no" ]; then
-    deleteTCTLJob
+    deleteTCTLPod
     deployTCTL "get tenant ${HP_TENANT_ID} -o json"
     getTCTLOutput full
-    deleteTCTLJob
+    deleteTCTLPod
     # Get JSON from tctl pod output
     TMP_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}")
   fi
@@ -7711,22 +7699,22 @@ gatherInfo() {
   getDomain
   getTenantDetails
   if [ "${HP_SM_PLATFORM_CORE}" == "no" ]; then
-    deleteTCTLJob
+    deleteTCTLPod
     deployTCTL "get tenant"
     getTCTLOutput full
     HP_TENANTS=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
-    deleteTCTLJob
+    deleteTCTLPod
     if deployTCTL "get tenant -o json"; then
       getTCTLOutput full
       HP_TENANTS_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '')
     else
       HP_TENANTS_JSON=''
     fi
-    deleteTCTLJob
+    deleteTCTLPod
     deployTCTL "get service"
     getTCTLOutput full
     HP_SERVICES=$(echo "${TCTL_OUTPUT}" | sed -n -e '/^NAME/,$p')
-    deleteTCTLJob
+    deleteTCTLPod
     if deployTCTL "get service -o json"; then
       getTCTLOutput full
       HP_SERVICES_JSON=$(extractTctlJsonFromLogText <<< "${TCTL_OUTPUT}" | ${JQ_BIN} -c . 2>>"${HITT_ERR_FILE}" || echo '')
@@ -7734,7 +7722,7 @@ gatherInfo() {
       HP_SERVICES_JSON=''
       HP_TENANTS_JSON=''
     fi
-    deleteTCTLJob
+    deleteTCTLPod
   else
       HP_SERVICES_JSON=''
       HP_TENANTS_JSON=''
@@ -8506,7 +8494,7 @@ all|required|all-ns|get|daemonsets|Read DaemonSets (ingress controller discovery
 all|required|all-ns|list|daemonsets|List DaemonSets cluster-wide
 all|required|all-ns|get|statefulsets|Read StatefulSets (IS platform checks)
 all|required|all-ns|list|statefulsets|List StatefulSets
-all|required|all-ns|get|jobs|Read Jobs (tctl / sealtctl)
+all|required|all-ns|get|jobs|Read Jobs (discover tctlrest image)
 all|required|all-ns|list|jobs|List Jobs
 all|required|all-ns|get|secrets|Read Secrets (credentials, cacerts, registry)
 all|required|all-ns|list|secrets|List Secrets
@@ -8536,9 +8524,8 @@ hitt|optional|openshift|list|clusteroperators|List OpenShift cluster operators
 hitt|optional|openshift|get|clusterversion|Read OpenShift cluster version
 hitt|optional|openshift|list|clusterversion|List OpenShift cluster versions
 hitt|optional|all-ns|create|pods/exec|Exec into pods (DB/ES health checks, ping utility)
-hitt|required|helix-ns|delete|jobs|Delete tctl/sealtctl jobs after use
-hitt|required|helix-ns|create|jobs|Create tctl/sealtctl jobs
-hitt|required|helix-ns|patch|jobs|Apply/update tctl jobs (kubectl apply)
+hitt|required|helix-ns|delete|pods|Delete hitt-tctl pod after use
+hitt|required|helix-ns|create|pods|Create hitt-tctl pod for tctl commands
 hitt|required|helix-ns|delete|secrets|Replace IS cacerts secret (fix cacerts)
 hitt|required|helix-ns|create|secrets|Create IS cacerts secret (fix cacerts)
 hitt|required|helix-ns|patch|secrets|Apply updated secrets (fix cacerts)
@@ -9014,11 +9001,11 @@ if [[ -n "${TCTL_CMD}" ]]; then
     genTctlConfig
     exit
   fi
-  deleteTCTLJob
+  deleteTCTLPod
   deployTCTL "${TCTL_CMD}"
   getTCTLOutput full
   echo "${TCTL_OUTPUT}"
-  deleteTCTLJob
+  deleteTCTLPod
   exit
 fi
 
@@ -9426,7 +9413,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260914-08"
+HITT_BUILD_VERSION="20260915-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9468,7 +9455,7 @@ NORMAL=$'\e[0m'
 RED=$'\e[31m'
 YELLOW=$'\e[33m'
 GREEN=$'\e[32m'
-SEALTCTL=sealtctl
+HITT_TCTL_POD=hitt-tctl
 TCTL_FILE_USED=0
 TCTL_FILE_JSON=""
 # tmp set as used before processing config on initial setup
@@ -9965,7 +9952,7 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
   },
   {
     "id": "115",
-    "cause": "The sealtctl Kubernetes job used to read the tenant details from the Helix Platform failed to run.",
+    "cause": "The hitt-tctl pod used to read the tenant details from the Helix Platform failed to run.",
     "impact": "HITT cannot continue without the tenant details which are needed for later checks.",
     "remediation": "Review the Helix Platform pods for issues and use the tctl command to verify the tenant status."
   },
@@ -10013,7 +10000,7 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
   },
   {
     "id": "123",
-    "cause": "The sealtcl Kubernetes job used to confirm that the required ARSERVICES are installed in the Helix Platform failed to return the expected response.",
+    "cause": "The hitt-tctl pod used to confirm that the required ARSERVICES are installed in the Helix Platform failed to return the expected response.",
     "impact": "If the Helix Platform was installed with ARSERVICES=no the HELIX_ITSM_INTEROPS pipeline will fail.",
     "remediation": "If the Helix Platform was installed with ARSERVICES=yes in the deployment.config file this error can be ignored, otherwise you should update the Helix Platform to install them."
   },

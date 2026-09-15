@@ -1,5 +1,5 @@
 # Helix IS Triage Tool (HITT)
-**Latest build `20260914-08`**
+**Latest build `20260915-01`**
 
 The **Helix IS Triage Tool (HITT)** is a command-line helper for BMC Helix on-premises deployments. It can check your environment, fix common setup problems, work with the **HELIX_ONPREM_DEPLOYMENT** pipeline, and gather information for troubleshooting or support.
 
@@ -144,7 +144,7 @@ HITT will print the results of the checks and tests as they are run.  Errors and
 
 When the test being run produces additional output, pod status for example, this is displayed after the related ERROR or WARNING.
 
-All of the tests are read-only and will not make changes to the system.  However, please note that the checks which discover the tenant and service details from the Helix Platform deploy a tctl job/pod in the same way as the Jenkins HELIX_ITSM_INTEROPS pipeline.  The job/pod are deleted after use.
+All of the tests are read-only and will not make changes to the system.  However, please note that the checks which discover the tenant and service details from the Helix Platform deploy a short-lived **hitt-tctl** pod (same tctlrest image as Jenkins **HELIX_ITSM_INTEROPS**).  The pod is deleted after use.
 
 ### Logging ###
 
@@ -185,7 +185,7 @@ Use **`-o`** to print Deployment Engine logs on screen: **`-o jenkins`** (system
 
 ### tctl Mode ###
 
-HITT can run **tctl** (Tenant Management Service CLI) commands against your Helix Platform cluster without installing tctl locally. It deploys a short-lived **sealtctl** job in the Helix Platform namespace (same pattern as Jenkins **HELIX_ITSM_INTEROPS**), runs the command, prints the output, and deletes the job.
+HITT can run **tctl** (Tenant Management Service CLI) commands against your Helix Platform cluster without installing tctl locally. It deploys a short-lived **hitt-tctl** pod in the Helix Platform namespace (same tctlrest image pattern as Jenkins **HELIX_ITSM_INTEROPS**), runs the command, prints the output, and deletes the pod.
 
 #### Generate a tctl config file
 
