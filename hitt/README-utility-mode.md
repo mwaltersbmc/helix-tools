@@ -1,31 +1,39 @@
 # HITT Utility Mode
 
-**Utility mode** (`-u`) provides small helpers for Helix deployments: DBID and license type, JWT, IS platform pod status, pod liveness/readiness probe checks, secret decode, ConfigMap export, AR form/field search, custom SQL queries, generated DBID, Docker Hub PAT check, and container image tag listing.
+**Utility mode** (`-u`) provides small helpers for everyday Helix tasks: licensing and database IDs, reading cluster secrets, checking pod health, validating certificates, and more.
 
-When the command has spaces or multiple words, pass the whole thing in **double quotes**.
+When the command has spaces or multiple words, pass the whole thing in **double quotes**:
+
+```bash
+bash hitt.sh -u "get secret my-secret helix-is"
+bash hitt.sh -u "check cert /path/to/cert.pem"
+```
+
+Built-in summary: `bash hitt.sh -u help` or `bash hitt.sh -h utility`
 
 ## Commands
 
 | Command | Description |
 |--------|-------------|
-| `get dbid` | Displays the database ID (DBID) for the system (used for licensing). |
-| `get arlicense` | Displays the current **IS Server license type** (for example **AR Server** for a permanent license, or a temporary type before a full license is applied). |
-| `get jwt` | Prints an AR-JWT for the IS REST API. Defaults to `hannah_admin` using credentials from the cluster; optional username/password. |
-| `get secret` | Decodes and displays secret data from the cluster. Binary keys are written to files; remaining keys are printed. Args: **SECRETNAME** [**NAMESPACE**]. If namespace is omitted, searches your Helix IS, Helix Platform, and Deployment Engine namespaces; prompts if more than one match (use explicit namespace with `-q` for automation). |
-| `get configmap` | Exports ConfigMap text and binary keys to files under a new directory (named after the ConfigMap, with a numeric suffix if that name already exists). With **`-v`**, lists key names only (no files). Args: **CM_NAME** [**NAMESPACE**]. Optional namespace uses the same search and prompt rules as `get secret`. |
-| `get forms` | Searches AR forms whose name contains your keyword; prints **Form name** and **Schema ID**. Args: **KEYWORD**. |
-| `get fields` | Lists fields on one form using its **Schema ID** from `get forms`. Args: **SCHEMAID** [**KEYWORD**]. Omit the keyword to list all fields; add a keyword to filter by field name. |
-| `sql` | Runs a custom AR SQL query via the IS REST API and prints the full JSON response. Args: **SQL_QUERY** (put the entire query inside the quoted `-u` string). |
-| `gendbid` | Generates a database ID (DBID) from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME**. |
-| `check arservers` | Lists each Helix IS **platform** pod with **K8s Status** (platform container ready) and **AR Status** (AR Server readiness inside the pod). Pods not Kubernetes-ready show AR Status as **skipped**. |
-| `check liveness` | Runs the pod’s **liveness** probe URL and prints the response. Args: **PODNAME**. HITT finds the pod in your Helix IS, Helix Platform, or Deployment Engine namespace (prompts if the name exists in more than one). |
-| `check readiness` | Same as **check liveness**, but uses the pod’s **readiness** probe. Args: **PODNAME**. |
-| `check pat` | Validates a Docker Hub **USERNAME** and **Personal Access Token** by requesting a registry token and checking pull scope for a private BMC Helix repository under that user. Omit both args to offer credentials from the **bmc-dtrhub** secret in your Helix Platform namespace; omit **PAT** only to be prompted (hidden). |
-| `check rbac [hitt\|deploy\|all]` | Validates Kubernetes RBAC for the account HITT uses. **hitt** (default): triage/read checks plus fix-mode writes. **deploy**: shared reads plus install/upgrade permissions in your Helix namespaces. **all**: union of both. |
-| `imagels` | Lists tags available in a container image repository using **skopeo**. Args: **IMAGE** — short name (assumes `docker.io/bmchelix/`) or full **registry/host/path/repository** path. Requires **skopeo** and **`skopeo login`** to the registry host. |
+| `get dbid` | Shows the database ID (DBID) for your Helix IS system — used for licensing. |
+| `get arlicense` | Shows the current **IS Server license type** (for example **AR Server** for a permanent license). |
+| `get jwt` | Prints a login token for Helix IS REST calls. Uses **hannah_admin** from the cluster unless you give another username. |
+| `get secret` | Shows secret contents from the cluster. Args: **SECRETNAME** [**NAMESPACE**]. If you omit the namespace, HITT searches your Helix IS, Helix Platform, and Deployment Engine namespaces and asks you to choose when needed. |
+| `get configmap` | Saves ConfigMap contents to a new folder in the current directory. With **`-v`**, lists key names only. Args: **CM_NAME** [**NAMESPACE**]. Namespace rules match **get secret**. |
+| `get forms` | Finds AR forms whose name contains your keyword. Prints **Form name** and **Schema ID**. Args: **KEYWORD**. |
+| `get fields` | Lists fields on a form. Args: **SCHEMAID** [**KEYWORD**] from **get forms**. |
+| `sql` | Runs a custom AR SQL query and prints the result. Args: **SQL_QUERY** (put the full query inside the quoted `-u` string). |
+| `gendbid` | Builds a DBID from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME** before deployment. |
+| `check arservers` | Lists each Helix IS platform pod with pod readiness and AR Server readiness. |
+| `check liveness` | Runs the pod’s **liveness** health check and shows the response. Args: **PODNAME**. |
+| `check readiness` | Same as **check liveness**, using the **readiness** check. Args: **PODNAME**. |
+| `check cert` | Checks a PEM certificate file is valid and not expired, then tests HTTPS to your Helix Platform load balancer and Helix IS hostnames. Args: **/path/to/cert.pem** |
+| `check pat` | Checks a Docker Hub username and personal access token can pull BMC Helix images. Omit both args to use registry credentials from Helix Platform when available. |
+| `check rbac [hitt\|deploy\|all]` | Checks whether your cluster account has the permissions HITT or Helix deployment need. Default: **hitt**. |
+| `imagels` | Lists tags for a container image repository. Requires **skopeo** and a registry login. Args: **IMAGE**. |
 | `help` | Prints this summary (built into HITT). |
 
-## Usage
+## Usage examples
 
 ```bash
 # Current DBID from the running system
@@ -34,13 +42,13 @@ bash hitt.sh -u "get dbid"
 # Current IS Server license type
 bash hitt.sh -u "get arlicense"
 
-# JWT for hannah_admin (cluster credentials)
+# Login token for hannah_admin
 bash hitt.sh -u "get jwt"
 
-# JWT for another user (password prompted if not given)
+# Login token for another user (password prompted if not given)
 bash hitt.sh -u "get jwt myuser"
 
-# Decode a secret (secret name, then optional namespace)
+# Read a secret (name, then optional namespace)
 bash hitt.sh -u "get secret ar-global-secret helix-is"
 bash hitt.sh -u "get secret ar-global-secret"
 
@@ -48,36 +56,38 @@ bash hitt.sh -u "get secret ar-global-secret"
 bash hitt.sh -u "get configmap my-configmap helix-is"
 bash hitt.sh -u "get configmap my-configmap"
 
-# List ConfigMap keys only (no export) — use global -v before -u
+# List ConfigMap keys only — use global -v before -u
 bash hitt.sh -v -u "get configmap my-configmap helix-is"
 
-# Custom AR SQL (raw JSON on stdout)
+# Custom AR SQL
 bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'"
-bash hitt.sh -u "sql select [Login Name],[Full Name] from [User] where [Login Name] = 'hannah_admin'"
 
-# Generate DBID before deployment / license (mssql | oracle | postgres)
+# Generate DBID before deployment (mssql | oracle | postgres)
 bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
 
-# IS platform pod status (Kubernetes + AR Server readiness)
+# Helix IS platform pod status
 bash hitt.sh -u "check arservers"
 
-# Run a pod liveness or readiness probe and show the response
+# Run a pod health check and show the response
 bash hitt.sh -u "check readiness midtier-int-85486987d7-z22tt"
 bash hitt.sh -u "check liveness platform-fts-0"
 
-# Validate Docker Hub PAT
+# Validate a certificate file before addcert or deployment
+bash hitt.sh -u "check cert /path/to/cert.pem"
+
+# Validate Docker Hub credentials
 bash hitt.sh -u "check pat"
 bash hitt.sh -u "check pat mydockerhubuser"
 bash hitt.sh -u "check pat mydockerhubuser dckr_pat_xxxxxxxx"
 
-# List tags for a BMC Helix image on Docker Hub
+# List image tags on Docker Hub
 bash hitt.sh -u "imagels ars"
 
 # List tags on a private registry (log in with skopeo first)
 skopeo login harbor.example.com
 bash hitt.sh -u "imagels harbor.example.com/bmchelix/ars"
 
-# Kubernetes RBAC audit
+# Check cluster permissions
 bash hitt.sh -u "check rbac"
 bash hitt.sh -u "check rbac hitt"
 bash hitt.sh -u "check rbac deploy"
@@ -86,177 +96,151 @@ bash hitt.sh -u "check rbac all"
 bash hitt.sh -u help
 ```
 
-### `get dbid`
+## `get dbid`
 
-Prints the current DBID from the running Helix IS system.
+Shows the current DBID from your running Helix IS system.
 
-### `get arlicense`
+## `get arlicense`
 
-Prints the current **IS Server license type**. A permanent production license is usually shown as **AR Server**; temporary or evaluation types indicate you may still need to apply a full license (see fix mode **arlicense** in [README-fix-mode.md](README-fix-mode.md)).
+Shows the current **IS Server license type**. A permanent production license is usually **AR Server**. Other types may mean you still need to apply a full license — see fix mode **arlicense** in [README-fix-mode.md](README-fix-mode.md).
 
-### `get jwt`
+## `get jwt`
 
-- With no username: uses **hannah_admin** and resolves password from the cluster.
-- With a username: uses that user; password is taken from the second argument if present, otherwise prompted.
+- With no username: uses **hannah_admin** and reads the password from the cluster.
+- With a username: uses that user. Give the password as the next argument, or HITT prompts you.
 
-### `get secret SECRETNAME [NAMESPACE]`
+## `get secret SECRETNAME [NAMESPACE]`
 
-Reads the named secret from the cluster, base64-decodes its data entries, and:
+Shows the named secret from the cluster. Readable values print on screen; other values save as files in the current directory.
 
-- Prints `key: value` lines for values that look printable (ASCII-safe).
-- For other keys, writes decoded bytes to uniquely named files in the current directory and prints a short log line.
+If you omit **NAMESPACE**, HITT looks in your Helix IS, Helix Platform, and Deployment Engine namespaces. It uses the namespace automatically when the secret exists in only one. When it exists in more than one, you choose from a menu.
 
-If **NAMESPACE** is omitted, HITT looks for the secret in your Helix IS, Helix Platform, and Deployment Engine namespaces (skipping blanks and duplicates). If it exists in exactly one, that namespace is used. If it exists in more than one, you are prompted to choose. If it is not found in any of them, pass **NAMESPACE** on the command line.
+## `get configmap CM_NAME [NAMESPACE]`
 
-### `get configmap CM_NAME [NAMESPACE]`
+Exports the named ConfigMap to a new folder under the current directory (named after the ConfigMap). With **`-v`**, HITT lists key names only and does not create files.
 
-Reads the named ConfigMap from the cluster. If the ConfigMap is missing, the command fails.
+Optional **NAMESPACE** follows the same rules as **get secret**.
 
-Otherwise it creates a directory under the current working directory named **CM_NAME** (or **CM_NAME.1**, **CM_NAME.2**, … if that name already exists). Text keys are written as UTF-8 files; binary keys are decoded and written as raw bytes. Keys containing `/` or `..` are rejected. A short summary line is printed with counts and the directory path.
+## Finding forms (`get forms KEYWORD`)
 
-Run with **`-v`** (verbose) to **list only** key names — no directory is created and nothing is written to disk.
-
-Optional **NAMESPACE** uses the same Helix IS → Helix Platform → Deployment Engine namespace discovery and interactive choice when ambiguous.
-
-### Finding forms (`get forms KEYWORD`)
-
-Use this when you know part of a form name but need the full name or its **Schema ID** (a number HITT uses in the next step).
-
-1. Run from your HITT directory.
-2. Use a keyword that appears in the form name (for example `Login` or `AR System Metadata`).
-3. Read the table: first column is the form name, second is **Schema ID**.
+Use this when you know part of a form name and need the full name or **Schema ID** for **get fields**.
 
 ```bash
 bash hitt.sh -u "get forms Login"
 bash hitt.sh -u "get forms AR System Metadata"
 ```
 
-If the keyword has spaces, keep the entire utility command inside double quotes.
+Use double quotes when the keyword contains spaces.
 
-### Finding fields on a form (`get fields SCHEMAID [KEYWORD]`)
+## Finding fields (`get fields SCHEMAID [KEYWORD]`)
 
-Use this after you have a **Schema ID** from `get forms`.
+Use after **get forms** gave you a **Schema ID**.
 
 - **SCHEMAID only** — lists every field on that form.
-- **SCHEMAID and KEYWORD** — lists only fields whose name contains the keyword.
+- **SCHEMAID and KEYWORD** — lists fields whose name contains the keyword.
 
 ```bash
 bash hitt.sh -u "get fields 163"
 bash hitt.sh -u "get fields 163 Login"
 ```
 
-### Running custom AR SQL (`sql SQL_QUERY`)
+## Custom AR SQL (`sql SQL_QUERY`)
 
-Use **`get forms`** or **`get fields`** for everyday lookups. Use **`sql`** when you need your own query against AR metadata tables.
+Use **get forms** or **get fields** for simple lookups. Use **sql** when you need your own query.
 
-1. Run from your HITT directory.
-2. Put the **whole** command in double quotes, including the word `sql` and the full SQL text.
-3. Use **square brackets** around table and column names (AR style), for example `[name]` and `[AR System Metadata: arschema]`.
-4. HITT prints **JSON** on the screen (not a formatted table). To view rows as a table, pipe the output through **jq** (see example below).
-
-**Note:** Field names must be database field names, not display labels — use **get forms** and **get fields** to verify them if in doubt.
+Put the whole command in double quotes, including the word `sql` and the full query. Use square brackets around AR table and column names.
 
 ```bash
 bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'"
 ```
 
-Pipe results through jq:
+Field names must be database names, not display labels — use **get forms** and **get fields** to confirm them.
 
-```bash
-bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'" | jq .
-```
+## `gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME`
 
-Save results to a file and show a simple table:
+Builds a DBID string. **DB_TYPE** is `mssql`, `oracle`, or `postgres`.
 
-```bash
-bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'" > /tmp/ar-query.json
-jq -r '"\(.columns[0].label)\t\(.columns[1].label)", (.rows[] | [.[]] | @tsv)' /tmp/ar-query.json | column -t -s $'\t'
-```
+## `check arservers`
 
-If the query fails, HITT reports an error with the message from the IS REST API when available.
-
-### `gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME`
-
-Generates a DBID string from the values provided. **DB_TYPE** is one of `mssql`, `oracle`, or `postgres`.
-
-### `check arservers`
-
-Checks every Helix IS **platform** pod in your configured Helix IS namespace and prints a table:
+Lists each Helix IS platform pod and shows:
 
 | Column | Meaning |
 |--------|---------|
 | **Name** | Pod name |
-| **K8s Status** | Whether the **platform** container is ready in Kubernetes |
-| **AR Status** | **ready** — AR Server readiness check passed; **not ready** — container is ready but the check failed; **skipped** — container not ready yet (no in-pod check) |
+| **K8s Status** | Whether the platform pod is ready |
+| **AR Status** | Whether the AR Server inside the pod is ready (**skipped** when the pod itself is not ready yet) |
 
-This is the same check HITT runs during **post-is** and **upgrade-is** mode. If any pod with a ready container fails the AR readiness check, those pod names are reported as errors in the HITT summary.
+This is the same check HITT runs in **post-is** and **upgrade-is** mode.
 
 ```bash
 bash hitt.sh -u "check arservers"
 ```
 
-### `check liveness PODNAME` / `check readiness PODNAME`
+## `check liveness PODNAME` / `check readiness PODNAME`
 
-Runs the same HTTP check configured on the pod’s **liveness** or **readiness** probe and prints what comes back — useful when a pod is not becoming ready and you want to see the probe response yourself.
+Runs the same health check configured on the pod and prints the response — useful when a pod stays not ready and you want to see what the check returns.
 
-HITT looks for **PODNAME** in your configured **Helix IS**, **Helix Platform**, and **Deployment Engine** namespaces. If the name appears in more than one namespace, you are asked to choose. If the pod has more than one container, you are asked which container’s probe to use.
+HITT finds **PODNAME** in your Helix IS, Helix Platform, or Deployment Engine namespaces. You choose when the name appears in more than one place, or when the pod has more than one container.
 
-The request is sent from the cluster (using the **platform-fts-0** pod). HITT shows the probe URL, then the response. JSON responses are formatted for readability. If the response body is empty, HITT prints the HTTP status code instead.
-
-Only **httpGet** probes are supported at this time.
+The check runs from inside the cluster. HITT shows the URL, then the response. JSON responses are formatted for readability.
 
 ```bash
 bash hitt.sh -u "check readiness midtier-int-85486987d7-z22tt"
 bash hitt.sh -u "check liveness platform-fts-0"
 ```
 
-### `check pat [USERNAME] [PAT]`
+## `check cert /path/to/cert.pem`
 
-Calls Docker Hub’s token service with **USERNAME** and **PAT** to verify pull access for the **`bmchelix`** repository. On success you see a confirmation; on failure, HITT explains that the token may be limited to public-repo read-only and should be recreated with the correct access (see Docker Hub / EPD documentation).
+Checks a PEM file before you add it with **addcert** (fix mode) or deploy it to the cluster.
 
-If you omit **both** arguments, HITT looks for **bmc-dtrhub** in your Helix Platform namespace and offers those docker.io credentials. If the secret is missing or you decline, you are prompted for username and PAT.
+For each certificate in the file, HITT confirms it is valid and **not expired** (warns if expiry is within four weeks). Then it tests HTTPS connections to:
 
-If **USERNAME** is given but **PAT** is omitted, **PAT** is read from a hidden prompt.
+- Your Helix Platform load balancer hostname
+- Your Helix IS service hostnames (midtier and related aliases for your deployment)
 
-### `imagels IMAGE`
-
-Lists tags for a container image repository using **skopeo**. Output is JSON (pretty-printed with **jq** when available).
-
-1. Install **skopeo** — see [skopeo.org](https://skopeo.org/#download).
-2. Log in to the registry host before running HITT:
+Each connection must complete a secure TLS handshake. HITT does not check the web page content.
 
 ```bash
-skopeo login docker.io
-skopeo login harbor.example.com
+bash hitt.sh -u "check cert /path/to/cert.pem"
 ```
+
+## `check pat [USERNAME] [PAT]`
+
+Verifies a Docker Hub username and personal access token can pull the **bmchelix** repository.
+
+If you omit both arguments, HITT offers credentials stored in Helix Platform when it finds them. Otherwise you are prompted.
+
+If you give **USERNAME** only, HITT prompts for the token (input is hidden).
+
+## `imagels IMAGE`
+
+Lists tags for a container image using **skopeo**. Install skopeo and log in to the registry first — see [skopeo.org](https://skopeo.org/#download).
 
 | Form | Resolves to |
 |------|-------------|
-| Short name (no `/`) | `docker.io/bmchelix/IMAGE` — for example `ars` → `docker.io/bmchelix/ars` |
-| Full path (contains `/`) | Used as-is — for example `registry.example.com/project/my-image` |
+| Short name (no `/`) | `docker.io/bmchelix/IMAGE` — for example `ars` |
+| Full path (contains `/`) | Used as-is |
 
 ```bash
 bash hitt.sh -u imagels ars
 bash hitt.sh -u "imagels my-registry.example.com/bmchelix/ars"
 ```
 
-If the repository is missing or you are not logged in, HITT reports an error.
+## `check rbac [hitt|deploy|all]`
 
-### `check rbac [hitt|deploy|all]`
+Checks whether the account HITT uses has enough access in the cluster.
 
-Checks whether the account HITT uses has the permissions HITT and Helix deployment need.
+| Profile | What it checks |
+|--------|----------------|
+| **hitt** (default) | Read access HITT needs for triage, plus permissions for fix-mode changes (certificates, Support Assistant role, and similar). |
+| **deploy** | Permissions needed to install or upgrade Helix in your namespaces. See [Deployment Engine RBAC](https://docs.helixops.ai/bin/Service-Management/On-Premises-Deployment/BMC-Helix-Service-Management-Deployment/brid26201/Installing/Preparing-for-installation/Setting-up-the-BMC-Deployment-Engine/). |
+| **all** | Both profiles combined. |
 
-| Profile | Checks |
-|--------|--------|
-| **hitt** (default) | Cluster-wide **read** access plus HITT-specific writes (tctl jobs, cacerts fix, Support Assistant role). Optional: metrics API, OpenShift cluster operators, pod exec. |
-| **deploy** | Shared reads plus **create/update/patch/delete** permissions needed to install or upgrade Helix in your configured namespaces. Optional: HPAs. See [Deployment Engine RBAC](https://docs.helixops.ai/bin/Service-Management/On-Premises-Deployment/BMC-Helix-Service-Management-Deployment/brid26201/Installing/Preparing-for-installation/Setting-up-the-BMC-Deployment-Engine/). |
-| **all** | Every catalog row (hitt + deploy). |
-
-Namespace-scoped rules use your Helix Platform, Helix IS, Deployment Engine, and Helix Logging namespaces (duplicates skipped).
+Checks use your configured Helix Platform, Helix IS, Deployment Engine, and Helix Logging namespaces.
 
 ## See also
 
-- [README-fix-mode.md](README-fix-mode.md) — **`-f` fix mode** (cacerts, Jenkins, license apply, etc.)
+- [README-fix-mode.md](README-fix-mode.md) — **`-f` fix mode** (cacerts, Jenkins, license apply, and more)
 - [README-pipeline-mode.md](README-pipeline-mode.md) — **`-k` pipeline mode**
-- [README-info-mode.md](README-info-mode.md) — **`-i`**
+- [README-info-mode.md](README-info-mode.md) — **`-i` info mode**
 - Step-by-step use cases: https://bit.ly/hitthelp

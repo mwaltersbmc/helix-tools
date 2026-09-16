@@ -4941,6 +4941,40 @@ addcertPreparePlatformContext() {
   CACERTS_FILENAME="is-sealcacerts"
 }
 
+hittUtilCheckCertCurlTarget() {
+  local pem_file="${1}" target="${2}"
+  if ${CURL_BIN} --cacert "${pem_file}" -sS -o /dev/null --max-time 10 "https://${target}/" 2>>"${HITT_ERR_FILE}"; then
+    logMessage "  - https://${target}/ — TLS OK with provided CA bundle." 1
+    return 0
+  fi
+  logError "999" "TLS verification failed for 'https://${target}/' using '${pem_file}'." 1
+}
+
+hittUtilCheckCert() {
+  local pem_file="${1}"
+  pem_file="${pem_file/#\~/$HOME}"
+  if [[ ! -f "${pem_file}" ]]; then
+    logError "999" "Certificate file '${pem_file}' not found." 1
+  fi
+  if [[ ! -s "${pem_file}" ]]; then
+    logError "999" "Certificate file '${pem_file}' is empty." 1
+  fi
+  checkBinary curl
+  addcertPreparePemCertDir "${pem_file}"
+  checkToolVersion kubectl
+  getVersions
+  setVarsFromPlatform
+  getDomain
+  IS_ALIAS_ARRAY=()
+  buildISAliasesArray
+  hittUtilCheckCertCurlTarget "${pem_file}" "${LB_HOST}"
+  for target in "${IS_ALIAS_ARRAY[@]}"; do
+    hittUtilCheckCertCurlTarget "${pem_file}" "${target}"
+  done
+  addcertCleanupPemCertDir
+  logMessage "Certificate file '${pem_file}' passed expiry checks and TLS validation for LB_HOST and IS aliases." 1
+}
+
 addcertImportPemIntoKeystore() {
   local pem_file=$1
   if [ -z "${ADD_CERT_CERT_DIR}" ] || [ ! -d "${ADD_CERT_CERT_DIR}" ]; then
@@ -6220,6 +6254,7 @@ showUtilHelp() { # utility mode help
     \tcheck pat \t| Validate Docker Hub username and PAT. Args: [USERNAME] [PAT] — omit both to use bmc-dtrhub from HP namespace or be prompted.
     \tcheck arservers | List IS platform pods with K8s and AR Server readiness (table). Same check as post-is / upgrade-is.
     \tcheck liveness|readiness | Run a pod httpGet probe and print the response. Args: PODNAME (namespace resolved from Helix IS, Platform, or Deployment Engine).
+    \tcheck cert \t| Validate a PEM CA bundle (not expired) and test TLS to LB_HOST and IS aliases with curl --cacert. Args: /path/to/cert.pem
     \timagels \t| List tags for a container image repository (requires skopeo). Args: IMAGE — name under docker.io/bmchelix/ or full registry/host/path/repo.
     \thelp \t\t| Show this list.
     "
@@ -7062,7 +7097,7 @@ parseUtilGet() {
 
 parseUtilCheck() {
   if [[ -z "${UTILARGS[1]:-}" ]]; then
-    logError "999" "Usage: bash $0 -u \"check <rbac|pat|arservers|liveness|readiness> [options]\"" 1
+    logError "999" "Usage: bash $0 -u \"check <rbac|pat|arservers|liveness|readiness|cert> [options]\"" 1
   fi
   case "${UTILARGS[1]}" in
     rbac)
@@ -7086,6 +7121,10 @@ parseUtilCheck() {
     liveness|readiness)
       [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check liveness|readiness PODNAME\"" 1
       checkPodProbe "${UTILARGS[1]}" "${UTILARGS[2]:-}"
+      ;;
+    cert)
+      [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check cert /path/to/cert.pem\"" 1
+      hittUtilCheckCert "${UTILARGS[2]}"
       ;;
     *)
       logError "999" "'${UTILARGS[1]}' is not a valid utility mode check option. Please check for an updated HITT."
@@ -9414,7 +9453,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260916-01"
+HITT_BUILD_VERSION="20260916-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
