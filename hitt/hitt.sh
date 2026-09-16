@@ -4972,7 +4972,7 @@ hittUtilCheckCert() {
     hittUtilCheckCertCurlTarget "${pem_file}" "${target}"
   done
   addcertCleanupPemCertDir
-  logMessage "Certificate file '${pem_file}' passed expiry checks and TLS validation for LB_HOST and IS aliases." 1
+  logMessage "Certificate file '${pem_file}' passed expiry checks and TLS validation for LB_HOST and IS aliases."
 }
 
 addcertImportPemIntoKeystore() {
@@ -9453,7 +9453,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260916-03"
+HITT_BUILD_VERSION="20260916-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
