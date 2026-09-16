@@ -740,6 +740,25 @@
       }
     },
     {
+      "id": "utility-check-cert",
+      "topicId": "helix-is-mgmt",
+      "order": 27,
+      "title": "I want to check that a certificate (pem) file is valid for use with Helix aliases",
+      "commands": [
+        "bash hitt.sh -u \"check cert /path/to/cert.pem\""
+      ],
+      "notes": [
+        "Checks each certificate in the PEM file is valid and not expired. HITT warns if a certificate expires within four weeks.",
+        "Tests secure HTTPS connections to your Helix Platform load balancer hostname and your Helix IS service hostnames.",
+        "Use this before addcert when you want to confirm the file before updating the cacerts secret — see fix-addcert use case."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#check-cert-pathtocertpem",
+      "video": {
+        "enabled": false,
+        "script": "utility-check-cert"
+      }
+    },
+    {
       "id": "fix-addcert",
       "topicId": "helix-is-mgmt",
       "order": 28,

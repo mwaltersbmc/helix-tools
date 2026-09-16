@@ -9453,7 +9453,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260916-02"
+HITT_BUILD_VERSION="20260916-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -11594,6 +11594,21 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
         "If the pod name exists in more than one namespace, or the pod has more than one container, HITT asks you to choose."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#check-liveness-podname--check-readiness-podname"
+    },
+    {
+      "id": "utility-check-cert",
+      "topicId": "helix-is-mgmt",
+      "order": 27,
+      "title": "I want to check that a certificate (pem) file is valid for use with Helix aliases",
+      "commands": [
+        "bash hitt.sh -u \"check cert /path/to/cert.pem\""
+      ],
+      "notes": [
+        "Checks each certificate in the PEM file is valid and not expired. HITT warns if a certificate expires within four weeks.",
+        "Tests secure HTTPS connections to your Helix Platform load balancer hostname and your Helix IS service hostnames.",
+        "Use this before addcert when you want to confirm the file before updating the cacerts secret — see fix-addcert use case."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#check-cert-pathtocertpem"
     },
     {
       "id": "fix-addcert",
