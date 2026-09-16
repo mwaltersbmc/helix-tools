@@ -323,8 +323,8 @@ checkVars() {
 
 checkRequiredTools() {
   for i in "${REQUIRED_TOOLS[@]}"; do
-    BINARY="${i^^}_BIN"
-    checkBinary "${!BINARY}" "${i}"
+    BINARY_VAR="${i^^}_BIN"
+    checkBinary "${!BINARY_VAR}" "${i}"
   done
   if [ -n "${MISSING}" ] ; then
     logError "999" "One or more required tools not found - cannot continue." 1
@@ -388,11 +388,12 @@ checkToolVersion() {
 }
 
 checkBinary() {
+  local binary_var="${1##*/}_BIN"
   if ! which "${1}" > /dev/null 2>&1 ; then
-    logError "105" "${1} command not found in path. Please set ${1^^}_BIN variable with the full path to the file."
+    logError "105" "${1} command not found. Please set the '${binary_var^^}' variable with the full path to the file."
   else
     logMessage "${1} command found ($(which ${1}))." 1
-    checkToolVersion "${2}"
+    [[ -n "${2}" ]] && checkToolVersion "${2}"
   fi
 }
 
@@ -9413,7 +9414,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260915-02"
+HITT_BUILD_VERSION="20260916-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
