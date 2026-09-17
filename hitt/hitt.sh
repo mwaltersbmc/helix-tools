@@ -8897,14 +8897,22 @@ checkPlatformPodsState() {
 checkPodsForMissingProbes() {
   local ns="${1}"
   local -a pod_names=()
-
   [[ -n "${ns}" ]] || return
+  # Currently specific to IS pods due to containername dependency
   readarray -t pod_names < <(${KUBECTL_BIN} -n "${ns}" get pods -o json 2>/dev/null \
     | ${JQ_BIN} -r '
         .items[]
         | select(.status.phase == "Running")
-        | select(any(.spec.containers[]; .readinessProbe == null or .livenessProbe == null))
-        | .metadata.name
+        | .metadata.name as $pod
+        | ($pod | split("-")[0]) as $containerName
+        | .spec.containers[]?
+        | select(.name == $containerName)
+        | [
+            (if .readinessProbe == null then "readinessProbe" else empty end),
+            (if .livenessProbe == null then "livenessProbe" else empty end)
+          ] as $missing
+        | select($missing | length > 0)
+        | "\($pod) (\($missing | join(", ")))"
       ' | sort -u)
 
   if ((${#pod_names[@]} > 0)); then
@@ -9436,7 +9444,7 @@ if [ "${SKIP_JENKINS}" == "0" ]; then
 fi
 
 if [[ ("${MODE}" == "post-is" || "${MODE}" == "upgrade-is") ]]; then
-  #checkPodsForMissingProbes "${IS_NAMESPACE}"
+  checkPodsForMissingProbes "${IS_NAMESPACE}"
   logStatus "Checking IS platform pods..."
   checkPlatformPodsState
   logPlatformFTSStartTime
@@ -9453,7 +9461,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260917-01"
+HITT_BUILD_VERSION="20260917-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
