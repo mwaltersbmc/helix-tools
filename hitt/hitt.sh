@@ -2004,6 +2004,7 @@ createPipelineVarsArray() {
     SIDECAR_FLUENTBIT
     REGISTRY_TYPE
     HARBOR_REGISTRY_HOST
+    HARBOR_REGISTRY_ORG
     IMAGE_REGISTRY_USERNAME
     IMAGESECRET_NAME
     DB_TYPE
@@ -2685,6 +2686,10 @@ validateISDetails() {
       logError "147" "HARBOR_REGISTRY_HOST '${IS_HARBOR_REGISTRY_HOST}' does not match the Helix Platform registry server '${HP_REGISTRY_SERVER}'."
     else
       logMessage "HARBOR_REGISTRY_HOST '${IS_HARBOR_REGISTRY_HOST}' matches the Helix Platform registry server '${HP_REGISTRY_SERVER}'." 1
+    fi
+
+    if [ "${IS_VERSION}" -ge 2026201 ] && [ "${IS_HARBOR_REGISTRY_ORG}" == "" ]; then
+      logError "283" "HARBOR_REGISTRY_ORG is blank - this must be set to the name of the registry server project where the Helix images are located e.g. bmchelix"
     fi
 
     if [ "${IS_IMAGESECRET_NAME}" == "" ]; then
@@ -9461,7 +9466,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260917-02"
+HITT_BUILD_VERSION="20260917-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -10999,6 +11004,12 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
     "cause": "The AR server in the named pods is not running/ready for use.",
     "impact": "Some applications/services may not work as expected or return errors.",
     "remediation": "Check the logs in the named pods for possible issues."
+  },
+  {
+    "id": "283",
+    "cause": "The pipeline HARBOR_REGISTRY_ORG value is blank.",
+    "impact": "Deployment will fail.",
+    "remediation": "Set the value to the location of the Helix images in your registry server e.g. bmchelix"
   }
 ]
 ALL_MSGS_JSON_EOF
