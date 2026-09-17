@@ -1581,7 +1581,9 @@ validateRealmDomains() {
     WILDCARD_CERT=0
   fi
 
-  ADE_ALIAS_ARRAY=("${LB_HOST}" "${TMS_LB_HOST}" "${MINIO_LB_HOST}" "${MINIO_API_LB_HOST}")
+  ADE_ALIAS_ARRAY=("${LB_HOST}" "${TMS_LB_HOST}")
+  [[ -n "${MINIO_LB_HOST}" ]] && ADE_ALIAS_ARRAY+=("${MINIO_LB_HOST}")
+  [[ -n "${MINIO_API_LB_HOST}" ]] && ADE_ALIAS_ARRAY+=("${MINIO_API_LB_HOST}")
   [[ -n "${PORTAL_HOSTNAME}" ]] && ADE_ALIAS_ARRAY+=("${PORTAL_HOSTNAME}")
   [[ -n "${KIBANA_LB_HOST}" ]] && ADE_ALIAS_ARRAY+=("${KIBANA_LB_HOST}")
   for i in "${ADE_ALIAS_ARRAY[@]}"; do
@@ -8845,9 +8847,32 @@ enumerateHelixVersions() {
   fi
 }
 
+hittGenConfigJenkinsParamName() {
+  case "${1}" in
+    REGISTRY_ORG) echo "HARBOR_REGISTRY_ORG" ;;
+    SR_REGISTRY_ORG) echo "HARBOR_REGISTRY_ORG" ;;
+    *) echo "${1}" ;;
+  esac
+}
+
+hittGenConfigExtractShellVarName() {
+  local expr_line="${1}"
+  local shell_var_name
+  # Prefer ${VAR} from the sed replacement side; fallback to legacy literal parsing.
+  shell_var_name=$(echo "${expr_line}" | grep -oE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' | tail -1 | tr -d '${}')
+  if [[ "${shell_var_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "${shell_var_name}"
+    return
+  fi
+  shell_var_name=$(echo "${expr_line}" | sed -E -e 's/^[[:space:]]*["'\'']s([^[:alnum:]])//' -e 's/([^[:alnum:]])[a-z]*["'\'']?[[:space:]]*\\?$//' | awk -F '[/,!+,]' '{print $2}' \
+    | sed -E 's/\\?["'\'']//g; s/\$\{?([A-Za-z0-9_]+)\}?/\1/g' | grep -oE '^[A-Za-z_][A-Za-z0-9_]*$' | head -1)
+  echo "${shell_var_name}"
+}
+
 checkGenConfigOutput() {
+  [[ "${IS_VERSION}" -ge 2026301 ]] && return # Return as 26301 switches to use python for template completion
   local regex line file full_line expr_num char_num invalid_value
-  local first_sed_block expr_line replacement_literal clean_var_name
+  local first_sed_block expr_line shell_var_name jenkins_param_name
   if [ "${SKIP_JENKINS}" == "1" ] || [[ ("${MODE}" != "pre-is" && "${MODE}" != "upgrade-is") ]]; then
     return
   fi
@@ -8875,17 +8900,17 @@ checkGenConfigOutput() {
   # Best-effort mapping: layout of sed -e blocks in generateITSMinput.sh varies by ITSM installer version.
   first_sed_block=$(sed -n '/^sed -i/,/${TARGET_FILE}/p' "${file}")
   expr_line=$(echo "${first_sed_block}" | awk -v RS='-e' -v n="${expr_num}" 'NR==n+1 {print $0}')
-  replacement_literal=$(echo "${expr_line}" | sed -E -e 's/^[[:space:]]*["'\'']s([^[:alnum:]])//' -e 's/([^[:alnum:]])[a-z]*["'\'']?[[:space:]]*\\?$//' | awk -F '[/,!+,]' '{print $2}')
-  clean_var_name=$(echo "${replacement_literal}" | sed -E 's/\\?["'\'']//g; s/\$\{?([A-Za-z0-9_]+)\}?/\1/g')
-  if [ -n "${clean_var_name}" ]; then
-    invalid_value=$(echo "${JENKINS_PARAMS}" | ${JQ_BIN} -r ".${clean_var_name} // empty")
+  shell_var_name=$(hittGenConfigExtractShellVarName "${expr_line}")
+  jenkins_param_name=$(hittGenConfigJenkinsParamName "${shell_var_name}")
+  if [[ "${jenkins_param_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    invalid_value=$(echo "${JENKINS_PARAMS}" | ${JQ_BIN} -r --arg k "${jenkins_param_name}" '.[$k] // empty' 2>>"${HITT_ERR_FILE}")
     if [ -n "${invalid_value}" ]; then
-      logMessage "    - the '${clean_var_name}' value from the latest HELIX_ONPREM_DEPLOYMENT build contains an invalid character: '${invalid_value}'."
+      logMessage "    - the '${jenkins_param_name}' value from the latest HELIX_ONPREM_DEPLOYMENT build contains an invalid character: '${invalid_value}'."
     else
       logMessage "    - the failing sed expression is ${expr_line}."
     fi
   else
-    logError "274" "Could not map sed expression '#${expr_num}' to a pipeline parameter — review HELIX_GENERATE_CONFIG.log."
+    logMessage "    - the failing sed expression is ${expr_line}."
   fi
 }
 
@@ -9422,6 +9447,7 @@ if [ "${MODE}" != "post-hp" ]; then
   checkUpgradeISDeployedValues
   checkPipelinePwds
   checkGenConfigOutput
+  [[ "${IS_VERSION}" -ge 2026301 ]] && return
   logStatus "Checking IS registry details..."
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
@@ -9466,7 +9492,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260917-03"
+HITT_BUILD_VERSION="20260917-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
