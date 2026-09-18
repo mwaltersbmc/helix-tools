@@ -826,9 +826,9 @@ getVersions() {
   HELM_VERSION=$(helm version --short 2>/dev/null)
   logMessage "Helm version '${HELM_VERSION}'."
   if [ -f /etc/os-release ]; then
-    OS_NAME=$(grep "^NAME=" /etc/os-release | cut -d '=' -f2)
-    OS_VERSION=$(grep "^VERSION=" /etc/os-release | cut -d '=' -f2)
-    logMessage "Running on ${OS_NAME} version ${OS_VERSION}."
+    OS_NAME=$(grep "^PRETTY_NAME=" /etc/os-release | cut -d '=' -f2 | tr -d '"')
+    #OS_VERSION=$(grep "^VERSION=" /etc/os-release | cut -d '=' -f2)
+    logMessage "HITT running on '${OS_NAME}'."
   fi
   HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json 2>>${HITT_ERR_FILE})
   if [ "${HP_CONFIG_MAP_JSON}" == "" ]; then
@@ -7812,7 +7812,6 @@ printInfo() {
 
   hittInfoPrintSection "Client information"
   hittInfoPrintKv "OS" "${OS_NAME:-unknown}"
-  hittInfoPrintKv "Version" "${OS_VERSION:-unknown}"
   hittInfoPrintKv "kubectl" "${KUBECTL_VERSION:-unknown}"
   hittInfoPrintKv "Helm" "${HELM_VERSION:-unknown}"
 
@@ -8049,7 +8048,6 @@ writeInfoJson() {
     --arg environmentType "${ENV_TYPE:-}" \
     --argjson environmentLive "${env_live}" \
     --arg clientOsName "${OS_NAME:-}" \
-    --arg clientOsVersion "${OS_VERSION:-}" \
     --arg clientKubectl "${KUBECTL_VERSION:-}" \
     --arg clientHelm "${HELM_VERSION:-}" \
     --arg clusterKubernetesVersion "${K8S_VERSION:-}" \
@@ -9532,7 +9530,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260918-04"
+HITT_BUILD_VERSION="20260918-06"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
