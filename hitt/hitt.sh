@@ -1020,9 +1020,7 @@ setVarsFromPlatform() {
   if [[ "${FTS_ELASTIC_SERVICENAME}" =~ ^opensearch.* ]]; then
     FTS_ELASTIC_POD_CONTAINER="-c opensearch"
   fi
-
   setHPVersionImageTags
-
   HP_COMPANY_NAME_LABEL="COMPANY_NAME"
   if compare "${HP_VERSION%.*} >= 24.2" ; then
     HP_COMPANY_NAME_LABEL="TENANT_NAME"
@@ -1064,8 +1062,8 @@ setVarsFromPlatform() {
   fi
 
   if compare "${HP_VERSION%.*} >= 26.2" ; then
-    # no-op placeholder
-    :
+    SEAWEEDFS_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress seaweedfs-master -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
+    SEAWEEDFS_API_LB_HOST=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get ingress seaweedfs-s3 -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
   fi
 
   # Catch cases where the LB_HOST is the same as the IS CUSTOMER_SERVICE-ENVIRONMENT.CLUSTER_DOMAIN
@@ -1074,7 +1072,7 @@ setVarsFromPlatform() {
   else
     IS_PREFIX="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
   fi
-  for i in LB_HOST TMS_LB_HOST MINIO_LB_HOST MINIO_API_LB_HOST KIBANA_LB_HOST; do
+  for i in "${ADE_ALIAS_ARRAY[@]}"; do
     if [ "${!i}" == "${IS_PREFIX}.${LB_HOST#*.}" ]; then
       logError "110" "${i} value '${!i}' conflicts with the derived MidTier alias '${IS_PREFIX}.${LB_HOST#*.}'."
       #logError "You ${BOLD}MUST${NORMAL} change one or more of the Helix Platform LB_HOST, Helix IS CUSTOMER_SERVICE or ENVIRONMENT before installing Helix IS."
@@ -1581,11 +1579,10 @@ validateRealmDomains() {
     WILDCARD_CERT=0
   fi
 
-  ADE_ALIAS_ARRAY=("${LB_HOST}" "${TMS_LB_HOST}")
-  [[ -n "${MINIO_LB_HOST}" ]] && ADE_ALIAS_ARRAY+=("${MINIO_LB_HOST}")
-  [[ -n "${MINIO_API_LB_HOST}" ]] && ADE_ALIAS_ARRAY+=("${MINIO_API_LB_HOST}")
-  [[ -n "${PORTAL_HOSTNAME}" ]] && ADE_ALIAS_ARRAY+=("${PORTAL_HOSTNAME}")
-  [[ -n "${KIBANA_LB_HOST}" ]] && ADE_ALIAS_ARRAY+=("${KIBANA_LB_HOST}")
+  # Define all potential host variables in order
+  for var in "${ADE_ALIAS_LIST[@]}"; do
+    [[ -n "${!var:-}" ]] && ADE_ALIAS_ARRAY+=("${!var}")
+  done
   for i in "${ADE_ALIAS_ARRAY[@]}"; do
     validateAliasInDNS "${i}"
     validateAliasInLBCert "${i}"
@@ -8986,11 +8983,9 @@ fi
 
 [[ -f "./${HITT_CONFIG_FILE}" ]] && source "./${HITT_CONFIG_FILE}"
 
-if [ -n "${CDE_NAMESPACE}" ]; then
+if [ -z "${JENKINS_USERNAME:-}" ] && [ -n "${CDE_NAMESPACE:-}" ]; then
   getJenkinsCDECredentials
-  if [ "${JENKINS_USERNAME}" = "" ]; then
-    askForJenkinsCredentials
-  fi
+  [ -z "${JENKINS_USERNAME:-}" ] && askForJenkinsCredentials
 fi
 
 # Conf overrides
@@ -9492,7 +9487,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260917-04"
+HITT_BUILD_VERSION="20260918-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9521,6 +9516,7 @@ IS_ALIAS_SUFFIXES=(smartit sr is restapi atws dwp dwpcatalog vchat chat int repo
 JENKINS_CREDS=(git github ansible_host ansible kubeconfig TOKENS password_vault_apikey)
 MULTI_TENANT_HP=0
 IS_ALIAS_ARRAY=()
+ADE_ALIAS_LIST=(LB_HOST TMS_LB_HOST MINIO_LB_HOST MINIO_API_LB_HOST PORTAL_HOSTNAME KIBANA_LB_HOST SEAWEEDFS_LB_HOST SEAWEEDFS_API_LB_HOST)
 ADE_ALIAS_ARRAY=()
 NAMESPACE_OTHER_OPTION="Other"
 VERBOSITY=0
