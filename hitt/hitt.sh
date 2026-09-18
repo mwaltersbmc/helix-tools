@@ -2695,6 +2695,10 @@ validateISDetails() {
       logError "283" "HARBOR_REGISTRY_ORG is blank - this must be set to the name of the registry server project where the Helix images are located e.g. bmchelix"
     fi
 
+    if [ "${IS_VERSION}" -eq 2026201 ] && [[ "${IS_HARBOR_REGISTRY_ORG}" == */* ]]; then
+      logError "284" "HARBOR_REGISTRY_ORG cannot contain a '/' character. Append any text before the slash to the end of HARBOR_REGISTRY_HOST."
+    fi
+
     if [ "${IS_IMAGESECRET_NAME}" == "" ]; then
       logError "243" "IMAGESECRET_NAME is blank - you must provide a value for this parameter to be used as the registry credentials secret name."
     fi
@@ -9491,7 +9495,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260918-02"
+HITT_BUILD_VERSION="20260918-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -11036,6 +11040,12 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
     "cause": "The pipeline HARBOR_REGISTRY_ORG value is blank.",
     "impact": "Deployment will fail.",
     "remediation": "Set the value to the location of the Helix images in your registry server e.g. bmchelix"
+  },
+  {
+    "id": "284",
+    "cause": "Invalid character in the HARBOR_REGISTRY_ORG value.",
+    "impact": "HELIX_GENERATE_CONFIG pipeline will fail.",
+    "remediation": "Remove the / from HARBOR_REGISTRY_ORG. Take everything before the slash and append it to the end of HARBOR_REGISTRY_HOST instead."
   }
 ]
 ALL_MSGS_JSON_EOF
