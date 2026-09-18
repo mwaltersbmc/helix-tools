@@ -1998,8 +1998,10 @@ createPipelineVarsArray() {
     HELIX_DWP
     HELIX_DWPA
     HELIX_MCSM
+    HELIX_GPT
     HELIX_CLOUD_ACTIONS
     HELIX_SMARTAPPS_CSM
+    HELIX_SMARTAPPS_HPM
     HELIX_SMARTAPPS_FAS
     SIDECAR_SUPPORT_ASSISTANT_FPACK
     SUPPORT_ASSISTANT_CREATE_ROLE
@@ -2631,28 +2633,28 @@ validateISDetails() {
       fi
     fi
 
-    if [ -n "${IS_HELIX_CLOUD_ACTIONS}" ]; then
-      if [ "${IS_HELIX_CLOUD_ACTIONS}" == "true" ] && [ "${IS_HELIX_DWPA}" != "true" ]; then
-        logError "104" "HELIX_CLOUD_ACTIONS is selected but this option requires HELIX_DWPA, which is not selected."
-      fi
+    if [ "${IS_HELIX_CLOUD_ACTIONS}" == "true" ] && [ "${IS_HELIX_DWPA}" != "true" ]; then
+      logError "104" "HELIX_CLOUD_ACTIONS is selected but this option requires HELIX_DWPA, which is not selected."
     fi
 
-    if [ -n "${IS_HELIX_MCSM}" ]; then
-      if [ "${IS_HELIX_MCSM}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
-        logError "104" "HELIX_MCSM is selected but this option requires HELIX_BWF, which is not selected."
-      fi
+    if [ "${IS_HELIX_MCSM}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
+      logError "104" "HELIX_MCSM is selected but this option requires HELIX_BWF, which is not selected."
     fi
 
-    if [ -n "${IS_HELIX_SMARTAPPS_CSM}" ]; then
-      if [ "${IS_HELIX_SMARTAPPS_CSM}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
-        logError "104" "HELIX_SMARTAPPS_CSM is selected but this option requires HELIX_BWF, which is not selected."
-      fi
+    if [ "${IS_HELIX_SMARTAPPS_CSM}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
+      logError "104" "HELIX_SMARTAPPS_CSM is selected but this option requires HELIX_BWF, which is not selected."
     fi
 
-    if [ -n "${IS_HELIX_SMARTAPPS_FAS}" ]; then
-      if [ "${IS_HELIX_SMARTAPPS_FAS}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
-        logError "104" "HELIX_SMARTAPPS_FAS is selected but this option requires HELIX_BWF, which is not selected."
-      fi
+    if [ "${IS_HELIX_SMARTAPPS_HPM}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
+      logError "104" "HELIX_SMARTAPPS_HPM is selected but this option requires HELIX_BWF, which is not selected."
+    fi
+
+    if [ "${IS_HELIX_SMARTAPPS_FAS}" == "true" ] && [ "${IS_HELIX_BWF}" != "true" ]; then
+      logError "104" "HELIX_SMARTAPPS_FAS is selected but this option requires HELIX_BWF, which is not selected."
+    fi
+
+    if [ -n "${IS_HELIX_GPT}" ] && [ "${K8S_AIRGAPPED}" == "1" ] && [ "${IS_VERSION}" -ge 2025301 ]; then
+      logWarning "052" "Air-gapped cluster - please review 'Troubleshooting BMC HelixGPT installation issues' in the product documentation."
     fi
 
     if [ "${ITSM_INSIGHTS}" == "1" ]; then
@@ -8983,6 +8985,7 @@ isClusterAirGapped() {
 checkForAirGappedCluster() {
   if isClusterAirGapped; then
     logMessage "Cluster appears to be air-gapped (no outbound access to ${HITT_AIR_GAP_TEST_URL})."
+    K8S_AIRGAPPED=1
   elif [[ $? -eq 1 ]]; then
     logMessage "Cluster has outbound internet access." 1
   else
@@ -9530,7 +9533,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260918-06"
+HITT_BUILD_VERSION="20260918-07"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9979,6 +9982,12 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
     "cause": "The named pods do not have their expected readiness or liveness probes configured.",
     "impact": "Troubleshooting behaviour may be unpredictable as the applicaction state in the pod is unknown.",
     "remediation": "Review the pod configuration and status before relying on the reported status of the application."
+  },
+  {
+    "id": "052",
+    "cause": "Helix GPT is selected and the cluster is air-gapped.",
+    "impact": "Helix GPT pods will not work without additional configuration.",
+    "remediation": "Review the 'Troubleshooting BMC HelixGPT installation issues' section of the docs for steps to perform."
   },
   {
     "id": "100",
