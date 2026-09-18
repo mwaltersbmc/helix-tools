@@ -135,6 +135,10 @@ getConfValues() {
 
   confirmOrSelectNamespace HP_NAMESPACE HP_NS_CANDIDATES "Helix Platform"
   confirmOrSelectNamespace IS_NAMESPACE IS_NS_CANDIDATES "Helix IS" "${HP_NAMESPACE}"
+  while [[ "${IS_NAMESPACE}" == "${HP_NAMESPACE}" ]]; do
+    askYesNo "Helix Platform and IS should not be deployed in the same namespace. Please select a different IS namespace."
+    confirmOrSelectNamespace IS_NAMESPACE IS_NS_CANDIDATES "Helix IS" "${HP_NAMESPACE}"
+  done
 
   logStatus "Please enter your HELIX_ONPREM_DEPLOYMENT pipeline CUSTOMER_SERVICE and ENVIRONMENT values:" 1
   #read -p "CUSTOMER_SERVICE : " IS_CUSTOMER_SERVICE
@@ -9487,7 +9491,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260918-01"
+HITT_BUILD_VERSION="20260918-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
