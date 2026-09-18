@@ -136,7 +136,7 @@ getConfValues() {
   confirmOrSelectNamespace HP_NAMESPACE HP_NS_CANDIDATES "Helix Platform"
   confirmOrSelectNamespace IS_NAMESPACE IS_NS_CANDIDATES "Helix IS" "${HP_NAMESPACE}"
   while [[ "${IS_NAMESPACE}" == "${HP_NAMESPACE}" ]]; do
-    askYesNo "Helix Platform and IS should not be deployed in the same namespace. Please select a different IS namespace."
+    logStatus "Helix Platform and IS should not be deployed in the same namespace. Please select a different IS namespace."
     confirmOrSelectNamespace IS_NAMESPACE IS_NS_CANDIDATES "Helix IS" "${HP_NAMESPACE}"
   done
 
