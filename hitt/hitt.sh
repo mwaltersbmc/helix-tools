@@ -8955,6 +8955,42 @@ checkPodsForMissingProbes() {
   fi
 }
 
+# Run curl from FTS_ELASTIC_POD in HP_NAMESPACE against a public HTTPS URL to detect outbound internet access.
+# Uses the Platform FTS/Elasticsearch pod so the check works before Helix IS is deployed.
+# Optional $1 = test URL (default HITT_AIR_GAP_TEST_URL).
+# Returns: 0 = air-gapped (no outbound access), 1 = not air-gapped (reachable), 2 = could not determine.
+isClusterAirGapped() {
+  local test_url="${1:-${HITT_AIR_GAP_TEST_URL}}"
+  local timeout="${HITT_AIR_GAP_TEST_TIMEOUT}"
+  local pod_phase http_code
+
+  [[ -n "${HP_NAMESPACE:-}" && -n "${FTS_ELASTIC_POD:-}" && -n "${test_url}" ]] || return 2
+
+  pod_phase=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get pod "${FTS_ELASTIC_POD}" \
+    -o jsonpath='{.status.phase}' 2>>"${HITT_ERR_FILE}")
+  [[ "${pod_phase}" == "Running" ]] || return 2
+
+  http_code=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" exec "${FTS_ELASTIC_POD}" ${FTS_ELASTIC_POD_CONTAINER} -- \
+    curl -sS -o /dev/null -w '%{http_code}' --max-time "${timeout}" "${test_url}" 2>>"${HITT_ERR_FILE}") || true
+
+  if [[ "${http_code}" =~ ^[1-9][0-9]{2}$ ]]; then
+    return 1
+  fi
+  if [[ -z "${http_code}" || "${http_code}" == "000" ]]; then
+    return 0
+  fi
+  return 2
+}
+
+checkForAirGappedCluster() {
+  if isClusterAirGapped; then
+    logMessage "Cluster appears to be air-gapped (no outbound access to ${HITT_AIR_GAP_TEST_URL})."
+  elif [[ $? -eq 1 ]]; then
+    logMessage "Cluster has outbound internet access." 1
+  else
+    logWarning "999" "Could not determine cluster air-gap status."
+  fi
+}
 #End functions
 
 # MAIN Start
@@ -9408,6 +9444,7 @@ fi
 logStatus "Getting versions..."
 getVersions
 setVarsFromPlatform
+checkForAirGappedCluster
 checkHelixLoggingDeployed
 logStatus "Checking Helix Platform registry details..."
 checkHPRegistryDetails
@@ -9495,7 +9532,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260918-03"
+HITT_BUILD_VERSION="20260918-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9533,6 +9570,8 @@ VERBOSITY=0
 : "${DISABLE_PROXY=0}"
 : "${CURL_POD:=platform-fts-0}"
 : "${CURL_CONTAINER:=platform}"
+: "${HITT_AIR_GAP_TEST_URL:=https://huggingface.co}"
+: "${HITT_AIR_GAP_TEST_TIMEOUT:=10}"
 BOLD=$'\e[1m'
 NORMAL=$'\e[0m'
 RED=$'\e[31m'

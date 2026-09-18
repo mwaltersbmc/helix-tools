@@ -56,3 +56,32 @@ Function: `discoverIngressControllerDetails` in `hitt.sh` (~6685).
 - Configmap with `INGRESS_CLASS` missing/empty — verify behaviour after fix (warning or explicit failure, not silent `nginx`).
 - `bash hitt.sh -i` and `bash hitt.sh -i ingress` — human report and `info.json` ingress fields consistent.
 - No-arg call `discoverIngressControllerDetails` (if exposed or tested in isolation) — uses `HP_INGRESS_CLASS` when set.
+
+---
+
+## Remove unused functions in `hitt.sh`
+
+Status: **backlog**
+
+Static analysis (Sep 2026): **12** functions in `hitt.sh` are defined but never called (function name appears only at the definition). Remove in a dedicated cleanup pass when convenient — no functional change expected.
+
+| Line | Function | Notes |
+|------|----------|--------|
+| 429 | `generateRandom` | Random hex helper; no references |
+| 1218 | `checkPlatformSSL` | Replaced by `validateCacertsFile HP` |
+| 1751 | `runARDriver` | Wrapper for driver exec; callers use inline exec |
+| 1787 | `getDeployedISSecret` | Sibling of `getDeployedISSTS` (which is used) |
+| 1792 | `getDeployedISVersion` | Version read done elsewhere |
+| 2135 | `setVarsFromPipelineJSON` | Incomplete; superseded by `getPipelineValues` |
+| 2385 | `checkBlank` | Callers use `isBlank` directly |
+| 3052 | `checkISFTSElasticHost` | Superseded by `checkFTSElasticSettings` / `checkIsValidElastic` |
+| 3400 | `checkSRDBSettings` | Stub (`echo TODO` only) |
+| 3813 | `checkJenkinsCredentials` | Marked `# NOT USED` in source |
+| 4370 | `xgetPipelineDefaults` | Marked `# Old version` |
+| 6832 | `URLEncode` | Dead in HITT; `scripts/imagemgr.sh` has its own copy |
+
+### When picked up
+
+1. Delete the functions above (and any now-orphaned comments).
+2. Re-run a static unused-function scan on `hitt.sh` to confirm zero dead definitions.
+3. `bash -n hitt/hitt.sh` and a quick smoke run (`bash hitt.sh -i helix` or `-m pre-is` if available).
