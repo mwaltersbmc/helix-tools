@@ -684,6 +684,27 @@ window.HITT_USE_CASES = {
       }
     },
     {
+      "id": "utility-get-gsi",
+      "topicId": "helix-system-info",
+      "order": 32,
+      "title": "I want to run an AR GSI command",
+      "commands": [
+        "bash hitt.sh -u \"get gsi list\"",
+        "bash hitt.sh -u \"get gsi 89\""
+      ],
+      "notes": [
+        "Requires a running Helix IS deployment.",
+        "get gsi list prints every AR_SERVER_INFO constant as name : id pairs.",
+        "get gsi GSI_ID runs GetServerInfo against the IS server for that GSI id and prints the current value.",
+        "Use list to find the numeric id for a setting (for example AR_SERVER_INFO_SERVER_NAME is id 89)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-gsi",
+      "video": {
+        "enabled": false,
+        "script": "utility-get-gsi"
+      }
+    },
+    {
       "id": "utility-jwt",
       "topicId": "helix-system-info",
       "order": 35,

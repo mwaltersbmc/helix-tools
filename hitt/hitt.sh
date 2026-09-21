@@ -2062,6 +2062,7 @@ createPipelineVarsArray() {
     AR_SERVER_APP_SERVICE_PASSWORD
     AR_SERVER_DSO_USER_PASSWORD
     AR_SERVER_MIDTIER_SERVICE_PASSWORD
+    ARTEMIS_AMQ_PASSWORD
     VC_RKM_PASSWORD
     VC_PROXY_USER_PASSWORD
     RSSO_ADMIN_PASSWORD
@@ -3225,6 +3226,15 @@ getISJWT() {
   else
     return 0
   fi
+}
+
+getARGSI() {
+  # $1 is number of the GSI to return
+  local gsi="${1}"
+  local value
+  [[ -z "${gsi}" ]] && return
+  value=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/systemconfiguration/${gsi}" -H "Authorization: AR-JWT ${ARJWT}")
+  echo "${value}" | ${JQ_BIN} -r '.value'
 }
 
 getISServerInfo() {
@@ -6259,6 +6269,8 @@ showUtilHelp() { # utility mode help
     \tget secret \t| Decode Kubernetes secret .data (binary keys saved as files). Args: SECRETNAME [NAMESPACE]
     \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap), or with -v list key names only. Args: CM_NAME [NAMESPACE]
     \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
+    \tget arlicense \t| Show current IS Server license type and fixed/floating seat counts.
+    \tget gsi \t| GetServerInfo (GSI): Args: list (name : id pairs) or GSI_ID (current value from IS).
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
     \tget forms \t| Search AR forms by keyword; prints form name and Schema ID. Args: KEYWORD (use quotes for multi-word, e.g. -u \"get forms AR System\")
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
@@ -7044,6 +7056,18 @@ parseUtilGet() {
       ;;
     dbid)
       getISDbID
+      ;;
+    gsi)
+      [[ -z "${UTILARGS[2]}" ]] && logError "999" "Usage: bash $0 -u \"get gsi AR_GSI_VALUE|list\"" 1
+      if [ "${UTILARGS[2]}" == "list" ]; then
+        echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -r '.[] | "\(.name) : \(.id)"'
+        exit
+      fi
+      initISAdminREST
+      GSI_ID="${UTILARGS[2]}"
+      GSI_VALUE=$(getARGSI "${GSI_ID}")
+      GSI_NAME=$(echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -r --argjson id "${GSI_ID}" '(first(.[] | select(.id == $id)).name) // "UNKNOWN"')
+      logMessage "GSI value for '${GSI_NAME} (${GSI_ID})' is '${GSI_VALUE}'"
       ;;
     secret)
       if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
@@ -9549,7 +9573,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260921-01"
+HITT_BUILD_VERSION="20260921-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -11668,6 +11692,23 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-arlicense"
     },
     {
+      "id": "utility-get-gsi",
+      "topicId": "helix-system-info",
+      "order": 32,
+      "title": "I want to run an AR GSI command",
+      "commands": [
+        "bash hitt.sh -u \"get gsi list\"",
+        "bash hitt.sh -u \"get gsi 89\""
+      ],
+      "notes": [
+        "Requires a running Helix IS deployment.",
+        "get gsi list prints every AR_SERVER_INFO constant as name : id pairs.",
+        "get gsi GSI_ID runs GetServerInfo against the IS server for that GSI id and prints the current value.",
+        "Use list to find the numeric id for a setting (for example AR_SERVER_INFO_SERVER_NAME is id 89)."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-gsi"
+    },
+    {
       "id": "utility-jwt",
       "topicId": "helix-system-info",
       "order": 35,
@@ -12222,6 +12263,3368 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
 }
 HITT_USE_CASES_JSON_EOF
 # END HITT_USE_CASES_JSON
+# BEGIN AR_SERVER_INFO_JSON
+read -r -d '' AR_SERVER_INFO_JSON <<'AR_SERVER_INFO_JSON_EOF' || true
+[
+  {
+    "name": "AR_SERVER_INFO_DB_TYPE",
+    "id": 1
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_LICENSE",
+    "id": 2
+  },
+  {
+    "name": "AR_SERVER_INFO_FIXED_LICENSE",
+    "id": 3
+  },
+  {
+    "name": "AR_SERVER_INFO_VERSION",
+    "id": 4
+  },
+  {
+    "name": "AR_SERVER_INFO_ALLOW_GUESTS",
+    "id": 5
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_ETC_PASSWD",
+    "id": 6
+  },
+  {
+    "name": "AR_SERVER_INFO_XREF_PASSWORDS",
+    "id": 7
+  },
+  {
+    "name": "AR_SERVER_INFO_DEBUG_MODE",
+    "id": 8
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_NAME",
+    "id": 9
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_PASSWORD",
+    "id": 10
+  },
+  {
+    "name": "AR_SERVER_INFO_HARDWARE",
+    "id": 11
+  },
+  {
+    "name": "AR_SERVER_INFO_OS",
+    "id": 12
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_DIR",
+    "id": 13
+  },
+  {
+    "name": "AR_SERVER_INFO_DBHOME_DIR",
+    "id": 14
+  },
+  {
+    "name": "AR_SERVER_INFO_SET_PROC_TIME",
+    "id": 15
+  },
+  {
+    "name": "AR_SERVER_INFO_EMAIL_FROM",
+    "id": 16
+  },
+  {
+    "name": "AR_SERVER_INFO_SQL_LOG_FILE",
+    "id": 17
+  },
+  {
+    "name": "AR_SERVER_INFO_FLOAT_LICENSE",
+    "id": 18
+  },
+  {
+    "name": "AR_SERVER_INFO_FLOAT_TIMEOUT",
+    "id": 19
+  },
+  {
+    "name": "AR_SERVER_INFO_UNQUAL_QUERIES",
+    "id": 20
+  },
+  {
+    "name": "AR_SERVER_INFO_FILTER_LOG_FILE",
+    "id": 21
+  },
+  {
+    "name": "AR_SERVER_INFO_USER_LOG_FILE",
+    "id": 22
+  },
+  {
+    "name": "AR_SERVER_INFO_REM_SERV_ID",
+    "id": 23
+  },
+  {
+    "name": "AR_SERVER_INFO_MULTI_SERVER",
+    "id": 24
+  },
+  {
+    "name": "AR_SERVER_INFO_EMBEDDED_SQL",
+    "id": 25
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_SCHEMAS",
+    "id": 26
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_VERSION",
+    "id": 27
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_ENTRIES",
+    "id": 28
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_F_DAEMONS",
+    "id": 29
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_L_DAEMONS",
+    "id": 30
+  },
+  {
+    "name": "AR_SERVER_INFO_ESCALATION_LOG_FILE",
+    "id": 31
+  },
+  {
+    "name": "AR_SERVER_INFO_ESCL_DAEMON",
+    "id": 32
+  },
+  {
+    "name": "AR_SERVER_INFO_SUBMITTER_MODE",
+    "id": 33
+  },
+  {
+    "name": "AR_SERVER_INFO_API_LOG_FILE",
+    "id": 34
+  },
+  {
+    "name": "AR_SERVER_INFO_FTEXT_FIXED",
+    "id": 35
+  },
+  {
+    "name": "AR_SERVER_INFO_FTEXT_FLOAT",
+    "id": 36
+  },
+  {
+    "name": "AR_SERVER_INFO_FTEXT_TIMEOUT",
+    "id": 37
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERV1_A",
+    "id": 38
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERV1_B",
+    "id": 39
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERV1_C",
+    "id": 40
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_IDENT",
+    "id": 41
+  },
+  {
+    "name": "AR_SERVER_INFO_DS_SVR_LICENSE",
+    "id": 42
+  },
+  {
+    "name": "AR_SERVER_INFO_DS_MAPPING",
+    "id": 43
+  },
+  {
+    "name": "AR_SERVER_INFO_DS_PENDING",
+    "id": 44
+  },
+  {
+    "name": "AR_SERVER_INFO_DS_RPC_SOCKET",
+    "id": 45
+  },
+  {
+    "name": "AR_SERVER_INFO_DS_LOG_FILE",
+    "id": 46
+  },
+  {
+    "name": "AR_SERVER_INFO_SUPPRESS_WARN",
+    "id": 47
+  },
+  {
+    "name": "AR_SERVER_INFO_HOSTNAME",
+    "id": 48
+  },
+  {
+    "name": "AR_SERVER_INFO_FULL_HOSTNAME",
+    "id": 49
+  },
+  {
+    "name": "AR_SERVER_INFO_SAVE_LOGIN",
+    "id": 50
+  },
+  {
+    "name": "AR_SERVER_INFO_U_CACHE_CHANGE",
+    "id": 51
+  },
+  {
+    "name": "AR_SERVER_INFO_G_CACHE_CHANGE",
+    "id": 52
+  },
+  {
+    "name": "AR_SERVER_INFO_STRUCT_CHANGE",
+    "id": 53
+  },
+  {
+    "name": "AR_SERVER_INFO_CASE_SENSITIVE",
+    "id": 54
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_LANG",
+    "id": 55
+  },
+  {
+    "name": "AR_SERVER_INFO_ADMIN_ONLY",
+    "id": 56
+  },
+  {
+    "name": "AR_SERVER_INFO_CACHE_LOG_FILE",
+    "id": 57
+  },
+  {
+    "name": "AR_SERVER_INFO_FLASH_DAEMON",
+    "id": 58
+  },
+  {
+    "name": "AR_SERVER_INFO_THREAD_LOG_FILE",
+    "id": 59
+  },
+  {
+    "name": "AR_SERVER_INFO_ADMIN_TCP_PORT",
+    "id": 60
+  },
+  {
+    "name": "AR_SERVER_INFO_ESCL_TCP_PORT",
+    "id": 61
+  },
+  {
+    "name": "AR_SERVER_INFO_FAST_TCP_PORT",
+    "id": 62
+  },
+  {
+    "name": "AR_SERVER_INFO_LIST_TCP_PORT",
+    "id": 63
+  },
+  {
+    "name": "AR_SERVER_INFO_FLASH_TCP_PORT",
+    "id": 64
+  },
+  {
+    "name": "AR_SERVER_INFO_TCD_TCP_PORT",
+    "id": 65
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_DEST_PORT",
+    "id": 66
+  },
+  {
+    "name": "AR_SERVER_INFO_INFORMIX_DBN",
+    "id": 67
+  },
+  {
+    "name": "AR_SERVER_INFO_INFORMIX_TBC",
+    "id": 68
+  },
+  {
+    "name": "AR_SERVER_INFO_INGRES_VNODE",
+    "id": 69
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_SID",
+    "id": 70
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_TWO_T",
+    "id": 71
+  },
+  {
+    "name": "AR_SERVER_INFO_SYBASE_CHARSET",
+    "id": 72
+  },
+  {
+    "name": "AR_SERVER_INFO_SYBASE_SERV",
+    "id": 73
+  },
+  {
+    "name": "AR_SERVER_INFO_SHARED_MEM",
+    "id": 74
+  },
+  {
+    "name": "AR_SERVER_INFO_SHARED_CACHE",
+    "id": 75
+  },
+  {
+    "name": "AR_SERVER_INFO_CACHE_SEG_SIZE",
+    "id": 76
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_USER",
+    "id": 77
+  },
+  {
+    "name": "AR_SERVER_INFO_NFY_TCP_PORT",
+    "id": 78
+  },
+  {
+    "name": "AR_SERVER_INFO_FILT_MAX_TOTAL",
+    "id": 79
+  },
+  {
+    "name": "AR_SERVER_INFO_FILT_MAX_STACK",
+    "id": 80
+  },
+  {
+    "name": "AR_SERVER_INFO_DEFAULT_ORDER_BY",
+    "id": 81
+  },
+  {
+    "name": "AR_SERVER_INFO_DELAYED_CACHE",
+    "id": 82
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_MERGE_STYLE",
+    "id": 83
+  },
+  {
+    "name": "AR_SERVER_INFO_EMAIL_LINE_LEN",
+    "id": 84
+  },
+  {
+    "name": "AR_SERVER_INFO_EMAIL_SYSTEM",
+    "id": 85
+  },
+  {
+    "name": "AR_SERVER_INFO_INFORMIX_RELAY_MOD",
+    "id": 86
+  },
+  {
+    "name": "AR_SERVER_INFO_PS_RPC_SOCKET",
+    "id": 87
+  },
+  {
+    "name": "AR_SERVER_INFO_REGISTER_PORTMAPPER",
+    "id": 88
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_NAME",
+    "id": 89
+  },
+  {
+    "name": "AR_SERVER_INFO_DBCONF",
+    "id": 90
+  },
+  {
+    "name": "AR_SERVER_INFO_APPL_PENDING",
+    "id": 91
+  },
+  {
+    "name": "AR_SERVER_INFO_AP_RPC_SOCKET",
+    "id": 92
+  },
+  {
+    "name": "AR_SERVER_INFO_AP_LOG_FILE",
+    "id": 93
+  },
+  {
+    "name": "AR_SERVER_INFO_AP_DEFN_CHECK",
+    "id": 94
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_LOG_FILE_SIZE",
+    "id": 95
+  },
+  {
+    "name": "AR_SERVER_INFO_CLUSTERED_INDEX",
+    "id": 96
+  },
+  {
+    "name": "AR_SERVER_INFO_ACTLINK_DIR",
+    "id": 97
+  },
+  {
+    "name": "AR_SERVER_INFO_ACTLINK_SHELL",
+    "id": 98
+  },
+  {
+    "name": "AR_SERVER_INFO_USER_CACHE_UTILS",
+    "id": 99
+  },
+  {
+    "name": "AR_SERVER_INFO_EMAIL_TIMEOUT",
+    "id": 100
+  },
+  {
+    "name": "AR_SERVER_INFO_EXPORT_VERSION",
+    "id": 101
+  },
+  {
+    "name": "AR_SERVER_INFO_ENCRYPT_AL_SQL",
+    "id": 102
+  },
+  {
+    "name": "AR_SERVER_INFO_SCC_ENABLED",
+    "id": 103
+  },
+  {
+    "name": "AR_SERVER_INFO_SCC_PROVIDER_NAME",
+    "id": 104
+  },
+  {
+    "name": "AR_SERVER_INFO_SCC_TARGET_DIR",
+    "id": 105
+  },
+  {
+    "name": "AR_SERVER_INFO_SCC_COMMENT_CHECKIN",
+    "id": 106
+  },
+  {
+    "name": "AR_SERVER_INFO_SCC_COMMENT_CHECKOUT",
+    "id": 107
+  },
+  {
+    "name": "AR_SERVER_INFO_SCC_INTEGRATION_MODE",
+    "id": 108
+  },
+  {
+    "name": "AR_SERVER_INFO_EA_RPC_SOCKET",
+    "id": 109
+  },
+  {
+    "name": "AR_SERVER_INFO_EA_RPC_TIMEOUT",
+    "id": 110
+  },
+  {
+    "name": "AR_SERVER_INFO_USER_INFO_LISTS",
+    "id": 111
+  },
+  {
+    "name": "AR_SERVER_INFO_USER_INST_TIMEOUT",
+    "id": 112
+  },
+  {
+    "name": "AR_SERVER_INFO_DEBUG_GROUPID",
+    "id": 113
+  },
+  {
+    "name": "AR_SERVER_INFO_APPLICATION_AUDIT",
+    "id": 114
+  },
+  {
+    "name": "AR_SERVER_INFO_EA_SYNC_TIMEOUT",
+    "id": 115
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_TIME",
+    "id": 116
+  },
+  {
+    "name": "AR_SERVER_INFO_SVR_SEC_CACHE",
+    "id": 117
+  },
+  {
+    "name": "AR_SERVER_INFO_LOGFILE_APPEND",
+    "id": 118
+  },
+  {
+    "name": "AR_SERVER_INFO_MINIMUM_API_VER",
+    "id": 119
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_AUDIT_LOG_FILE_SIZE",
+    "id": 120
+  },
+  {
+    "name": "AR_SERVER_INFO_CANCEL_QUERY",
+    "id": 121
+  },
+  {
+    "name": "AR_SERVER_INFO_MULT_ASSIGN_GROUPS",
+    "id": 122
+  },
+  {
+    "name": "AR_SERVER_INFO_ARFORK_LOG_FILE",
+    "id": 123
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_PLACEHOLDER_MODE",
+    "id": 124
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_POLLING_INTERVAL",
+    "id": 125
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_SOURCE_SERVER",
+    "id": 126
+  },
+  {
+    "name": "AR_SERVER_INFO_DS_POOL",
+    "id": 127
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_TIMEOUT_NORMAL",
+    "id": 128
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_PUB_KEY",
+    "id": 129
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_PUB_KEY_EXP",
+    "id": 130
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_DATA_KEY_EXP",
+    "id": 131
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_DATA_ENCR_ALG",
+    "id": 132
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_SEC_POLICY",
+    "id": 133
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_SESS_H_ENTRIES",
+    "id": 134
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_TARGET_CONNECTION",
+    "id": 135
+  },
+  {
+    "name": "AR_SERVER_INFO_PREFERENCE_PRIORITY",
+    "id": 136
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_QUERY_ON_CLOB",
+    "id": 137
+  },
+  {
+    "name": "AR_SERVER_INFO_MESSAGE_CAT_SCHEMA",
+    "id": 138
+  },
+  {
+    "name": "AR_SERVER_INFO_ALERT_SCHEMA",
+    "id": 139
+  },
+  {
+    "name": "AR_SERVER_INFO_LOCALIZED_SERVER",
+    "id": 140
+  },
+  {
+    "name": "AR_SERVER_INFO_SVR_EVENT_LIST",
+    "id": 141
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ADMIN_OPERATIONS",
+    "id": 142
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ESCALATIONS",
+    "id": 143
+  },
+  {
+    "name": "AR_SERVER_INFO_ALERT_LOG_FILE",
+    "id": 144
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ALERTS",
+    "id": 145
+  },
+  {
+    "name": "AR_SERVER_INFO_CHECK_ALERT_USERS",
+    "id": 146
+  },
+  {
+    "name": "AR_SERVER_INFO_ALERT_SEND_TIMEOUT",
+    "id": 147
+  },
+  {
+    "name": "AR_SERVER_INFO_NOTIF_SEND_TIMEOUT",
+    "id": 147
+  },
+  {
+    "name": "AR_SERVER_INFO_ALERT_OUTBOUND_PORT",
+    "id": 148
+  },
+  {
+    "name": "AR_SERVER_INFO_ALERT_SOURCE_AR",
+    "id": 149
+  },
+  {
+    "name": "AR_SERVER_INFO_ALERT_SOURCE_FB",
+    "id": 150
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_USER_PASSWD",
+    "id": 151
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_TARGET_PASSWD",
+    "id": 152
+  },
+  {
+    "name": "AR_SERVER_INFO_APP_SERVICE_PASSWD",
+    "id": 153
+  },
+  {
+    "name": "AR_SERVER_INFO_MID_TIER_PASSWD",
+    "id": 154
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_LOG_FILE",
+    "id": 155
+  },
+  {
+    "name": "AR_SERVER_INFO_SVR_STATS_REC_MODE",
+    "id": 156
+  },
+  {
+    "name": "AR_SERVER_INFO_SVR_STATS_REC_INTERVAL",
+    "id": 157
+  },
+  {
+    "name": "AR_SERVER_INFO_DEFAULT_WEB_PATH",
+    "id": 158
+  },
+  {
+    "name": "AR_SERVER_INFO_FILTER_API_RPC_TIMEOUT",
+    "id": 159
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLED_CLIENT",
+    "id": 160
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_PASSWD",
+    "id": 161
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_ALIAS",
+    "id": 162
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_TARGET_PASSWD",
+    "id": 163
+  },
+  {
+    "name": "AR_SERVER_INFO_REM_WKFLW_PASSWD",
+    "id": 164
+  },
+  {
+    "name": "AR_SERVER_INFO_REM_WKFLW_TARGET_PASSWD",
+    "id": 165
+  },
+  {
+    "name": "AR_SERVER_INFO_EXPORT_SVR_OPS",
+    "id": 166
+  },
+  {
+    "name": "AR_SERVER_INFO_INIT_FORM",
+    "id": 167
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_PUB_KEY_ALG",
+    "id": 168
+  },
+  {
+    "name": "AR_SERVER_INFO_IP_NAMES",
+    "id": 169
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_CACHE_CHK_INTERVAL",
+    "id": 170
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_MARK_PENDING_RETRY",
+    "id": 171
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_RPCPROG_NUM",
+    "id": 172
+  },
+  {
+    "name": "AR_SERVER_INFO_DELAY_RECACHE_TIME",
+    "id": 173
+  },
+  {
+    "name": "AR_SERVER_INFO_DFLT_ALLOW_CURRENCIES",
+    "id": 174
+  },
+  {
+    "name": "AR_SERVER_INFO_CURRENCY_INTERVAL",
+    "id": 175
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_CURSOR_SHARE",
+    "id": 176
+  },
+  {
+    "name": "AR_SERVER_INFO_DB2_DB_ALIAS",
+    "id": 177
+  },
+  {
+    "name": "AR_SERVER_INFO_DB2_SERVER",
+    "id": 178
+  },
+  {
+    "name": "AR_SERVER_INFO_DFLT_FUNC_CURRENCIES",
+    "id": 179
+  },
+  {
+    "name": "AR_SERVER_INFO_EMAIL_IMPORT_FORM",
+    "id": 180
+  },
+  {
+    "name": "AR_SERVER_INFO_EMAIL_AIX_USE_OLD_EMAIL",
+    "id": 181
+  },
+  {
+    "name": "AR_SERVER_INFO_TWO_DIGIT_YEAR_CUTOFF",
+    "id": 182
+  },
+  {
+    "name": "AR_SERVER_INFO_ALLOW_BACKQUOTE_IN_PROCESS",
+    "id": 183
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_CONNECTION_RETRIES",
+    "id": 184
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_CHAR_SET",
+    "id": 185
+  },
+  {
+    "name": "AR_SERVER_INFO_CURR_PART_VALUE_STR",
+    "id": 186
+  },
+  {
+    "name": "AR_SERVER_INFO_CURR_PART_TYPE_STR",
+    "id": 187
+  },
+  {
+    "name": "AR_SERVER_INFO_CURR_PART_DATE_STR",
+    "id": 188
+  },
+  {
+    "name": "AR_SERVER_INFO_HOMEPAGE_FORM",
+    "id": 189
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_FTS_INDEXER",
+    "id": 190
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ARCHIVE",
+    "id": 191
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVERGROUP_MEMBER",
+    "id": 192
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVERGROUP_LOG_FILE",
+    "id": 193
+  },
+  {
+    "name": "AR_SERVER_INFO_FLUSH_LOG_LINES",
+    "id": 194
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVERGROUP_INTERVAL",
+    "id": 195
+  },
+  {
+    "name": "AR_SERVER_INFO_JAVA_VM_OPTIONS",
+    "id": 196
+  },
+  {
+    "name": "AR_SERVER_INFO_PER_THREAD_LOGS",
+    "id": 197
+  },
+  {
+    "name": "AR_SERVER_INFO_CONFIG_FILE",
+    "id": 198
+  },
+  {
+    "name": "AR_SERVER_INFO_SSTABLE_CHUNK_SIZE",
+    "id": 199
+  },
+  {
+    "name": "AR_SERVER_INFO_SG_EMAIL_STATE",
+    "id": 200
+  },
+  {
+    "name": "AR_SERVER_INFO_SG_FLASHBOARDS_STATE",
+    "id": 201
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVERGROUP_NAME",
+    "id": 202
+  },
+  {
+    "name": "AR_SERVER_INFO_SG_ADMIN_SERVER_NAME",
+    "id": 203
+  },
+  {
+    "name": "AR_SERVER_INFO_LOCKED_WKFLW_LOG_MODE",
+    "id": 204
+  },
+  {
+    "name": "AR_SERVER_INFO_ROLE_CHANGE",
+    "id": 205
+  },
+  {
+    "name": "AR_SERVER_INFO_SG_ADMIN_SERVER_PORT",
+    "id": 206
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_LOOPBACK_RPC",
+    "id": 207
+  },
+  {
+    "name": "AR_SERVER_INFO_CACHE_MODE",
+    "id": 208
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_FREESPACE",
+    "id": 209
+  },
+  {
+    "name": "AR_SERVER_INFO_GENERAL_AUTH_ERR",
+    "id": 210
+  },
+  {
+    "name": "AR_SERVER_INFO_AUTH_CHAINING_MODE",
+    "id": 211
+  },
+  {
+    "name": "AR_SERVER_INFO_RPC_NON_BLOCKING_IO",
+    "id": 212
+  },
+  {
+    "name": "AR_SERVER_INFO_SYS_LOGGING_OPTIONS",
+    "id": 213
+  },
+  {
+    "name": "AR_SERVER_INFO_EXT_AUTH_CAPABILITIES",
+    "id": 214
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_ERROR_RETRY",
+    "id": 215
+  },
+  {
+    "name": "AR_SERVER_INFO_PREF_SERVER_OPTION",
+    "id": 216
+  },
+  {
+    "name": "AR_SERVER_INFO_FTINDEXER_LOG_FILE",
+    "id": 217
+  },
+  {
+    "name": "AR_SERVER_INFO_EXCEPTION_OPTION",
+    "id": 218
+  },
+  {
+    "name": "AR_SERVER_INFO_ERROR_EXCEPTION_LIST",
+    "id": 219
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_MAX_QUERY_SIZE",
+    "id": 220
+  },
+  {
+    "name": "AR_SERVER_INFO_ADMIN_OP_TRACKING",
+    "id": 221
+  },
+  {
+    "name": "AR_SERVER_INFO_ADMIN_OP_PROGRESS",
+    "id": 222
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_DEFAULT_TIMEOUT",
+    "id": 223
+  },
+  {
+    "name": "AR_SERVER_INFO_EA_IGNORE_EXCESS_GROUPS",
+    "id": 224
+  },
+  {
+    "name": "AR_SERVER_INFO_EA_GROUP_MAPPING",
+    "id": 225
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_LOG_LEVEL",
+    "id": 226
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_THRESHOLD_LOW",
+    "id": 227
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_THRESHOLD_HIGH",
+    "id": 228
+  },
+  {
+    "name": "AR_SERVER_INFO_NOTIFY_WEB_PATH",
+    "id": 229
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_NON_UNICODE_CLIENTS",
+    "id": 230
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_COLLECTION_DIR",
+    "id": 231
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_CONFIGURATION_DIR",
+    "id": 232
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_TEMP_DIR",
+    "id": 233
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_REINDEX",
+    "id": 234
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_DISABLE_SEARCH",
+    "id": 235
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_CASE_SENSITIVITY",
+    "id": 236
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SEARCH_MATCH_OP",
+    "id": 237
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_STOP_WORDS",
+    "id": 238
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_RECOVERY_INTERVAL",
+    "id": 239
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_OPTIMIZE_THRESHOLD",
+    "id": 240
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_PASSWORD_ATTEMPTS",
+    "id": 241
+  },
+  {
+    "name": "AR_SERVER_INFO_GUESTS_RESTRICT_READ",
+    "id": 242
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_CLOB_STORE_INROW",
+    "id": 243
+  },
+  {
+    "name": "AR_SERVER_INFO_NEXT_ID_BLOCK_SIZE",
+    "id": 244
+  },
+  {
+    "name": "AR_SERVER_INFO_NEXT_ID_COMMIT",
+    "id": 245
+  },
+  {
+    "name": "AR_SERVER_INFO_RPC_CLIENT_XDR_LIMIT",
+    "id": 246
+  },
+  {
+    "name": "AR_SERVER_INFO_CACHE_DISP_PROP",
+    "id": 247
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_CON_NAME_IN_STATS",
+    "id": 248
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_MAX_ATTACH_SIZE",
+    "id": 249
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_MAX_TEXT_SIZE",
+    "id": 250
+  },
+  {
+    "name": "AR_SERVER_INFO_GUID_PREFIX",
+    "id": 251
+  },
+  {
+    "name": "AR_SERVER_INFO_MULTIPLE_ARSYSTEM_SERVERS",
+    "id": 252
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_BULK_FETCH_COUNT",
+    "id": 253
+  },
+  {
+    "name": "AR_SERVER_INFO_MINIMUM_CMDB_API_VER",
+    "id": 254
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_PORT",
+    "id": 255
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_LIST",
+    "id": 256
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_PATH_LIST",
+    "id": 257
+  },
+  {
+    "name": "AR_SERVER_INFO_SHARED_LIB",
+    "id": 258
+  },
+  {
+    "name": "AR_SERVER_INFO_SHARED_LIB_PATH",
+    "id": 259
+  },
+  {
+    "name": "AR_SERVER_INFO_CMDB_INSTALL_DIR",
+    "id": 260
+  },
+  {
+    "name": "AR_SERVER_INFO_RE_LOG_DIR",
+    "id": 261
+  },
+  {
+    "name": "AR_SERVER_INFO_LOG_TO_FORM",
+    "id": 262
+  },
+  {
+    "name": "AR_SERVER_INFO_SQL_LOG_FORM",
+    "id": 263
+  },
+  {
+    "name": "AR_SERVER_INFO_API_LOG_FORM",
+    "id": 264
+  },
+  {
+    "name": "AR_SERVER_INFO_ESCL_LOG_FORM",
+    "id": 265
+  },
+  {
+    "name": "AR_SERVER_INFO_FILTER_LOG_FORM",
+    "id": 266
+  },
+  {
+    "name": "AR_SERVER_INFO_USER_LOG_FORM",
+    "id": 267
+  },
+  {
+    "name": "AR_SERVER_INFO_ALERT_LOG_FORM",
+    "id": 268
+  },
+  {
+    "name": "AR_SERVER_INFO_SVRGRP_LOG_FORM",
+    "id": 269
+  },
+  {
+    "name": "AR_SERVER_INFO_FTINDX_LOG_FORM",
+    "id": 270
+  },
+  {
+    "name": "AR_SERVER_INFO_THREAD_LOG_FORM",
+    "id": 271
+  },
+  {
+    "name": "AR_SERVER_INFO_FIPS_SERVER_MODE",
+    "id": 272
+  },
+  {
+    "name": "AR_SERVER_INFO_FIPS_CLIENT_MODE",
+    "id": 273
+  },
+  {
+    "name": "AR_SERVER_INFO_FIPS_STATUS",
+    "id": 274
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_LEVEL",
+    "id": 275
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_ALGORITHM",
+    "id": 276
+  },
+  {
+    "name": "AR_SERVER_INFO_FIPS_MODE_INDEX",
+    "id": 277
+  },
+  {
+    "name": "AR_SERVER_INFO_FIPS_DUAL_MODE_INDEX",
+    "id": 278
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_LEVEL_INDEX",
+    "id": 279
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_MAIN_POLL_INTERVAL",
+    "id": 280
+  },
+  {
+    "name": "AR_SERVER_INFO_RECORD_OBJECT_RELS",
+    "id": 281
+  },
+  {
+    "name": "AR_SERVER_INFO_LICENSE_USAGE",
+    "id": 282
+  },
+  {
+    "name": "AR_SERVER_INFO_COMMON_LOG_FORM",
+    "id": 283
+  },
+  {
+    "name": "AR_SERVER_INFO_COMMON_LOG_FORM_SELECTED",
+    "id": 284
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_CLIENT_MANAGED_TRANSACTIONS",
+    "id": 285
+  },
+  {
+    "name": "AR_SERVER_INFO_CLIENT_MANAGED_TRANSACTION_TIMEOUT",
+    "id": 286
+  },
+  {
+    "name": "AR_SERVER_INFO_OBJ_RESERVATION_MODE",
+    "id": 287
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_PUB_KEY_EXP",
+    "id": 288
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_DATA_KEY_EXP",
+    "id": 289
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_DATA_ALG",
+    "id": 290
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_SEC_POLICY",
+    "id": 291
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_FIPS_SERVER_MODE",
+    "id": 292
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_LEVEL",
+    "id": 293
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_ALGORITHM",
+    "id": 294
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_FIPS_MODE_INDEX",
+    "id": 295
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_LEVEL_INDEX",
+    "id": 296
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_PUB_KEY",
+    "id": 297
+  },
+  {
+    "name": "AR_SERVER_INFO_CUR_ENC_PUB_KEY",
+    "id": 298
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_ENC_PUB_KEY_INDEX",
+    "id": 299
+  },
+  {
+    "name": "AR_SERVER_INFO_CURRENT_ENC_SEC_POLICY",
+    "id": 300
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_LIBRARY_LEVEL",
+    "id": 301
+  },
+  {
+    "name": "AR_SERVER_INFO_NEW_FIPS_ALG",
+    "id": 302
+  },
+  {
+    "name": "AR_SERVER_INFO_FIPS_ALG",
+    "id": 303
+  },
+  {
+    "name": "AR_SERVER_INFO_FIPS_PUB_KEY",
+    "id": 304
+  },
+  {
+    "name": "AR_SERVER_INFO_WFD_QUEUES",
+    "id": 305
+  },
+  {
+    "name": "AR_SERVER_INFO_VERCNTL_OBJ_MOD_LOG_MODE",
+    "id": 306
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_RECURSION_LEVEL",
+    "id": 307
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SERVER_NAME",
+    "id": 308
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SERVER_PORT",
+    "id": 309
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_AUDIT_ONLY_CHANGED_FIELDS",
+    "id": 310
+  },
+  {
+    "name": "AR_SERVER_INFO_VERCNTL_OBJ_MOD_LOG_SAVE_DEF",
+    "id": 311
+  },
+  {
+    "name": "AR_SERVER_INFO_SG_AIE_STATE",
+    "id": 312
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_VENDOR_TEMP_TABLES",
+    "id": 313
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_LOG_LEVEL",
+    "id": 314
+  },
+  {
+    "name": "AR_SERVER_INFO_DS_PENDING_ERR",
+    "id": 315
+  },
+  {
+    "name": "AR_SERVER_INFO_REGISTRY_LOCATION",
+    "id": 316
+  },
+  {
+    "name": "AR_SERVER_INFO_REGISTRY_USER",
+    "id": 317
+  },
+  {
+    "name": "AR_SERVER_INFO_REGISTRY_PASSWORD",
+    "id": 318
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_LOG_ERR_FORM",
+    "id": 319
+  },
+  {
+    "name": "AR_SERVER_INFO_ARSIGNALD_LOG_FILE",
+    "id": 320
+  },
+  {
+    "name": "AR_SERVER_INFO_FIRE_ESCALATIONS",
+    "id": 321
+  },
+  {
+    "name": "AR_SERVER_INFO_PRELOAD_NUM_THREADS",
+    "id": 322
+  },
+  {
+    "name": "AR_SERVER_INFO_PRELOAD_NUM_SCHEMA_SEGS",
+    "id": 323
+  },
+  {
+    "name": "AR_SERVER_INFO_PRELOAD_THREAD_INIT_ONLY",
+    "id": 324
+  },
+  {
+    "name": "AR_SERVER_INFO_REG_ENDPOINT_CACHE_FLUSH",
+    "id": 325
+  },
+  {
+    "name": "AR_SERVER_INFO_CREATE_WKFLW_PLACEHOLDER",
+    "id": 326
+  },
+  {
+    "name": "AR_SERVER_INFO_MFS_TITLE_FIELD_WEIGHT",
+    "id": 327
+  },
+  {
+    "name": "AR_SERVER_INFO_MFS_ENVIRONMENT_FIELD_WEIGHT",
+    "id": 328
+  },
+  {
+    "name": "AR_SERVER_INFO_MFS_KEYWORDS_FIELD_WEIGHT",
+    "id": 329
+  },
+  {
+    "name": "AR_SERVER_INFO_COPY_CACHE_LOGGING",
+    "id": 330
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_SUPRESS_NO_SUCH_ENTRY_FOR_DELETE",
+    "id": 331
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_FTS_IN_WORKFLOW",
+    "id": 332
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_ATTACH_SIZE",
+    "id": 333
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ARSIGNALS",
+    "id": 334
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SEARCH_THRESHOLD",
+    "id": 335
+  },
+  {
+    "name": "AR_SERVER_INFO_REQ_FIELD_IDENTIFIER",
+    "id": 336
+  },
+  {
+    "name": "AR_SERVER_INFO_REQ_FIELD_IDENTIFIER_LOCATION",
+    "id": 337
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SIGNAL_DELAY",
+    "id": 338
+  },
+  {
+    "name": "AR_SERVER_INFO_ATRIUM_SSO_AUTHENTICATION",
+    "id": 339
+  },
+  {
+    "name": "AR_SERVER_INFO_OVERLAY_MODE",
+    "id": 340
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_FORM_REINDEX",
+    "id": 341
+  },
+  {
+    "name": "AR_SERVER_INFO_DS_LOGICAL_MAPPING",
+    "id": 342
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_CONNECTION_TIMEOUT",
+    "id": 343
+  },
+  {
+    "name": "AR_SERVER_INFO_ATRIUMSSO_LOCATION",
+    "id": 344
+  },
+  {
+    "name": "AR_SERVER_INFO_ATRIUMSSO_USER",
+    "id": 345
+  },
+  {
+    "name": "AR_SERVER_INFO_ATRIUMSSO_PASSWORD",
+    "id": 346
+  },
+  {
+    "name": "AR_SERVER_INFO_SUPPRESS_DOMAIN_IN_URL",
+    "id": 347
+  },
+  {
+    "name": "AR_SERVER_INFO_RESTART_PLUGIN",
+    "id": 348
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_PROMPT_BAR_FOR",
+    "id": 349
+  },
+  {
+    "name": "AR_SERVER_INFO_ATRIUMSSO_KEYSTORE_PATH",
+    "id": 350
+  },
+  {
+    "name": "AR_SERVER_INFO_ATRIUMSSO_KEYSTORE_PASSWORD",
+    "id": 351
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_LOG_HISTORY",
+    "id": 352
+  },
+  {
+    "name": "AR_SERVER_INFO_SUPRESS_LOGOFF_SIGNALS",
+    "id": 353
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_FUNCTIONAL_INDEX",
+    "id": 354
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_MODE",
+    "id": 355
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_RESERVED",
+    "id": 356
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_ADMIN_USER",
+    "id": 357
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_DUAL_DATA_FORMS",
+    "id": 358
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED5",
+    "id": 359
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED6",
+    "id": 360
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED7",
+    "id": 361
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED8",
+    "id": 362
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED9",
+    "id": 363
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED10",
+    "id": 364
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED11",
+    "id": 365
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED12",
+    "id": 366
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED13",
+    "id": 367
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED14",
+    "id": 368
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED15",
+    "id": 369
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED16",
+    "id": 370
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED17",
+    "id": 371
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED18",
+    "id": 372
+  },
+  {
+    "name": "AR_SERVER_INFO_RESERVED19",
+    "id": 373
+  },
+  {
+    "name": "AR_SERVER_INFO_NUMBER_OF_SELECTOR_THREADS",
+    "id": 375
+  },
+  {
+    "name": "AR_SERVER_INFO_MESSAGE_BROKER_PORT",
+    "id": 376
+  },
+  {
+    "name": "AR_SERVER_INFO_JMX_PORT",
+    "id": 377
+  },
+  {
+    "name": "AR_SERVER_INFO_PEER_LISTENER_PORT",
+    "id": 378
+  },
+  {
+    "name": "AR_SERVER_INFO_API_MONITORING_UPDATE_INTERVAL",
+    "id": 379
+  },
+  {
+    "name": "AR_SERVER_INFO_API_RECORDING_CLIENT_TYPE",
+    "id": 380
+  },
+  {
+    "name": "AR_SERVER_INFO_API_RECORDING_ENABLE",
+    "id": 381
+  },
+  {
+    "name": "AR_SERVER_INFO_OBJ_RESERVATION_REPOSITORY_TYPE",
+    "id": 382
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVICE_RECORDING_ENABLE",
+    "id": 383
+  },
+  {
+    "name": "AR_SERVER_INFO_STATS_APISQL_CONTROL",
+    "id": 384
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVERGROUP_FLASHBOARD_ADMIN_PORT",
+    "id": 385
+  },
+  {
+    "name": "AR_SERVER_INFO_STATS_APISQL_MAX_SAVED",
+    "id": 386
+  },
+  {
+    "name": "AR_SERVER_INFO_STATS_APISQL_INTERVAL",
+    "id": 387
+  },
+  {
+    "name": "AR_SERVER_INFO_STATS_APISQL_MIN_TIME",
+    "id": 388
+  },
+  {
+    "name": "AR_SERVER_INFO_STATS_GET_INCOMPLETE_API",
+    "id": 389
+  },
+  {
+    "name": "AR_SERVER_INFO_STATS_GET_LONGEST_API",
+    "id": 390
+  },
+  {
+    "name": "AR_SERVER_INFO_STATS_GET_INCOMPLETE_SQL",
+    "id": 391
+  },
+  {
+    "name": "AR_SERVER_INFO_STATS_GET_LONGEST_SQL",
+    "id": 392
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACH_EXT_FILTER",
+    "id": 393
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACH_EXT_LIST",
+    "id": 394
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACH_EXCEPTION_LIST",
+    "id": 395
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACH_DISPLAY_FILTER",
+    "id": 396
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACH_DISPLAY_LIST",
+    "id": 397
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACH_VALIDATION_PLUGIN_NAME",
+    "id": 398
+  },
+  {
+    "name": "AR_SERVER_INFO_FTS_FILTER_API_RPC_TIMEOUT",
+    "id": 399
+  },
+  {
+    "name": "AR_SERVER_INFO_DEV_STUDIO_DEVELOPMENT_MODE",
+    "id": 400
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACH_SYSTEM_EXCEPTION_LIST",
+    "id": 401
+  },
+  {
+    "name": "AR_SERVER_INFO_SSO_CONFIRM_PASSWORD_PLUGIN_NAME",
+    "id": 402
+  },
+  {
+    "name": "AR_SERVER_INFO_ARCHIVE_LOG_FILE",
+    "id": 403
+  },
+  {
+    "name": "AR_SERVER_INFO_ARCHIVE_LOG_FORM",
+    "id": 404
+  },
+  {
+    "name": "AR_SERVER_INFO_USER_RESTRICT",
+    "id": 406
+  },
+  {
+    "name": "AR_SERVER_INFO_CLIENT_TYPE_RESTRICT",
+    "id": 407
+  },
+  {
+    "name": "AR_SERVER_INFO_RPCQUEUE_RESTRICT",
+    "id": 409
+  },
+  {
+    "name": "AR_SERVER_INFO_ARCHIVE_INTERVAL",
+    "id": 410
+  },
+  {
+    "name": "AR_SERVER_INFO_FTS_FAILOVER",
+    "id": 414
+  },
+  {
+    "name": "AR_SERVER_INFO_TCD_TCP_BIND",
+    "id": 415
+  },
+  {
+    "name": "AR_SERVER_INFO_ENC_WORKFLOW_DATA_ENC_ALG",
+    "id": 417
+  },
+  {
+    "name": "AR_SERVER_INFO_AUTH_TOKEN_SIGNATURE_SALT",
+    "id": 418
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ARCHIVE_GLOBAL",
+    "id": 419
+  },
+  {
+    "name": "AR_SERVER_INFO_LARGE_RESULT_LOGGING_THRESHOLD",
+    "id": 420
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ESCALATIONS_GLOBAL",
+    "id": 422
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ADMIN_OPERATIONS_GLOBAL",
+    "id": 423
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVICE_MONITORING_UPDATE_INTERVAL",
+    "id": 424
+  },
+  {
+    "name": "AR_SERVER_INFO_WS_FILTERAPI_WSSE_NO_MUSTUNDERSTAND_ENDPOINTS",
+    "id": 425
+  },
+  {
+    "name": "AR_SERVER_INFO_DEV_STUDIO_THREEWAY_RECON_PACKINGLIST",
+    "id": 426
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_SERVICE",
+    "id": 427
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_INDEX_COMMIT_INTERVAL",
+    "id": 428
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_INDEX_SCHEDULER_INTERVAL",
+    "id": 429
+  },
+  {
+    "name": "AR_SERVER_INFO_MEMLOG_DUMP",
+    "id": 430
+  },
+  {
+    "name": "AR_SERVER_INFO_MEMLOG_MAX",
+    "id": 431
+  },
+  {
+    "name": "AR_SERVER_INFO_MEMLOG_ERROR_NUMBERS",
+    "id": 432
+  },
+  {
+    "name": "AR_SERVER_INFO_MEMLOG_LOGFILE",
+    "id": 433
+  },
+  {
+    "name": "AR_SERVER_INFO_MEMLOG_HISTORY",
+    "id": 434
+  },
+  {
+    "name": "AR_SERVER_INFO_RPC_QUEUE_BY_CLIENT_TYPE",
+    "id": 435
+  },
+  {
+    "name": "AR_SERVER_INFO_RPC_QUEUE_STATISTICS",
+    "id": 436
+  },
+  {
+    "name": "AR_SERVER_INFO_HG_DISABLE",
+    "id": 437
+  },
+  {
+    "name": "AR_SERVER_INFO_HG_INTERVAL",
+    "id": 438
+  },
+  {
+    "name": "AR_SERVER_INFO_HG_THREADPOOL_SIZE",
+    "id": 439
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_NEW_RLS_IMPL",
+    "id": 440
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_INDEX_DELETE_POLICY_TIME",
+    "id": 441
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_INDEX_NUM_INDEXER_THREADS",
+    "id": 442
+  },
+  {
+    "name": "AR_SERVER_INFO_RELOAD_LOG_CONFIG_FILE",
+    "id": 443
+  },
+  {
+    "name": "AR_SERVER_INFO_WS_FILTERAPI_WSSE_USE_PREEMPTIVE_AUTH_ENDPOINTS",
+    "id": 444
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_MAX_INACTIVITY_DURATION_INITAL_DELAY",
+    "id": 445
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_MAX_INACTIVITY_DURATION",
+    "id": 446
+  },
+  {
+    "name": "AR_SERVER_INFO_ENTRIES_CHUNK_THRESHOLD",
+    "id": 447
+  },
+  {
+    "name": "AR_SERVER_INFO_ENTRIES_CHUNK_SIZE",
+    "id": 448
+  },
+  {
+    "name": "AR_SERVER_INFO_IS_READ_ONLY_DB",
+    "id": 449
+  },
+  {
+    "name": "AR_SERVER_INFO_WORKFLOW_SERVER_CHAR_SET",
+    "id": 450
+  },
+  {
+    "name": "AR_SERVER_INFO_HG_CHUNK_SIZE",
+    "id": 451
+  },
+  {
+    "name": "AR_SERVER_INFO_PEER_REMOTE_OBJECT_PORT",
+    "id": 452
+  },
+  {
+    "name": "AR_SERVER_INFO_OPERATING_MODE",
+    "id": 463
+  },
+  {
+    "name": "AR_SERVER_INFO_OPERATING_MODE_BACKUP",
+    "id": 464
+  },
+  {
+    "name": "AR_SERVER_INFO_ENFORCE_ARSIGNALS_ADMIN_PRIV",
+    "id": 465
+  },
+  {
+    "name": "AR_SERVER_INFO_IGNORE_FORM_PERMISSIONS_NOTIFICATION",
+    "id": 466
+  },
+  {
+    "name": "AR_SERVER_INFO_RLS_FIELD_ORDER_RLS_SPLIT",
+    "id": 467
+  },
+  {
+    "name": "AR_SERVER_INFO_RLS_FIELD_ORDER_COMBINED_LIKES",
+    "id": 468
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_SHA256",
+    "id": 469
+  },
+  {
+    "name": "AR_SERVER_INFO_CHECK_ATTACHMENT_PERMISSIONS",
+    "id": 471
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_BROKER_MAX_MEMORY_USAGE",
+    "id": 472
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_BROKER_MAX_TEMP_STORAGE",
+    "id": 473
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_BROKER_TEMP_STORAGE_DIR",
+    "id": 474
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_BROKER_SEND_FAILED_NO_SPACE_AFTER_TIMEOUT",
+    "id": 475
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_USER_PROPERTY_CHANGE",
+    "id": 476
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_STATUS",
+    "id": 477
+  },
+  {
+    "name": "AR_SERVER_INFO_WS_USE_OLD_PARSING",
+    "id": 478
+  },
+  {
+    "name": "AR_SERVER_INFO_ZDT_UPGRADE_MAX_WAIT_HOUR_FOR_INACTIVE_SERVER",
+    "id": 479
+  },
+  {
+    "name": "AR_SERVER_INFO_COMMON_LOGGING_ROOT_PATH",
+    "id": 480
+  },
+  {
+    "name": "AR_SERVER_INFO_DEPLOYMENT_TIMEOUT_INTERVAL",
+    "id": 481
+  },
+  {
+    "name": "AR_SERVER_INFO_JETTY_PORT",
+    "id": 482
+  },
+  {
+    "name": "AR_SERVER_INFO_JETTY_PROTOCOL",
+    "id": 483
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_MAX_CONNECTIONS",
+    "id": 484
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_MAX_ACTIVE_SESSIONS_PER_CONNECTION",
+    "id": 485
+  },
+  {
+    "name": "AR_SERVER_INFO_COGNITIVE_SERVICE_USER_NAME",
+    "id": 486
+  },
+  {
+    "name": "AR_SERVER_INFO_COGNITIVE_SERVICE_USER_PASSWORD",
+    "id": 487
+  },
+  {
+    "name": "AR_SERVER_INFO_COGNITIVE_SERVICE_URL",
+    "id": 488
+  },
+  {
+    "name": "AR_SERVER_INFO_COGNITIVE_SERVICE_TRAINING_DATA_GENERATOR_THREADS",
+    "id": 489
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_COGNITIVE_SERVICE",
+    "id": 490
+  },
+  {
+    "name": "AR_SERVER_INFO_COGNITIVE_SERVICE_CONFIDENCE_THRESHOLD",
+    "id": 491
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_ID",
+    "id": 492
+  },
+  {
+    "name": "AR_SERVER_INFO_RUNNING_IN_CONTAINER",
+    "id": 493
+  },
+  {
+    "name": "AR_SERVER_INFO_PROVIDER_ID",
+    "id": 494
+  },
+  {
+    "name": "AR_SERVER_INFO_PREVIOUS_CONFIGURATION_NAME",
+    "id": 495
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_MANAGE_PROCESS_OPERATION",
+    "id": 496
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_VIEW_LOG",
+    "id": 497
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_GET_LOG_FILE_SIZE",
+    "id": 498
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SCHEMA_ID_REINDEX",
+    "id": 499
+  },
+  {
+    "name": "AR_SERVER_INFO_NUM_ARCHIVE_THREADS",
+    "id": 500
+  },
+  {
+    "name": "AR_SERVER_INFO_REST_AUTH_TOKEN_TIMEOUT",
+    "id": 501
+  },
+  {
+    "name": "AR_SERVER_INFO_DSO_TARGET_USER",
+    "id": 502
+  },
+  {
+    "name": "AR_SERVER_INFO_SQL_DOP",
+    "id": 504
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_TEMP_TABLE_THRESHOLD",
+    "id": 505
+  },
+  {
+    "name": "AR_SERVER_INFO_ROLLBACK_TIMEOUT_INTERVAL",
+    "id": 506
+  },
+  {
+    "name": "AR_SERVER_INFO_FORM_ACTION_RESTRICTION",
+    "id": 507
+  },
+  {
+    "name": "AR_SERVER_INFO_SAAS_AUTH_PLUGIN_NAME",
+    "id": 508
+  },
+  {
+    "name": "AR_SERVER_INFO_REDIRECT_URL",
+    "id": 509
+  },
+  {
+    "name": "AR_SERVER_INFO_OMIT_TIMESTAMP_IN_FILTER_LOGIFLE",
+    "id": 510
+  },
+  {
+    "name": "AR_SERVER_INFO_IGNORE_DST_HANDLING",
+    "id": 511
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_CONNECTION_IN_POOL",
+    "id": 512
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_CHAR_LIMIT_HIGHLIGHT",
+    "id": 513
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_TEMP_SEGMENT_CLEANUP",
+    "id": 514
+  },
+  {
+    "name": "AR_SERVER_INFO_LOG_RAS_AUTH_FAILURE",
+    "id": 515
+  },
+  {
+    "name": "AR_SERVER_INFO_LOG_SAVE_POINT_STATISTICS",
+    "id": 516
+  },
+  {
+    "name": "AR_SERVER_INFO_DB_PROVIDER",
+    "id": 517
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_CONDITIONAL_JOIN_VIEW_RECREATION",
+    "id": 520
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_ARCHIVE_FORM_FTS",
+    "id": 521
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_QUERY_TIMEOUT",
+    "id": 522
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_MFS_WILDCARD_FALLBACK",
+    "id": 523
+  },
+  {
+    "name": "AR_SERVER_INFO_CONFIGURATION_NAME",
+    "id": 605
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SERVER_FORM_REINDEX",
+    "id": 606
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_SSL_JMX",
+    "id": 607
+  },
+  {
+    "name": "AR_SERVER_INFO_RLS_SUBQUERY_TEMP_TABLE_THRESHOLD",
+    "id": 608
+  },
+  {
+    "name": "AR_SERVER_INFO_ACCESS_CONTROL_ALLOW_ORIGIN",
+    "id": 614
+  },
+  {
+    "name": "AR_SERVER_INFO_ACCESS_CONTROL_ALLOW_CREDENTIALS",
+    "id": 615
+  },
+  {
+    "name": "AR_SERVER_INFO_ACCESS_CONTROL_ALLOW_HEADERS",
+    "id": 616
+  },
+  {
+    "name": "AR_SERVER_INFO_ACCESS_CONTROL_ALLOW_METHODS",
+    "id": 617
+  },
+  {
+    "name": "AR_SERVER_INFO_ACCESS_CONTROL_EXPOSE_HEADERS",
+    "id": 618
+  },
+  {
+    "name": "AR_SERVER_INFO_SG_ESCALATION_SERVER_NAME",
+    "id": 621
+  },
+  {
+    "name": "AR_SERVER_INFO_IS_ESCALATION_RUNNING",
+    "id": 622
+  },
+  {
+    "name": "AR_SERVER_INFO_APPS_UPGRADE_STATUS",
+    "id": 623
+  },
+  {
+    "name": "AR_SERVER_INFO_TIMEZONE",
+    "id": 624
+  },
+  {
+    "name": "AR_SERVER_INFO_CALCULATE_OBJECT_CACHE_STATISTICS",
+    "id": 625
+  },
+  {
+    "name": "AR_SERVER_INFO_OBJECT_CACHE_FORMS_COUNT",
+    "id": 626
+  },
+  {
+    "name": "AR_SERVER_INFO_FORCE_RSSO_AUTHENTICATION",
+    "id": 627
+  },
+  {
+    "name": "AR_SERVER_INFO_RSSO_EXTERNAL_URL",
+    "id": 628
+  },
+  {
+    "name": "AR_SERVER_INFO_RSSO_CLIENT_ID_AND_SECRET",
+    "id": 629
+  },
+  {
+    "name": "AR_SERVER_INFO_RSSO_INTERNAL_URL",
+    "id": 630
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_SORT_NULL_FIRST",
+    "id": 631
+  },
+  {
+    "name": "AR_SERVER_INFO_ESCALATION_PUSH_ACTION_CREATE_TIME_PER_ENTRY",
+    "id": 632
+  },
+  {
+    "name": "AR_SERVER_INFO_ENFORCE_APPS_ZDT_UPGRADE",
+    "id": 633
+  },
+  {
+    "name": "AR_SERVER_INFO_APPS_ZDT_MAX_SERVER_RESTART_WAIT_INTERVAL",
+    "id": 634
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SUPPORT_EXACT_MATCH_SEARCH",
+    "id": 635
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBHOOK_CALLBACK_RETRY_INTERVAL",
+    "id": 636
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBHOOK_CALLBACK_MAX_RETRIES",
+    "id": 637
+  },
+  {
+    "name": "AR_SERVER_INFO_MAINTENANCE_WINDOW",
+    "id": 638
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBHOOK_PENDING_POLLING_INTERVAL",
+    "id": 639
+  },
+  {
+    "name": "AR_SERVER_INFO_HG_ENABLE_FALLBACK",
+    "id": 640
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBHOOK_WORKER_THREAD_COUNT",
+    "id": 641
+  },
+  {
+    "name": "AR_SERVER_INFO_OUTBOUND_HTTP_CLIENT_READ_TIMEOUT",
+    "id": 642
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_PROGRESSIVE_VIEWS",
+    "id": 643
+  },
+  {
+    "name": "AR_SERVER_INFO_CORS_ALLOW_AND_EXPOSE_HEADER_VALIDATION_REGEX",
+    "id": 644
+  },
+  {
+    "name": "AR_SERVER_INFO_CORS_ALLOW_ORIGIN_VALIDATION_REGEX",
+    "id": 645
+  },
+  {
+    "name": "AR_SERVER_INFO_NUM_ESCALATION_THREADS",
+    "id": 646
+  },
+  {
+    "name": "AR_SERVER_INFO_ALLOW_SEMI_COLON_IN_LOGIN_NAME",
+    "id": 647
+  },
+  {
+    "name": "AR_SERVER_INFO_REST_URL_USE_OLD_PARSING",
+    "id": 648
+  },
+  {
+    "name": "AR_SERVER_INFO_RLS_AUTODISCOVERY_THRESHOLD",
+    "id": 649
+  },
+  {
+    "name": "AR_SERVER_INFO_FLTR_SET_VALIDATES_LIMITS",
+    "id": 650
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVICE_ENTRY_USE_OLD_FLOW",
+    "id": 651
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_NOTIFICATIONS",
+    "id": 652
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_CASE_SENSITIVE_ORDERING_FIELDIDS",
+    "id": 653
+  },
+  {
+    "name": "AR_SERVER_INFO_EXTERNAL_COMMAND_REPLACE_NEW_FLOW",
+    "id": 654
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_BULK_FETCH_COUNT",
+    "id": 655
+  },
+  {
+    "name": "AR_SERVER_INFO_COLFUN_CALLGUIDE_RUN_ON_ALLROWS",
+    "id": 656
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_SORT_NULL_FIRST",
+    "id": 657
+  },
+  {
+    "name": "AR_SERVER_INFO_IMS_ENDPOINT_URL",
+    "id": 658
+  },
+  {
+    "name": "AR_SERVER_INFO_IMS_TENANT_ID",
+    "id": 659
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_LOG_FILE",
+    "id": 751
+  },
+  {
+    "name": "AR_SERVER_INFO_RX_MAX_ALLOWED_PAGE_SIZE",
+    "id": 752
+  },
+  {
+    "name": "AR_SERVER_INFO_FIELD_VALUE_LOCALIZED",
+    "id": 753
+  },
+  {
+    "name": "AR_SERVER_INFO_SINGLE_TENANT_MODE",
+    "id": 754
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_LOG_FORM",
+    "id": 756
+  },
+  {
+    "name": "AR_SERVER_INFO_ROOT_DIR",
+    "id": 757
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_NAME_RESTRICT",
+    "id": 759
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_EXTERNAL_UDDI",
+    "id": 760
+  },
+  {
+    "name": "AR_SERVER_INFO_SESSION_IDLE_TIMEOUT",
+    "id": 761
+  },
+  {
+    "name": "AR_SERVER_INFO_SESSION_ABSOLUTE_TIMEOUT",
+    "id": 762
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVICE_LOG_FILE",
+    "id": 763
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVICE_LOG_FORM",
+    "id": 764
+  },
+  {
+    "name": "AR_SERVER_INFO_AE_LOG_FILE",
+    "id": 765
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_CONNECT_NAME",
+    "id": 766
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_DEVELOPER_ID",
+    "id": 767
+  },
+  {
+    "name": "AR_SERVER_INFO_FIELDID_RANGE",
+    "id": 768
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_TIMER_JOB_THREAD_POOL_SIZE",
+    "id": 769
+  },
+  {
+    "name": "AR_SERVER_INFO_ENTRY_EVENT_NOTIFICATION_THREAD_POOL_SIZE",
+    "id": 770
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_STREAMING_BROKER_LIST",
+    "id": 780
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_STREAMING_SERVICE_ENDPOINT",
+    "id": 781
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_STREAMING_SUPER_USER",
+    "id": 782
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_STREAMING_SUPER_USER_PASSWORD",
+    "id": 783
+  },
+  {
+    "name": "AR_SERVER_INFO_INNOVATION_SUITE_POD_ID",
+    "id": 784
+  },
+  {
+    "name": "AR_SERVER_INFO_TELEMETRY_SERVICE_ENDPOINT",
+    "id": 785
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_STREAMING_ADMIN_USER",
+    "id": 786
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_STREAMING_ADMIN_USER_PASSWORD",
+    "id": 788
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_STREAMING_REGISTRATION_TOGGLE",
+    "id": 789
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_STREAMING_REGISTRATION_STATUS",
+    "id": 790
+  },
+  {
+    "name": "AR_SERVER_INFO_TELEMETRY_APP_NAME",
+    "id": 791
+  },
+  {
+    "name": "AR_SERVER_INFO_TELEMETRY_USER",
+    "id": 792
+  },
+  {
+    "name": "AR_SERVER_INFO_TELEMETRY_USER_PASSWORD",
+    "id": 793
+  },
+  {
+    "name": "AR_SERVER_INFO_TELEMETRY_REGISTRATION_TOGGLE",
+    "id": 794
+  },
+  {
+    "name": "AR_SERVER_INFO_TELEMETRY_REGISTRATION_STATUS",
+    "id": 795
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_INSTANCE_TYPE",
+    "id": 799
+  },
+  {
+    "name": "AR_SERVER_INFO_WATSON_CONVERSATION_ENDPOINT",
+    "id": 801
+  },
+  {
+    "name": "AR_SERVER_INFO_WATSON_CLASSIFIER_ENDPOINT",
+    "id": 802
+  },
+  {
+    "name": "AR_SERVER_INFO_WATSON_DISCOVERY_ENDPOINT",
+    "id": 803
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_SYNONYMS_LIST",
+    "id": 813
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_HISTORY_LEVEL",
+    "id": 814
+  },
+  {
+    "name": "AR_SERVER_INFO_ENFORCE_PASSWORD_POLICY",
+    "id": 818
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_QUEUE_MEMORY_USAGE_LIMIT",
+    "id": 828
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_MODE_IN_PROGRESS",
+    "id": 829
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_NOTIFICATION_TEXT",
+    "id": 830
+  },
+  {
+    "name": "AR_SERVER_INFO_ASYNCHRONOUS_MESSAGE_HANDLER_THREAD_POOL_SIZE",
+    "id": 831
+  },
+  {
+    "name": "AR_SERVER_INFO_ASYNCHRONOUS_MESSAGE_HANDLER_QUEUE_SIZE",
+    "id": 832
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_MODE_PLAINTEXT_RPC_CLIENTS_LIST",
+    "id": 833
+  },
+  {
+    "name": "AR_SERVER_INFO_HTTP_CLIENT_MAX_TOTAL_CONNECTIONS",
+    "id": 834
+  },
+  {
+    "name": "AR_SERVER_INFO_HTTP_CLIENT_MAX_TOTAL_CONNECTIONS_PER_ROUTE",
+    "id": 835
+  },
+  {
+    "name": "AR_SERVER_INFO_TRUSTED_WEB_SITES",
+    "id": 836
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_THROTTLE_INTERVAL",
+    "id": 837
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_UPGRADE_DB_TRANSACTION_LOCK",
+    "id": 838
+  },
+  {
+    "name": "AR_SERVER_INFO_UPGRADE_DB_BACKUP_TIMESTAMP",
+    "id": 839
+  },
+  {
+    "name": "AR_SERVER_INFO_SUMMARIZATION_SERVICE_ENDPOINT_CONFIGURATION",
+    "id": 840
+  },
+  {
+    "name": "AR_SERVER_INFO_SUMMARIZATION_SERVICE_TENANT_CONFIGUARATION",
+    "id": 841
+  },
+  {
+    "name": "AR_SERVER_INFO_GCP_REGION",
+    "id": 842
+  },
+  {
+    "name": "AR_SERVER_INFO_WHATFIX_DISABLE",
+    "id": 843
+  },
+  {
+    "name": "AR_SERVER_INFO_TONE_ANALYSIS_SERVICE_PROVIDER",
+    "id": 844
+  },
+  {
+    "name": "AR_SERVER_INFO_WATSON_TONE_ANALYZER_ENDPOINT",
+    "id": 845
+  },
+  {
+    "name": "AR_SERVER_INFO_TONE_SCORE_THRESHOLD",
+    "id": 846
+  },
+  {
+    "name": "AR_SERVER_INFO_TRANSLATION_SERVICE_PROVIDER",
+    "id": 847
+  },
+  {
+    "name": "AR_SERVER_INFO_MICROSOFT_SERVICE_CREDENTIAL",
+    "id": 848
+  },
+  {
+    "name": "AR_SERVER_INFO_GCP_TRANSLATION_SERVICE_CREDENTIAL",
+    "id": 849
+  },
+  {
+    "name": "AR_SERVER_INFO_COGNITIVE_SERVICE_REGION_TENANT_CONFIGURATION",
+    "id": 850
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_LOAD_TENANTS",
+    "id": 851
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_MESSAGE_PERSISTENCE",
+    "id": 852
+  },
+  {
+    "name": "AR_SERVER_INFO_PERSISTENCE_MESSAGE_RETRY_INTERVAL",
+    "id": 853
+  },
+  {
+    "name": "AR_SERVER_INFO_IMPORT_APP_VERSION_IN_PLACE",
+    "id": 854
+  },
+  {
+    "name": "AR_SERVER_INFO_COMPARE_DEFINITION_ON_IMPORT",
+    "id": 855
+  },
+  {
+    "name": "AR_SERVER_INFO_NPS_SURVEY_BASE_URL",
+    "id": 856
+  },
+  {
+    "name": "AR_SERVER_INFO_PREFERRED_USER_LOCALE",
+    "id": 857
+  },
+  {
+    "name": "AR_SERVER_INFO_ERROR_REPORTING_LP",
+    "id": 858
+  },
+  {
+    "name": "AR_SERVER_INFO_ERROR_REPORTING_DR",
+    "id": 859
+  },
+  {
+    "name": "AR_SERVER_INFO_TRUST_INSECURE_CONNECTION",
+    "id": 860
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_DATA_ARCHIVAL_INTERVAL",
+    "id": 861
+  },
+  {
+    "name": "AR_SERVER_INFO_RLS_IMPLEMENTATION",
+    "id": 862
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_FILE_SIZE_FOR_UPLOAD_TO_CHAT_CLIENT",
+    "id": 863
+  },
+  {
+    "name": "AR_SERVER_INFO_DEBUG_MODE_STARTTIME",
+    "id": 864
+  },
+  {
+    "name": "AR_SERVER_INFO_DEBUG_MODE_DURATION",
+    "id": 865
+  },
+  {
+    "name": "AR_SERVER_INFO_CACHE_PROCESS_INFO_ONLY",
+    "id": 866
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_SEARCH_ENABLED",
+    "id": 867
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_SEARCH_HOSTNAME",
+    "id": 868
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_SEARCH_PORT",
+    "id": 869
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_SEARCH_USER",
+    "id": 870
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_SEARCH_USER_PASSWORD",
+    "id": 871
+  },
+  {
+    "name": "AR_SERVER_INFO_FTS_TYPE",
+    "id": 872
+  },
+  {
+    "name": "AR_SERVER_INFO_FLUSH_EXPIRED_USER_SESSIONS_INTERVAL",
+    "id": 873
+  },
+  {
+    "name": "AR_SERVER_INFO_IFRAME_ALLOWED_SITES",
+    "id": 875
+  },
+  {
+    "name": "AR_SERVER_INFO_SAT_TOOL_INSTALL_NAMESPACE",
+    "id": 876
+  },
+  {
+    "name": "AR_SERVER_INFO_SAT_TOOL_HOSTNAME",
+    "id": 877
+  },
+  {
+    "name": "AR_SERVER_INFO_SAT_TOOL_OAUTH_URL",
+    "id": 878
+  },
+  {
+    "name": "AR_SERVER_INFO_SAT_TOOL_OAUTH_CLIENT_ID",
+    "id": 879
+  },
+  {
+    "name": "AR_SERVER_INFO_SAT_TOOL_OAUTH_CLIENT_SECRET",
+    "id": 880
+  },
+  {
+    "name": "AR_SERVER_INFO_WATSON_MESSAGE_RETRY_COUNT",
+    "id": 881
+  },
+  {
+    "name": "AR_SERVER_INFO_WATSON_MESSAGE_TIMEOUT",
+    "id": 882
+  },
+  {
+    "name": "AR_SERVER_INFO_WATSON_SEARCH_RETRY_COUNT",
+    "id": 883
+  },
+  {
+    "name": "AR_SERVER_INFO_WATSON_SEARCH_TIMEOUT",
+    "id": 884
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_PROCESS_DATA_CLEANUP",
+    "id": 885
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_DATA_CLEANUP_FROM",
+    "id": 886
+  },
+  {
+    "name": "AR_SERVER_INFO_BUNDLE_DEPLOY_CONTROL_MAP",
+    "id": 887
+  },
+  {
+    "name": "AR_SERVER_INFO_DEFAULT_RX_TRANSACTION_TIMEOUT",
+    "id": 888
+  },
+  {
+    "name": "AR_SERVER_INFO_PASSWORD_ENCRYPTION_VERSION",
+    "id": 889
+  },
+  {
+    "name": "AR_SERVER_INFO_RETRIAL_DURATION_TIMEOUT_MAP",
+    "id": 890
+  },
+  {
+    "name": "AR_SERVER_INFO_EXECUTE_WINDOW_CLOSE_UNDISPLAY_ACTIVELINKS",
+    "id": 891
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_REGEX_USER_SEARCH",
+    "id": 892
+  },
+  {
+    "name": "AR_SERVER_INFO_USERMESSAGE_RETENTION_DURATION",
+    "id": 893
+  },
+  {
+    "name": "AR_SERVER_INFO_USERMESSAGE_CLEANUP_FREQUENCY",
+    "id": 894
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_DATA_CLEANUP_CHUNK_SIZE",
+    "id": 895
+  },
+  {
+    "name": "AR_SERVER_INFO_RULE_EXCEPTION_LIST",
+    "id": 896
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_PBKDF2",
+    "id": 897
+  },
+  {
+    "name": "AR_SERVER_INFO_FTS_SNAPSHOT_ENABLE",
+    "id": 898
+  },
+  {
+    "name": "AR_SERVER_INFO_FTS_SNAPSHOT_DELAY",
+    "id": 899
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_BULK_INDEXING_SIZE",
+    "id": 900
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_OLD_GET_LIST_GROUP",
+    "id": 901
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_SEARCH_USE_SSL",
+    "id": 902
+  },
+  {
+    "name": "AR_SERVER_INFO_MIGRATION_MODE",
+    "id": 903
+  },
+  {
+    "name": "AR_SERVER_INFO_PERMISSIONS_POLICY",
+    "id": 904
+  },
+  {
+    "name": "AR_SERVER_INFO_SERVER_WEB_PATH",
+    "id": 905
+  },
+  {
+    "name": "AR_SERVER_INFO_AUTO_TIME_TO_UNLOCK",
+    "id": 906
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_UNLOCK_ATTEMPTS",
+    "id": 907
+  },
+  {
+    "name": "AR_SERVER_INFO_SMART_APP_UPGRADE_IDENTIFIER",
+    "id": 908
+  },
+  {
+    "name": "AR_SERVER_INFO_CACHE_SYNC_SCHEDULER_INTERVAL_IN_MINS",
+    "id": 909
+  },
+  {
+    "name": "AR_SERVER_INFO_SCRT_ENC_SCRT_LOC",
+    "id": 910
+  },
+  {
+    "name": "AR_SERVER_INFO_TIMEOUT_QUERIES_FROM_GET_CALLS_ONLY",
+    "id": 911
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACHMENT_VIRUSSCAN_SYSTEM_EXCEPTION_LIST",
+    "id": 912
+  },
+  {
+    "name": "AR_SERVER_INFO_CLAMAV_SERVICE_HOSTNAME",
+    "id": 913
+  },
+  {
+    "name": "AR_SERVER_INFO_CLAMAV_SERVICE_PORT",
+    "id": 914
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_MAX_CONTEXT_SIZE",
+    "id": 915
+  },
+  {
+    "name": "AR_SERVER_INFO_STALE_DATA_CLEANUP_CRON_JOB_SCHEDULE",
+    "id": 916
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_ACCENT_CHARS_ASCII_CONVERT",
+    "id": 917
+  },
+  {
+    "name": "AR_SERVER_INFO_CLAMAV_SOCKET_TIMEOUT",
+    "id": 918
+  },
+  {
+    "name": "AR_SERVER_INFO_CLAMAV_MAX_FILE_SIZE_KB",
+    "id": 919
+  },
+  {
+    "name": "AR_SERVER_INFO_ALLOW_ATTACHMENT_UPLOAD_IF_SIZE_EXCEED",
+    "id": 920
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_ATTACHMENT_VALIDATION_PLUGIN",
+    "id": 921
+  },
+  {
+    "name": "AR_SERVER_INFO_PERSISTENCE_MESSAGE_PENDING_THRESHOLD_MINUTES",
+    "id": 922
+  },
+  {
+    "name": "AR_SERVER_INFO_SAAS_ADMIN_GROUP_LIST",
+    "id": 923
+  },
+  {
+    "name": "AR_SERVER_INFO_SAAS_ADMIN_LICENSE_LIST",
+    "id": 924
+  },
+  {
+    "name": "AR_SERVER_INFO_RUN_PROCESS_COMMAND_WHITELIST",
+    "id": 925
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACHMENT_VIRUSSCAN_EXCEPTION_LIST",
+    "id": 926
+  },
+  {
+    "name": "AR_SERVER_INFO_SMART_APP_ROLLBACK_STRATEGY",
+    "id": 927
+  },
+  {
+    "name": "AR_SERVER_INFO_BUNDLE_DEPLOYMENT_SYNC_INTERVAL",
+    "id": 928
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_BULK_REQUEST_SIZE",
+    "id": 930
+  },
+  {
+    "name": "AR_SERVER_INFO_FTS_INDEX_DOCUMENT_COUNT",
+    "id": 931
+  },
+  {
+    "name": "AR_SERVER_INFO_ARSYSTEM_ALLOW_DIRECT_SQL",
+    "id": 932
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_LOGINNAME_FOR_NOTIFICATION",
+    "id": 933
+  },
+  {
+    "name": "AR_SERVER_INFO_JDBC_READ_TIMEOUT",
+    "id": 934
+  },
+  {
+    "name": "AR_SERVER_INFO_JDBC_WRITE_TIMEOUT",
+    "id": 935
+  },
+  {
+    "name": "AR_SERVER_INFO_ARCHIVE_EXPORT_FTP_SERVER",
+    "id": 936
+  },
+  {
+    "name": "AR_SERVER_INFO_ARCHIVE_EXPORT_FTP_USER",
+    "id": 937
+  },
+  {
+    "name": "AR_SERVER_INFO_ARCHIVE_EXPORT_FTP_PASSWORD",
+    "id": 938
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_NON_BLOCKING_INDEX_BUILD",
+    "id": 939
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_INDEX_CONCURRENNTLY_MAXRETRIES",
+    "id": 940
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_INDEX_CONCURRENNTLY_RETRY_INTERVAL",
+    "id": 941
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_SEARCH_SHARDS",
+    "id": 942
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_SEARCH_REPLICAS",
+    "id": 943
+  },
+  {
+    "name": "AR_SERVER_INFO_TRIM_TRAILING_SPACES",
+    "id": 944
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_GLOBAL_ENTRY_DELETE_AUDIT",
+    "id": 945
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_LONG_TIMEOUT",
+    "id": 946
+  },
+  {
+    "name": "AR_SERVER_INFO_CHATBOT_NOTIFICATIONS_IDLE_TIME",
+    "id": 947
+  },
+  {
+    "name": "AR_SERVER_INFO_CHATBOT_NOTIFICATIONS_MAX_TIME",
+    "id": 948
+  },
+  {
+    "name": "AR_SERVER_INFO_RUN_PROCESS_ENVRIONMENT_VARIABLE_WHITELIST",
+    "id": 950
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_FILTER_ERROR_HANDLER_SAVEPOINT",
+    "id": 951
+  },
+  {
+    "name": "AR_SERVER_INFO_ORACLE_USE_BIND_VARIABLES_FOR_CASE_INSENSITIVE_DB",
+    "id": 952
+  },
+  {
+    "name": "AR_SERVER_INFO_SKIP_INDEX_OPERATION_IN_UPGRADE",
+    "id": 953
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_PROCESS_TIMER_TASK_EXECUTION",
+    "id": 954
+  },
+  {
+    "name": "AR_SERVER_INFO_AGENT_POLL_TIMEOUT",
+    "id": 955
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_RPC_ENCRYPTION",
+    "id": 956
+  },
+  {
+    "name": "AR_SERVER_INFO_DIRECT_SQL_IN_PARENT_TRANSACTION",
+    "id": 957
+  },
+  {
+    "name": "AR_SERVER_INFO_DIRECT_SQL_IN_PARENT_TRANSACTION_EXCLUSION",
+    "id": 958
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_CREATE_ENTRY_SAVEPOINT",
+    "id": 959
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_SAVEPOINT_FAILURE_LOGGING",
+    "id": 960
+  },
+  {
+    "name": "AR_SERVER_INFO_REST_USER_IMPERSONATION_LICENSE_USAGE",
+    "id": 961
+  },
+  {
+    "name": "AR_SERVER_INFO_BUNDLE_DEPLOYMENT_SYNC",
+    "id": 962
+  },
+  {
+    "name": "AR_SERVER_INFO_EMAIL_MARK_DO_NOT_SEND",
+    "id": 963
+  },
+  {
+    "name": "AR_SERVER_INFO_JDBC_URL",
+    "id": 964
+  },
+  {
+    "name": "AR_SERVER_INFO_CHAT_POWERED_BY_BMC_HELIX",
+    "id": 965
+  },
+  {
+    "name": "AR_SERVER_INFO_ADMIN_SETTING_VALIDATION_URL_CONFIG_NAME_LIST",
+    "id": 966
+  },
+  {
+    "name": "AR_SERVER_INFO_TRACK_API_STATUS",
+    "id": 968
+  },
+  {
+    "name": "AR_SERVER_INFO_API_TIMEOUT",
+    "id": 969
+  },
+  {
+    "name": "AR_SERVER_INFO_BUNDLE_DEPLOY_BACKGROUND_MONITOR_INTERVAL",
+    "id": 970
+  },
+  {
+    "name": "AR_SERVER_INFO_BUNDLE_DEPLOYMENT_STATUS_POLL_RETRY_DELAY",
+    "id": 971
+  },
+  {
+    "name": "AR_SERVER_INFO_BUNDLE_DEPLOYMENT_STATUS_MAX_POLL_TIME",
+    "id": 972
+  },
+  {
+    "name": "AR_SERVER_INFO_RECORD_FILTER_COUNT",
+    "id": 973
+  },
+  {
+    "name": "AR_SERVER_INFO_ADMIN_SETTINGS_DATA_OVERRIDE_BUNDLE_LIST",
+    "id": 974
+  },
+  {
+    "name": "AR_SERVER_INFO_LOCALE_LOOPKUP_BY_COUNTRY",
+    "id": 975
+  },
+  {
+    "name": "AR_SERVER_INFO_LOCALE_TREAT_NULL_AS_ENGLISH",
+    "id": 976
+  },
+  {
+    "name": "AR_SERVER_INFO_BYTE_FIELD_LENGTH_FACTOR",
+    "id": 978
+  },
+  {
+    "name": "AR_SERVER_INFO_SEND_EMAIL_TO_SELECTED_USER",
+    "id": 979
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBSERVICE_XMLGETENTRY_RETURNS_STATUSHISTORY",
+    "id": 980
+  },
+  {
+    "name": "AR_SERVER_INFO_FTS_INDEXING_AUDIT",
+    "id": 981
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_ARCHIVE_DB_INDEX_CREATION",
+    "id": 982
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTGRES_CREATE_ENTRY_SAVEPOINT_FOR_ARCHIVE",
+    "id": 983
+  },
+  {
+    "name": "AR_SERVER_INFO_ELASTIC_NORMAL_TIMEOUT",
+    "id": 984
+  },
+  {
+    "name": "AR_SERVER_INFO_USE_KEK_EXTERNALIZATION",
+    "id": 985
+  },
+  {
+    "name": "AR_SERVER_INFO_KEK_EXTERNALIZATION_FEATURE_FLAG",
+    "id": 986
+  },
+  {
+    "name": "AR_SERVER_INFO_MESSAGING_TYPE",
+    "id": 987
+  },
+  {
+    "name": "AR_SERVER_INFO_KAFKA_SERVERS",
+    "id": 988
+  },
+  {
+    "name": "AR_SERVER_INFO_KAFKA_USER",
+    "id": 989
+  },
+  {
+    "name": "AR_SERVER_INFO_KAFKA_USER_PASSWORD",
+    "id": 990
+  },
+  {
+    "name": "AR_SERVER_INFO_HELIXGPT_ASSISTANT_SERVICE_URL",
+    "id": 991
+  },
+  {
+    "name": "AR_SERVER_INFO_RETRY_ON_AUTH_FAILURE_FOR_RXADMIN_CALLS",
+    "id": 992
+  },
+  {
+    "name": "AR_SERVER_INFO_KAFKA_NAMESPACE",
+    "id": 993
+  },
+  {
+    "name": "AR_SERVER_INFO_OPTIMIZE_ELASTIC_PHASE2_QUERY",
+    "id": 995
+  },
+  {
+    "name": "AR_SERVER_INFO_RX_ADMIN_OPERATION_TIMEOUT",
+    "id": 996
+  },
+  {
+    "name": "AR_SERVER_INFO_SAAS_ADMIN_LDAP_SERVER",
+    "id": 997
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBHOOK_MAX_PAYLOAD_SIZE",
+    "id": 998
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBHOOK_MAX_FIELD_VALUE_SIZE",
+    "id": 999
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESSCODE_EXCLUSIONS_BTS",
+    "id": 1000
+  },
+  {
+    "name": "AR_SERVER_INFO_SKIP_REQUESTID_BASED_SORT",
+    "id": 1001
+  },
+  {
+    "name": "AR_SERVER_INFO_KEK_BACKUP_ENABLED",
+    "id": 1002
+  },
+  {
+    "name": "AR_SERVER_INFO_TERMINATE_UNRECOVERABLE_THREAD",
+    "id": 1003
+  },
+  {
+    "name": "AR_SERVER_INFO_SKIP_COMPLETED_TIMER_TASK_CHECK",
+    "id": 1004
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLED_APPLICATION",
+    "id": 1005
+  },
+  {
+    "name": "AR_SERVER_INFO_PLUGIN_SVR_CONNECTION_LIFESPAN",
+    "id": 1006
+  },
+  {
+    "name": "AR_SERVER_INFO_DISABLE_WEBHOOK_EXECUTION",
+    "id": 1007
+  },
+  {
+    "name": "AR_SERVER_INFO_OPENTELEMETRY_ENABLED",
+    "id": 1008
+  },
+  {
+    "name": "AR_SERVER_INFO_OPENTELEMETRY_SAMPLING_PERCENTAGE",
+    "id": 1009
+  },
+  {
+    "name": "AR_SERVER_INFO_IS_HYOK_ENABLED",
+    "id": 1010
+  },
+  {
+    "name": "AR_SERVER_INFO_HYOK_PROVIDER",
+    "id": 1011
+  },
+  {
+    "name": "AR_SERVER_INFO_KMS_HEARTBEAT_INTERVAL_IN_MIN",
+    "id": 1012
+  },
+  {
+    "name": "AR_SERVER_INFO_EXPIRE_DATAKEY_CACHE_IN_MIN",
+    "id": 1013
+  },
+  {
+    "name": "AR_SERVER_INFO_AUDIT_ALL_KMS_CALLS",
+    "id": 1014
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_CONNECTOR_TARGET_DATABASE",
+    "id": 1015
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_LOCALE_DATA_TRANSLATION",
+    "id": 1016
+  },
+  {
+    "name": "AR_SERVER_INFO_OPTIN_NEW_LICENSING_MODEL",
+    "id": 1017
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_DEFAULT_LOCALE",
+    "id": 1018
+  },
+  {
+    "name": "AR_SERVER_INFO_IS_AV_SERVICE_RUNNING",
+    "id": 1019
+  },
+  {
+    "name": "AR_SERVER_INFO_AUTH_TOKEN_PREFER_HEADER_OVER_COOKIE",
+    "id": 1020
+  },
+  {
+    "name": "AR_SERVER_INFO_OBJECT_CACHE_STATISTICS_BULK_PERSIST_ENTRIES_SIZE",
+    "id": 1021
+  },
+  {
+    "name": "AR_SERVER_INFO_OBJECT_CACHE_FORMS_ADDITIONAL_LOAD_COUNT",
+    "id": 1022
+  },
+  {
+    "name": "AR_SERVER_INFO_REST_API_PAYLOAD_ESCAPE_GLOBAL",
+    "id": 1023
+  },
+  {
+    "name": "AR_SERVER_INFO_REST_API_PAYLOAD_ESCAPE_SPECIAL_CHARACTERS_LIST",
+    "id": 1024
+  },
+  {
+    "name": "AR_SERVER_INFO_SELECT_DISTINCT_ENFORCE_ALL_FIELD_PERM",
+    "id": 1025
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_OBJECT_SRC",
+    "id": 1026
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_SCRIPT_SRC",
+    "id": 1027
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_STYLE_SRC",
+    "id": 1028
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_IMAGE_SRC",
+    "id": 1029
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_FONT_SRC",
+    "id": 1030
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_CONNECT_SRC",
+    "id": 1031
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_MEDIA_SRC",
+    "id": 1032
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_BASE_URI",
+    "id": 1033
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_FORM_ACTION",
+    "id": 1034
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_WORKER_SRC",
+    "id": 1035
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_UNLIMITED_LOG_LINE_LENGTH",
+    "id": 1036
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_CSP_HEADER",
+    "id": 1037
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_CSP_NONCE_SCRIPT",
+    "id": 1038
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_CSP_NONCE_STYLE",
+    "id": 1039
+  },
+  {
+    "name": "AR_SERVER_INFO_HELIXGPT_DATA_CONNECTION_SERVICE_URL",
+    "id": 1040
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_TRANSLATION_CACHE_SIZE",
+    "id": 1041
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_LOOKBACK_OFFSET_TIME",
+    "id": 1042
+  },
+  {
+    "name": "AR_SERVER_INFO_REPORT_MAX_ENTRIES_PER_QUERY",
+    "id": 1043
+  },
+  {
+    "name": "AR_SERVER_INFO_OBJECT_CACHE_FORMS_IDLE_TIME_SINCE_LAST_ACCESS",
+    "id": 1044
+  },
+  {
+    "name": "AR_SERVER_INFO_OBJECT_CACHE_FORMS_WARMUP_TIME_INTERVAL",
+    "id": 1045
+  },
+  {
+    "name": "AR_SERVER_INFO_AR_IS_LOCALE_CONVERGENCE",
+    "id": 1046
+  },
+  {
+    "name": "AR_SERVER_INFO_DST_TIMEZONE_INFO_POPULATED",
+    "id": 1047
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_INSTANCE_LOCK_ACQUISITION_RETRY_ATTEMPTS",
+    "id": 1048
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_INSTANCE_LOCK_ACQUISITION_RETRY_INTERVAL_SECONDS",
+    "id": 1049
+  },
+  {
+    "name": "AR_SERVER_INFO_REPORT_MAX_ENTRIES_PER_QUERY_PREFFERED_CLIENT_TYPES",
+    "id": 1050
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_SEND_MESSAGE_TIMEOUT",
+    "id": 1051
+  },
+  {
+    "name": "AR_SERVER_INFO_JMS_RECEIVE_MESSAGE_TIMEOUT",
+    "id": 1052
+  },
+  {
+    "name": "AR_SERVER_INFO_SUPPORT_ADVANCED_CLIENT_TLS_VERSIONS",
+    "id": 1053
+  },
+  {
+    "name": "AR_SERVER_INFO_ACTIVE_NODES",
+    "id": 1054
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_ESCALATION_DEBUG_LOG",
+    "id": 1055
+  },
+  {
+    "name": "AR_SERVER_INFO_FT_LOCALE",
+    "id": 1056
+  },
+  {
+    "name": "AR_SERVER_INFO_CSP_DIRECTIVE_REPORT_TO",
+    "id": 1057
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_INSTANCE_COMMAND_ENFORCE_LICENSE",
+    "id": 1058
+  },
+  {
+    "name": "AR_SERVER_INFO_DATA_SUPPORTED_LOCALES",
+    "id": 1059
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_CLASSIC_VALUE_EXPRESSION",
+    "id": 1060
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_EXCLUSIVE_GATEWAY_MAX_LOOP_COUNT",
+    "id": 1061
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_CALL_ACTIVITY_MAX_RECURSION_DEPTH",
+    "id": 1062
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_MULTI_INSTANCE_MAX_ITERATIONS",
+    "id": 1063
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_RECEIVE_TASK_MAX_TIMER_SCHEDULES",
+    "id": 1064
+  },
+  {
+    "name": "AR_SERVER_INFO_PROCESS_ACTIVITY_LIMIT_ENFORCE_EXCEPTION",
+    "id": 1065
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_ASYNC_LOGGING",
+    "id": 1066
+  },
+  {
+    "name": "AR_SERVER_INFO_ENABLE_PDF_SANITIZATION",
+    "id": 1067
+  },
+  {
+    "name": "AR_SERVER_INFO_POSTPHASEMESSAGE_SIZE_COMPRESSION_THRESHOLD",
+    "id": 1068
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_CLOB_VALUE_SIZE",
+    "id": 1069
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBSERVICE_CIRCUIT_BREAKER_THRESHOLD",
+    "id": 1070
+  },
+  {
+    "name": "AR_SERVER_INFO_HG_USE_GROUP_LIST",
+    "id": 1071
+  },
+  {
+    "name": "AR_SERVER_INFO_ATTACH_EXCEPTION_EXT_RULES",
+    "id": 1072
+  },
+  {
+    "name": "AR_SERVER_INFO_STALE_DATA_CLEANUP_HPC_STAGING_BATCH_SIZE",
+    "id": 1073
+  },
+  {
+    "name": "AR_SERVER_INFO_STALE_DATA_CLEANUP_HPC_DELETION_BATCH_SIZE",
+    "id": 1074
+  },
+  {
+    "name": "AR_SERVER_INFO_ES_TOTAL_FIELDS_LIMIT",
+    "id": 1075
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_EMAIL_CONTENT_SIZE_IN_MB",
+    "id": 1076
+  },
+  {
+    "name": "AR_SERVER_INFO_CACHE_MISS_DB_FALLBACK",
+    "id": 1077
+  },
+  {
+    "name": "AR_SERVER_INFO_WEBSERVICE_XML_STRIP_EMOJI",
+    "id": 1078
+  },
+  {
+    "name": "AR_SERVER_INFO_MESSAGING_SERVER_URL",
+    "id": 1079
+  },
+  {
+    "name": "AR_SERVER_INFO_MESSAGING_USER",
+    "id": 1080
+  },
+  {
+    "name": "AR_SERVER_INFO_MESSAGING_USER_PASSWORD",
+    "id": 1081
+  },
+  {
+    "name": "AR_SERVER_INFO_MAX_INCOMING_EMAIL_PLAIN_TEXT_BODY_SIZE_IN_MB",
+    "id": 1082
+  }
+]
+AR_SERVER_INFO_JSON_EOF
+# END AR_SERVER_INFO_JSON
 
 if [ ! -t 1 ]; then
   REDIRECT=1

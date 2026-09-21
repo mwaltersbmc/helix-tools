@@ -17,6 +17,8 @@ Built-in summary: `bash hitt.sh -u help` or `bash hitt.sh -h utility`
 |--------|-------------|
 | `get dbid` | Shows the database ID (DBID) for your Helix IS system — used for licensing. |
 | `get arlicense` | Shows the current **IS Server license type** (for example **AR Server** for a permanent license). |
+| `get gsi list` | Lists every AR Server Info (GSI) constant as **name : id** pairs. |
+| `get gsi GSI_ID` | Runs **Get Server Info** on the IS server for that GSI id and prints the current value. |
 | `get jwt` | Prints a login token for Helix IS REST calls. Uses **hannah_admin** from the cluster unless you give another username. |
 | `get secret` | Shows secret contents from the cluster. Args: **SECRETNAME** [**NAMESPACE**]. If you omit the namespace, HITT searches your Helix IS, Helix Platform, and Deployment Engine namespaces and asks you to choose when needed. |
 | `get configmap` | Saves ConfigMap contents to a new folder in the current directory. With **`-v`**, lists key names only. Args: **CM_NAME** [**NAMESPACE**]. Namespace rules match **get secret**. |
@@ -41,6 +43,12 @@ bash hitt.sh -u "get dbid"
 
 # Current IS Server license type
 bash hitt.sh -u "get arlicense"
+
+# List AR Server Info (GSI) constant names and ids
+bash hitt.sh -u "get gsi list"
+
+# Get Server Info value for a GSI id (89 = AR_SERVER_INFO_SERVER_NAME)
+bash hitt.sh -u "get gsi 89"
 
 # Login token for hannah_admin
 bash hitt.sh -u "get jwt"
@@ -103,6 +111,20 @@ Shows the current DBID from your running Helix IS system.
 ## `get arlicense`
 
 Shows the current **IS Server license type**. A permanent production license is usually **AR Server**. Other types may mean you still need to apply a full license — see fix mode **arlicense** in [README-fix-mode.md](README-fix-mode.md).
+
+## `get gsi`
+
+AR **GSI** (Global Server Info) settings are numbered constants (`AR_SERVER_INFO_*` in the AR API). HITT embeds the full name-to-id map.
+
+- **`get gsi list`** — prints every known constant as `name : id` (sorted by id).
+- **`get gsi GSI_ID`** — runs **Get Server Info** against your Helix IS server for that numeric id and prints the current value.
+
+```bash
+bash hitt.sh -u "get gsi list"
+bash hitt.sh -u "get gsi 89"
+```
+
+Use **list** first when you know the setting name but not the id (for example **AR_SERVER_INFO_SERVER_NAME** is id **89**).
 
 ## `get jwt`
 
