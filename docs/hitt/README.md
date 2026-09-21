@@ -6,6 +6,7 @@ Interactive use-case reference: open [`index.html`](index.html) locally (with si
 
 1. **Edit the canonical file:** [`use-cases.json`](use-cases.json)  
    - **`topics[]`:** each topic has `id`, `title`, `order` (section order on the page; lower first).  
+   - **`meta.helpBaseUrl`:** canonical base URL for the online help page (`https://mwaltersbmc.github.io/helix-tools/hitt/index.html`). Each use case is linkable at `{helpBaseUrl}#use-case-{id}`.
    - **`useCases[]`:** each row has `id`, `topicId` (must match a topic `id`), `order` (within that section), `title`, optional `commands[]`, `notes[]`, optional `seeAlso` (URL).
 
 2. **Regenerate the offline bundle:** run [`update-bundled-data.ps1`](update-bundled-data.ps1) so [`use-cases-data.js`](use-cases-data.js) stays in sync (required for **File → Open** / `file://`; the app loads `window.HITT_USE_CASES` before falling back to `fetch`).

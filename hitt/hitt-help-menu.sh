@@ -145,6 +145,19 @@ load_use_case_menu() {
   UC_TITLES=("${titles[@]}")
 }
 
+use_cases_help_url() {
+  use_cases_jq -r '.meta.helpBaseUrl // "https://mwaltersbmc.github.io/helix-tools/hitt/index.html"'
+}
+
+use_cases_direct_url() {
+  local use_case_id="${1}"
+  local base
+  base=$(use_cases_help_url)
+  base=${base//$'\r'/}
+  base=${base%/}
+  echo "${base}#use-case-${use_case_id}"
+}
+
 show_use_case_detail() {
   local use_case_id="${1}"
   local title see_also
@@ -161,6 +174,9 @@ show_use_case_detail() {
   echo "================================================================"
   echo "${title}"
   echo "================================================================"
+  echo
+  echo "Help link:"
+  echo "  $(use_cases_direct_url "${use_case_id}")"
   echo
 
   if use_cases_jq -e --arg id "${use_case_id}" \

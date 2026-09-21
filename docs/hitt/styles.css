@@ -219,11 +219,26 @@ details {
   overflow: hidden;
 }
 
+details.use-case-details {
+  scroll-margin-top: 0.75rem;
+}
+
 summary {
   cursor: pointer;
   padding: 0.75rem 1rem;
   font-weight: 600;
   list-style-position: outside;
+}
+
+summary.use-case-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.use-case-title {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 summary:hover {

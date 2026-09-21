@@ -5,6 +5,26 @@
   var rootEl = document.getElementById("use-cases");
   var tocListEl = document.getElementById("topic-toc-list");
   var tocNavEl = document.getElementById("topic-toc");
+  var helpBaseUrl = "";
+
+  function useCaseFragmentId(ucId) {
+    return "use-case-" + ucId;
+  }
+
+  function resolveHelpBaseUrl(meta) {
+    if (meta && meta.helpBaseUrl) {
+      return String(meta.helpBaseUrl).replace(/\/$/, "");
+    }
+    if (location.protocol === "file:") {
+      return "";
+    }
+    return (location.origin + location.pathname).replace(/\/[^/]*$/, "").replace(/\/$/, "");
+  }
+
+  function useCaseDirectUrl(ucId) {
+    var fragment = "#" + useCaseFragmentId(ucId);
+    return helpBaseUrl ? helpBaseUrl + fragment : fragment;
+  }
 
   function num(x, def) {
     if (typeof x === "number" && !isNaN(x)) return x;
@@ -38,51 +58,68 @@
     '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   var CHECK_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+  var LINK_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
 
   var BACK_TO_TOP_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 16.5L12 13L8.5 16.5"/><path d="M15.5 10.5L12 7L8.5 10.5"/><path d="M3 20.4V3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6V20.4C21 20.7314 20.7314 21 20.4 21H3.6C3.26863 21 3 20.7314 3 20.4Z"/></svg>';
+
+  function appendIconButton(parent, text, label, iconSvg) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copy-icon-btn";
+    btn.setAttribute("aria-label", label);
+    btn.setAttribute("title", label);
+    btn.innerHTML = iconSvg;
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      copyText(text)
+        .then(function () {
+          btn.innerHTML = CHECK_SVG;
+          btn.setAttribute("aria-label", "Copied");
+          btn.setAttribute("title", "Copied");
+          setTimeout(function () {
+            btn.innerHTML = iconSvg;
+            btn.setAttribute("aria-label", label);
+            btn.setAttribute("title", label);
+          }, 1500);
+        })
+        .catch(function () {
+          btn.setAttribute("title", "Copy failed");
+          setTimeout(function () {
+            btn.setAttribute("title", label);
+          }, 1500);
+        });
+    });
+    parent.appendChild(btn);
+  }
 
   function appendCommandBlock(panel, line) {
     var wrap = document.createElement("div");
     wrap.className = "command-block";
     var pre = document.createElement("pre");
     pre.textContent = line;
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "copy-icon-btn";
-    btn.setAttribute("aria-label", "Copy command");
-    btn.setAttribute("title", "Copy command");
-    btn.innerHTML = CLIPBOARD_SVG;
-    btn.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      copyText(line)
-        .then(function () {
-          btn.innerHTML = CHECK_SVG;
-          btn.setAttribute("aria-label", "Copied");
-          btn.setAttribute("title", "Copied");
-          setTimeout(function () {
-            btn.innerHTML = CLIPBOARD_SVG;
-            btn.setAttribute("aria-label", "Copy command");
-            btn.setAttribute("title", "Copy command");
-          }, 1500);
-        })
-        .catch(function () {
-          btn.setAttribute("title", "Copy failed");
-          setTimeout(function () {
-            btn.setAttribute("title", "Copy command");
-          }, 1500);
-        });
-    });
     wrap.appendChild(pre);
-    wrap.appendChild(btn);
+    appendIconButton(wrap, line, "Copy command", CLIPBOARD_SVG);
     panel.appendChild(wrap);
   }
 
   function renderUseCase(uc) {
     var det = document.createElement("details");
+    det.className = "use-case-details";
+    if (uc.id) {
+      det.id = useCaseFragmentId(uc.id);
+    }
     var sum = document.createElement("summary");
-    sum.textContent = uc.title || uc.id || "Untitled";
+    sum.className = "use-case-summary";
+    var titleSpan = document.createElement("span");
+    titleSpan.className = "use-case-title";
+    titleSpan.textContent = uc.title || uc.id || "Untitled";
+    sum.appendChild(titleSpan);
+    if (uc.id) {
+      appendIconButton(sum, useCaseDirectUrl(uc.id), "Copy link to this use case", LINK_SVG);
+    }
     det.appendChild(sum);
 
     var panel = document.createElement("div");
@@ -130,6 +167,18 @@
     return det;
   }
 
+  function openUseCaseFromHash() {
+    var hash = (location.hash || "").replace(/^#/, "");
+    if (!hash) return;
+    var elementId = hash.indexOf("use-case-") === 0 ? hash : useCaseFragmentId(hash);
+    var el = document.getElementById(elementId);
+    if (!el || el.tagName !== "DETAILS") return;
+    el.open = true;
+    requestAnimationFrame(function () {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   function appendTopicHeader(section, titleText) {
     var row = document.createElement("div");
     row.className = "topic-header-row";
@@ -149,6 +198,7 @@
   }
 
   function render(data) {
+    helpBaseUrl = resolveHelpBaseUrl(data.meta);
     var rawTopics = data.topics && data.topics.length ? data.topics.slice() : [];
     var cases = (data.useCases || []).slice();
 
@@ -249,6 +299,7 @@
     if (tocNavEl) {
       tocNavEl.hidden = tocSections.length === 0;
     }
+    openUseCaseFromHash();
   }
 
   function fail(msg) {
@@ -268,6 +319,7 @@
       d.open = false;
     });
   });
+  window.addEventListener("hashchange", openUseCaseFromHash);
 
   function loadData() {
     if (typeof window.HITT_USE_CASES !== "undefined" && window.HITT_USE_CASES !== null) {

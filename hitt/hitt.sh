@@ -6410,6 +6410,19 @@ hittUseCasesLoadTopics() {
   HITT_UC_TOPIC_TITLES=("${titles[@]}")
 }
 
+hittUseCasesHelpUrl() {
+  hittUseCasesJq -r '.meta.helpBaseUrl // "https://mwaltersbmc.github.io/helix-tools/hitt/index.html"'
+}
+
+hittUseCasesDirectUrl() {
+  local use_case_id="${1}"
+  local base
+  base=$(hittUseCasesHelpUrl)
+  base=${base//$'\r'/}
+  base=${base%/}
+  echo "${base}#use-case-${use_case_id}"
+}
+
 hittUseCasesLoadUseCases() {
   local topic_id="${1}"
   local -a ids=() titles=()
@@ -6446,6 +6459,9 @@ hittUseCasesShowDetail() {
   echo "================================================================"
   echo "${title}"
   echo "================================================================"
+  echo
+  echo "Help link:"
+  echo "  $(hittUseCasesDirectUrl "${use_case_id}")"
   echo
 
   if hittUseCasesJq -e --arg id "${use_case_id}" \
@@ -9533,7 +9549,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260918-07"
+HITT_BUILD_VERSION="20260921-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -11102,7 +11118,8 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
     "tool": "Helix IS Triage Tool (HITT)",
     "scriptUrl": "https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
     "docsRepoPath": "hitt/",
-    "groupingHelp": "Edit topics[] for section titles and order. Each use case has topicId (must match a topic id) and order (sort key within that section, lower first)."
+    "helpBaseUrl": "https://mwaltersbmc.github.io/helix-tools/hitt/index.html",
+    "groupingHelp": "Edit topics[] for section titles and order. Each use case has topicId (must match a topic id) and order (sort key within that section, lower first). Direct links use helpBaseUrl plus #use-case-<id> (for example https://mwaltersbmc.github.io/helix-tools/hitt/index.html#use-case-download-hitt)."
   },
   "topics": [
     {

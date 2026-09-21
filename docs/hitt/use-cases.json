@@ -3,7 +3,8 @@
     "tool": "Helix IS Triage Tool (HITT)",
     "scriptUrl": "https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh",
     "docsRepoPath": "hitt/",
-    "groupingHelp": "Edit topics[] for section titles and order. Each use case has topicId (must match a topic id) and order (sort key within that section, lower first)."
+    "helpBaseUrl": "https://mwaltersbmc.github.io/helix-tools/hitt/index.html",
+    "groupingHelp": "Edit topics[] for section titles and order. Each use case has topicId (must match a topic id) and order (sort key within that section, lower first). Direct links use helpBaseUrl plus #use-case-<id> (for example https://mwaltersbmc.github.io/helix-tools/hitt/index.html#use-case-download-hitt)."
   },
   "topics": [
     {
