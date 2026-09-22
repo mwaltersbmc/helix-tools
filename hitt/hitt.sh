@@ -263,6 +263,16 @@ logWarning() {
   logMessageDetails "${1}" "${MSG}"
 }
 
+logInfo() {
+  # Print info message MSG_ID MSG
+  stopOnError "${1}"
+  MSG="${BOLD}${GREEN}INFO${NORMAL} (${1}) - ${2}"
+  [[ "${QUIET}" == "0" ]] && echo -e "${MSG}" >&2
+  ((INFO++))
+  INFO_ARRAY+=("(${1}) - ${2}")
+  logMessageDetails "${1}" "${MSG}"
+}
+
 logMessage() {
   # Print message
   if [ -z "${2}" ]; then
@@ -2809,7 +2819,7 @@ validateISDetails() {
         logWarning "007" "platform-int pods are enabled but ENABLE_PLATFORM_INT_NORMALIZATION is not selected."
       fi
       if [ "${IS_ENABLE_PLATFORM_INT_NORMALIZATION}" == "true" ] && [ "${IS_VERSION}" -ge 2023303 ]; then
-        logWarning "033" "ENABLE_PLATFORM_INT_NORMALIZATION is selected but will be ignored."
+        logInfo "033" "ENABLE_PLATFORM_INT_NORMALIZATION is selected but will be ignored."
       fi
     fi
 
@@ -3447,6 +3457,10 @@ reportResults() {
     if [ "${#WARN_ARRAY[@]}" != "0" ]; then
       echo -e "${BOLD}${YELLOW}WARNINGS:${NORMAL}"
       printf '%s\n' "${WARN_ARRAY[@]}"
+    fi
+    if [ "${#INFO_ARRAY[@]}" != "0" ]; then
+      echo -e "${BOLD}${GREEN}INFO:${NORMAL}"
+      printf '%s\n' "${INFO_ARRAY[@]}"
     fi
     echo "==================="
     echo -e "${BOLD}Please review the ${GREEN}${HITT_MSG_FILE}${NORMAL}${BOLD} file or run 'bash $0 -e MSG_NUM' for explanations and suggested fixes for the messages above.${NORMAL}"
@@ -4545,7 +4559,7 @@ case "${PLATFORM_EXT_SVC_TYPE}" in
   ClusterIP)
     PLATFORM_EXT_IP=$(echo ${PLATFORM_EXT_JSON} | ${JQ_BIN} '.spec.externalIPs | length' )
     if [ "${PLATFORM_EXT_IP}" == "0" ]; then
-      logWarning "025" "Helix IS platform-admin-ext service is of type ClusterIP but does not appear to have an externalIP assigned."
+      logInfo "025" "Helix IS platform-admin-ext service is of type ClusterIP but does not appear to have an externalIP assigned."
     else
       logMessage "Helix IS platform-admin-ext service is of type ClusterIP." 1
     fi
@@ -4554,7 +4568,7 @@ case "${PLATFORM_EXT_SVC_TYPE}" in
     logMessage "Helix IS platform-admin-ext service is of type NodePort." 1
     ;;
   *)
-    logWarning "026" "Helix IS platform-admin-ext service is of type '${PLATFORM_EXT_SVC_TYPE}' and not the expected ClusterIP or NodePort."
+    logInfo "026" "Helix IS platform-admin-ext service is of type '${PLATFORM_EXT_SVC_TYPE}' and not the expected ClusterIP or NodePort."
     ;;
 esac
 }
@@ -9573,7 +9587,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260921-02"
+HITT_BUILD_VERSION="20260922-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9627,6 +9641,7 @@ CURL_BIN=curl
 JQ_BIN=jq
 ERROR_ARRAY=()
 WARN_ARRAY=()
+INFO_ARRAY=()
 JENKINS_CREDENTIALS=""
 OPENSHIFT=0
 AR_DRIVER_POD=platform-fts-0
@@ -9917,7 +9932,7 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
   },
   {
     "id": "034",
-    "cause": "There are Kubernetes resourcequotas defined for the named namespace.",
+    "cause": "There are Kubernetes resource quotas defined for the named namespace.",
     "impact": "If the quotas are too low deployments may fail.",
     "remediation": "Review the resourcequotas and verify that they are high enough for the planned deployment."
   },
