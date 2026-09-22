@@ -7072,7 +7072,7 @@ parseUtilGet() {
       getVersions
       getDomain
       buildISAliasesArray
-      ${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/healthcheck/ready" | ${JQ_BIN} .
+      ${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/healthcheck/ready" | ${JQ_BIN} 'to_entries | sort_by(.key) | from_entries'
       ;;
     dbid)
       QUIET=1
@@ -9601,7 +9601,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260922-02"
+HITT_BUILD_VERSION="20260922-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
