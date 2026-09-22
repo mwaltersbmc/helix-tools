@@ -5857,7 +5857,6 @@ generateISDbID() {
 getISDbID() {
   initISAdminREST
   IS_DBID=$(getISServerInfo dbId)
-  logMessage "DB ID for this system is '${IS_DBID}'."
 }
 
 getISJWTToken() {
@@ -7059,19 +7058,30 @@ decodeK8sSecret() {
 parseUtilGet() {
   case "${UTILARGS[1]}" in
     arlicense)
+      QUIET=1
       initISAdminREST
       IS_LIC=$(getISServerInfo licensetype)
       IS_LIC_FIXED=$(getISServerInfo fixedlicensecount)
       IS_LIC_FLOATING=$(getISServerInfo floatinglicensecount)
+      QUIET=0
       logMessage "IS license type is '${IS_LIC}' (${IS_LIC_FIXED} fixed / ${IS_LIC_FLOATING} floating)."
       ;;
-    jwt)
-      getISJWTToken "${UTILARGS[2]}" "${UTILARGS[3]}"
+    bundles)
+      QUIET=1
+      checkToolVersion kubectl
+      getVersions
+      getDomain
+      buildISAliasesArray
+      ${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/healthcheck/ready" | ${JQ_BIN} .
       ;;
     dbid)
+      QUIET=1
       getISDbID
+      QUIET=0
+      logMessage "DB ID for this system is '${IS_DBID}'."
       ;;
     gsi)
+      QUIET=1
       [[ -z "${UTILARGS[2]}" ]] && logError "999" "Usage: bash $0 -u \"get gsi AR_GSI_VALUE|list\"" 1
       if [ "${UTILARGS[2]}" == "list" ]; then
         echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -r '.[] | "\(.name) : \(.id)"'
@@ -7081,7 +7091,11 @@ parseUtilGet() {
       GSI_ID="${UTILARGS[2]}"
       GSI_VALUE=$(getARGSI "${GSI_ID}")
       GSI_NAME=$(echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -r --argjson id "${GSI_ID}" '(first(.[] | select(.id == $id)).name) // "UNKNOWN"')
+      QUIET=0
       logMessage "GSI value for '${GSI_NAME} (${GSI_ID})' is '${GSI_VALUE}'"
+      ;;
+    jwt)
+      getISJWTToken "${UTILARGS[2]}" "${UTILARGS[3]}"
       ;;
     secret)
       if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
@@ -9587,7 +9601,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260922-01"
+HITT_BUILD_VERSION="20260922-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
