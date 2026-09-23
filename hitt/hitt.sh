@@ -2425,10 +2425,10 @@ validateISDetails() {
     logError "134" "AR_SERVER_APP_SERVICE_PASSWORD is too long - maximum of 19 characters."
   fi
 
-  if [ "${#IS_AR_SERVER_APP_SERVICE_PASSWORD}" -gt 8 ] && [[ "${IS_PLATFORM_HELM_VERSION}" =~ ^2026101 ]]; then
+  if [ "${#IS_AR_SERVER_APP_SERVICE_PASSWORD}" -gt 10 ] && [[ "${IS_PLATFORM_HELM_VERSION}" =~ ^2026101 ]]; then
     FULL_VER=$(echo "${IS_PLATFORM_HELM_VERSION}" | tr -d .)
     if [ "${FULL_VER}" -lt 202610110600 ]; then
-      logError "134" "AR_SERVER_APP_SERVICE_PASSWORD is too long - maximum of 8 characters due to defect DRD21-151079."
+      logError "134" "AR_SERVER_APP_SERVICE_PASSWORD is too long - maximum of 10 characters due to defect DRD21-151079."
     fi
   fi
 
@@ -8311,7 +8311,7 @@ validateDockerIOPat() {
   if echo "${ACTIONS}" | grep -q "pull"; then
     logMessage "Success: token grants pull scope for private repository '${DOCKER_IO_USERNAME}/bmchelix'."
   else
-    logError "999" "Failed: token does not grant pull for private repository '${DOCKER_IO_USERNAME}/bmchelix' (often public-repo read-only). Update the PAT in Docker Hub / EPD." 1
+    logError "999" "Failed: PAT does not grant pull for repository 'bmchelix'. Edit the PAT via EPD/Docker Hub and ensure it is of type 'Read-only' and not 'Public Repo Read-only'." 1
   fi
 }
 
@@ -9629,7 +9629,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260923-04"
+HITT_BUILD_VERSION="20260923-05"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
