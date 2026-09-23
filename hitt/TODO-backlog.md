@@ -92,6 +92,49 @@ Utility mode: `parseUtilGet` → `gsi` branch; `getARGSI()` (~3241). Review item
 
 ---
 
+## `FTS_ELASTIC_POD` — select a running, ready pod
+
+Status: **backlog**
+
+Platform init: `setVarsFromPlatform()` in `hitt.sh` (~1019–1036). Consumers: `checkFTSElasticStatus`, `isClusterAirGapped` (curl from pod in `HP_NAMESPACE`), cacerts-related exec paths. Service name from `logelasticsearchsecret` → `LOG_ELASTICSEARCH_CLUSTER` / `FTS_ELASTIC_SERVICENAME`; OpenSearch uses `FTS_ELASTIC_POD_CONTAINER="-c opensearch"` when the service name matches `^opensearch.*`.
+
+### Problem summary
+
+| Issue | Detail |
+|-------|--------|
+| **No phase filter** | `kubectl get pods -l …` can return `Pending`, `Failed`, or briefly **Terminating** pods. |
+| **No Ready check** | `exec` / air-gap curl fails when the chosen pod exists but containers are not ready. |
+| **`head -n 1`** | Arbitrary list order — not necessarily a healthy replica (common with headless `*-hl` services and multi-replica OpenSearch). |
+| **Label selector only** | Breaks or mis-matches if the Service is missing, has no selector, or labels differ from pod labels. |
+| **One-shot at init** | `FTS_ELASTIC_POD` is set once in `setVarsFromPlatform`; stale during rollouts until platform vars are refreshed. |
+| **Commented alternative** | Older endpoints IP → pod-by-`podIP` path in source is closer to **ready** backends but unused. |
+
+### Proposed fix (when picked up)
+
+1. Add `hittSelectFtsElasticPod()` (near other k8s helpers, ~500–800) and call it from `setVarsFromPlatform` instead of inline `get pods … \| head -n 1`.
+
+2. **Primary:** resolve pod name from Service **Endpoints** ready addresses (`targetRef.name` when present); sort and take first for determinism (e.g. `…-0`).
+
+3. **Fallback:** if endpoints empty or no `targetRef`, use endpoints **IP → pod** (`status.podIP`) as in commented code, then label selector + jq filter:
+   - `status.phase == "Running"`
+   - all `containerStatuses` ready (or require `opensearch` ready when `FTS_ELASTIC_POD_CONTAINER` is set).
+
+4. **Optional:** `HITT_FTS_ELASTIC_POD` in `hitt.conf` to skip auto-selection (break-glass).
+
+5. **Optional hardening:** before `exec` in `isClusterAirGapped` / `checkFTSElasticStatus`, re-resolve if pod phase ≠ Running or not Ready; consider **EndpointSlice** (`kubernetes.io/service-name=${FTS_ELASTIC_SERVICENAME}`) where Endpoints are deprecated.
+
+6. On empty result: keep existing errors (**125**, air-gap return **2**); optional verbosity-1 line with service name, selector, Running vs Ready counts.
+
+### Test plan
+
+- Multi-replica OpenSearch / headless service — selected pod is Ready and `curl` to `:9200/_cluster/health` succeeds from `exec`.
+- During rollout — terminating or not-ready pods are not chosen; re-resolve (if implemented) picks a new ready pod.
+- Missing or misconfigured service — clear failure, no silent empty `exec`.
+- `bash hitt.sh -i` / air-gap path — FTS pod used for outbound probe is running and ready.
+- Optional override — `HITT_FTS_ELASTIC_POD` forces a specific pod name.
+
+---
+
 ## Remove unused functions in `hitt.sh`
 
 Status: **backlog**

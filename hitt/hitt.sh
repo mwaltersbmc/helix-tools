@@ -955,7 +955,7 @@ _IS_DB_VERSION_MAP=(
   "25.4.01:216"
   "26.1.01:236"
   "26.2.01:237"
-  "26.3.01:999"
+  "26.3.01:237"
 )
 
 lookupISDBVersion() {
@@ -9629,7 +9629,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260923-03"
+HITT_BUILD_VERSION="20260923-04"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
