@@ -3428,15 +3428,15 @@ isIPAddress() {
 }
 
 isRFC1123() {
-  local INPUT="$1"
+  local INPUT="${1}"
   local LABEL_REGEX='^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'
 
   # Reject empty input, leading/trailing/consecutive dots
-  [[ "$INPUT" =~ ^\. ]] && return 1
-  [[ "$INPUT" =~ \.$ ]] && return 1
-  [[ "$INPUT" =~ \.\. ]] && return 1
+  [[ "${INPUT}" =~ ^\. ]] && return 1
+  [[ "${INPUT}" =~ \.$ ]] && return 1
+  [[ "${INPUT}" =~ \.\. ]] && return 1
 
-  IFS='.' read -ra LABELS <<< "$INPUT"
+  IFS='.' read -ra LABELS <<< "${INPUT}"
   for LABEL in "${LABELS[@]}"; do
       [[ "${LABEL}" =~ $LABEL_REGEX ]] || return 1
   done
@@ -3447,7 +3447,7 @@ reportResults() {
   echo ""
   logStatus "HITT Summary Report"
   echo "==================="
-  if [ $FAIL -gt 0 ] || [ $WARN -gt 0 ] ; then
+  if [ "${INFO}" -gt 0 ] || [ "${FAIL}" -gt 0 ] || [ "${WARN}" -gt 0 ] ; then
 #    echo -e "${BOLD}${FAIL} errors / ${WARN} warnings found - please review the ${HITT_MSG_FILE} file for more details and suggested fixes.${NORMAL}"
 #    echo ""
     if [ "${#ERROR_ARRAY[@]}" != "0" ]; then
@@ -9638,7 +9638,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260923-01"
+HITT_BUILD_VERSION="20260923-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9646,6 +9646,7 @@ SHORT_HOSTNAME=$(hostname --short 2>/dev/null || hostname)
 LONG_HOSTNAME=$(hostname --long 2>/dev/null || hostname)
 GIT_USER=$(whoami)
 : "${DEBUG=0}"
+INFO=0
 FAIL=0
 WARN=0
 SKIP_JENKINS=0
