@@ -2750,44 +2750,36 @@ validateISDetails() {
         if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
           logWarning "040" "DATABASE_RESTORE is not selected - please make sure you have restored the appropriate Postgres database dump."
         else
-          logMessage "Postgres database dump will be restored by pipeline."
+          if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
+            logMessage "Case sensitive database will be restored by the pipeline."
+          else
+            logMessage "Case insensitive database will be restored by the pipeline."
+          fi
         fi
       else
           logMessage "Please make sure you have restored the appropriate ${IS_DB_TYPE^^} database dump."
       fi
-    fi
-#    else
-#      logMessage "Postgres database dump will be restored."
-#    fi
 
-    if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ]; then
-      if [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "true" ]; then
+      if [ "${IS_DB_TYPE}" != "postgres" ]; then
         if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
-          logMessage "Case sensitive database will be restored."
-        else
-          logMessage "Case insensitive database will be restored."
+          logInfo "024" "AR_DB_CASE_SENSITIVE is selected but will be ignored as it is only relevant when performing a fresh deployment with a Postgres database."
         fi
-      fi
-      if [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
-        if ([ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_DATABASE_RESTORE}" == "false" ]) || ([ "${IS_DB_TYPE}" != "postgres" ]); then
-          logWarning "024" "AR_DB_CASE_SENSITIVE is selected but will be ignored as it is only relevant when the database type is Postgres and the DATABASE_RESTORE option is selected."
+        if [ "${IS_DATABASE_RESTORE}" == "true" ]; then
+          logInfo "024" "DATABASE_RESTORE is selected but will be ignored as it is only relevant when performing a fresh deployment with a Postgres database."
         fi
       fi
     fi
 
     if [ -n "${IS_DB_JDBC_URL}" ]; then
-      if [ "${IS_DB_TYPE}" != "oracle" ]; then
+      if [ "${IS_DB_TYPE}" == "oracle" ]; then
+        logWarning "047" "DB_JDBC_URL is set - make sure that the ONS port (6200) is open from the cluster to the DB server."
+      else
         logError "217" "DB_JDBC_URL is only valid for Oracle databases - use with MSSQL/Postgres will cause a failure in the HELIX_SMARTAPPS_DEPLOY pipeline.  Please check with BMC Support."
       fi
-      logWarning "047" "DB_JDBC_URL is set - make sure that the ONS port (6200) is open from the cluster to the DB server."
     fi
 
     if [ "${#IS_SMARTREPORTING_DB_PASSWORD}" -gt 28 ]; then
       logError "212" "SMARTREPORTING_DB_PASSWORD is too long - maximum of 28 characters."
-    fi
-
-    if [ -n "${IS_AR_DB_CASE_SENSITIVE}" ] && [ "${IS_DB_TYPE}" == "postgres" ] && [ "${IS_AR_DB_CASE_SENSITIVE}" == "true" ]; then
-      logMessage "Case sensitive database will be restored."
     fi
 
     if [ "$HELIX_LOGGING_DEPLOYED" == 0 ]; then
@@ -9593,7 +9585,6 @@ if [ "${MODE}" != "post-hp" ]; then
   checkUpgradeISDeployedValues
   checkPipelinePwds
   checkGenConfigOutput
-  [[ "${IS_VERSION}" -ge 2026301 ]] && return
   logStatus "Checking IS registry details..."
   checkISDockerLogin
   logStatus "Checking IS cacerts..."
@@ -9638,7 +9629,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260923-02"
+HITT_BUILD_VERSION="20260923-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
