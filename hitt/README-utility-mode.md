@@ -19,6 +19,8 @@ Built-in summary: `bash hitt.sh -u help` or `bash hitt.sh -h utility`
 | `get arlicense` | Shows the current **IS Server license type** (for example **AR Server** for a permanent license). |
 | `get gsi list` | Lists every AR Server Info (GSI) constant as **name : id** pairs. |
 | `get gsi GSI_ID` | Runs **Get Server Info** on the IS server for that GSI id and prints the current value. |
+| `get group GROUPNAME` | Displays an AR/IS group by name. |
+| `get user USERNAME` | Displays an AR/IS user by login name. |
 | `get jwt` | Prints a login token for Helix IS REST calls. Uses **hannah_admin** from the cluster unless you give another username. |
 | `get secret` | Shows secret contents from the cluster. Args: **SECRETNAME** [**NAMESPACE**]. If you omit the namespace, HITT searches your Helix IS, Helix Platform, and Deployment Engine namespaces and asks you to choose when needed. |
 | `get configmap` | Saves ConfigMap contents to a new folder in the current directory. With **`-v`**, lists key names only. Args: **CM_NAME** [**NAMESPACE**]. Namespace rules match **get secret**. |
@@ -49,6 +51,10 @@ bash hitt.sh -u "get gsi list"
 
 # Get Server Info value for a GSI id (89 = AR_SERVER_INFO_SERVER_NAME)
 bash hitt.sh -u "get gsi 89"
+
+# Innovation Suite user or group (JSON)
+bash hitt.sh -u "get user Demo"
+bash hitt.sh -u "get group Administrator"
 
 # Login token for hannah_admin
 bash hitt.sh -u "get jwt"
@@ -125,6 +131,22 @@ bash hitt.sh -u "get gsi 89"
 ```
 
 Use **list** first when you know the setting name but not the id (for example **AR_SERVER_INFO_SERVER_NAME** is id **89**).
+
+## `get user` and `get group`
+
+HITT authenticates to Helix IS (AR-JWT) and calls the RX application REST APIs:
+
+- **`get user USERNAME`** — `GET /api/rx/application/user/{username}`
+- **`get group GROUPNAME`** — `GET /api/rx/application/group/{groupname}`
+
+The response is printed as formatted JSON. User and group names are URL-encoded for special characters.
+
+**Group names with spaces** must be passed inside one double-quoted `-u` string so HITT reads the full name from `UTILOPTS` (not only the first word):
+
+```bash
+bash hitt.sh -u "get group AR Submitter"
+bash hitt.sh -u "get group My Custom Group"
+```
 
 ## `get jwt`
 

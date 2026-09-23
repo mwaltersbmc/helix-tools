@@ -6284,6 +6284,8 @@ showUtilHelp() { # utility mode help
     \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
     \tget arlicense \t| Show current IS Server license type and fixed/floating seat counts.
     \tget gsi \t| GetServerInfo (GSI): Args: list (name : id pairs) or GSI_ID (current value from IS).
+    \tget group \t| Fetch Innovation Suite application group JSON. Args: GROUPNAME (use -u \"get group My Group\" for names with spaces).
+    \tget user \t| Fetch Innovation Suite application user JSON. Args: USERNAME (quote multi-word names).
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
     \tget forms \t| Search AR forms by keyword; prints form name and Schema ID. Args: KEYWORD (use quotes for multi-word, e.g. -u \"get forms AR System\")
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
@@ -7055,6 +7057,16 @@ decodeK8sSecret() {
   echo "${K8S_SECRET}" | ${JQ_BIN} -r '.data | to_entries[] | "\(.key): \(.value | @base64d)"'
 }
 
+# Value after "get <subcommand> " in UTILOPTS (keeps internal spaces; requires -u "get group My Group").
+hittUtilOptsGetArgValue() {
+  local subcommand="${1}"
+  if [[ "${UTILOPTS}" =~ ^get[[:space:]]+${subcommand}[[:space:]]+(.+)$ ]]; then
+    printf '%s' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  return 1
+}
+
 parseUtilGet() {
   case "${UTILARGS[1]}" in
     arlicense)
@@ -7074,11 +7086,74 @@ parseUtilGet() {
       buildISAliasesArray
       ${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/healthcheck/ready" | ${JQ_BIN} 'to_entries | sort_by(.key) | from_entries'
       ;;
+    configmap)
+      if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
+        logError "999" "Usage: bash $0 -u \"get configmap CM_NAME [NAMESPACE]\"" 1
+      fi
+      if [ ${#UTILARGS[@]} -eq 4 ]; then
+        exportK8sConfigMap "${UTILARGS[2]}" "${UTILARGS[3]}"
+      else
+        populateUtilK8sObjectMatches configmap "${UTILARGS[2]}"
+        case ${#UTIL_NS_MATCHES[@]} in
+          0)
+            logError "999" "ConfigMap '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from hitt.conf. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get configmap ${UTILARGS[2]} NAMESPACE\"." 1
+            ;;
+          1)
+            exportK8sConfigMap "${UTILARGS[2]}" "${UTIL_NS_MATCHES[0]}"
+            ;;
+          *)
+            if [[ "${QUIET}" == "1" ]]; then
+              logError "999" "ConfigMap '${UTILARGS[2]}' exists in more than one configured namespace; omit -q to choose interactively, or pass NAMESPACE explicitly." 1
+            fi
+            logStatus "ConfigMap '${UTILARGS[2]}' exists in multiple namespaces — select namespace:" 1
+            exportK8sConfigMap "${UTILARGS[2]}" "$(selectFromArray UTIL_NS_MATCHES)"
+            ;;
+        esac
+      fi
+      ;;
     dbid)
       QUIET=1
       getISDbID
       QUIET=0
       logMessage "DB ID for this system is '${IS_DBID}'."
+      ;;
+    fields)
+      if [ ${#UTILARGS[@]} -lt 3 ] ; then
+        logError "999" "Usage: bash $0 -u \"get fields SCHEMAID [KEYWORD]\"" 1
+      fi
+      SCHEMAID=${UTILARGS[2]}
+      if [[ ! ${SCHEMAID} =~ ^[0-9]+$ ]]; then
+        logError "999" "Invalid schemaId '${SCHEMAID}' - must be a number. Use \"get forms\" to find schemaId." 1
+      fi
+      KEYWORD="${UTILARGS[3]}"
+      if ((${#UTILARGS[@]} > 4)); then
+        KEYWORD="${UTILARGS[*]:3}"
+      fi
+      utilGetFields
+      ;;
+    forms)
+      if [ ${#UTILARGS[@]} -le 2 ] ; then
+        logError "999" "Usage: bash $0 -u \"get forms KEYWORD\"" 1
+      fi
+      KEYWORD="${UTILARGS[2]}"
+      if ((${#UTILARGS[@]} > 3)); then
+        KEYWORD="${UTILARGS[*]:2}"   # or "${UTILARGS[@]:2}" with IFS=' '
+      fi
+      utilGetForms
+      ;;
+    group)
+      GROUPNAME=""
+      if ! GROUPNAME=$(hittUtilOptsGetArgValue group); then
+        GROUPNAME="${UTILARGS[2]:-}"
+        if ((${#UTILARGS[@]} > 3)); then
+          GROUPNAME="${UTILARGS[*]:2}"
+        fi
+      fi
+      [[ -z "${GROUPNAME}" ]] && logError "999" "Usage: bash $0 -u \"get group GROUPNAME\" (use one quoted -u string when the group name contains spaces)" 1
+      QUIET=1
+      initISAdminREST
+      ${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/group/$(URLEncode "${GROUPNAME}")" -H "Authorization: AR-JWT ${ARJWT}" | ${JQ_BIN}
+      QUIET=0
       ;;
     gsi)
       QUIET=1
@@ -7122,54 +7197,16 @@ parseUtilGet() {
         esac
       fi
       ;;
-    configmap)
-      if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
-        logError "999" "Usage: bash $0 -u \"get configmap CM_NAME [NAMESPACE]\"" 1
-      fi
-      if [ ${#UTILARGS[@]} -eq 4 ]; then
-        exportK8sConfigMap "${UTILARGS[2]}" "${UTILARGS[3]}"
-      else
-        populateUtilK8sObjectMatches configmap "${UTILARGS[2]}"
-        case ${#UTIL_NS_MATCHES[@]} in
-          0)
-            logError "999" "ConfigMap '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from hitt.conf. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get configmap ${UTILARGS[2]} NAMESPACE\"." 1
-            ;;
-          1)
-            exportK8sConfigMap "${UTILARGS[2]}" "${UTIL_NS_MATCHES[0]}"
-            ;;
-          *)
-            if [[ "${QUIET}" == "1" ]]; then
-              logError "999" "ConfigMap '${UTILARGS[2]}' exists in more than one configured namespace; omit -q to choose interactively, or pass NAMESPACE explicitly." 1
-            fi
-            logStatus "ConfigMap '${UTILARGS[2]}' exists in multiple namespaces — select namespace:" 1
-            exportK8sConfigMap "${UTILARGS[2]}" "$(selectFromArray UTIL_NS_MATCHES)"
-            ;;
-        esac
-      fi
-      ;;
-    forms)
-      if [ ${#UTILARGS[@]} -le 2 ] ; then
-        logError "999" "Usage: bash $0 -u \"get forms KEYWORD\"" 1
-      fi
-      KEYWORD="${UTILARGS[2]}"
+    user)
+      [[ -z "${UTILARGS[2]:-}" ]] && logError "999" "Usage: bash $0 -u \"get user USERNAME\"" 1
+      QUIET=1
+      USERNAME="${UTILARGS[2]}"
       if ((${#UTILARGS[@]} > 3)); then
-        KEYWORD="${UTILARGS[*]:2}"   # or "${UTILARGS[@]:2}" with IFS=' '
+        USERNAME="${UTILARGS[*]:2}"
       fi
-      utilGetForms
-      ;;
-    fields)
-      if [ ${#UTILARGS[@]} -lt 3 ] ; then
-        logError "999" "Usage: bash $0 -u \"get fields SCHEMAID [KEYWORD]\"" 1
-      fi
-      SCHEMAID=${UTILARGS[2]}
-      if [[ ! ${SCHEMAID} =~ ^[0-9]+$ ]]; then
-        logError "999" "Invalid schemaId '${SCHEMAID}' - must be a number. Use \"get forms\" to find schemaId." 1
-      fi
-      KEYWORD="${UTILARGS[3]}"
-      if ((${#UTILARGS[@]} > 4)); then
-        KEYWORD="${UTILARGS[*]:3}"
-      fi
-      utilGetFields
+      initISAdminREST
+      ${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/user/$(URLEncode "${USERNAME}")" -H "Authorization: AR-JWT ${ARJWT}" | ${JQ_BIN}
+      QUIET=0
       ;;
     *)
      logError "999" "'${UTILARGS[1]}' is not a valid utility mode get command option. Please check for an updated HITT."
@@ -7182,6 +7219,21 @@ parseUtilCheck() {
     logError "999" "Usage: bash $0 -u \"check <rbac|pat|arservers|liveness|readiness|cert> [options]\"" 1
   fi
   case "${UTILARGS[1]}" in
+    arserver|arservers)
+      checkPlatformPodsReadiness
+      printPlatformPodsTable
+      ;;
+    cert)
+      [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check cert /path/to/cert.pem\"" 1
+      hittUtilCheckCert "${UTILARGS[2]}"
+      ;;
+    liveness|readiness)
+      [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check liveness|readiness PODNAME\"" 1
+      checkPodProbe "${UTILARGS[1]}" "${UTILARGS[2]:-}"
+      ;;
+    pat)
+      validateDockerIOPat "${UTILARGS[2]:-}" "${UTILARGS[3]:-}"
+      ;;
     rbac)
       profile="${UTILARGS[2]:-hitt}"
       case "${profile}" in
@@ -7192,21 +7244,6 @@ parseUtilCheck() {
           logError "999" "Usage: bash $0 -u \"check rbac [hitt|deploy|all]\" (default: hitt)." 1
           ;;
       esac
-      ;;
-    pat)
-      validateDockerIOPat "${UTILARGS[2]:-}" "${UTILARGS[3]:-}"
-      ;;
-    arserver|arservers)
-      checkPlatformPodsReadiness
-      printPlatformPodsTable
-      ;;
-    liveness|readiness)
-      [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check liveness|readiness PODNAME\"" 1
-      checkPodProbe "${UTILARGS[1]}" "${UTILARGS[2]:-}"
-      ;;
-    cert)
-      [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check cert /path/to/cert.pem\"" 1
-      hittUtilCheckCert "${UTILARGS[2]}"
       ;;
     *)
       logError "999" "'${UTILARGS[1]}' is not a valid utility mode check option. Please check for an updated HITT."
@@ -9601,7 +9638,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260922-03"
+HITT_BUILD_VERSION="20260923-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -11730,12 +11767,26 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
         "bash hitt.sh -u \"get gsi 89\""
       ],
       "notes": [
-        "Requires a running Helix IS deployment.",
         "get gsi list prints every AR_SERVER_INFO constant as name : id pairs.",
         "get gsi GSI_ID runs GetServerInfo against the IS server for that GSI id and prints the current value.",
         "Use list to find the numeric id for a setting (for example AR_SERVER_INFO_SERVER_NAME is id 89)."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-gsi"
+    },
+    {
+      "id": "utility-get-rx-user-group",
+      "topicId": "helix-system-info",
+      "order": 33,
+      "title": "I want to look up an Innovation Suite user or group",
+      "commands": [
+        "bash hitt.sh -u \"get user Demo\"",
+        "bash hitt.sh -u \"get group Asset Viewer\""
+      ],
+      "notes": [
+        "get user USERNAME calls the RX application user API and prints the raw JSON record.",
+        "get group GROUPNAME calls the RX application group API and prints the raw JSON record."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-user-and-get-group"
     },
     {
       "id": "utility-jwt",

@@ -59,6 +59,39 @@ Function: `discoverIngressControllerDetails` in `hitt.sh` (~6685).
 
 ---
 
+## `get gsi` / `getARGSI` — validation and REST error handling
+
+Status: **backlog**
+
+Utility mode: `parseUtilGet` → `gsi` branch; `getARGSI()` (~3241). Review item **#5** (Sep 2026).
+
+### Problem summary
+
+| Issue | Detail |
+|-------|--------|
+| **Non-numeric GSI id** | `jq --argjson id "${GSI_ID}"` fails when the user passes a constant name instead of a number. |
+| **Silent REST failures** | `getARGSI` uses `curl -sk` with no HTTP status check; HTML/error bodies still piped to `jq -r '.value'` → empty value and a misleading success line. |
+| **`get gsi list` + QUIET** | Branch sets `QUIET=1` then `exit` without resetting `QUIET` (low risk; inconsistent with other branches). |
+
+### Proposed fix (when picked up)
+
+1. **Validate id** — After `list`, require `^[0-9]+$` (same pattern as `get fields` / `schemaId`). Clear error pointing at `get gsi list`.
+2. **Optional name → id** — If arg matches `^AR_SERVER_INFO_`, resolve numeric id from `AR_SERVER_INFO_JSON` before the REST call.
+3. **Name lookup in jq** — Use `--arg id` + string compare (or `tonumber` after bash validation), not `--argjson`, for `GSI_NAME`.
+4. **Harden `getARGSI`** — Mirror `runARRESTSQL`: temp file, `%{http_code}`, `jq -e` on body, `logError` on non-2xx / empty / invalid JSON; surface `.value` only on success.
+5. **`gsi` branch flow** — Handle `list` before `QUIET=1`; reset `QUIET=0` before `exit 0` on list; validate id → `initISAdminREST` → `getARGSI` → display.
+6. **Docs** — One line in `README-utility-mode.md` / usage: numeric id or (if implemented) constant name; API path `systemconfiguration/{id}`.
+
+### Test plan
+
+- `bash hitt.sh -u "get gsi list"` — exits cleanly, no stray status noise with `-q` elsewhere in same script path.
+- `bash hitt.sh -u "get gsi 89"` — known id returns a value when IS is up.
+- `bash hitt.sh -u "get gsi not-a-number"` — friendly error, no jq stack trace.
+- Invalid id or 401/404 — explicit HITT error, not `GSI value for 'UNKNOWN (99)' is ''`.
+- Optional: `bash hitt.sh -u "get gsi AR_SERVER_INFO_SERVER_NAME"` if name resolution is added.
+
+---
+
 ## Remove unused functions in `hitt.sh`
 
 Status: **backlog**
@@ -78,7 +111,7 @@ Static analysis (Sep 2026): **12** functions in `hitt.sh` are defined but never 
 | 3400 | `checkSRDBSettings` | Stub (`echo TODO` only) |
 | 3813 | `checkJenkinsCredentials` | Marked `# NOT USED` in source |
 | 4370 | `xgetPipelineDefaults` | Marked `# Old version` |
-| 6832 | `URLEncode` | Dead in HITT; `scripts/imagemgr.sh` has its own copy |
+| 6832 | `URLEncode` | Re-check before delete — used by `get group` / `get user`; `scripts/imagemgr.sh` has its own copy |
 
 ### When picked up
 
