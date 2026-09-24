@@ -246,7 +246,7 @@ logError() {
   # Print error message MSG_ID MSG / exit if value of 1 passed as third parameter
   stopOnError "${1}"
   MSG="${BOLD}${RED}ERROR${NORMAL} (${1}) - ${2}"
-  [[ "${QUIET}" == "0" ]] && echo -e "${MSG}" >&2
+  [[ "${QUIET}" == "0" ]] || [[ -n "${3}" ]] && echo -e "${MSG}" >&2
   ((FAIL++))
   ERROR_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
@@ -9629,7 +9629,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260923-05"
+HITT_BUILD_VERSION="20260924-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
