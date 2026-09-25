@@ -2219,7 +2219,7 @@ getPipelineValues() {
 checkPipelinePwds() {
   [[ "${SKIP_JENKINS}" == "1" ]] && return
   if [[ ("${MODE}" != "pre-is" && "${MODE}" != "upgrade-is") ]]; then return; fi
-    PASSWDS_JSON=$(getPipelinePasswords | ${JQ_BIN} 'to_entries')
+  PASSWDS_JSON=$(getPipelinePasswords | ${JQ_BIN} 'to_entries')
   return # next bit no longer valid?
   for i in $(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r '.[].key'); do
     PASSWD=$(echo "${PASSWDS_JSON}" | ${JQ_BIN} -r ".[] | select(.key==\"${i}\").value.plainText")
@@ -3455,7 +3455,7 @@ reportResults() {
       printf '%s\n' "${INFO_ARRAY[@]}"
     fi
     echo "==================="
-    echo -e "${BOLD}Please review the ${GREEN}${HITT_MSG_FILE}${NORMAL}${BOLD} file or run 'bash $0 -e MSG_NUM' for explanations and suggested fixes for the messages above.${NORMAL}"
+    echo -e "${BOLD}Please review the ${YELLOW}${HITT_MSG_FILE}${NORMAL}${BOLD} file or run ${YELLOW}bash $0 -e MSG_NUM${NORMAL} for explanations and suggested fixes for the messages above.${NORMAL}"
     echo -e "${BOLD}Attach the ${YELLOW}hittlogs.zip${NORMAL}${BOLD} file to your case if requested by BMC Support.${NORMAL}"
   else
     echo -e "${BOLD}Tests complete - no errors or warnings found.${NORMAL}"
@@ -5727,7 +5727,7 @@ triggerHelixDryRun() {
       def future = job.scheduleBuild2(0, causeAction)
       def build = future.get()
     }"
-  logMessage "Started dry runs of Helix deployment pipelines..."
+  logMessage "Starting dry runs of Helix deployment pipelines..."
   runJenkinsScript "${SCRIPT}"
 }
 
@@ -8972,12 +8972,12 @@ hittGenConfigExtractShellVarName() {
 }
 
 checkGenConfigOutput() {
-  [[ "${IS_VERSION}" -ge 2026301 ]] && return # Return as 26301 switches to use python for template completion
-  local regex line file full_line expr_num char_num invalid_value
-  local first_sed_block expr_line shell_var_name jenkins_param_name
   if [ "${SKIP_JENKINS}" == "1" ] || [[ ("${MODE}" != "pre-is" && "${MODE}" != "upgrade-is") ]]; then
     return
   fi
+  [[ "${IS_VERSION}" -ge 2026301 ]] && return # Return as 26301 switches to use python for template completion
+  local regex line file full_line expr_num char_num invalid_value
+  local first_sed_block expr_line shell_var_name jenkins_param_name
   savePipelineConsoleOutput "HELIX_GENERATE_CONFIG" "lastBuild"
   [[ ! -f HELIX_GENERATE_CONFIG.log ]] && return
   regex="^(sed: -e expression #([0-9]+), char ([0-9]+):.*)$"
@@ -9629,7 +9629,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260924-01"
+HITT_BUILD_VERSION="20260925-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
