@@ -9498,12 +9498,10 @@ if [ "${MODE}" == "info" ]; then
   exit
 fi
 
-# Validate action
-[[ "${MODE}" =~ ^pre-hp|^post-hp$|^pre-is$|^upgrade-is$|^post-is$ ]] || usage
-
 # MODE is required
 if [[ -z "${MODE}" ]]; then
-  logError "200" "Mode must be specified with -m <post-hp|pre-is|upgrade-is|post-is>" 1
+  showGeneralHelp
+  exit
 fi
 
 if [ "${MODE}" == "post-hp" ] || [ "${MODE}" == "pre-hp" ]; then
@@ -9567,10 +9565,12 @@ validateCacertsFile HP
 if [ "${MODE}" != "post-hp" ]; then
   logStatus "Checking Jenkins is accessible..."
   checkJenkinsIsRunning
-  logStatus "Checking Jenkins configuration..."
-  UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
-  checkCDE
-  checkJenkinsConfig
+  if [ "${SKIP_JENKINS}" == "0" ]; then
+    logStatus "Checking Jenkins configuration..."
+    UBER_VERSION=$(getPipelineParameterDefault HELIX_ONPREM_DEPLOYMENT PLATFORM_HELM_VERSION)
+    checkCDE
+    checkJenkinsConfig
+  fi
   logStatus "Getting IS details..."
   case "${MODE}" in
     post-is|info)
@@ -9629,7 +9629,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260925-01"
+HITT_BUILD_VERSION="20260928-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -15802,17 +15802,11 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
     m)
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        if [[ "${OPTARG}" == "info" ]]; then
-          logError "999" "Info mode uses -i: eg: bash $0 -i ${NEXT_VAL}" 1
-        fi
         logError "999" "When using mode (-m) commands with multiple words you must enclose them in double quotes - eg: bash $0 -m \"post-is\"" 1
       fi
       read -r -a MODEARGS <<< "${OPTARG}"
       MODE="${MODEARGS[0]}"
-      if [ "${MODE}" == "info" ]; then
-        INFOARGS=("${MODEARGS[@]:1}")
-        hittNormalizeInfoArgs
-      fi
+      [[ "${MODE}" =~ ^pre-hp|^post-hp$|^jenkins$|^pre-is$|^upgrade-is$|^post-is$ ]] || usage
       ;;
     o)
       QUIET=1
