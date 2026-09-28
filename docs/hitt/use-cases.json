@@ -689,12 +689,13 @@
       "title": "I want to run an AR GSI command",
       "commands": [
         "bash hitt.sh -u \"get gsi list\"",
-        "bash hitt.sh -u \"get gsi 89\""
+        "bash hitt.sh -u \"get gsi 89\"",
+        "bash hitt.sh -u \"get gsi server_name\""
       ],
       "notes": [
         "get gsi list prints every AR_SERVER_INFO constant as name : id pairs.",
-        "get gsi GSI_ID runs GetServerInfo against the IS server for that GSI id and prints the current value.",
-        "Use list to find the numeric id for a setting (for example AR_SERVER_INFO_SERVER_NAME is id 89)."
+        "get gsi accepts a numeric id or constant name (case-insensitive; AR_SERVER_INFO_ prefix may be omitted).",
+        "Partial suffix match applies when the prefix is omitted; ambiguous matches return an error — use list or a numeric id."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-gsi",
       "video": {

@@ -3230,6 +3230,54 @@ getISJWT() {
   fi
 }
 
+# $1 = numeric GSI id or AR_SERVER_INFO name (case-insensitive; suffix/partial when prefix omitted).
+# Sets GSI_ID and GSI_NAME from AR_SERVER_INFO_JSON; logError+exit when not found or ambiguous.
+hittResolveGsiFromToken() {
+  local token="${1}"
+  local row matches_json match_count names
+
+  [[ -z "${token}" ]] && logError "999" "Usage: bash $0 -u \"get gsi GSI_ID|NAME|list\"" 1
+
+  if [[ "${token}" =~ ^[0-9]+$ ]]; then
+    row=$(echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -c --argjson id "${token}" \
+      'first(.[] | select(.id == $id)) // empty')
+    if [[ -z "${row}" || "${row}" == "null" ]]; then
+      logError "999" "Unknown GSI id '${token}' — not in the AR_SERVER_INFO catalog. Use \"get gsi list\"." 1
+    fi
+    GSI_ID=$(echo "${row}" | ${JQ_BIN} -r '.id')
+    GSI_NAME=$(echo "${row}" | ${JQ_BIN} -r '.name')
+    return 0
+  fi
+
+  matches_json=$(echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -c --arg token "${token}" '
+    def nlc: ascii_downcase;
+    ($token | nlc) as $tl |
+    ($tl | startswith("ar_server_info_")) as $has_prefix |
+    [ .[] | select((.name | nlc) == $tl) ] as $exact |
+    if ($exact | length) > 0 then $exact
+    elif $has_prefix then []
+    else
+      [ .[] | select((.name | nlc) == ("ar_server_info_" + $tl)) ] as $prefixed |
+      if ($prefixed | length) > 0 then $prefixed
+      else
+        [ .[] | select((.name | nlc | sub("^ar_server_info_", "")) | contains($tl)) ]
+      end
+    end
+  ')
+
+  match_count=$(echo "${matches_json}" | ${JQ_BIN} 'length')
+  if [[ "${match_count}" -eq 0 ]]; then
+    logError "999" "Unknown GSI '${token}' — no matching AR_SERVER_INFO name. Use \"get gsi list\"." 1
+  fi
+  if [[ "${match_count}" -gt 1 ]]; then
+    names=$(echo "${matches_json}" | ${JQ_BIN} -r '[.[].name] | join(", ")')
+    logError "999" "GSI '${token}' is ambiguous (${match_count} matches: ${names}). Use a more specific name or a numeric id from \"get gsi list\"." 1
+  fi
+  row=$(echo "${matches_json}" | ${JQ_BIN} -c '.[0]')
+  GSI_ID=$(echo "${row}" | ${JQ_BIN} -r '.id')
+  GSI_NAME=$(echo "${row}" | ${JQ_BIN} -r '.name')
+}
+
 getARGSI() {
   # $1 is number of the GSI to return
   local gsi="${1}"
@@ -4538,7 +4586,7 @@ checkJenkinsScriptApprovals() {
   APPROVED_SCRIPTS=$(getJenkinsApprovedScripts)
   for i in "getRawBuild" "getLog" ; do
     if ! echo "${APPROVED_SCRIPTS}" | ${JQ_BIN} '.approvedSignatures' | grep -q "${i}" ; then
-      logError "238" "Missing script approval in Jenkins - '${i}' not found in the list of approved scripts.  See https://community.bmc.com/s/article/Helix-ITSM-Onprem-How-to-add-Jenkins-in-process-script-approvals"
+      logError "238" "Missing script approval in Jenkins - '${i}' not found in the list of approved scripts.  See https://community.helixops.ai/s/article/Helix-ITSM-Onprem-How-to-add-Jenkins-in-process-script-approvals"
     fi
   done
 }
@@ -6275,7 +6323,7 @@ showUtilHelp() { # utility mode help
     \tget configmap \t| Export ConfigMap .data and .binaryData keys to files in a new directory (named after the ConfigMap), or with -v list key names only. Args: CM_NAME [NAMESPACE]
     \tget dbid \t| Display the database ID (DBID) for the system - used for licensing.
     \tget arlicense \t| Show current IS Server license type and fixed/floating seat counts.
-    \tget gsi \t| GetServerInfo (GSI): Args: list (name : id pairs) or GSI_ID (current value from IS).
+    \tget gsi \t| GetServerInfo (GSI): Args: list, numeric id, or AR_SERVER_INFO name (case-insensitive; suffix ok without prefix).
     \tget group \t| Fetch Innovation Suite application group JSON. Args: GROUPNAME (use -u \"get group My Group\" for names with spaces).
     \tget user \t| Fetch Innovation Suite application user JSON. Args: USERNAME (quote multi-word names).
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
@@ -7148,16 +7196,17 @@ parseUtilGet() {
       QUIET=0
       ;;
     gsi)
-      QUIET=1
-      [[ -z "${UTILARGS[2]}" ]] && logError "999" "Usage: bash $0 -u \"get gsi AR_GSI_VALUE|list\"" 1
+      [[ -z "${UTILARGS[2]}" ]] && logError "999" "Usage: bash $0 -u \"get gsi GSI_ID|NAME|list\"" 1
       if [ "${UTILARGS[2]}" == "list" ]; then
+        QUIET=1
         echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -r '.[] | "\(.name) : \(.id)"'
-        exit
+        QUIET=0
+        exit 0
       fi
+      hittResolveGsiFromToken "${UTILARGS[2]}"
+      QUIET=1
       initISAdminREST
-      GSI_ID="${UTILARGS[2]}"
       GSI_VALUE=$(getARGSI "${GSI_ID}")
-      GSI_NAME=$(echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -r --argjson id "${GSI_ID}" '(first(.[] | select(.id == $id)).name) // "UNKNOWN"')
       QUIET=0
       logMessage "GSI value for '${GSI_NAME} (${GSI_ID})' is '${GSI_VALUE}'"
       ;;
@@ -7704,7 +7753,6 @@ discoverIngressControllerDetails() {
   ic_name="${1:-}"
   [[ -z "${ic_name}" ]] && ic_name="nginx"
   INGRESS_CLASS_NAME="${ic_name}"
-
   INGRESS_CLASS_SPEC_CONTROLLER=""
   INGRESS_CONTROLLER_TYPE="unknown"
   INGRESS_CONTROLLER_NAMESPACE=""
@@ -9629,7 +9677,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260928-01"
+HITT_BUILD_VERSION="20260928-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -10157,7 +10205,7 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
     "id": "111",
     "cause": "This version of the Helix Platform uses a new credentials service which must be installed, or the use of disabled in the TMS deployment, before the HELIX_ITSM_INTEROPS pipeline can be run.",
     "impact": "The HELIX_ITSM_INTEROPS pipeline will fail due to the missing/misconfigured service.",
-    "remediation": "See https://community.bmc.com/s/article/Helix-ITSM-OnPrem-HELIX-ITSM-INTEROPS-pipeline-fails-with-INTERNAL-SERVER-ERROR-when-using-Helix-Platform-24-2"
+    "remediation": "See https://community.helixops.ai/s/article/Helix-ITSM-OnPrem-HELIX-ITSM-INTEROPS-pipeline-fails-with-INTERNAL-SERVER-ERROR-when-using-Helix-Platform-24-2"
   },
   {
     "id": "112",
@@ -11756,12 +11804,13 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
       "title": "I want to run an AR GSI command",
       "commands": [
         "bash hitt.sh -u \"get gsi list\"",
-        "bash hitt.sh -u \"get gsi 89\""
+        "bash hitt.sh -u \"get gsi 89\"",
+        "bash hitt.sh -u \"get gsi server_name\""
       ],
       "notes": [
         "get gsi list prints every AR_SERVER_INFO constant as name : id pairs.",
-        "get gsi GSI_ID runs GetServerInfo against the IS server for that GSI id and prints the current value.",
-        "Use list to find the numeric id for a setting (for example AR_SERVER_INFO_SERVER_NAME is id 89)."
+        "get gsi accepts a numeric id or constant name (case-insensitive; AR_SERVER_INFO_ prefix may be omitted).",
+        "Partial suffix match applies when the prefix is omitted; ambiguous matches return an error — use list or a numeric id."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-gsi"
     },

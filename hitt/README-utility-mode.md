@@ -18,7 +18,7 @@ Built-in summary: `bash hitt.sh -u help` or `bash hitt.sh -h utility`
 | `get dbid` | Shows the database ID (DBID) for your Helix IS system — used for licensing. |
 | `get arlicense` | Shows the current **IS Server license type** (for example **AR Server** for a permanent license). |
 | `get gsi list` | Lists every AR Server Info (GSI) constant as **name : id** pairs. |
-| `get gsi GSI_ID` | Runs **Get Server Info** on the IS server for that GSI id and prints the current value. |
+| `get gsi GSI_ID\|NAME` | Runs **Get Server Info** for a numeric id or **AR_SERVER_INFO** name (case-insensitive; suffix without `AR_SERVER_INFO_` allowed). |
 | `get group GROUPNAME` | Displays an AR/IS group by name. |
 | `get user USERNAME` | Displays an AR/IS user by login name. |
 | `get jwt` | Prints a login token for Helix IS REST calls. Uses **hannah_admin** from the cluster unless you give another username. |
@@ -123,14 +123,17 @@ Shows the current **IS Server license type**. A permanent production license is 
 AR **GSI** (Global Server Info) settings are numbered constants (`AR_SERVER_INFO_*` in the AR API). HITT embeds the full name-to-id map.
 
 - **`get gsi list`** — prints every known constant as `name : id` (sorted by id).
-- **`get gsi GSI_ID`** — runs **Get Server Info** against your Helix IS server for that numeric id and prints the current value.
+- **`get gsi GSI_ID`** — numeric id from **list** (must exist in HITT’s embedded catalog).
+- **`get gsi NAME`** — resolves a constant by name (case-insensitive). You may omit the **`AR_SERVER_INFO_`** prefix (for example **`SERVER_NAME`** → **AR_SERVER_INFO_SERVER_NAME**). A partial suffix match is allowed when the prefix is omitted; if more than one constant matches, HITT reports an ambiguity error.
 
 ```bash
 bash hitt.sh -u "get gsi list"
 bash hitt.sh -u "get gsi 89"
+bash hitt.sh -u "get gsi AR_SERVER_INFO_SERVER_NAME"
+bash hitt.sh -u "get gsi server_name"
 ```
 
-Use **list** first when you know the setting name but not the id (for example **AR_SERVER_INFO_SERVER_NAME** is id **89**).
+Use **list** when you are unsure of the id or exact spelling.
 
 ## `get user` and `get group`
 
