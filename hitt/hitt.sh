@@ -1209,7 +1209,7 @@ getTenantDetails() {
   logMessage "Helix Platform tenant is '${HP_TENANT}'."
   PORTAL_HOSTNAME=$(echo "${TENANT_JSON}" | ${JQ_BIN} -r '.[] | select(.name=="'${HP_TENANT}'").host')
   if isTenantActivated ; then
-    logMessage "Tenant has been activated."
+    logMessage "Tenant has been activated." 1
   else
     logWarning "041" "Tenant has not been activated."
   fi
@@ -1807,7 +1807,7 @@ getDeployedISVersion() {
 # Populates IS_* from the cluster. Do not call for upgrade-is — pipeline values must stay in IS_*.
 getISDetailsFromK8s() {
   [[ "${MODE}" != "post-is" && "${MODE}" != "info" ]] && return
-  logMessage "Getting data from IS namespace..."
+  logMessage "Getting data from IS namespace..." 1
   ensureISPlatformCache || return
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret > /dev/null 2>&1; then
     IS_PLATFORM_SECRET=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data}')
@@ -1956,7 +1956,7 @@ getISDetailsFromJenkins() {
   #logMessage "Downloading jenkins-cli.jar from Jenkins..."
   #downloadJenkinsCLIJar
   #checkJenkinsCLIJavaVersion
-  logMessage "Reading values from Jenkins..."
+  logMessage "Reading values from Jenkins..." 1
   JENKINS_JSON=$(${CURL_BIN} -sk "${JENKINS_URL}/job/HELIX_ONPREM_DEPLOYMENT/lastBuild/api/json")
   checkJenkinsJobResult
   JENKINS_ONPREM_DEPLOYMENT_LASTBUILD=$(getLastBuildFromJenkins HELIX_ONPREM_DEPLOYMENT)
@@ -2745,7 +2745,7 @@ validateISDetails() {
       fi
     fi
 
-    if [ "${IS_PIPELINE_MODE}" == "FRESH" ]; then
+    if [ "${IS_PIPELINE_MODE}" == "FRESH" ] && [ "${MODE}" == "pre-is" ]; then
       if [ "${IS_DB_TYPE}" == "postgres" ]; then
         if [ "${IS_DATABASE_RESTORE}" == "false" ]; then
           logWarning "040" "DATABASE_RESTORE is not selected - please make sure you have restored the appropriate Postgres database dump."
@@ -2912,7 +2912,7 @@ getCacertsFile() {
       if [ -f configsrepo/customer/customCerts/cacerts ] ; then
         SKIP_CACERTS=0
         cp -f configsrepo/customer/customCerts/cacerts ${CACERTS_FILENAME}
-        logMessage "Using cacerts file from CUSTOMER_CONFIGS repo."
+        logMessage "Using cacerts file from CUSTOMER_CONFIGS repo..." 1
         return
       else
         logWarning "017" "Custom cacerts file not found - remember to attach when building the HELIX_ONPREM_DEPLOYMENT pipeline unless using a Digicert certificate."
@@ -2920,7 +2920,7 @@ getCacertsFile() {
       if [ -f itsmrepo/pipeline/tasks/cacerts ] ; then
         SKIP_CACERTS=0
         cp -f itsmrepo/pipeline/tasks/cacerts ${CACERTS_FILENAME}
-        logMessage "Using cacerts file from ITSM_REPO."
+        logMessage "Using cacerts file from ITSM_REPO..." 1
         return
       fi
     fi
@@ -2999,7 +2999,7 @@ validateCacertsFile() {
     logMessage "${CACERTS_SOURCE} cacerts file is a valid Java keystore." 1
   fi
 
-  logMessage "Validating cacerts..."
+  logMessage "Validating cacerts..." 1
   # Convert JKS to pem
   #  ${KEYTOOL_BIN} -importkeystore -srckeystore ${CACERTS_FILENAME} -destkeystore sealstore.p12 -srcstoretype jks -deststoretype pkcs12 -srcstorepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" -deststorepass changeit > /dev/null 2>&1
   #  ${OPENSSL_BIN} pkcs12 -in sealstore.p12 -out sealstore.pem -password pass:"${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" > /dev/null 2>&1
@@ -3187,7 +3187,7 @@ checkISLicenseStatus() {
   if [ "${IS_REST_READY}" == "0" ]; then
     return
   fi
-  logMessage "Checking IS license status..."
+  logMessage "Checking IS license status..." 1
   checkISLicense
 }
 
@@ -3195,7 +3195,7 @@ checkISTenant() {
   if [ "${IS_REST_READY}" == "0" ]; then
     return
   fi
-  logMessage "Checking IS Tenant..."
+  logMessage "Checking IS Tenant..." 1
   getISTenant
   logMessage "IS tenant name: '${IS_TENANT_NAME}', domainIdentifier: '${IS_TENANT_DOMID}', virtualHostname: '${IS_TENANT_VHOSTNAME}'." 1
   return # skipping following as still under review
@@ -3590,7 +3590,7 @@ checkISDBLatency() {
     logMessage "DATABASE_HOST_NAME not set - can't test IS DB latency."
     return
   fi
-  logMessage "Attempting to test latency between cluster and IS DB server '${IS_DATABASE_HOST_NAME}'..."
+  logMessage "Attempting to test latency between cluster and IS DB server '${IS_DATABASE_HOST_NAME}'..." 1
   PING_NAMESPACE="${HP_NAMESPACE}"
   PING_SELECTOR="data=postgres"
   if [ "${MODE}" == "post-is" ]; then
@@ -3726,21 +3726,21 @@ dumpVARs() {
 
 checkJenkinsConfig() {
   [[ "${SKIP_JENKINS}" == 1 ]] && return
-    logMessage "Checking plugins..."
+    logMessage "Checking plugins..." 1
     checkJenkinsPlugins
   if isJenkinsInCluster ; then
     checkGITEAPassword
     logMessage "Jenkins is running in cluster - skipping remaining checks..."
   else
-    logMessage "Checking approved scripts..."
+    logMessage "Checking approved scripts..." 1
     checkJenkinsScriptApprovals
-    logMessage "Checking nodes..."
+    logMessage "Checking nodes..." 1
     checkJenkinsNodes
-    logMessage "Checking credentials..."
+    logMessage "Checking credentials..." 1
     validateJenkinsCredentials
-    logMessage "Checking global pipeline libraries..."
+    logMessage "Checking global pipeline libraries..." 1
     checkJenkinsGlobalLibs
-    logMessage "Checking ssh configuration..."
+    logMessage "Checking ssh configuration..." 1
     checkSSHSetup
   fi
 }
@@ -4718,7 +4718,7 @@ checkDERequirements() {
   if isJenkinsInCluster ; then
     return
   fi
-  logMessage "Checking OS binaries..."
+  logMessage "Checking OS binaries..." 1
   MISSING_BINS=()
   for i in ansible dos2unix python xmlstarlet yq; do
     if ! which "${i}" > /dev/null 2>&1; then
@@ -6026,7 +6026,7 @@ validateSSHPermissions() {
   SSH_DIR="$HOME/.ssh"
   SSH_ERROR=0
   local dir
-  logMessage "Validating directory and file permissions for SSH..."
+  logMessage "Validating directory and file permissions for SSH..." 1
 
   if [ ! -d "$SSH_DIR" ]; then
     logError "235" "SSH directory '$SSH_DIR' does not exist. Please see the product documentation for the steps to set up ssh for the git user."
@@ -9571,16 +9571,16 @@ logStatus "Checking cluster and namespaces..."
 if [ "${HP_NAMESPACE}" == "${IS_NAMESPACE}" ]; then
   logError "201" "It is recommended to install the Helix Platform and Helix IS in their own namespaces."
 fi
-logMessage "Gathering cluster information..."
+logMessage "Gathering cluster information..." 1
 checkClusterConfig
 logK8sNodeDetails
-logMessage "Gathering Helix Platform namespace information..."
+logMessage "Gathering Helix Platform namespace information..." 1
 checkHPNamespace "${HP_NAMESPACE}"
 #checkPodsForMissingProbes "${HP_NAMESPACE}"
 logPods ${HP_NAMESPACE}
 logEvents ${HP_NAMESPACE}
 if [ "${MODE}" != "post-hp" ]; then
-  logMessage "Gathering Helix IS namespace information..."
+  logMessage "Gathering Helix IS namespace information..." 1
   checkISNamespace "${IS_NAMESPACE}"
   logPods ${IS_NAMESPACE}
   logEvents ${IS_NAMESPACE}
@@ -9677,7 +9677,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260928-02"
+HITT_BUILD_VERSION="20260929-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
