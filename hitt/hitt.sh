@@ -8944,7 +8944,6 @@ getJenkinsSystemLog() {
 runJenkinsScript "${SCRIPT}"
 }
 
-# Requires
 listImageTags() {
   local host SKOPEO_JSON
   if ! which skopeo >/dev/null 2>&1; then
@@ -8959,6 +8958,28 @@ listImageTags() {
     logError "999" "Error listing repository tags: repository '${SKOPEO_IMAGE}' not found"
   else
     echo "${SKOPEO_JSON}" | ${JQ_BIN}
+  fi
+}
+
+listImageRepos() {
+  local TOKEN URL RESPONSE repo_name
+  local -a repo_names=()
+  TOKEN=$(${CURL_BIN} -s -X POST "https://hub.docker.com/v2/auth/token" \
+    -H "Content-Type: application/json" \
+    -d "{\"identifier\": \"${REPO_USER}\", \"secret\": \"${REPO_SECRET}\"}" \
+    | ${JQ_BIN} -r .access_token)
+
+  URL="https://hub.docker.com/v2/namespaces/bmchelix/repositories?page_size=100"
+
+  while [ -n "$URL" ] && [ "$URL" != "null" ]; do
+      RESPONSE=$(${CURL_BIN} -s -H "Authorization: Bearer ${TOKEN}" "${URL}")
+      while IFS= read -r repo_name; do
+        [[ -n "${repo_name}" ]] && repo_names+=("${repo_name}")
+      done < <(echo "${RESPONSE}" | ${JQ_BIN} -r '.results[].name // empty')
+      URL=$(echo "${RESPONSE}" | ${JQ_BIN} -r '.next // "null"')
+  done
+  if ((${#repo_names[@]} > 0)); then
+    printf '%s\n' "${repo_names[@]}" | sort -u
   fi
 }
 
@@ -9462,6 +9483,23 @@ if [ "${MODE}" == "utility" ]; then
       fi
       listImageTags
       ;;
+    repols)
+      if [ -f ~/.docker/config.json ]; then
+        REPOCREDS=$(${JQ_BIN} -r '.auths["https://index.docker.io/v1/"].auth // empty | select(. != null) | @base64d' ~/.docker/config.json 2>/dev/null)
+      fi
+      if [ -n "${REPOCREDS}" ]; then
+        REPO_USER="${REPOCREDS%%:*}"
+        REPO_SECRET="${REPOCREDS#*:}"
+      else
+        read -r -p "Enter your docker.io username : " REPO_USER
+        read -r -s -p "Enter your PAT : " REPO_SECRET
+        echo ""
+      fi
+      if [ -z "${REPO_USER}" ] || [ -z "${REPO_SECRET}" ]; then
+        logError "999" "Docker Hub credentials are required." 1
+      fi
+      listImageRepos
+      ;;
     sql)
       parseUtilSQL
       ;;
@@ -9677,7 +9715,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260929-01"
+HITT_BUILD_VERSION="20260930-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
