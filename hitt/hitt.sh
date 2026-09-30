@@ -933,7 +933,7 @@ setHPVersionImageTags() {
       ADE_INFRA_CLIENT_IMAGE_TAG=26201-v692-ade-infra-clients-alpine
       ;;
     26.3.01)
-      TCTL_REST_VER=1722
+      TCTL_REST_VER=1772
       ADE_INFRA_CLIENT_IMAGE_TAG=26301-v838-ade-infra-clients-alpine
       ;;
     *)
@@ -9715,7 +9715,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260930-01"
+HITT_BUILD_VERSION="20260930-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
