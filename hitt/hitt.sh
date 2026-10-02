@@ -8989,7 +8989,7 @@ enumerateHelixVersions() {
   if [ "${#HP_NS_CANDIDATES[@]}" -gt 0 ]; then
     logStatus "Helix Platform"
     for n in "${HP_NS_CANDIDATES[@]}"; do
-      HP_VERSION=$(${KUBECTL_BIN} -n "${n}" get cm helix-on-prem-config -o jsonpath='{.data.version}' | head -1)
+      HP_VERSION=$(${KUBECTL_BIN} -n "${n}" get cm helix-on-prem-config -o jsonpath='{.data.version}' 2>/dev/null | head -1)
       [[ "${n}" == "${HP_NAMESPACE}" ]] && n="${n}*"
       echo -e "${n}\t\t${HP_VERSION:-unknown}"
     done
@@ -8997,7 +8997,7 @@ enumerateHelixVersions() {
   if [ "${#IS_NS_CANDIDATES[@]}" -gt 0 ]; then
     logStatus "Helix IS"
     for n in "${IS_NS_CANDIDATES[@]}"; do
-      IS_VERSION=$(${KUBECTL_BIN} -n "${n}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' | cut -d'-' -f2)
+      IS_VERSION=$(${KUBECTL_BIN} -n "${n}" get sts platform-fts -o jsonpath='{.metadata.labels.chart}' 2>/dev/null | cut -d'-' -f2)
       [[ "${n}" == "${IS_NAMESPACE}" ]] && n="${n}*"
       echo -e "${n}\t\t${IS_VERSION:-unknown}"
     done
@@ -9005,7 +9005,7 @@ enumerateHelixVersions() {
   if [ "${#CDE_NS_CANDIDATES[@]}" -gt 0 ]; then
     logStatus "Containerized Deployment Engine"
     for n in "${CDE_NS_CANDIDATES[@]}"; do
-      CDE_VERSION=$(${KUBECTL_BIN} -n "${n}" get deployments.apps gitea -o jsonpath='{.metadata.labels.helix-de/version}')
+      CDE_VERSION=$(${KUBECTL_BIN} -n "${n}" get deployments.apps gitea -o jsonpath='{.metadata.labels.helix-de/version}' 2>/dev/null)
       [[ "${n}" == "${CDE_NAMESPACE}" ]] && n="${n}*"
       echo -e "${n}\t\t${CDE_VERSION:-unknown}"
     done
@@ -9715,7 +9715,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20260930-02"
+HITT_BUILD_VERSION="20261002-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
