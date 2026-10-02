@@ -5025,7 +5025,7 @@ hittUtilCheckCertCurlTarget() {
     logMessage "  - https://${target}/ — TLS OK with provided CA bundle." 1
     return 0
   fi
-  logError "999" "TLS verification failed for 'https://${target}/' using '${pem_file}'." 1
+  logError "999" "TLS verification failed for 'https://${target}/' using '${pem_file}'."
 }
 
 hittUtilCheckCert() {
@@ -9715,7 +9715,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261002-01"
+HITT_BUILD_VERSION="20261002-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
