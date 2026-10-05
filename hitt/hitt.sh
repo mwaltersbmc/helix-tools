@@ -7648,6 +7648,10 @@ getK8sNodePodDetails() {
   local pods_json top_pods_text stats_json TABLE_DATA pod pod_label
   local pod_ns pod_name req_cpu_milli req_mem_mi lim_cpu_milli lim_mem_mi
   local requests limits top_cpu top_mem top_cpu_milli top_mem_mi current_usage ephem_bytes ephem_display
+  local pod_count=0 sum_req_cpu_milli=0 sum_req_mem_mi=0 sum_lim_cpu_milli=0 sum_lim_mem_mi=0
+  local sum_top_cpu_milli=0 sum_top_mem_mi=0 metrics_pod_count=0
+  local sum_ephem_bytes=0 ephem_pod_count=0
+  local total_requests total_limits total_current total_ephem
   local -A pod_ephem_bytes=()
   local k8s_cpu_to_milli='if endswith("m") then (sub("m$"; "") | tonumber) else (tonumber * 1000) end'
   local k8s_qty_to_mi='if endswith("Ti") then (sub("Ti$"; "") | tonumber * 1024 * 1024) elif endswith("Gi") then (sub("Gi$"; "") | tonumber * 1024) elif endswith("G") then (sub("G$"; "") | tonumber * 953) elif endswith("Mi") then (sub("Mi$"; "") | tonumber) elif endswith("M") then (sub("M$"; "") | tonumber * 0.953) elif endswith("Ki") then (sub("Ki$"; "") | tonumber / 1024) else (tonumber / 1024 / 1024) end'
@@ -7681,6 +7685,7 @@ getK8sNodePodDetails() {
 
   TABLE_DATA=""
   TABLE_DATA+=$'POD_NAME|REQUESTS_(CPU/MEM)|LIMITS_(CPU/MEM)|CURRENT_(CPU/MEM)|EPHEMERAL_STORAGE\n'
+  TABLE_DATA+=$'|CPU/MEM|CPU/MEM|CPU/MEM|\n'
 
   while read -r pod; do
     [[ -z "${pod}" ]] && continue
@@ -7718,7 +7723,45 @@ getK8sNodePodDetails() {
     fi
 
     TABLE_DATA+="${pod_label}|${requests}|${limits}|${current_usage}|${ephem_display}"$'\n'
+    pod_count=$((pod_count + 1))
+    sum_req_cpu_milli=$((sum_req_cpu_milli + ${req_cpu_milli:-0}))
+    sum_req_mem_mi=$((sum_req_mem_mi + ${req_mem_mi:-0}))
+    sum_lim_cpu_milli=$((sum_lim_cpu_milli + ${lim_cpu_milli:-0}))
+    sum_lim_mem_mi=$((sum_lim_mem_mi + ${lim_mem_mi:-0}))
+    if [[ -n "${top_cpu}" && -n "${top_mem}" ]]; then
+      sum_top_cpu_milli=$((sum_top_cpu_milli + ${top_cpu_milli:-0}))
+      sum_top_mem_mi=$((sum_top_mem_mi + ${top_mem_mi:-0}))
+      metrics_pod_count=$((metrics_pod_count + 1))
+    fi
+    if [[ -n "${ephem_bytes}" ]]; then
+      sum_ephem_bytes=$((sum_ephem_bytes + ephem_bytes))
+      ephem_pod_count=$((ephem_pod_count + 1))
+    fi
   done < <(echo "${pods_json}" | ${JQ_BIN} -c '.items | sort_by(.metadata.namespace, .metadata.name)[]' 2>>"${HITT_ERR_FILE}")
+
+  if [[ "${pod_count}" -gt 0 ]]; then
+    total_requests="$(hittFormatCpuMilliAsCores "${sum_req_cpu_milli}")_/_$(hittFormatMemMiAsGi "${sum_req_mem_mi}")"
+    total_limits="$(hittFormatCpuMilliAsCores "${sum_lim_cpu_milli}")_/_$(hittFormatMemMiAsGi "${sum_lim_mem_mi}")"
+    if [[ "${metrics_pod_count}" -eq 0 ]]; then
+      total_current="Metrics_N/A"
+    else
+      total_current="$(hittFormatCpuMilliAsCores "${sum_top_cpu_milli}")_/_$(hittFormatMemMiAsGi "${sum_top_mem_mi}")"
+      if [[ "${metrics_pod_count}" -lt "${pod_count}" ]]; then
+        total_current="${total_current}"
+      fi
+    fi
+    if [[ "${ephem_pod_count}" -gt 0 ]]; then
+      total_ephem=$(hittFormatBytesAsGi "${sum_ephem_bytes}")
+      if [[ "${ephem_pod_count}" -lt "${pod_count}" ]]; then
+        total_ephem="${total_ephem}"
+      fi
+    elif [[ -n "${stats_json}" ]]; then
+      total_ephem="N/A"
+    else
+      total_ephem="Stats_N/A"
+    fi
+    TABLE_DATA+="TOTAL_(${pod_count}_pods)|${total_requests}|${total_limits}|${total_current}|${total_ephem}"$'\n'
+  fi
 
   K8S_NODE_POD_DETAILS_TABLE="${TABLE_DATA}"
   return 0
@@ -9716,7 +9759,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261005-01"
+HITT_BUILD_VERSION="20261005-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
