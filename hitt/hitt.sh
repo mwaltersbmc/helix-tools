@@ -7467,7 +7467,8 @@ getK8sNodeDetails() {
   OOM_PODS_DATA=""
   ephem_stats_na=0
   # Use $'\n' — in bash, "\n" inside "..." is a literal backslash+n, not a newline (echo -e expands it for display; jq does not).
-  TABLE_DATA+=$'NODE_NAME|NODE_TYPE|ALLOCATABLE_(CPU/MEM)|ALLOCATED_REQ_(CPU/MEM)|EPHEMERAL_STORAGE_(TOTAL/USED)|ACTUAL_USAGE|NODE_STATUS/CONDITIONS|PODS_(RUN/BAD/CRASH)|OOM_KILLS|CONTAINER_RUNTIME\n'
+  TABLE_DATA+=$'NODE_NAME|NODE_TYPE|ALLOCATABLE|ALLOCATED_REQ|ACTUAL_USAGE|EPHEMERAL_STORAGE|NODE_STATUS|PODS|OOM_KILLS|CONTAINER_RUNTIME\n'
+  TABLE_DATA+=$'||CPU/MEM|CPU/MEM(FREE MEM)|CPU/MEM|TOTAL/USED||RUN/BAD/CRASH||\n'
   OOM_PODS_DATA+=$'POD_NAME|CONTAINER_NAME|NAMESPACE|NODE_NAME\n'
 
   while read -r node; do
@@ -7570,7 +7571,7 @@ getK8sNodeDetails() {
       ] | .[]
     ' 2>>"${HITT_ERR_FILE}")
 
-    TABLE_DATA+="${node_name}|${node_type}|${allocatable}|${allocated}|${ephem_storage}|${actual_usage}|${node_status}|${pod_stats}|${count_oom}|${runtime}"$'\n'
+    TABLE_DATA+="${node_name}|${node_type}|${allocatable}|${allocated}|${actual_usage}|${ephem_storage}|${node_status}|${pod_stats}|${count_oom}|${runtime}"$'\n'
   done < <(echo "${nodes_json}" | ${JQ_BIN} -c '.items[]')
 
   if [[ "${ephem_stats_na}" -eq 1 ]] && [[ "${VERBOSITY}" -ge 1 ]] && [[ "${QUIET}" == "0" ]]; then
@@ -9715,7 +9716,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261002-02"
+HITT_BUILD_VERSION="20261005-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
