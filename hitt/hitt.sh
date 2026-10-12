@@ -840,6 +840,7 @@ getVersions() {
     #OS_VERSION=$(grep "^VERSION=" /etc/os-release | cut -d '=' -f2)
     logMessage "HITT running on '${OS_NAME}'."
   fi
+  [[ "${MODE}" == "jenkins" ]] && return
   HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json 2>>${HITT_ERR_FILE})
   if [ "${HP_CONFIG_MAP_JSON}" == "" ]; then
     logError "999" "Unable to read the 'helix-on-prem-config' configMap from the Helix Platform namespace - cannot continue until the Platform is installed." 1
@@ -9759,7 +9760,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261005-02"
+HITT_BUILD_VERSION="20261012-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
