@@ -3700,7 +3700,8 @@ checkISDockerLogin() {
   fi
 
   [[ "${SKIP_REGISTRY}" == "1" ]] && return
-  case "$(hittValidateRegistryCredentials "${IS_SECRET_HARBOR_REGISTRY_HOST}" "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}")" in
+  hittValidateRegistryCredentials "${IS_SECRET_HARBOR_REGISTRY_HOST}" "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}"
+  case $? in
     0)
       logMessage "IMAGE_REGISTRY credentials are valid - authenticated to '${IS_SECRET_HARBOR_REGISTRY_HOST}'." 1
       ;;
@@ -9783,7 +9784,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261013-01"
+HITT_BUILD_VERSION="20261013-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
