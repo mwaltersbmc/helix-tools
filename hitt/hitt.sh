@@ -3650,6 +3650,33 @@ EOF
   fi
 }
 
+# Validate registry username/password (curl only). Returns 0=ok, 1=auth failed, 2=unreachable.
+hittValidateRegistryCredentials() {
+  local registry_ref="$1" user="$2" pass="$3"
+  local api_host api_host_lc http_code
+
+  registry_ref="${registry_ref#https://}"
+  registry_ref="${registry_ref#http://}"
+  registry_ref="${registry_ref%/}"
+  api_host="${registry_ref%%/*}"
+  api_host_lc=$(printf '%s' "${api_host}" | tr '[:upper:]' '[:lower:]')
+
+  if [[ "${api_host_lc}" == "docker.io" || "${api_host_lc}" == "index.docker.io" || "${api_host_lc}" == "registry-1.docker.io" ]]; then
+    http_code=$(${CURL_BIN} -sk -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 \
+      -H "Content-Type: application/json" \
+      -d "$(${JQ_BIN} -n --arg u "${user}" --arg p "${pass}" '{username:$u,password:$p}')" \
+      "https://hub.docker.com/v2/users/login/")
+  else
+    http_code=$(${CURL_BIN} -sk -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 \
+      -u "${user}:${pass}" \
+      "https://${api_host}/v2/")
+  fi
+
+  [[ "${http_code}" == "200" ]] && return 0
+  [[ "${http_code}" == "401" ]] && return 1
+  return 2
+}
+
 checkISDockerLogin() {
   SKIP_REGISTRY=0
   IS_HARBOR_REGISTRY_HOSTNAME=$(echo "${IS_HARBOR_REGISTRY_HOST%%/*}")
@@ -3672,22 +3699,18 @@ checkISDockerLogin() {
     fi
   fi
 
-  if ! docker ps > /dev/null 2>&1; then
-    if ! which docker > /dev/null 2>&1 ; then
-      LOG_MSG="'docker' command not found in path"
-    else
-      LOG_MSG="'docker ps' command returned an error"
-    fi
-    logWarning "022" "${LOG_MSG} - skipping registry credentials check."
-    SKIP_REGISTRY=1
-  fi
-
   [[ "${SKIP_REGISTRY}" == "1" ]] && return
-  if docker login "${IS_SECRET_HARBOR_REGISTRY_HOST}" -u "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" -p "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}" > /dev/null 2>&1 ; then
-    logMessage "IMAGE_REGISTRY credentials are valid - docker login to '${IS_SECRET_HARBOR_REGISTRY_HOST}' was successful." 1
-  else
-    logError "192" "'docker login' to '${IS_SECRET_HARBOR_REGISTRY_HOST}' failed - please check credentials."
-  fi
+  case "$(hittValidateRegistryCredentials "${IS_SECRET_HARBOR_REGISTRY_HOST}" "${IS_SECRET_IMAGE_REGISTRY_USERNAME}" "${IS_SECRET_IMAGE_REGISTRY_PASSWORD}")" in
+    0)
+      logMessage "IMAGE_REGISTRY credentials are valid - authenticated to '${IS_SECRET_HARBOR_REGISTRY_HOST}'." 1
+      ;;
+    1)
+      logError "192" "Registry authentication failed for '${IS_SECRET_HARBOR_REGISTRY_HOST}' - please check credentials in IMAGESECRET_NAME."
+      ;;
+    *)
+      logError "192" "Unable to reach registry '${IS_SECRET_HARBOR_REGISTRY_HOST}' - check network, TLS, and host name."
+      ;;
+  esac
 }
 
 dumpVARs() {
@@ -9760,7 +9783,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261012-01"
+HITT_BUILD_VERSION="20261013-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -10772,7 +10795,7 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
   },
   {
     "id": "192",
-    "cause": "The HITT script attempted a 'docker login' to the registry server using the credentials in the IMAGESECRET_NAME secret but failed.",
+    "cause": "HITT could not authenticate to the registry server using the credentials in the IMAGESECRET_NAME secret (curl check).",
     "impact": "Helix Service Management deployment may fail if the credentials are invalid.",
     "remediation": "Verify the credentials in the IMAGESECRET_NAME secret in the Helix Service Management namespace. This is expected if the registry server is not accessible from this system."
   },
