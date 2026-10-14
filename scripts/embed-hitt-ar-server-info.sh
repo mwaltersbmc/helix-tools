@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Embed AR server info JSON into hitt/hitt.sh as AR_SERVER_INFO_JSON (heredoc).
 #
-# Usage:
-#   pwsh -File scripts/gen-ar-server-info-json.ps1 | bash scripts/embed-hitt-ar-server-info.sh
-#   bash scripts/embed-hitt-ar-server-info.sh path/to.json
-#   bash scripts/embed-hitt-ar-server-info.sh --check   # reads JSON from stdin
+# Usage (run scripts by path from any cwd; JSON paths relative to repo root):
+#   pwsh -File .../helix-tools/scripts/gen-ar-server-info-json.ps1 -OutPath ar-server-info.json
+#   bash .../helix-tools/scripts/embed-hitt-ar-server-info.sh ar-server-info.json
+#   python .../helix-tools/scripts/gen-ar-server-info-json.py -o ar-server-info.json
+#   bash .../helix-tools/scripts/embed-hitt-ar-server-info.sh --check   # JSON on stdin
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,11 +31,15 @@ fi
 }
 
 if [[ -n "${1:-}" ]]; then
-  [[ -f "${1}" ]] || {
-    echo "embed-hitt-ar-server-info: missing ${1}" >&2
+  json_file="${1}"
+  if [[ "${json_file}" != /* && ! "${json_file}" =~ ^[A-Za-z]:[/\\] ]]; then
+    json_file="${ROOT}/${json_file}"
+  fi
+  [[ -f "${json_file}" ]] || {
+    echo "embed-hitt-ar-server-info: missing ${json_file}" >&2
     exit 1
   }
-  JSON_INPUT="$(<"${1}")"
+  JSON_INPUT="$(<"${json_file}")"
 elif [[ ! -t 0 ]]; then
   JSON_INPUT="$(cat)"
 else
@@ -108,7 +113,7 @@ if [[ "${CHECK_ONLY}" == "1" ]]; then
   fi
   extract_embed_block "${HITT_SH}" "${current_block}"
   if ! diff -u "${current_block}" "${block_file}"; then
-    echo "embed-hitt-ar-server-info: embedded AR server info is out of date. Run: pwsh -File scripts/gen-ar-server-info-json.ps1 | bash scripts/embed-hitt-ar-server-info.sh" >&2
+    echo "embed-hitt-ar-server-info: embedded AR server info is out of date. From repo root: pwsh -File scripts/gen-ar-server-info-json.ps1 -OutPath ar-server-info.json && bash scripts/embed-hitt-ar-server-info.sh ar-server-info.json" >&2
     exit 1
   fi
   exit 0
