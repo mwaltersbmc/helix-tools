@@ -9082,7 +9082,9 @@ enumerateHelixVersions() {
   if [ "${#HL_NS_CANDIDATES[@]}" -gt 0 ]; then
     logStatus "Helix Logging"
     for n in "${HL_NS_CANDIDATES[@]}"; do
-      echo -e "${n}"
+      HL_VERSION=$(${KUBECTL_BIN} -n "${n}" get ds efk-fluent-bit -o json | ${JQ_BIN} -r '.spec.template.spec.containers[0].image | split(":")[1] | split("-")[0]')
+      [[ "${n}" == "${HELIX_LOGGING_NAMESPACE}" ]] && n="${n}*"
+      echo -e "${n}\t\t${HL_VERSION:-unknown}"
     done
   fi
 }
@@ -9784,7 +9786,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261013-02"
+HITT_BUILD_VERSION="20261014-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -15849,6 +15851,14 @@ read -r -d '' AR_SERVER_INFO_JSON <<'AR_SERVER_INFO_JSON_EOF' || true
   {
     "name": "AR_SERVER_INFO_MAX_INCOMING_EMAIL_PLAIN_TEXT_BODY_SIZE_IN_MB",
     "id": 1082
+  },
+  {
+    "name": "AR_SERVER_INFO_NUM_ZDT_SNAPSHOT_THREADS",
+    "id": 1083
+  },
+  {
+    "name": "AR_SERVER_INFO_TELEMETRY_HTTP_CLIENT_READ_TIMEOUT",
+    "id": 1084
   }
 ]
 AR_SERVER_INFO_JSON_EOF
