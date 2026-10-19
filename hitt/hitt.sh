@@ -302,30 +302,7 @@ stopOnError() {
 }
 
 usage() {
-    echo ""
-    echo -e "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
-    echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|upgrade-is|post-is|jenkins>${NORMAL}"
-    echo ""
-    echo "Examples:"
-    echo "bash $0 -m post-hp     - run post HP installation only checks"
-    echo "OR"
-    echo "bash $0 -m pre-is      - run pre-installation checks"
-    echo "OR"
-    echo "bash $0 -m upgrade-is  - run pre-upgrade pipeline validation checks"
-    echo "OR"
-    echo "bash $0 -m post-is     - run post-installation checks"
-    echo "OR"
-    echo "bash $0 -m jenkins     - run Jenkins configuration checks"
-    echo ""
-    echo -e "Use ${BOLD}post-hp${NORMAL} after successfully installing the Helix Platform but before using Jenkins."
-    echo -e "Use ${BOLD}pre-is${NORMAL} after successfully running the HELIX_GENERATE_CONFIG pipeline but before starting deployment of Helix IS."
-    echo -e "Use ${BOLD}upgrade-is${NORMAL} to validate HELIX_ONPREM_DEPLOYMENT pipeline values before upgrading, when Helix IS is already deployed and running."
-    echo -e "Use ${BOLD}post-is${NORMAL} for troubleshooting after IS deployment."
-    echo -e "Use ${BOLD}jenkins${NORMAL} to validate Jenkins config - nodes, credentials, libraries etc."
-    echo
-    echo -e "${BOLD}Interactive help page with HITT use-cases available at https://bit.ly/hitthelp${NORMAL}"
-    echo -e "Or run: ${BOLD}bash $0 -h usecases${NORMAL}"
-    echo
+    showGeneralHelp
     exit 1
 }
 
@@ -4688,7 +4665,8 @@ showMessageById() {
 
 isHittActionRun() {
   [[ -n "${MODE}" || -n "${FIXOPTS}" || -n "${UTILOPTS}" || -n "${PIPELINEOPTS}" \
-     || -n "${TCTL_CMD}" || -n "${BUNDLE_ID}" || -n "${PIPELINE_NAME}" || -n "${DUMP_JCREDS}" ]]
+     || -n "${TCTL_CMD}" || -n "${BUNDLE_ID}" || -n "${PIPELINE_NAME}" || -n "${DUMP_JCREDS}" \
+     || -n "${IMAGEMGR_OPTS}" ]]
 }
 
 logMessageDetails() {
@@ -6382,6 +6360,39 @@ showConsoleLogHelp() { # -o console log options help
     "
 }
 
+showImageMgrHelp() { # image manager / registry mode (-r)
+  echo "HITT image manager (registry sync/pull/push) - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-imagemgr-mode.md"
+  echo .
+  echo 'Usage: bash hitt.sh -r "<action> [options]"'
+  echo "The first token is the action; remaining tokens are imagemgr flags (-f, -i, -t, -s, -n, -p, -k)."
+  echo "Enclose the full -r value in double quotes (same as -f, -u, -k)."
+  echo -e "
+    \tActions:
+    \tsync \t\t| Pull from source registry, tag for target, push, delete local copy.
+    \tpull \t\t| Pull images and keep them in local container storage.
+    \tpush \t\t| Tag and push images already present locally to the target registry.
+    \tsave \t\t| Pull and save as gzip tar files in the current directory.
+    \tload \t\t| Load tar files from disk, tag, and push to the target registry.
+    \tverify \t\t| Check that an image exists in the registry (-t optional).
+    \tcompare \t| Compare image checksums between source and target.
+    \tOptions (after the action):
+    \t-f FILE \t| Image list file (one reference per line; # comments allowed).
+    \t-i IMAGE \t| Single image reference (e.g. docker.io/bmchelix/ars:26101-RTM).
+    \t-t REGISTRY \t| Target registry host/path (required for sync, push, load, compare).
+    \t-s REGISTRY \t| Source registry prefix for lines in -f (not used with -i).
+    \t-n N \t\t| Parallel operations (default 2).
+    \t-p old:new \t| Project path substitution (e.g. bmchelix:customer).
+    \t-k \t\t| Skip registry login (already logged in).
+    \thelp \t\t| Show this list.
+    "
+  echo "Examples:"
+  echo '  bash hitt.sh -r "sync -f images.txt -t myregistry.example.com/myproject"'
+  echo '  bash hitt.sh -r "pull -f helix-images.txt -k"'
+  echo '  bash hitt.sh -r "verify -i docker.io/bmchelix/ars:26101-RTM -t myregistry.example.com/proj"'
+  echo
+  echo "Progress is written to results.txt; errors to errors.txt."
+}
+
 showPipelineHelp() { # pipeline mode help
   echo "HITT pipeline mode options - see https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-pipeline-mode.md"
   echo .
@@ -6674,6 +6685,9 @@ showGeneralHelp() {
   echo ""
   echo -e "${BOLD}Helix IS Triage Tool (HITT)${NORMAL}"
   echo -e "${BOLD}Usage: bash $0 -m <post-hp|pre-is|upgrade-is|post-is|jenkins>${NORMAL}"
+  echo -e "or single-purpose modes - see help below."
+  echo -e "${BOLD}Single-purpose modes:${NORMAL} -f (fix), -i (info), -u (utility), -k (pipeline), -o (logs), -r (image manager), -t (tctl)"
+  echo "  Multi-word options must be double-quoted (e.g. bash $0 -r \"sync -f images.txt -t my.registry/proj\")"
   echo ""
   echo "Examples:"
   echo "bash $0 -m post-hp     - run post HP installation only checks"
@@ -6695,6 +6709,7 @@ showGeneralHelp() {
   echo "  bash $0 -h pipeline    - pipeline mode options (-k)"
   echo "  bash $0 -h consolelog  - Deployment Engine log options (-o)"
   echo "  bash $0 -h tctl        - tctl mode options (-t)"
+  echo "  bash $0 -h imagemgr    - image manager / registry options (-r)"
   echo "  bash $0 -h override    - config override options"
   echo "  bash $0 -h usecases    - interactive use-case menu"
   echo
@@ -6726,6 +6741,9 @@ showHittHelp() {
     tctl)
       showTctlHelp
       ;;
+    image|imagemgr|registry)
+      showImageMgrHelp
+      ;;
     override)
       showOverrideHelp
       ;;
@@ -6733,7 +6751,7 @@ showHittHelp() {
       hittUseCasesInteractive
       ;;
     *)
-      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, consolelog, tctl, override, usecases)."
+      echo -e "${BOLD}ERROR:${NORMAL} Unknown help topic '${1}' (try: fix, info, utility, pipeline, consolelog, tctl, imagemgr, override, usecases)."
       showGeneralHelp
       exit 1
       ;;
@@ -9229,9 +9247,595 @@ checkForAirGappedCluster() {
     logWarning "999" "Could not determine cluster air-gap status."
   fi
 }
+
+runImageMgr() {
+  TARGET_REGISTRY=""
+  SOURCE_REGISTRY=""
+  NUM_ACTIONS=2
+  IMAGE_FILE=""
+  IMAGE_NAME=""
+  IMAGE_ARRAY=()
+  declare -A REGISTRY_ARRAY
+  DISK_REQUIRED=10
+  SKIP_LOGIN=F
+  PROJECT=""
+  PROJECT_SOURCE=""
+  PROJECT_TARGET=""
+  CURRENT_JOBS=0
+  COUNT=0
+  FAILED=0
+  CONTAINER_STORAGE_DIR=""
+  OPTIND=1
+  ACTION=""
+  CONTAINER_ENGINE=""
+
+  local payload="${1:-${IMAGEMGR_OPTS}}"
+  local -a img_argv=()
+  # Word-split (same limitation as FIX/UTIL: paths with spaces need care)
+  read -r -a img_argv <<< "${payload}"
+  # HITT style: first word is the action (no -a)
+  if [[ ${#img_argv[@]} -gt 0 ]]; then
+    case "${img_argv[0]}" in
+      sync|pull|push|save|load|verify|compare)
+        set -- -a "${img_argv[0]}" "${img_argv[@]:1}"
+        ;;
+      *)
+        set -- "${img_argv[@]}"   # allow "-a sync ..." if you want
+        ;;
+    esac
+  else
+    set --
+  fi
+
+  while getopts "a:f:i:n:p:s:t:k" options; do
+    case "${options}" in
+      a)
+        ACTION=${OPTARG}
+        ;;
+      f)
+        IMAGE_FILE=${OPTARG}
+        ;;
+      i)
+        IMAGE_NAME=${OPTARG}
+        ;;
+      n)
+        NUM_ACTIONS=${OPTARG}
+        ;;
+      p)
+        PROJECT=${OPTARG}
+        ;;
+      s)
+        SOURCE_REGISTRY=${OPTARG}
+        ;;
+      t)
+        TARGET_REGISTRY=${OPTARG}
+        ;;
+      k)
+        SKIP_LOGIN=T
+        ;;
+      :)
+        imgr_usage
+        ;;
+      *)
+        imgr_usage
+        ;;
+    esac
+  done
+
+  # Validate action
+  [[ "${ACTION}" =~ ^sync$|^pull$|^save$|^push$|^load$|^verify$|^compare$ ]] || imgr_usage
+  imgr_check_tools
+  parseImgMgr
+}
+
+parseImgMgr() {
+  local TARGET_REGISTRY_HOST=""
+  local line IMAGE
+
+  if [[ ${ACTION} == "sync" || ${ACTION} == "push" || ${ACTION} == "load" || ${ACTION} == "compare" ]]; then
+    if [[ -z ${TARGET_REGISTRY} ]]; then
+      echo "TARGET_REGISTRY must be set for sync/push/load/compare actions."
+      exit 1
+    fi
+  fi
+
+  if [[ -z ${IMAGE_FILE} && -z ${IMAGE_NAME} ]]; then
+    echo "Either -f image-file or -i image-name must be provided."
+    exit 1
+  fi
+
+  if [[ -n ${IMAGE_FILE} && -n ${IMAGE_NAME} ]]; then
+    echo "Use -f image-file or -i image-name, not both."
+    exit 1
+  fi
+
+  if [[ -n ${IMAGE_FILE} && ! -f ${IMAGE_FILE} ]]; then
+    echo "Image file '${IMAGE_FILE}' not found.  Please check the name and try again."
+    exit 1
+  fi
+
+  if [[ -n ${IMAGE_NAME} && -n ${SOURCE_REGISTRY} ]]; then
+    echo "Source registry (-s) not valid with image name (-i)."
+    exit 1
+  fi
+
+  if [[ -n "${PROJECT}" ]]; then
+    if [[ ! "${PROJECT}" =~ ^([^:]+):([^:]+)$ ]]; then
+      echo "Project substitution string (-p ${PROJECT}) must be in 'currentproject:newproject' format."
+      exit 1
+    fi
+    PROJECT_SOURCE="${BASH_REMATCH[1]}"
+    PROJECT_TARGET="${BASH_REMATCH[2]}"
+  fi
+
+  if [[ -n ${IMAGE_FILE} ]]; then
+    dos2unix -q "${IMAGE_FILE}"
+    echo "Processing ${IMAGE_FILE}" | tee -a results.txt
+    while IFS= read -r line || [ -n "${line}" ]; do
+      IMAGE=""
+      if [[ -z "${SOURCE_REGISTRY}" ]]; then
+        IMAGE="${line}"
+      else
+        IMAGE="${SOURCE_REGISTRY}/${line#*/}"
+      fi
+      REGISTRY_ARRAY["$(registry_host "${IMAGE}")"]=1
+      IMAGE_ARRAY+=($(echo "${IMAGE}" | tr -d '[:space:]'))
+    done < <(grep -v '^#' "${IMAGE_FILE}" | sed '/^[[:space:]]*$/d')
+    echo "${#IMAGE_ARRAY[@]} image(s) to process." | tee -a results.txt
+  fi
+
+  if [[ -n ${IMAGE_NAME} ]]; then
+    IMAGE_ARRAY=("${IMAGE_NAME}")
+    REGISTRY_ARRAY["$(registry_host "${IMAGE_NAME}")"]=1
+  fi
+
+  [[ -n "${TARGET_REGISTRY}" ]] && TARGET_REGISTRY_HOST="$(registry_host "${TARGET_REGISTRY}")"
+  [[ -n "${TARGET_REGISTRY_HOST}" ]] && REGISTRY_ARRAY["${TARGET_REGISTRY_HOST}"]=1
+  for registry in "${!REGISTRY_ARRAY[@]}"; do
+    [[ -n "${TARGET_REGISTRY_HOST}" && "${registry}" == "${TARGET_REGISTRY_HOST}" ]] && continue
+    registry_login "${registry}"
+  done
+  [[ -n "${TARGET_REGISTRY_HOST}" ]] && registry_login "${TARGET_REGISTRY_HOST}"
+
+  for SOURCE_IMAGE in "${IMAGE_ARRAY[@]}"; do
+    while (( CURRENT_JOBS >= NUM_ACTIONS )); do
+      if ! wait -n; then
+        ((FAILED++))
+      fi
+      ((CURRENT_JOBS--))
+    done
+    if [[ -n "${PROJECT}" ]] && [[ ! "${SOURCE_IMAGE}" == *"/${PROJECT_SOURCE}/"* ]]; then
+      log_error "${ACTION}" "'${SOURCE_IMAGE}' does not include '/${PROJECT_SOURCE}/'."
+      continue
+    fi
+    ((COUNT++))
+    process_image "${SOURCE_IMAGE}" &
+    ((CURRENT_JOBS++))
+  done
+  while (( CURRENT_JOBS > 0 )); do
+    if ! wait -n; then
+      ((FAILED++))
+    fi
+    ((CURRENT_JOBS--))
+  done
+  if (( FAILED > 0 )); then
+    echo "Finished processing images with ${FAILED} failure(s)."
+    exit 1
+  fi
+  echo "Finished processing images."
+}
+
+log_error(){
+  printf "${RED}%03d${NORMAL} - Failed to ${1} ${2}\n" ${COUNT} | tee -a errors.txt
+}
+
+log_result(){
+  printf "${2}%03d${NORMAL} - ${1}\n" ${COUNT} | tee -a results.txt
+}
+
+log_missing() {
+  echo "${1}" >> missing.txt
+}
+
+imgr_usage() {
+  echo "Usage: bash $0 -r \"<sync|pull|push|save|load|verify|compare> [-f image-file|-i image-name] [options]\""
+  echo "The first word is the action. Enclose the full -r value in double quotes."
+  echo "Example: bash $0 -r \"sync -f images.txt -t myregistry.example.com/myproject\""
+  echo "Run: bash $0 -h imagemgr"
+  exit 1
+}
+
+imgr_check_tools() {
+  local -a missing=()
+  local jq_bin="${JQ_BIN:-jq}"
+
+  detect_container_engine
+  if [[ -z "${CONTAINER_ENGINE}" ]] || ! command -v "${CONTAINER_ENGINE}" >/dev/null 2>&1; then
+    missing+=("docker or podman")
+  fi
+  if [[ -n "${IMAGE_FILE}" ]] && ! command -v dos2unix >/dev/null 2>&1; then
+    missing+=("dos2unix")
+  fi
+  if [[ "${ACTION}" == "compare" ]] && ! command -v "${jq_bin}" >/dev/null 2>&1; then
+    missing+=("jq")
+  fi
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    logError "999" "Image manager mode requires command-line tools: ${missing[*]}. Please install them and try again." 1
+  fi
+}
+
+is_podman_docker() {
+  if command -v docker >/dev/null 2>&1 && command docker --version 2>/dev/null | grep -qi podman; then
+    return 0
+  fi
+  if command -v docker >/dev/null 2>&1 && command docker info 2>/dev/null | grep -qi podman; then
+    return 0
+  fi
+  return 1
+}
+
+detect_container_engine() {
+  [[ -n "${CONTAINER_ENGINE}" ]] && return
+  if is_podman_docker && command -v podman >/dev/null 2>&1; then
+    CONTAINER_ENGINE=podman
+  elif command -v docker >/dev/null 2>&1; then
+    CONTAINER_ENGINE=docker
+  elif command -v podman >/dev/null 2>&1; then
+    CONTAINER_ENGINE=podman
+  fi
+  if [[ -z "${CONTAINER_ENGINE}" ]]; then
+    return
+  fi
+  CONTAINER_STORAGE_DIR=$(get_container_storage_dir) || true
+  if [[ -z "${CONTAINER_STORAGE_DIR}" ]]; then
+    logError "999" "Unable to determine container storage directory from docker/podman info." 1
+  fi
+}
+
+# Return registry host[:port] from a full image ref or registry/project prefix.
+# Uses Docker-style heuristics: namespace/repo refs (no hostname) => docker.io.
+registry_host() {
+  local ref="${1}"
+  local hostname
+
+  ref="${ref%%@*}"
+  if [[ "${ref}" != */* ]]; then
+    echo "docker.io"
+    return
+  fi
+  if [[ "${ref}" == */*:* ]]; then
+    ref="${ref%:*}"
+  fi
+  hostname="${ref%%/*}"
+  if [[ "${hostname}" == *.* ]] || [[ "${hostname}" == *:* ]] || [[ "${hostname}" == "localhost" ]]; then
+    echo "${hostname}"
+  else
+    echo "docker.io"
+  fi
+}
+
+is_docker_hub_registry() {
+  local registry="${1}"
+
+  registry="${registry%%/*}"
+  registry="${registry,,}"
+  case "${registry}" in
+    docker.io|index.docker.io|registry-1.docker.io) return 0 ;;
+  esac
+  return 1
+}
+
+imgr_login_password() {
+  local registry="${1}"
+  local user="${2}"
+  local pass="${3}"
+
+  echo "${pass}" | ${CONTAINER_ENGINE} login -u "${user}" --password-stdin "${registry}"
+}
+
+imgr_login_interactive_user() {
+  local registry="${1}"
+  local user="${2}"
+
+  ${CONTAINER_ENGINE} login -u "${user}" "${registry}"
+}
+
+imgr_login_docker_hub() {
+  local registry="${1}"
+  local user="${IMAGEMGR_DOCKERIO_USER:-${IMAGEMGR_REGISTRY_USER:-}}"
+  local pass="${IMAGEMGR_DOCKERIO_PASS:-${IMAGEMGR_REGISTRY_PASS:-}}"
+
+  if [[ -n "${user}" && -n "${pass}" ]]; then
+    imgr_login_password "${registry}" "${user}" "${pass}"
+    return
+  fi
+
+  if [[ -n "${user}" ]]; then
+    imgr_login_interactive_user "${registry}" "${user}"
+    return
+  fi
+
+  if [[ -t 0 ]]; then
+    read -rp "Docker Hub username: " user
+    imgr_login_interactive_user "${registry}" "${user}"
+    return
+  fi
+
+  echo "Docker Hub login requires a username to avoid web-based login."
+  echo "Set IMAGEMGR_DOCKERIO_USER and IMAGEMGR_DOCKERIO_PASS (or IMAGEMGR_REGISTRY_USER/PASS)."
+  return 1
+}
+
+registry_login() {
+  local registry="${1}"
+
+  [[ "${SKIP_LOGIN}" == "T" ]] && return
+  registry="$(registry_host "${registry}")"
+  echo "Validating login to ${registry}"
+
+  if is_docker_hub_registry "${registry}"; then
+    if ! imgr_login_docker_hub "${registry}"; then
+      echo "Failed to login to registry server '${registry}' - check credentials."
+      exit 1
+    fi
+    return
+  fi
+
+  if [[ -n "${IMAGEMGR_REGISTRY_USER:-}" && -n "${IMAGEMGR_REGISTRY_PASS:-}" ]]; then
+    if ! imgr_login_password "${registry}" "${IMAGEMGR_REGISTRY_USER}" "${IMAGEMGR_REGISTRY_PASS}"; then
+      echo "Failed to login to registry server '${registry}' - check credentials."
+      exit 1
+    fi
+    return
+  fi
+
+  if ! ${CONTAINER_ENGINE} login "${registry}"; then
+    echo "Failed to login to registry server '${registry}' - check credentials."
+    exit 1
+  fi
+}
+
+# Resolve container image store (Docker or Podman via docker alias).
+get_container_storage_dir() {
+  local dir=""
+
+  dir=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)
+  if [[ -n "${dir}" && "${dir}" != "<no value>" ]]; then
+    echo "${dir}"
+    return 0
+  fi
+
+  dir=$(docker info --format '{{.Store.GraphRoot}}' 2>/dev/null)
+  if [[ -n "${dir}" && "${dir}" != "<no value>" ]]; then
+    echo "${dir}"
+    return 0
+  fi
+
+  if command -v podman >/dev/null 2>&1; then
+    dir=$(podman info --format '{{.Store.GraphRoot}}' 2>/dev/null)
+    if [[ -n "${dir}" && "${dir}" != "<no value>" ]]; then
+      echo "${dir}"
+      return 0
+    fi
+  fi
+
+  for dir in /var/lib/docker /var/lib/containers/storage "${HOME}/.local/share/containers/storage"; do
+    if [[ -d "${dir}" ]]; then
+      echo "${dir}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# Returns available space in whole GB for path, or empty on failure.
+get_disk_avail_gb() {
+  local path="$1"
+  local avail_kb=""
+
+  # GNU df: --output=avail (cannot combine with -P)
+  if avail_kb=$(df -k --output=avail "${path}" 2>/dev/null | awk 'NR==2 {print $1; exit}'); then
+    if [[ -n "${avail_kb}" && "${avail_kb}" =~ ^[0-9]+$ ]]; then
+      awk -v kb="${avail_kb}" 'BEGIN {printf "%.0f\n", kb/1024/1024}'
+      return 0
+    fi
+  fi
+
+  # POSIX df -kP: Available is column 4
+  avail_kb=$(df -kP "${path}" 2>/dev/null | awk 'NR==2 {print $4; exit}')
+  if [[ -n "${avail_kb}" && "${avail_kb}" =~ ^[0-9]+$ ]]; then
+    awk -v kb="${avail_kb}" 'BEGIN {printf "%.0f\n", kb/1024/1024}'
+    return 0
+  fi
+
+  return 1
+}
+
+check_disk_space() {
+  local target="${1}"
+  local check_path="${target}"
+  local parent=""
+  local disk_avail=""
+
+  if [[ -z "${target}" ]]; then
+    echo "Unable to determine container storage path for disk space check."
+    exit 1
+  fi
+
+  while [[ ! -e "${check_path}" ]]; do
+    parent=$(dirname "${check_path}")
+    if [[ "${parent}" == "${check_path}" ]]; then
+      echo "Storage path '${target}' does not exist and could not be resolved."
+      exit 1
+    fi
+    check_path="${parent}"
+  done
+
+  disk_avail=$(get_disk_avail_gb "${check_path}") || true
+  if [[ -z "${disk_avail}" || ! "${disk_avail}" =~ ^[0-9]+$ ]]; then
+    echo "Unable to check free disk space for ${target}"
+    exit 1
+  fi
+
+  if (( disk_avail < DISK_REQUIRED )); then
+    echo "Not enough free disk space in ${target}"
+    echo "${DISK_REQUIRED}GB required / ${disk_avail}GB available"
+    exit 1
+  fi
+}
+
+process_image(){
+  IMAGE_FILENAME=$(URLEncode "${SOURCE_IMAGE}")
+  TARGET_IMAGE="${TARGET_REGISTRY}/${SOURCE_IMAGE#*/}"
+  if [ "${PROJECT}" != "" ]; then
+    TARGET_IMAGE=$(echo "${TARGET_IMAGE}" | sed "s,/${PROJECT_SOURCE}/,/${PROJECT_TARGET}/,g")
+  fi
+
+  case ${ACTION} in
+    sync)
+      pull_image
+      tag_image
+      push_image
+      delete_image "${SOURCE_IMAGE}"
+      delete_image "${TARGET_IMAGE}"
+      ;;
+    pull)
+      pull_image
+      ;;
+    push)
+      tag_image
+      push_image
+      ;;
+    save)
+      pull_image
+      save_image
+      delete_image "${SOURCE_IMAGE}"
+      ;;
+    load)
+      load_image
+      tag_image
+      push_image
+      delete_image "${SOURCE_IMAGE}"
+      delete_image "${TARGET_IMAGE}"
+      ;;
+    verify)
+      if [ -z "$TARGET_REGISTRY" ]; then
+        verify_image "${SOURCE_IMAGE}"
+      else
+        verify_image "${TARGET_IMAGE}" "${SOURCE_IMAGE}"
+      fi
+      ;;
+    compare)
+      compare_images
+      ;;
+  esac
+}
+
+pull_image() {
+  check_disk_space "${CONTAINER_STORAGE_DIR}"
+  log_result "Pulling ${SOURCE_IMAGE}" ${YELLOW}
+  if ! ${CONTAINER_ENGINE} pull -q "${SOURCE_IMAGE}" > /dev/null; then
+    log_error "pull" "${SOURCE_IMAGE}"
+    exit 1
+  fi
+}
+
+tag_image() {
+  log_result "Tagging ${SOURCE_IMAGE} as ${TARGET_IMAGE}" ${BLUE}
+  if ! ${CONTAINER_ENGINE} tag "${SOURCE_IMAGE}" "${TARGET_IMAGE}"; then
+    log_error "tag" "${SOURCE_IMAGE}"
+    exit 1
+  fi
+}
+
+push_image() {
+  log_result "Pushing ${TARGET_IMAGE}" ${PURPLE}
+  if ! ${CONTAINER_ENGINE} push -q "${TARGET_IMAGE}" > /dev/null; then
+    log_error "push" "${TARGET_IMAGE}"
+    exit 1
+  fi
+}
+
+save_image() {
+  check_disk_space "$(pwd)"
+  log_result "Saving ${SOURCE_IMAGE}" ${YELLOW}
+  if ! ${CONTAINER_ENGINE} save "${SOURCE_IMAGE}" | gzip > "${IMAGE_FILENAME}" ; then
+    log_error "save" "${SOURCE_IMAGE}"
+    exit 1
+  fi
+}
+
+load_image() {
+  log_result "Loading ${SOURCE_IMAGE}" ${YELLOW}
+  if ! ${CONTAINER_ENGINE} load < "${IMAGE_FILENAME}" > /dev/null; then
+    log_error "load" "${SOURCE_IMAGE}"
+    exit 1
+  fi
+}
+
+delete_image() {
+  log_result "Deleting local image ${1}" ${YELLOW}
+  if ! ${CONTAINER_ENGINE} rmi "${1}" >/dev/null; then
+    log_error "delete" "${1}"
+    exit 1
+  fi
+  log_result "Deleted ${1} from the local system." ${GREEN}
+}
+
+verify_image() {
+  log_result "Verifying image ${1}" ${YELLOW}
+  if ! ${CONTAINER_ENGINE} manifest inspect "${1}" >/dev/null; then
+    log_error "verify" "${1}"
+    log_missing "${1}"
+    exit 1
+  fi
+  log_result "Image ${1} found." ${GREEN}
+}
+
+# Returns linux/amd64 config or manifest digest for compare, or empty on failure.
+image_amd64_digest() {
+  local image="$1"
+  local manifest
+
+  manifest=$(${CONTAINER_ENGINE} manifest inspect "${image}" 2>/dev/null) || return 1
+
+  ${JQ_BIN} -r '
+    if .manifests then
+      (.manifests[]
+        | select(.platform.os == "linux" and .platform.architecture == "amd64")
+        | .digest) // empty
+    else
+      .config.digest // empty
+    end
+  ' <<< "${manifest}"
+}
+
+compare_images() {
+  log_result "Comparing images ${SOURCE_IMAGE} / ${TARGET_IMAGE}" ${YELLOW}
+  SOURCE_DIGEST=$(image_amd64_digest "${SOURCE_IMAGE}")
+  if [[ -z "${SOURCE_DIGEST}" ]]; then
+    log_error "find" "${SOURCE_IMAGE}"
+    exit 1
+  fi
+
+  TARGET_DIGEST=$(image_amd64_digest "${TARGET_IMAGE}")
+  if [[ -z "${TARGET_DIGEST}" ]]; then
+    log_error "find" "${TARGET_IMAGE}"
+    exit 1
+  fi
+
+  if [[ "${SOURCE_DIGEST}" != "${TARGET_DIGEST}" ]]; then
+    log_error "compare" "${TARGET_IMAGE}"
+    exit 1
+  else
+    log_result "Images ${SOURCE_IMAGE} and ${TARGET_IMAGE} match (linux/amd64)." ${GREEN}
+  fi
+}
+
 #End functions
 
-# MAIN Start
+#MAIN Start
 main() {
 
 NOW=$(date)
@@ -9786,7 +10390,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261014-01"
+HITT_BUILD_VERSION="20261019-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -9832,6 +10436,8 @@ NORMAL=$'\e[0m'
 RED=$'\e[31m'
 YELLOW=$'\e[33m'
 GREEN=$'\e[32m'
+BLUE=$'\e[34m'
+PURPLE=$'\e[35m'
 HITT_TCTL_POD=hitt-tctl
 TCTL_FILE_USED=0
 TCTL_FILE_JSON=""
@@ -15864,13 +16470,14 @@ read -r -d '' AR_SERVER_INFO_JSON <<'AR_SERVER_INFO_JSON_EOF' || true
 AR_SERVER_INFO_JSON_EOF
 # END AR_SERVER_INFO_JSON
 
+#ENTRY point
 if [ ! -t 1 ]; then
   REDIRECT=1
 fi
 
 HITT_INVOCATION=( "$0" "$@" )
 
-while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
+while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
   case "${options}" in
     b)
       BUNDLE_ID="${OPTARG}"
@@ -15994,6 +16601,21 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:qs:t:u:U:vxz" options; do
     q)
       QUIET=1
       SKIP_UPDATE_CHECK=1
+      ;;
+    r)
+      SKIP_UPDATE_CHECK=1
+      [[ -n "${REDIRECT}" ]] && QUIET=1
+      IMAGEMGR_OPTS="${OPTARG}"
+      NEXT_VAL="${!OPTIND}"
+      if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
+        logError "999" "When using imagemgr mode (-r) you must enclose the command in double quotes - eg: bash $0 -r \"sync -f images.txt -t my.registry/bmchelix\"" 1
+      fi
+      if [[ "${IMAGEMGR_OPTS}" == "help" ]] || [[ -z "${IMAGEMGR_OPTS}" ]]; then
+        showImageMgrHelp
+        exit 0
+      fi
+      runImageMgr "${IMAGEMGR_OPTS}"
+      exit $?
       ;;
     t)
       TCTL_CMD="${OPTARG}"
