@@ -690,12 +690,13 @@ window.HITT_USE_CASES = {
       "title": "I want to run an AR GSI command",
       "commands": [
         "bash hitt.sh -u \"get gsi list\"",
-        "bash hitt.sh -u \"get gsi 89\""
+        "bash hitt.sh -u \"get gsi 89\"",
+        "bash hitt.sh -u \"get gsi server_name\""
       ],
       "notes": [
         "get gsi list prints every AR_SERVER_INFO constant as name : id pairs.",
-        "get gsi GSI_ID runs GetServerInfo against the IS server for that GSI id and prints the current value.",
-        "Use list to find the numeric id for a setting (for example AR_SERVER_INFO_SERVER_NAME is id 89)."
+        "get gsi accepts a numeric id or constant name (case-insensitive; AR_SERVER_INFO_ prefix may be omitted).",
+        "Partial suffix match applies when the prefix is omitted; ambiguous matches return an error — use list or a numeric id."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-gsi",
       "video": {
@@ -946,6 +947,26 @@ window.HITT_USE_CASES = {
       "video": {
         "enabled": false,
         "script": "info-node-pods"
+      }
+    },
+    {
+      "id": "info-namespace",
+      "topicId": "helix-system-info",
+      "order": 14,
+      "title": "I want to display information about a specific namespace",
+      "commands": [
+        "bash hitt.sh -i ns",
+        "bash hitt.sh -i \"ns <namespace>\""
+      ],
+      "notes": [
+        "Shows whether the namespace is active, how old it is, and when it was created. Lists each pod with CPU and memory requests, limits, and current use (when metrics-server is available), plus temporary storage use where available.",
+        "When the namespace has resource quotas, shows each limit, how much is in use, and how much is still free; otherwise reports that no quotas apply.",
+        "Omit the namespace name to pick from an interactive menu."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md#ns--namespace-summary",
+      "video": {
+        "enabled": false,
+        "script": "info-namespace"
       }
     },
     {

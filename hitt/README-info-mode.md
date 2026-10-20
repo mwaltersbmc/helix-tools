@@ -7,6 +7,7 @@ When `-i` takes multiple words, enclose the whole value in **double quotes**:
 ```bash
 bash hitt.sh -i cluster
 bash hitt.sh -i "node <node-name>"
+bash hitt.sh -i "ns <namespace>"
 bash hitt.sh -i helix
 bash hitt.sh -i ingress
 bash hitt.sh -i dbversions
@@ -24,6 +25,7 @@ Built-in summary: `bash hitt.sh -i help` or `bash hitt.sh -h info`
 |-------------|-------------|
 | `cluster` | Kubernetes / OpenShift version and a **node summary table** (allocatable vs requested resources, usage, status, pods, runtime). |
 | `node` | **Per-pod resource table** for one named node (requests, limits, current usage, ephemeral storage). |
+| `ns` | **Namespace summary** — status, age, creation time, per-pod resources (same columns as **node**), and **ResourceQuota** hard/used/remaining. |
 | `helix` | **Helix namespace scan** — lists namespaces that look like Helix Platform, Helix IS, containerized Deployment Engine, or Helix Logging, with **version** where HITT can read it. |
 | `ingress` | **Ingress controller** details for the Helix **INGRESS_CLASS**: workload type, namespace, workload name, and container image. |
 | `dbversion` / `dbversions` | **Helix IS database versions** — tab-separated release and expected database version used by HITT checks. |
@@ -81,6 +83,26 @@ Lists every pod scheduled on the named node, sorted by namespace and name.
 - Ephemeral storage is omitted from node stats for some pods; those rows show `N/A`.
 - **CURRENT USAGE** is only reported for Running pods that metrics-server tracks.
 - Per-pod usage and ephemeral storage columns need **metrics-server** (or equivalent); node storage stats may need extra node read permissions.
+
+## `ns` — namespace summary
+
+```bash
+bash hitt.sh -i ns
+bash hitt.sh -i "ns helix-is"
+```
+
+If you omit the namespace name, HITT lists cluster namespaces and prompts you to **select one** interactively.
+
+**Namespace** — status, **Age** (same as `kubectl get ns`), and **Created (UTC)** timestamp.
+
+**Pods** — table matches **node** mode (requests, limits, current usage, ephemeral storage) for every pod in the namespace. The **POD_NAME** column is the pod name only (no `namespace/` prefix). A **TOTAL** row sums pod resources.
+
+**Resource quotas** — when `ResourceQuota` objects exist, a table lists each quota name and resource with **HARD**, **USED**, and **REMAINING** (for CPU, memory, and integer counts such as **pods**). If there are no quotas, HITT prints a short message instead.
+
+**Notes:**
+
+- **REMAINING** is computed from quota **hard** minus **used**; unlimited or non-numeric limits show `n/a`.
+- Ephemeral storage per pod uses kubelet stats from each node that runs pods in the namespace (same permissions as **node** mode).
 
 ## `helix` — Helix namespace scan
 

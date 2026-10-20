@@ -949,6 +949,26 @@
       }
     },
     {
+      "id": "info-namespace",
+      "topicId": "helix-system-info",
+      "order": 14,
+      "title": "I want to display information about a specific namespace",
+      "commands": [
+        "bash hitt.sh -i ns",
+        "bash hitt.sh -i \"ns <namespace>\""
+      ],
+      "notes": [
+        "Shows whether the namespace is active, how old it is, and when it was created. Lists each pod with CPU and memory requests, limits, and current use (when metrics-server is available), plus temporary storage use where available.",
+        "When the namespace has resource quotas, shows each limit, how much is in use, and how much is still free; otherwise reports that no quotas apply.",
+        "Omit the namespace name to pick from an interactive menu."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-info-mode.md#ns--namespace-summary",
+      "video": {
+        "enabled": false,
+        "script": "info-namespace"
+      }
+    },
+    {
       "id": "info-helix-namespaces",
       "topicId": "helix-system-info",
       "order": 15,
