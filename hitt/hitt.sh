@@ -1107,7 +1107,7 @@ getDomain() {
 
 checkHelixLoggingDeployed() {
   HELIX_LOGGING_DEPLOYED=0
-  HELIX_LOGGING_NAMESPACES=($(${KUBECTL_BIN} get deployment -A | grep efk-elasticsearch-kibana | awk '{print $1}' 2>/dev/null))
+  HELIX_LOGGING_NAMESPACES=($(${KUBECTL_BIN} get deployment -A 2>/dev/null | grep efk-elasticsearch-kibana | awk '{print $1}'))
   if [ "${#HELIX_LOGGING_NAMESPACES[@]}" -gt 1 ]; then
     echo "Multiple Helix Logging instances found - please select the namespace you wish to use:"
     HELIX_LOGGING_NAMESPACE=$(selectFromArray HELIX_LOGGING_NAMESPACES)
@@ -9305,7 +9305,7 @@ enumerateHelixVersions() {
   if [ "${#HL_NS_CANDIDATES[@]}" -gt 0 ]; then
     logStatus "Helix Logging"
     for n in "${HL_NS_CANDIDATES[@]}"; do
-      HL_VERSION=$(${KUBECTL_BIN} -n "${n}" get ds efk-fluent-bit -o json | ${JQ_BIN} -r '.spec.template.spec.containers[0].image | split(":")[1] | split("-")[0]')
+      HL_VERSION=$(${KUBECTL_BIN} -n "${n}" get ds efk-fluent-bit -o json 2>/dev/null | ${JQ_BIN} -r '.spec.template.spec.containers[0].image | split(":")[1] | split("-")[0]' 2>/dev/null)
       [[ "${n}" == "${HELIX_LOGGING_NAMESPACE}" ]] && n="${n}*"
       echo -e "${n}\t\t${HL_VERSION:-unknown}"
     done
@@ -10640,7 +10640,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261020-01"
+HITT_BUILD_VERSION="20261021-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
