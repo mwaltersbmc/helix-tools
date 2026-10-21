@@ -9305,7 +9305,7 @@ enumerateHelixVersions() {
   if [ "${#HL_NS_CANDIDATES[@]}" -gt 0 ]; then
     logStatus "Helix Logging"
     for n in "${HL_NS_CANDIDATES[@]}"; do
-      HL_VERSION=$(${KUBECTL_BIN} -n "${n}" get ds efk-fluent-bit -o json 2>/dev/null | ${JQ_BIN} -r '.spec.template.spec.containers[0].image | split(":")[1] | split("-")[0]' 2>/dev/null)
+      HL_VERSION=$(${KUBECTL_BIN} -n "${n}" get ds efk-fluent-bit -o json 2>/dev/null | ${JQ_BIN} -r '.spec.template.spec.containers[0].image | split(":")[1] | split("-")[0]')
       [[ "${n}" == "${HELIX_LOGGING_NAMESPACE}" ]] && n="${n}*"
       echo -e "${n}\t\t${HL_VERSION:-unknown}"
     done
@@ -10640,7 +10640,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261021-01"
+HITT_BUILD_VERSION="20261021-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
