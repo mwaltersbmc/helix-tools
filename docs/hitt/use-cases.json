@@ -1248,6 +1248,25 @@
       }
     },
     {
+      "id": "utility-migrate-config",
+      "topicId": "other-features",
+      "order": 30,
+      "title": "I want to migrate values from an existing config file to a new version",
+      "commands": [
+        "bash hitt.sh -u \"migrate PREVIOUS_FILE NEW_FILE\""
+      ],
+      "notes": [
+        "Copies matching settings from your previous config into a new out-of-the-box file when you upgrade or patch.",
+        "Writes NEW_FILE.updated and leaves the original new file unchanged. Names that contain VERSION, and keys that already have the same value, are left as they are.",
+        "Use full paths or $HOME/... — a quoted ~ is not expanded."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#migrate-previous_file-new_file",
+      "video": {
+        "enabled": false,
+        "script": "utility-migrate-config"
+      }
+    },
+    {
       "id": "bundle-status",
       "topicId": "other-features",
       "order": 20,

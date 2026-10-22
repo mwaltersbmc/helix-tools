@@ -6340,6 +6340,7 @@ showUtilHelp() { # utility mode help
     \tcheck liveness|readiness | Run a pod httpGet probe and print the response. Args: PODNAME (namespace resolved from Helix IS, Platform, or Deployment Engine).
     \tcheck cert \t| Validate a PEM CA bundle (not expired) and test TLS to LB_HOST and IS aliases with curl --cacert. Args: /path/to/cert.pem
     \timagels \t| List tags for a container image repository (requires skopeo). Args: IMAGE — name under docker.io/bmchelix/ or full registry/host/path/repo.
+    \tmigrate \t| Copy matching settings from a previous config file into a new out-of-the-box file (upgrades/patches). Args: PREVIOUS_FILE NEW_FILE. Writes NEW_FILE.updated; leaves VERSION keys and identical values unchanged.
     \thelp \t\t| Show this list.
     "
 }
@@ -10069,6 +10070,104 @@ compare_images() {
   fi
 }
 
+migrateConfigs() {
+  [[ ! -f "${SOURCE_FILE}" ]] && logError "999" "Error: Source file '${SOURCE_FILE}' does not exist." 1
+  [[ ! -f "${TARGET_FILE}" ]] && logError "999" "Error: Target file '${TARGET_FILE}' does not exist." 1
+
+  declare -A vars
+  local -a updated_vars=()
+  local -a unchanged_vars=()
+  local -a target_only_vars=()
+  local line trimmed clean_line key value target_value leading_space tmp_file
+
+  # 1. Read {SOURCE_FILE} and extract key-value pairs using native parameter expansion
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line//$'\r'/}"
+    trimmed="$(echo "$line" | xargs)"
+
+    # Skip empty lines and comments
+    [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
+
+    if [[ "$trimmed" == *=* ]]; then
+      key="${trimmed%%=*}"
+      value="${trimmed#*=}"
+      # Trim whitespace around key
+      key="$(echo "$key" | xargs)"
+      vars["$key"]="$value"
+    fi
+  done < "${SOURCE_FILE}"
+
+  tmp_file=$(mktemp)
+
+  # 2. Read {TARGET_FILE} line by line and update matching variables
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    clean_line="${line//$'\r'/}"
+    trimmed="$(echo "$clean_line" | xargs)"
+
+    # Keep comments and empty lines as-is
+    if [[ -z "$trimmed" || "$trimmed" == \#* ]]; then
+      echo "$line"
+      continue
+    fi
+
+    if [[ "$trimmed" == *=* ]]; then
+      key="${trimmed%%=*}"
+      target_value="${trimmed#*=}"
+      key="$(echo "$key" | xargs)"
+
+      # Check if the key exists in {SOURCE_FILE}'s parsed variables
+      if [[ -v vars["$key"] ]]; then
+        # Leave unchanged if name contains 'VERSION' or values already match
+        if [[ "${key^^}" == *VERSION* || "${vars["$key"]}" == "${target_value}" ]]; then
+          unchanged_vars+=("${key}")
+          echo "$line"
+          continue
+        fi
+
+        # Extract and preserve original leading whitespace (indentation)
+        leading_space=""
+        if [[ "$line" =~ ^([[:space:]]*).* ]]; then
+          leading_space="${BASH_REMATCH[1]}"
+        fi
+
+        updated_vars+=("${key}")
+        echo "${leading_space}${key}=${vars["$key"]}"
+        continue
+      fi
+
+      target_only_vars+=("${key}")
+    fi
+
+    # Keep original line if no match found in {SOURCE_FILE}
+    echo "$line"
+  done < "${TARGET_FILE}" > "${tmp_file}"
+
+  if ! mv "${tmp_file}" "${TARGET_FILE}.updated"; then
+    rm -f "${tmp_file}"
+    logError "999" "Failed to write '${TARGET_FILE}.updated'." 1
+  fi
+  logStatus "'${TARGET_FILE}.updated' created with values from '${SOURCE_FILE}'."
+
+  echo "Updated variables:"
+  if ((${#updated_vars[@]})); then
+    printf '  %s\n' "${updated_vars[@]}"
+  else
+    echo "  (none)"
+  fi
+  echo "Unchanged variables:"
+  if ((${#unchanged_vars[@]})); then
+    printf '  %s\n' "${unchanged_vars[@]}"
+  else
+    echo "  (none)"
+  fi
+  echo "New variables in ${TARGET_FILE}:"
+  if ((${#target_only_vars[@]})); then
+    printf '  %s\n' "${target_only_vars[@]}"
+  else
+    echo "  (none)"
+  fi
+}
+
 #End functions
 
 #MAIN Start
@@ -10363,6 +10462,11 @@ if [ "${MODE}" == "utility" ]; then
     check)
       parseUtilCheck
       ;;
+    checkpat)
+      logMessage "Note: 'checkpat' is deprecated — use 'check pat'." 1
+      UTILARGS=(check pat "${UTILARGS[1]:-}" "${UTILARGS[2]:-}")
+      parseUtilCheck
+      ;;
     checkrbac|authcheck)
       logMessage "Note: '${UTILARGS[0]}' is deprecated — use 'check rbac'." 1
       if [[ "${UTILARGS[0]}" == "authcheck" ]]; then
@@ -10394,6 +10498,14 @@ if [ "${MODE}" == "utility" ]; then
       fi
       listImageTags
       ;;
+    migrate)
+      if [ ${#UTILARGS[@]} -ne 3 ]; then
+        logError "999" "Usage: bash $0 -u \"migrate PREVIOUS_FILE NEW_FILE\"" 1
+      fi
+      SOURCE_FILE="${UTILARGS[1]}"
+      TARGET_FILE="${UTILARGS[2]}"
+      migrateConfigs
+      ;;
     repols)
       if [ -f ~/.docker/config.json ]; then
         REPOCREDS=$(${JQ_BIN} -r '.auths["https://index.docker.io/v1/"].auth // empty | select(. != null) | @base64d' ~/.docker/config.json 2>/dev/null)
@@ -10413,11 +10525,6 @@ if [ "${MODE}" == "utility" ]; then
       ;;
     sql)
       parseUtilSQL
-      ;;
-    checkpat)
-      logMessage "Note: 'checkpat' is deprecated — use 'check pat'." 1
-      UTILARGS=(check pat "${UTILARGS[1]:-}" "${UTILARGS[2]:-}")
-      parseUtilCheck
       ;;
     help)
       showUtilHelp
@@ -10640,7 +10747,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261021-02"
+HITT_BUILD_VERSION="20261022-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -13209,6 +13316,21 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
         "Use a short image name for docker.io/bmchelix/IMAGE (for example ars), or a full registry/host/path/repository when the image is on a private registry."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#imagels-image"
+    },
+    {
+      "id": "utility-migrate-config",
+      "topicId": "other-features",
+      "order": 30,
+      "title": "I want to migrate values from an existing config file to a new version",
+      "commands": [
+        "bash hitt.sh -u \"migrate PREVIOUS_FILE NEW_FILE\""
+      ],
+      "notes": [
+        "Copies matching settings from your previous config into a new out-of-the-box file when you upgrade or patch.",
+        "Writes NEW_FILE.updated and leaves the original new file unchanged. Names that contain VERSION, and keys that already have the same value, are left as they are.",
+        "Use full paths or $HOME/... — a quoted ~ is not expanded."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#migrate-previous_file-new_file"
     },
     {
       "id": "bundle-status",

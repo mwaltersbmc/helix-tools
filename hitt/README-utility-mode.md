@@ -35,6 +35,7 @@ Built-in summary: `bash hitt.sh -u help` or `bash hitt.sh -h utility`
 | `check pat` | Checks a Docker Hub username and personal access token can pull BMC Helix images. Omit both args to use registry credentials from Helix Platform when available. |
 | `check rbac [hitt\|deploy\|all]` | Checks whether your cluster account has the permissions HITT or Helix deployment need. Default: **hitt**. |
 | `imagels` | Lists tags for a container image repository. Requires **skopeo** and a registry login. Args: **IMAGE**. |
+| `migrate` | Copies matching settings from a **previous** config file into a **new** out-of-the-box file (for upgrades or patches). Args: **PREVIOUS_FILE** **NEW_FILE**. Writes **NEW_FILE.updated**. Leaves names containing **VERSION** and values that already match unchanged. |
 | `help` | Prints this summary (built into HITT). |
 
 ## Usage examples
@@ -100,6 +101,9 @@ bash hitt.sh -u "imagels ars"
 # List tags on a private registry (log in with skopeo first)
 skopeo login harbor.example.com
 bash hitt.sh -u "imagels harbor.example.com/bmchelix/ars"
+
+# Carry settings from a previous config into a new out-of-the-box file (upgrade/patch)
+bash hitt.sh -u "migrate /path/to/previous/deployment-engine-config.env /path/to/new/deployment-engine-config.env"
 
 # Check cluster permissions
 bash hitt.sh -u "check rbac"
@@ -271,6 +275,16 @@ Lists tags for a container image using **skopeo**. Install skopeo and log in to 
 ```bash
 bash hitt.sh -u imagels ars
 bash hitt.sh -u "imagels my-registry.example.com/bmchelix/ars"
+```
+
+## `migrate PREVIOUS_FILE NEW_FILE`
+
+Copies matching settings from a **previous** config file into a **new** out-of-the-box file when you upgrade or patch. Use full paths (or `$HOME/...`) — a quoted `~` is not expanded.
+
+Writes **NEW_FILE.updated** (the original new file is left unchanged). Prints lists of **updated**, **unchanged** (including names that contain **VERSION**, and keys whose values already match), and keys that exist only in the new file.
+
+```bash
+bash hitt.sh -u "migrate /path/to/previous/deployment-engine-config.env /path/to/new/deployment-engine-config.env"
 ```
 
 ## `check rbac [hitt|deploy|all]`
