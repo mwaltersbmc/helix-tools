@@ -1116,9 +1116,9 @@ checkHelixLoggingDeployed() {
   fi
   if [ -n "${HELIX_LOGGING_NAMESPACE}" ]; then
     HELIX_LOGGING_DEPLOYED=1
-    HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get secret efk-elasticsearch-kibana -o json  | ${JQ_BIN} -r '.data["kibana-password"] | @base64d')
+    HELIX_LOGGING_PASSWORD=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get secret efk-elasticsearch-kibana -o json 2>/dev/null | ${JQ_BIN} -r '.data["kibana-password"] | @base64d')
     HELIX_LOGGING_PASSWORD_URI=$(printf %s "${HELIX_LOGGING_PASSWORD}" | ${JQ_BIN} -sRr @uri)
-    HELIX_LOGGING_VERSION=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get ds efk-fluent-bit -o json | ${JQ_BIN} -r '.spec.template.spec.containers[0].image | split(":")[1] | split("-")[0]') || HELIX_LOGGING_VERSION="unknown"
+    HELIX_LOGGING_VERSION=$(${KUBECTL_BIN} -n "${HELIX_LOGGING_NAMESPACE}" get ds efk-fluent-bit -o json 2>/dev/null | ${JQ_BIN} -r '.spec.template.spec.containers[0].image | split(":")[1] | split("-")[0]') || HELIX_LOGGING_VERSION="unknown"
     logMessage "Helix Logging version '${HELIX_LOGGING_VERSION}' found in the '${HELIX_LOGGING_NAMESPACE}' namespace."
     checkEFKClusterHealth
   else
@@ -10747,7 +10747,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261022-01"
+HITT_BUILD_VERSION="20261022-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
