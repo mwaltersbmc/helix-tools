@@ -1335,7 +1335,7 @@ getDefaultTCTLImage() {
   if [[ "${HP_REGISTRY_SERVER}" == */* ]]; then
     echo "${HP_REGISTRY_SERVER}:${tctl_tag}"
   elif [ -n "${HP_REGISTRY_PROJECT}" ]; then
-    echo "${HP_REGISTRY_SERVER}/${HP_REGISTRY_PROJECT}:${tctl_tag}"
+    echo "${HP_REGISTRY_SERVER}/${HP_REGISTRY_PROJECT}/lp0lz:${tctl_tag}"
   else
     echo "${HP_REGISTRY_SERVER}/bmchelix/lp0lz:${tctl_tag}"
   fi
@@ -10759,7 +10759,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261023-02"
+HITT_BUILD_VERSION="20261023-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
