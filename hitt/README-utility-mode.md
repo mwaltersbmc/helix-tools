@@ -36,6 +36,7 @@ Built-in summary: `bash hitt.sh -u help` or `bash hitt.sh -h utility`
 | `check rbac [hitt\|deploy\|all]` | Checks whether your cluster account has the permissions HITT or Helix deployment need. Default: **hitt**. |
 | `imagels` | Lists tags for a container image repository. Requires **skopeo** and a registry login. Args: **IMAGE**. |
 | `migrate` | Copies matching settings from a **previous** config file into a **new** out-of-the-box file (for upgrades or patches). Args: **PREVIOUS_FILE** **NEW_FILE**. Writes **NEW_FILE.updated**. Leaves names containing **VERSION** and values that already match unchanged. |
+| `kubens` | Sets the default namespace for **kubectl** in your current kubeconfig context. Args: **NAMESPACE**. |
 | `help` | Prints this summary (built into HITT). |
 
 ## Usage examples
@@ -104,6 +105,9 @@ bash hitt.sh -u "imagels harbor.example.com/bmchelix/ars"
 
 # Carry settings from a previous config into a new out-of-the-box file (upgrade/patch)
 bash hitt.sh -u "migrate /path/to/previous/deployment-engine-config.env /path/to/new/deployment-engine-config.env"
+
+# Set the default namespace for kubectl
+bash hitt.sh -u "kubens helix-is"
 
 # Check cluster permissions
 bash hitt.sh -u "check rbac"
@@ -285,6 +289,14 @@ Writes **NEW_FILE.updated** (the original new file is left unchanged). Prints li
 
 ```bash
 bash hitt.sh -u "migrate /path/to/previous/deployment-engine-config.env /path/to/new/deployment-engine-config.env"
+```
+
+## `kubens NAMESPACE`
+
+Sets the default namespace for **kubectl** in your current kubeconfig context. Later **kubectl** commands that omit `-n` use this namespace. The namespace must already exist.
+
+```bash
+bash hitt.sh -u "kubens helix-is"
 ```
 
 ## `check rbac [hitt|deploy|all]`

@@ -1268,6 +1268,24 @@ window.HITT_USE_CASES = {
       }
     },
     {
+      "id": "utility-kubens",
+      "topicId": "other-features",
+      "order": 31,
+      "title": "I want to set the default namespace for kubectl commands",
+      "commands": [
+        "bash hitt.sh -u \"kubens NAMESPACE\""
+      ],
+      "notes": [
+        "Sets the default namespace on your current kubectl context so later kubectl commands that omit -n use that namespace.",
+        "The namespace must already exist in the cluster."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#kubens-namespace",
+      "video": {
+        "enabled": false,
+        "script": "utility-kubens"
+      }
+    },
+    {
       "id": "bundle-status",
       "topicId": "other-features",
       "order": 20,

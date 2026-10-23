@@ -6341,6 +6341,7 @@ showUtilHelp() { # utility mode help
     \tcheck cert \t| Validate a PEM CA bundle (not expired) and test TLS to LB_HOST and IS aliases with curl --cacert. Args: /path/to/cert.pem
     \timagels \t| List tags for a container image repository (requires skopeo). Args: IMAGE — name under docker.io/bmchelix/ or full registry/host/path/repo.
     \tmigrate \t| Copy matching settings from a previous config file into a new out-of-the-box file (upgrades/patches). Args: PREVIOUS_FILE NEW_FILE. Writes NEW_FILE.updated; leaves VERSION keys and identical values unchanged.
+    \tkubens \t\t| Set the default namespace for kubectl in the current kubeconfig context. Args: NAMESPACE
     \thelp \t\t| Show this list.
     "
 }
@@ -10498,6 +10499,17 @@ if [ "${MODE}" == "utility" ]; then
       fi
       listImageTags
       ;;
+    kubens)
+      if [ ${#UTILARGS[@]} -ne 2 ] || [[ -z "${UTILARGS[1]:-}" ]]; then
+        logError "999" "Usage: bash $0 -u \"kubens NAMESPACE\"" 1
+      fi
+      NS="${UTILARGS[1]}"
+      if ! ${KUBECTL_BIN} get ns "${NS}" &>/dev/null; then
+        logError "999" "Namespace '${NS}' not found." 1
+      fi
+      ${KUBECTL_BIN} config set-context --current --namespace="${NS}" &>/dev/null
+      logStatus "Default namespace changed to '${NS}'."
+      ;;
     migrate)
       if [ ${#UTILARGS[@]} -ne 3 ]; then
         logError "999" "Usage: bash $0 -u \"migrate PREVIOUS_FILE NEW_FILE\"" 1
@@ -10747,7 +10759,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261022-02"
+HITT_BUILD_VERSION="20261023-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -13331,6 +13343,20 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
         "Use full paths or $HOME/... — a quoted ~ is not expanded."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#migrate-previous_file-new_file"
+    },
+    {
+      "id": "utility-kubens",
+      "topicId": "other-features",
+      "order": 31,
+      "title": "I want to set the default namespace for kubectl commands",
+      "commands": [
+        "bash hitt.sh -u \"kubens NAMESPACE\""
+      ],
+      "notes": [
+        "Sets the default namespace on your current kubectl context so later kubectl commands that omit -n use that namespace.",
+        "The namespace must already exist in the cluster."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#kubens-namespace"
     },
     {
       "id": "bundle-status",
