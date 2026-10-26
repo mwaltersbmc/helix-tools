@@ -828,7 +828,17 @@ getVersions() {
   HP_CUSTOM_CERT=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.infra_config' | grep ^CUSTOM_CA_SIGNED_CERT_IN_USE | cut -d '=' -f2)
   HP_DEPLOYMENT_SIZE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^DEPLOYMENT_SIZE | cut -d '=' -f2)
   HP_REGISTRY_PROJECT=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^IMAGE_REGISTRY_PROJECT | cut -d '=' -f2)
-  logMessage "Helix Platform version '${HP_VERSION}' with DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}'."
+  HP_INSTALL_MODE=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config' | grep ^INSTALL_MODE | cut -d '=' -f2)
+  HP_INSTALLED_PRODUCTS=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.deployment_config
+    | split("\n")
+    | map(select(length > 0))
+    | map(split("="))
+    | map(select(.[1] == "yes") | .[0])
+    | sort
+    | join(",")
+  ')
+  logMessage "Helix Platform version '${HP_VERSION}' with DEPLOYMENT_SIZE '${HP_DEPLOYMENT_SIZE}' and INSTALL_MODE='${HP_INSTALL_MODE}'."
+  logMessage "Helix Platform deployment options: '${HP_INSTALLED_PRODUCTS}'."
   if [[ ! "${HP_DEPLOYMENT_SIZE}" =~ ^itsm.* ]]; then
     logWarning "002" "Helix Platform DEPLOYMENT_SIZE is '${HP_DEPLOYMENT_SIZE}' - expected to be itsmcompact/itsmsmall/itsmxlarge unless additional ITOM products are/will be installed."
   fi
@@ -10830,7 +10840,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261026-01"
+HITT_BUILD_VERSION="20261026-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
