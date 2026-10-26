@@ -994,8 +994,7 @@ window.HITT_USE_CASES = {
       "order": 20,
       "title": "I want to display information about my Helix environment",
       "commands": [
-        "bash hitt.sh -i full",
-        "bash hitt.sh -i"
+        "bash hitt.sh -i full"
       ],
       "notes": [
         "Prints a BMC Helix Environment Summary: client/cluster versions, node table, ingress controller, Helix Platform (tenants and services), Helix Logging, Deployment Engine (Jenkins), and Helix Service Management when IS is deployed.",

@@ -7880,7 +7880,12 @@ getK8sNamespaceQuotaDetails() {
   local quotas_json quota_name resource hard used remaining TABLE_DATA
 
   K8S_NS_QUOTA_TABLE=""
-  quotas_json=$(${KUBECTL_BIN} -n "${ns_name}" get resourcequota -o json 2>>"${HITT_ERR_FILE}") || return 0
+  if ! quotas_json=$(${KUBECTL_BIN} -n "${ns_name}" get resourcequota -o json 2>>"${HITT_ERR_FILE}"); then
+    return 1
+  fi
+  if ! echo "${quotas_json}" | ${JQ_BIN} -e '.items' >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    return 1
+  fi
   if ! echo "${quotas_json}" | ${JQ_BIN} -e '.items | length > 0' >/dev/null 2>>"${HITT_ERR_FILE}"; then
     return 0
   fi
@@ -9469,12 +9474,15 @@ printNSDetails() {
   hittInfoPrintSection "Pods — ${nsname}"
   printK8sNodePodDetails
 
-  getK8sNamespaceQuotaDetails "${nsname}"
   hittInfoPrintSection "Resource quotas — ${nsname}"
-  if printK8sNamespaceQuotaDetails; then
-    :
+  if getK8sNamespaceQuotaDetails "${nsname}"; then
+    if printK8sNamespaceQuotaDetails; then
+      :
+    else
+      echo "No ResourceQuota objects in this namespace."
+    fi
   else
-    echo "No ResourceQuota objects in this namespace."
+    echo "Unable to read ResourceQuota objects in this namespace."
   fi
   return 0
 }
@@ -10586,7 +10594,9 @@ if [ "${MODE}" == "utility" ]; then
       if ! ${KUBECTL_BIN} get ns "${NS}" &>/dev/null; then
         logError "999" "Namespace '${NS}' not found." 1
       fi
-      ${KUBECTL_BIN} config set-context --current --namespace="${NS}" &>/dev/null
+      if ! ${KUBECTL_BIN} config set-context --current --namespace="${NS}"; then
+        logError "999" "Failed to set default namespace to '${NS}'." 1
+      fi
       logStatus "Default namespace changed to '${NS}'."
       ;;
     migrate)
@@ -10840,7 +10850,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261026-02"
+HITT_BUILD_VERSION="20261026-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -13209,8 +13219,7 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
       "order": 20,
       "title": "I want to display information about my Helix environment",
       "commands": [
-        "bash hitt.sh -i full",
-        "bash hitt.sh -i"
+        "bash hitt.sh -i full"
       ],
       "notes": [
         "Prints a BMC Helix Environment Summary: client/cluster versions, node table, ingress controller, Helix Platform (tenants and services), Helix Logging, Deployment Engine (Jenkins), and Helix Service Management when IS is deployed.",
