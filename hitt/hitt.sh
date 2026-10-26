@@ -804,9 +804,10 @@ printPlatformPodsTable() {
 }
 
 getVersions() {
-  isOpenShift
+  detectClusterType
   logMessage "Kubernetes version '${K8S_VERSION}'."
   logMessage "kubectl version '${KUBECTL_VERSION}'."
+  logMessage "Cluster type '${CLUSTER_TYPE}'."
   if [ "${OPENSHIFT_VERSION}" != "" ]; then
     logMessage "OpenShift version '${OPENSHIFT_VERSION}'."
   fi
@@ -4834,14 +4835,6 @@ runJenkinsScript() {
   ${CURL_BIN} --max-time 10 -b .cookies --data-urlencode "script=${1}" -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" "${JENKINS_URL}/scriptText" 2>>${HITT_ERR_FILE}
 }
 
-isOpenShift() {
-  OPENSHIFT_VERSION=""
-  if ${KUBECTL_BIN} get clusteroperators >/dev/null 2>&1; then
-    OPENSHIFT=1
-    OPENSHIFT_VERSION=$(${KUBECTL_BIN} get clusterversion -o jsonpath='{.items[].spec.desiredUpdate.version}')
-  fi
-}
-
 tidyUp() {
   cleanUp stop
   reportResults
@@ -8257,6 +8250,7 @@ printInfo() {
   hittInfoPrintKv "Helm" "${HELM_VERSION:-unknown}"
 
   hittInfoPrintSection "Cluster information"
+  hittInfoPrintKv "Cluster type" "${CLUSTER_TYPE:-Kubernetes}"
   hittInfoPrintKv "Kubernetes version" "${K8S_VERSION:-unknown}"
   hittInfoPrintKv "OpenShift version" "${OPENSHIFT_VERSION:-n/a}"
 
@@ -10169,6 +10163,81 @@ migrateConfigs() {
   fi
 }
 
+detectClusterType() {
+  local os_image provider_id kubectl_json
+
+  OPENSHIFT=0
+  OPENSHIFT_VERSION=""
+  CLUSTER_TYPE="Kubernetes"
+
+  # Version-string heuristics need server gitVersion (set by checkToolVersion kubectl)
+  if [[ -z "${K8S_VERSION:-}" ]]; then
+    kubectl_json=$(${KUBECTL_BIN} version -o json 2>/dev/null) || kubectl_json=""
+    if [[ -n "${kubectl_json}" ]]; then
+      K8S_VERSION=$(echo "${kubectl_json}" | ${JQ_BIN} -r '.serverVersion.gitVersion // empty' 2>/dev/null)
+      [[ -z "${KUBECTL_VERSION:-}" ]] && KUBECTL_VERSION=$(echo "${kubectl_json}" | ${JQ_BIN} -r '.clientVersion.gitVersion // empty' 2>/dev/null)
+    fi
+  fi
+
+  # 1. Red Hat OpenShift / OKD
+  if ${KUBECTL_BIN} get crds routes.route.openshift.io &>/dev/null || ${KUBECTL_BIN} get namespace openshift-apiserver &>/dev/null; then
+    OPENSHIFT=1
+    OPENSHIFT_VERSION=$(${KUBECTL_BIN} get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || true)
+    if [[ -z "${OPENSHIFT_VERSION}" ]]; then
+      OPENSHIFT_VERSION=$(${KUBECTL_BIN} get clusterversion version -o jsonpath='{.status.history[0].version}' 2>/dev/null || true)
+    fi
+    os_image=$(${KUBECTL_BIN} get nodes -o jsonpath='{.items[0].status.nodeInfo.osImage}' 2>/dev/null || echo "")
+    if [[ "${os_image}" == *Fedora* || "${os_image}" == *CentOS* || "${K8S_VERSION}" == *okd* ]]; then
+      CLUSTER_TYPE="OKD (OpenShift Origin)"
+    else
+      CLUSTER_TYPE="Red Hat OpenShift (OCP)"
+    fi
+
+  # 2. VMware Tanzu
+  elif ${KUBECTL_BIN} get api-resources 2>/dev/null | grep -q "run.tanzu.vmware.com" || ${KUBECTL_BIN} get crds tanzuruntimes.run.tanzu.vmware.com &>/dev/null; then
+    CLUSTER_TYPE="VMware Tanzu"
+
+  # 3. Spectro Cloud Palette
+  elif ${KUBECTL_BIN} get api-resources 2>/dev/null | grep -q "spectrocloud.com" || ${KUBECTL_BIN} get crds audits.cluster.spectrocloud.com &>/dev/null; then
+    CLUSTER_TYPE="Spectro Cloud Palette"
+
+  # 4. Nutanix (NKP / NKE / Karbon / CAPX)
+  elif ${KUBECTL_BIN} get crds nutanixclusters.infrastructure.cluster.x-k8s.io &>/dev/null || ${KUBECTL_BIN} get api-resources 2>/dev/null | grep -q "nutanix.com"; then
+    CLUSTER_TYPE="Nutanix Kubernetes Platform / NKE"
+
+  # 5. Rancher (RKE / RKE2 / managed)
+  elif ${KUBECTL_BIN} get namespace cattle-system &>/dev/null; then
+    if [[ "${K8S_VERSION}" == *rke* ]]; then
+      CLUSTER_TYPE="Rancher RKE / RKE2"
+    else
+      CLUSTER_TYPE="Rancher-managed Kubernetes"
+    fi
+
+  # 6. Cloud / lightweight distributions
+  else
+    provider_id=$(${KUBECTL_BIN} get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null || echo "")
+    os_image=$(${KUBECTL_BIN} get nodes -o jsonpath='{.items[0].status.nodeInfo.osImage}' 2>/dev/null || echo "")
+
+    if [[ "${provider_id}" == nutanix://* ]]; then
+      CLUSTER_TYPE="Nutanix Kubernetes Infrastructure"
+    elif [[ "${provider_id}" == oci://* || "${K8S_VERSION}" == *oci* ]]; then
+      CLUSTER_TYPE="Oracle OKE"
+    elif [[ "${K8S_VERSION}" == *-eks-* || "${provider_id}" == aws://* ]]; then
+      CLUSTER_TYPE="AWS EKS"
+    elif [[ "${K8S_VERSION}" == *-gke.* || "${provider_id}" == gce://* ]]; then
+      CLUSTER_TYPE="Google Cloud GKE"
+    elif [[ "${K8S_VERSION}" == *-azure-* || "${provider_id}" == azure://* ]]; then
+      CLUSTER_TYPE="Azure AKS"
+    elif [[ "${K8S_VERSION}" == *k3s* || "${os_image}" == *K3s* ]]; then
+      CLUSTER_TYPE="K3s"
+    elif [[ "${os_image}" == *MicroK8s* ]]; then
+      CLUSTER_TYPE="MicroK8s"
+    elif [[ "${K8S_VERSION}" == *minikube* ]]; then
+      CLUSTER_TYPE="Minikube"
+    fi
+  fi
+}
+
 #End functions
 
 #MAIN Start
@@ -10555,7 +10624,9 @@ if [ "${MODE}" == "info" ]; then
     cluster)
       QUIET=1
       logStatus "Gathering cluster information..." 1
+      detectClusterType
       getK8sNodeDetails
+      hittInfoPrintKv "Cluster type" "${CLUSTER_TYPE:-Kubernetes}"
       hittInfoPrintKv "Kubernetes version" "${K8S_VERSION:-unknown}"
       hittInfoPrintKv "OpenShift version" "${OPENSHIFT_VERSION:-n/a}"
       hittInfoPrintSection "Node summary"
@@ -10759,7 +10830,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261023-03"
+HITT_BUILD_VERSION="20261026-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -10811,6 +10882,7 @@ HITT_TCTL_POD=hitt-tctl
 TCTL_FILE_USED=0
 TCTL_FILE_JSON=""
 # tmp set as used before processing config on initial setup
+CLUSTER_TYPE="Kubernetes"
 KUBECTL_BIN=kubectl
 CURL_BIN=curl
 JQ_BIN=jq

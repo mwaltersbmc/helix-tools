@@ -23,7 +23,7 @@ Built-in summary: `bash hitt.sh -i help` or `bash hitt.sh -h info`
 
 | Sub-command | Description |
 |-------------|-------------|
-| `cluster` | Kubernetes / OpenShift version and a **node summary table** (allocatable vs requested resources, usage, status, pods, runtime). |
+| `cluster` | **Cluster type** (for example OpenShift, EKS, Rancher), Kubernetes / OpenShift version, and a **node summary table** (allocatable vs requested resources, usage, status, pods, runtime). |
 | `node` | **Per-pod resource table** for one named node (requests, limits, current usage, ephemeral storage). |
 | `ns` | **Namespace summary** — status, age, creation time, per-pod resources (same columns as **node**), and **ResourceQuota** hard/used/remaining. |
 | `helix` | **Helix namespace scan** — lists namespaces that look like Helix Platform, Helix IS, containerized Deployment Engine, or Helix Logging, with **version** where HITT can read it. |
@@ -38,7 +38,7 @@ Built-in summary: `bash hitt.sh -i help` or `bash hitt.sh -h info`
 bash hitt.sh -i cluster
 ```
 
-Displays a table summarising cluster node resources.
+Prints **cluster type**, Kubernetes version, and OpenShift version (when applicable), then a table summarising cluster node resources.
 
 | Column | Meaning |
 |--------|---------|
