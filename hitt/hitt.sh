@@ -10850,7 +10850,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261026-03"
+HITT_BUILD_VERSION="20261029-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -17181,7 +17181,7 @@ if [ ${CREATE_LOGS} -eq 1 ]; then
   if [ "${DEBUG}" == "1" ]; then
     set -x
   fi
-  main 2>&1 | tee "${HITT_LOG_FILE}"
+  main > >(tee "${HITT_LOG_FILE}") 2>&1
 else
   main
 fi
