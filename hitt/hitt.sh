@@ -1614,21 +1614,28 @@ validateRealmDomains() {
     validateAliasAccessibleFromDE "${TARGET}"
   done
 
-  # Check for portal alias - will not be present if INTEROPS pipeline has not been run
-  if ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}" ; then
-    logWarning "005" "Alias '${PORTAL_HOSTNAME}' not found in the realm Application Domains list. This is expected until the HELIX_ITSM_INTEROPS pipeline has completed."
+  # Portal alias checks
+  # PCS core - portal alias not relevant
+  if [ "${HP_SM_PLATFORM_CORE}" == "yes" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
+    logWarning "053" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This alias is not used for PCS core deployments."
   fi
-  # Should not be present in pre-is unless INTEROPS run
-  if [ "${HP_SM_PLATFORM_CORE}" == "no" ] && [ "${MODE}" == "pre-is" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
-    logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is only expected after the HELIX_ITSM_INTEROPS pipeline has completed."
+
+  # PC non-core/pre-is/fresh
+  if [ "${HP_SM_PLATFORM_CORE}" == "no" ] && [ "${MODE}" == "pre-is" ] && [ "${IS_PIPELINE_MODE}" == "FRESH" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
+    logWarning "037" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This is not expected until the HELIX_ITSM_INTEROPS pipeline has completed."
+  fi
+
+  # PC non-core/upgrade/post-is
+  if [ "${HP_SM_PLATFORM_CORE}" == "no" ] && ([ "${MODE}" == "post-is" ] || [ "${MODE}" == "upgrade-is" ]) && ! echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
+    logWarning "005" "Alias '${PORTAL_HOSTNAME}' not found in the realm Application Domains list. Has the HELIX_ITSM_INTEROPS pipeline been run?"
   fi
 }
 
-validateAliasAccessibleFromDE(){
+validateAliasAccessibleFromDE() {
   HTTP_CODE=$(${CURL_BIN} -ks -o /dev/null -w "%{http_code}" --max-time 5 "https://${1}")
   case "${HTTP_CODE}" in
     200|201|202|204|404|409|302)
-      logMessage "  - url 'https://${1}' is accessible from the this system." 1
+      logMessage "  - url 'https://${1}' is accessible from this system." 1
       ;;
     *)
       if echo "${1}" | grep -q reporting ; then
@@ -10850,7 +10857,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261029-01"
+HITT_BUILD_VERSION="20261029-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -11310,6 +11317,12 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
     "cause": "Helix GPT is selected and the cluster is air-gapped.",
     "impact": "Helix GPT pods will not work without additional configuration.",
     "remediation": "Review the 'Troubleshooting BMC HelixGPT installation issues' section of the docs for steps to perform."
+  },
+  {
+    "id": "053",
+    "cause": "The Helix Portal alias is present in the Helix Service Management RSSO realm but is not used as this is a PCS core deployment.",
+    "impact": "May cause issues if deployment is later converted to non-core PCS.",
+    "remediation": "Remove the portal alias from the Applications Domains in the Helix Service Management SSO realm."
   },
   {
     "id": "100",
