@@ -737,7 +737,7 @@ getPodJSON()
 checkPlatformPodsReadiness() {
   local pods_json row pod ready readiness http_code
 
-  [[ -n "${IS_NAMESPACE:-}" ]] || logError "999" "IS_NAMESPACE is not set in hitt.conf." 1
+  [[ -n "${IS_NAMESPACE:-}" ]] || logError "999" "IS_NAMESPACE is not set in ${HITT_CONFIG_FILE}." 1
   pods_json=$(discoverPlatformPodsJSON) || logError "999" "Unable to list platform pods in '${IS_NAMESPACE}'." 1
   PLATFORM_PODS_JSON='[]'
 
@@ -1501,7 +1501,7 @@ getRealmDetails() {
   REALM_NAME="${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}"
   RSSO_REALM=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms/"${REALM_NAME}" -H "Authorization: RSSO ${RSSO_TOKEN}")
   if echo "${RSSO_REALM}" | ${JQ_BIN} | grep -q "realm does not exist" ; then
-    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check realm names and the IS_CUSTOMER_SERVICE/IS_ENVIRONMENT values in hitt.conf."
+    logError "116" "SSO realm '${REALM_NAME}' not found for SAAS_TENANT in RSSO.  Check realm names and the IS_CUSTOMER_SERVICE/IS_ENVIRONMENT values in ${HITT_CONFIG_FILE}."
     echo "Realms found in RSSO are:"
     ${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/realms -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} -r '" - " + .realms[].id'
     exit 1
@@ -1880,7 +1880,7 @@ checkJenkinsIsRunning() {
       getJenkinsCrumb
       ;;
     401|403)
-      logError "127" "Jenkins authentication is enabled but the credentials in hitt.conf are blank or wrong.  Please set correct credentials in the HITT config file '${HITT_CONFIG_FILE}'." 1
+      logError "127" "Jenkins authentication is enabled but the credentials in ${HITT_CONFIG_FILE} are blank or wrong.  Please set correct credentials in the HITT config file '${HITT_CONFIG_FILE}'." 1
       SKIP_JENKINS=1
       ;;
     *)
@@ -2573,7 +2573,7 @@ validateISDetails() {
     fi
 
     if [ "${IS_IS_NAMESPACE}" != "${IS_NAMESPACE}" ]; then
-      logError "138" "The IS_NAMESPACE value '${IS_IS_NAMESPACE}' does not match the IS_NAMESPACE defined in the hitt.conf file '${IS_NAMESPACE}'."
+      logError "138" "The IS_NAMESPACE value '${IS_IS_NAMESPACE}' does not match the IS_NAMESPACE defined in the ${HITT_CONFIG_FILE} file '${IS_NAMESPACE}'."
     else
       logMessage "IS_NAMESPACE is the expected value '${IS_NAMESPACE}'." 1
     fi
@@ -2590,7 +2590,7 @@ validateISDetails() {
     fi
 
     if [ "${ISP_CUSTOMER_SERVICE}-${ISP_ENVIRONMENT}" != "${IS_CUSTOMER_SERVICE}-${IS_ENVIRONMENT}" ]; then
-      logError "140" "CUSTOMER_SERVICE '${ISP_CUSTOMER_SERVICE}' and/or ENVIRONMENT '${ISP_ENVIRONMENT}' values do not match those set in the hitt.conf file - '${IS_CUSTOMER_SERVICE}' and '${IS_ENVIRONMENT}'."
+      logError "140" "CUSTOMER_SERVICE '${ISP_CUSTOMER_SERVICE}' and/or ENVIRONMENT '${ISP_ENVIRONMENT}' values do not match those set in the ${HITT_CONFIG_FILE} file - '${IS_CUSTOMER_SERVICE}' and '${IS_ENVIRONMENT}'."
     else
       logMessage "CUSTOMER_SERVICE and ENVIRONMENT appear valid '${ISP_CUSTOMER_SERVICE} / ${ISP_ENVIRONMENT}'." 1
     fi
@@ -7197,7 +7197,7 @@ parseUtilGet() {
         populateUtilK8sObjectMatches configmap "${UTILARGS[2]}"
         case ${#UTIL_NS_MATCHES[@]} in
           0)
-            logError "999" "ConfigMap '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from hitt.conf. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get configmap ${UTILARGS[2]} NAMESPACE\"." 1
+            logError "999" "ConfigMap '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from ${HITT_CONFIG_FILE}. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get configmap ${UTILARGS[2]} NAMESPACE\"." 1
             ;;
           1)
             exportK8sConfigMap "${UTILARGS[2]}" "${UTIL_NS_MATCHES[0]}"
@@ -7284,7 +7284,7 @@ parseUtilGet() {
         populateUtilK8sObjectMatches secret "${UTILARGS[2]}"
         case ${#UTIL_NS_MATCHES[@]} in
           0)
-            logError "999" "Secret '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from hitt.conf. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get secret ${UTILARGS[2]} NAMESPACE\"." 1
+            logError "999" "Secret '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from ${HITT_CONFIG_FILE}. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get secret ${UTILARGS[2]} NAMESPACE\"." 1
             ;;
           1)
             decodeK8sSecret "${UTILARGS[2]}" "${UTIL_NS_MATCHES[0]}"
@@ -9083,7 +9083,7 @@ validateHittK8sPermissions() {
   mapfile -t helix_ns < <(_hittK8sHelixNamespaces)
 
   if [[ "${active_profile}" == "deploy" || "${active_profile}" == "all" ]] && ((${#helix_ns[@]} == 0)); then
-    logError "999" "Profile '${active_profile}' needs Helix namespaces in hitt.conf (HP_NAMESPACE, IS_NAMESPACE, and optionally CDE_NAMESPACE / HELIX_LOGGING_NAMESPACE) before deploy permissions can be checked." 1
+    logError "999" "Profile '${active_profile}' needs Helix namespaces in ${HITT_CONFIG_FILE} (HP_NAMESPACE, IS_NAMESPACE, and optionally CDE_NAMESPACE / HELIX_LOGGING_NAMESPACE) before deploy permissions can be checked." 1
   fi
 
   logStatus "Kubernetes RBAC audit (profile: ${active_profile})..."
@@ -9092,7 +9092,7 @@ validateHittK8sPermissions() {
   if ((${#helix_ns[@]} > 0)); then
     logMessage "Helix namespaces: ${helix_ns[*]}"
   else
-    logWarning "999" "Helix namespaces: (none — set HP_NAMESPACE / IS_NAMESPACE / CDE_NAMESPACE in hitt.conf to validate namespace-scoped permissions)"
+    logWarning "999" "Helix namespaces: (none — set HP_NAMESPACE / IS_NAMESPACE / CDE_NAMESPACE in ${HITT_CONFIG_FILE} to validate namespace-scoped permissions)"
   fi
   echo ""
 
@@ -9196,7 +9196,7 @@ validateHittK8sPermissions() {
   fi
 
   if ((${#skipped_checks[@]} > 0)); then
-    echo "Not checked (${#skipped_checks[@]} — configure Helix namespaces in hitt.conf to include namespace-scoped rules):"
+    echo "Not checked (${#skipped_checks[@]} — configure Helix namespaces in ${HITT_CONFIG_FILE} to include namespace-scoped rules):"
     echo ""
     {
       printf '%s\n' 'VERB|RESOURCE|SCOPE|STATUS|DESCRIPTION'
@@ -10352,7 +10352,7 @@ checkCLITools
 
 # Make Jenkins credentials URL safe
 if [ "${JENKINS_USERNAME}" == "" ] && [ "${JENKINS_PASSWORD}" != "" ]; then
-  logError "219" "JENKINS_PASSWORD is set but JENKINS_USERNAME is blank.  Please set both values in the hitt.conf file." 1
+  logError "219" "JENKINS_PASSWORD is set but JENKINS_USERNAME is blank.  Please set both values in the ${HITT_CONFIG_FILE} file." 1
 fi
 if [ -n "${JENKINS_USERNAME}" ]; then
   JENKINS_PASSWORD=$(printf %s "${JENKINS_PASSWORD}" | ${JQ_BIN} -sRr @uri)
@@ -10857,7 +10857,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261029-02"
+HITT_BUILD_VERSION="20261029-03"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
