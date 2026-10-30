@@ -6342,6 +6342,7 @@ showUtilHelp() { # utility mode help
     \tget jwt \t| Print AR-JWT for IS REST API. Optional: USERNAME PASSWORD (default hannah_admin from cluster).
     \tget forms \t| Search AR forms by keyword; prints form name and Schema ID. Args: KEYWORD (use quotes for multi-word, e.g. -u \"get forms AR System\")
     \tget fields \t| List fields on a form by Schema ID; optional keyword filters field names. Args: SCHEMAID [KEYWORD]
+    \tget precheckresults | Download results from the pre-checker stage of the HELIX_FULL_STACK_UPGRADE pipeline and save as prechecker.tar.gz.
     \tsql \t\t| Run an AR SQL query via IS REST API (raw JSON). Args: SQL_QUERY (quote the whole -u string)
     \tgendbid \t| Generate DBID from DB_TYPE DATABASE_HOST_NAME AR_DB_NAME.
     \tcheck rbac \t| Validate Kubernetes RBAC for HITT. Args: [hitt|deploy|all] (default: hitt). Use -v for each permission checked.
@@ -7273,6 +7274,25 @@ parseUtilGet() {
       ;;
     jwt)
       getISJWTToken "${UTILARGS[2]}" "${UTILARGS[3]}"
+      ;;
+    precheckresults)
+      QUIET=1
+      initISAdminREST
+      QUIET=0
+      REQUEST_ID=$(${CURL_BIN} -sk -H "Content-Type: application/x-www-form-urlencoded" -H "Authorization: AR-JWT ${ARJWT}" \
+        "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/entry/AR%20System%20Upgrade%20Tracker?fields=values(Request%20ID)&q=%27componentName%27%3D%22Checker%20Utility%20tool%22%20AND%20%27commandLineArguments%27%3D%22--config-file%20%2Fopt%2Fbmc%2Fsoftwares%2FCheckerUtility%2Fconf%2Fpre_upgrade_checks_config.json%22&sort=43006.desc" \
+        | ${JQ_BIN} -r '.entries[0].values."Request ID" // empty')
+      [[ -z "${REQUEST_ID}" ]] && logError "999" "No upgrade pre-checker results records found in the 'AR System Upgrade Tracker' form." 1
+      logMessage "Found upgrade pre-checker results - 'AR System Upgrade Tracker' form request ID '${REQUEST_ID}'."
+      ATTACHMENT_SIZE=$(${CURL_BIN} -sk -H "Content-Type: application/x-www-form-urlencoded" -H "Authorization: AR-JWT ${ARJWT}" \
+        "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/entry/AR%20System%20Upgrade%20Tracker/${REQUEST_ID}" \
+        | ${JQ_BIN} '.values.attachment.sizeBytes')
+      [[ -z "${ATTACHMENT_SIZE}" || "${ATTACHMENT_SIZE}" == "null" || "${ATTACHMENT_SIZE}" == "0" ]] && logError "999" "No upgrade pre-checker results attachment found for this record." 1
+      logMessage "Saving upgrade pre-checker results attachment as 'prechecker.tar.gz'..."
+      ${CURL_BIN} -sk -H "Content-Type: application/x-www-form-urlencoded" -H "Authorization: AR-JWT ${ARJWT}" \
+        "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/entry/AR%20System%20Upgrade%20Tracker/${REQUEST_ID}/attach/attachment" \
+        -o prechecker.tar.gz
+      exit 0
       ;;
     secret)
       if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
@@ -10857,7 +10877,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261029-03"
+HITT_BUILD_VERSION="20261030-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -13461,6 +13481,20 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
         "The namespace must already exist in the cluster."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#kubens-namespace"
+    },
+    {
+      "id": "utility-get-precheckresults",
+      "topicId": "other-features",
+      "order": 32,
+      "title": "I want to download the HELIX_FULL_STACK_UPGRADE pipeline pre-checker results",
+      "commands": [
+        "bash hitt.sh -u \"get precheckresults\""
+      ],
+      "notes": [
+        "Downloads results from the pre-checker stage of the HELIX_FULL_STACK_UPGRADE pipeline.",
+        "Saves the file as prechecker.tar.gz in the current directory."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-precheckresults"
     },
     {
       "id": "bundle-status",

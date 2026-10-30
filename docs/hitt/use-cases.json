@@ -1284,6 +1284,24 @@
       }
     },
     {
+      "id": "utility-get-precheckresults",
+      "topicId": "other-features",
+      "order": 32,
+      "title": "I want to download the HELIX_FULL_STACK_UPGRADE pipeline pre-checker results",
+      "commands": [
+        "bash hitt.sh -u \"get precheckresults\""
+      ],
+      "notes": [
+        "Downloads results from the pre-checker stage of the HELIX_FULL_STACK_UPGRADE pipeline.",
+        "Saves the file as prechecker.tar.gz in the current directory."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md#get-precheckresults",
+      "video": {
+        "enabled": false,
+        "script": "utility-get-precheckresults"
+      }
+    },
+    {
       "id": "bundle-status",
       "topicId": "other-features",
       "order": 20,

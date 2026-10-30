@@ -26,6 +26,7 @@ Built-in summary: `bash hitt.sh -u help` or `bash hitt.sh -h utility`
 | `get configmap` | Saves ConfigMap contents to a new folder in the current directory. With **`-v`**, lists key names only. Args: **CM_NAME** [**NAMESPACE**]. Namespace rules match **get secret**. |
 | `get forms` | Finds AR forms whose name contains your keyword. Prints **Form name** and **Schema ID**. Args: **KEYWORD**. |
 | `get fields` | Lists fields on a form. Args: **SCHEMAID** [**KEYWORD**] from **get forms**. |
+| `get precheckresults` | Downloads results from the pre-checker stage of the **HELIX_FULL_STACK_UPGRADE** pipeline and saves them as **prechecker.tar.gz**. |
 | `sql` | Runs a custom AR SQL query and prints the result. Args: **SQL_QUERY** (put the full query inside the quoted `-u` string). |
 | `gendbid` | Builds a DBID from **DB_TYPE**, **DATABASE_HOST_NAME**, and **AR_DB_NAME** before deployment. |
 | `check arservers` | Lists each Helix IS platform pod with pod readiness and AR Server readiness. |
@@ -77,6 +78,9 @@ bash hitt.sh -v -u "get configmap my-configmap helix-is"
 
 # Custom AR SQL
 bash hitt.sh -u "sql select [name],[Schema ID] from [AR System Metadata: arschema] where [name] like '%field%'"
+
+# Download HELIX_FULL_STACK_UPGRADE pre-checker results
+bash hitt.sh -u "get precheckresults"
 
 # Generate DBID before deployment (mssql | oracle | postgres)
 bash hitt.sh -u "gendbid mssql my-db-server.acme.com arsystem"
@@ -191,12 +195,21 @@ Use double quotes when the keyword contains spaces.
 
 Use after **get forms** gave you a **Schema ID**.
 
+
 - **SCHEMAID only** — lists every field on that form.
 - **SCHEMAID and KEYWORD** — lists fields whose name contains the keyword.
 
 ```bash
 bash hitt.sh -u "get fields 163"
 bash hitt.sh -u "get fields 163 Login"
+```
+
+## `get precheckresults`
+
+Downloads results from the pre-checker stage of the **HELIX_FULL_STACK_UPGRADE** pipeline and saves them as **prechecker.tar.gz** in the current directory.
+
+```bash
+bash hitt.sh -u "get precheckresults"
 ```
 
 ## Custom AR SQL (`sql SQL_QUERY`)
