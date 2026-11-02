@@ -238,19 +238,26 @@ UNZIP_BIN=unzip
 EOF
 
 if [ ! -f "${1}" ]; then
-  logError "227" "Failed to create '${1}' file - please check you have permissions to create files in the current directory." 1
+  logErrorExit "227" "Failed to create '${1}' file - please check you have permissions to create files in the current directory."
 fi
 }
 
 logError() {
-  # Print error message MSG_ID MSG / exit if value of 1 passed as third parameter
+  # Print error message MSG_ID MSG (does not exit).
+  # Optional $3=1 forces print even when QUIET=1 (used by logErrorExit).
   stopOnError "${1}"
   MSG="${BOLD}${RED}ERROR${NORMAL} (${1}) - ${2}"
-  [[ "${QUIET}" == "0" ]] || [[ -n "${3}" ]] && echo -e "${MSG}" >&2
+  [[ "${QUIET}" == "0" ]] || [[ "${3}" == "1" ]] && echo -e "${MSG}" >&2
   ((FAIL++))
   ERROR_ARRAY+=("(${1}) - ${2}")
   logMessageDetails "${1}" "${MSG}"
-  if [ -z "${IGNORE_ERRORS}" ] && [ "${3}" == "1" ] ; then exit 1; fi
+}
+
+logErrorExit() {
+  # Print error message MSG_ID MSG and exit 1 (unless IGNORE_ERRORS is set).
+  # Always prints, including when QUIET=1.
+  logError "${1}" "${2}" 1
+  if [ -z "${IGNORE_ERRORS}" ]; then exit 1; fi
 }
 
 logWarning() {
@@ -308,7 +315,7 @@ usage() {
 
 checkVars() {
   if [ -z "${HP_NAMESPACE}" ] || [ -z "${IS_NAMESPACE}" ] || [ -z "${IS_CUSTOMER_SERVICE}" ] || [ -z "${IS_ENVIRONMENT}" ] ; then
-    logError "100" "Please set the namespace and IS variables in the ${HITT_CONFIG_FILE} file." 1
+    logErrorExit "100" "Please set the namespace and IS variables in the ${HITT_CONFIG_FILE} file."
   fi
 }
 
@@ -318,7 +325,7 @@ checkRequiredTools() {
     checkBinary "${!BINARY_VAR}" "${i}"
   done
   if [ -n "${MISSING}" ] ; then
-    logError "999" "One or more required tools not found - cannot continue." 1
+    logErrorExit "999" "One or more required tools not found - cannot continue."
   fi
 }
 
@@ -433,7 +440,7 @@ checkNamespaceExists() {
   if checkK8sAuth get ns; then
   # namespace_name - exit if not found
     if ! ${KUBECTL_BIN} get ns "${1}" > /dev/null 2>&1 ; then
-      logError "106" "${NS_TYPE} namespace '${1}' not found." 1
+      logErrorExit "106" "${NS_TYPE} namespace '${1}' not found."
     else
       logMessage "${NS_TYPE} namespace '${1}' found." 1
       checkNSResourceQuotas "${1}"
@@ -449,7 +456,7 @@ checkHPNamespace() {
   NS_TYPE="Helix Platform"
   checkNamespaceExists "${1}"
     if ! ${KUBECTL_BIN} -n "${1}" get deployment "${DEPLOYMENT}" > /dev/null 2>&1 ; then
-    logError "107" "Deployment '${DEPLOYMENT}' not found in '${1}' - please check the ${NS_TYPE} namespace name." 1
+    logErrorExit "107" "Deployment '${DEPLOYMENT}' not found in '${1}' - please check the ${NS_TYPE} namespace name."
   else
     logMessage "${NS_TYPE} namespace is '${1}'."
   fi
@@ -468,7 +475,7 @@ checkISNamespace() {
   fi
   if [[ ("${MODE}" == "post-is" || "${MODE}" == "upgrade-is") ]]; then
     if ! ${KUBECTL_BIN} -n "${1}" get secret cacerts > /dev/null 2>&1 ; then
-      logError "107" "cacerts secret not found in '${1}' namespace - please check the ${NS_TYPE} namespace name." 1
+      logErrorExit "107" "cacerts secret not found in '${1}' namespace - please check the ${NS_TYPE} namespace name."
     fi
   fi
   logMessage "${NS_TYPE} namespace is '${1}'."
@@ -557,7 +564,7 @@ resolvePodNamespace() {
       ;;
     *)
       if [[ "${QUIET}" == "1" ]]; then
-        logError "999" "Pod '${pod_name}' exists in more than one configured namespace; omit -q to choose interactively." 1
+        logErrorExit "999" "Pod '${pod_name}' exists in more than one configured namespace; omit -q to choose interactively."
       fi
       logStatus "Pod '${pod_name}' exists in multiple namespaces — select namespace:" 1
       selectFromArray pod_ns_matches
@@ -572,12 +579,12 @@ checkPodProbe()
   local pod_namespace container_array container_name pod_json probe_json
 
   pod_namespace=$(resolvePodNamespace "${pod_name}") || \
-    logError "999" "Pod '${pod_name}' not found in IS, HP, or CDE namespace." 1
+    logErrorExit "999" "Pod '${pod_name}' not found in IS, HP, or CDE namespace."
   logMessage "Pod '${pod_name}' in namespace '${pod_namespace}'." 1
 
   pod_json=$(getPodJSON "${pod_name}" "${pod_namespace}")
   if [ "${pod_json}" == "" ]; then
-    logError "999" "Failed to get details of pod '${pod_name}' in the '${pod_namespace}' namespace." 1
+    logErrorExit "999" "Failed to get details of pod '${pod_name}' in the '${pod_namespace}' namespace."
   fi
 
   readarray -t container_array < <(${JQ_BIN} -r '.spec.containers[].name' <<< "${pod_json}")
@@ -589,36 +596,36 @@ checkPodProbe()
   fi
 
   if [[ -z "${container_name:-}" ]]; then
-    logError "999" "Pod '${pod_name}' has no containers." 1
+    logErrorExit "999" "Pod '${pod_name}' has no containers."
   fi
   if ! echo "${pod_json}" | ${JQ_BIN} -e --arg name "${container_name}" --arg type "${probe_type}" \
     '.spec.containers[] | select(.name == $name) | .[($type + "Probe")] | select(. != null)' \
     >/dev/null 2>>"${HITT_ERR_FILE}"; then
-    logError "999" "Container '${container_name}' in pod '${pod_name}' does not have a ${probe_type}Probe." 1
+    logErrorExit "999" "Container '${container_name}' in pod '${pod_name}' does not have a ${probe_type}Probe."
   fi
 
   probe_json=$(getProbeFromJSON "${probe_type}" "${pod_json}" "${container_name}")
 
   if ! echo "${probe_json}" | ${JQ_BIN} -e '.httpGet' >/dev/null 2>>"${HITT_ERR_FILE}"; then
     echo "${probe_json}"
-    logError "999" "HITT only supports httpGet probes at this time." 1
+    logErrorExit "999" "HITT only supports httpGet probes at this time."
   fi
 
   local http_details probe_url timeout
   if ! http_details=$(parseProbeJSON "${probe_json}" "${pod_json}" "${container_name}"); then
-    logError "999" "Could not parse httpGet probe for container '${container_name}' in pod '${pod_name}'." 1
+    logErrorExit "999" "Could not parse httpGet probe for container '${container_name}' in pod '${pod_name}'."
   fi
 
   probe_url=$(${JQ_BIN} -r '"\(.scheme)://\(.host):\(.port)\(.path)"' <<<"${http_details}")
   logMessage "${probe_type}Probe target: ${probe_url}" 1
 
   if ! platformPodReady "${CURL_POD}" "${CURL_CONTAINER}"; then
-    logError "999" "Curl pod '${CURL_POD}' (container '${CURL_CONTAINER}') is not ready in '${IS_NAMESPACE}'." 1
+    logErrorExit "999" "Curl pod '${CURL_POD}' (container '${CURL_CONTAINER}') is not ready in '${IS_NAMESPACE}'."
   fi
 
   timeout=$(${JQ_BIN} -r '.timeoutSeconds // 10' <<<"${probe_json}")
   if ! curlProbeHttp "${http_details}" "${timeout}"; then
-    logError "999" "Failed to run curl for ${probe_type}Probe from ${CURL_POD}/${CURL_CONTAINER}." 1
+    logErrorExit "999" "Failed to run curl for ${probe_type}Probe from ${CURL_POD}/${CURL_CONTAINER}."
   fi
 }
 
@@ -737,8 +744,8 @@ getPodJSON()
 checkPlatformPodsReadiness() {
   local pods_json row pod ready readiness http_code
 
-  [[ -n "${IS_NAMESPACE:-}" ]] || logError "999" "IS_NAMESPACE is not set in ${HITT_CONFIG_FILE}." 1
-  pods_json=$(discoverPlatformPodsJSON) || logError "999" "Unable to list platform pods in '${IS_NAMESPACE}'." 1
+  [[ -n "${IS_NAMESPACE:-}" ]] || logErrorExit "999" "IS_NAMESPACE is not set in ${HITT_CONFIG_FILE}."
+  pods_json=$(discoverPlatformPodsJSON) || logErrorExit "999" "Unable to list platform pods in '${IS_NAMESPACE}'."
   PLATFORM_PODS_JSON='[]'
 
   while IFS= read -r row; do
@@ -821,7 +828,7 @@ getVersions() {
   [[ "${MODE}" == "jenkins" ]] && return
   HP_CONFIG_MAP_JSON=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get cm helix-on-prem-config -o json 2>>${HITT_ERR_FILE})
   if [ "${HP_CONFIG_MAP_JSON}" == "" ]; then
-    logError "999" "Unable to read the 'helix-on-prem-config' configMap from the Helix Platform namespace - cannot continue until the Platform is installed." 1
+    logErrorExit "999" "Unable to read the 'helix-on-prem-config' configMap from the Helix Platform namespace - cannot continue until the Platform is installed."
   fi
   HP_VERSION=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.version' | head -1)
   HP_INGRESS_CLASS=$(echo "${HP_CONFIG_MAP_JSON}" | ${JQ_BIN} -r '.data.infra_config' | grep ^INGRESS_CLASS | cut -d '=' -f2)
@@ -972,7 +979,7 @@ lookupISDBVersion() {
 
 setISDBVersion() {
   if ! IS_DB_VERSION=$(lookupISDBVersion "${1}"); then
-    logError "109" "Unknown Helix IS version '${1}' - please check https://bit.ly/gethitt for HITT updates." 1
+    logErrorExit "109" "Unknown Helix IS version '${1}' - please check https://bit.ly/gethitt for HITT updates."
   fi
 }
 
@@ -1106,7 +1113,7 @@ getRSSODetails() {
       fi
     fi
   else
-    logError "112" "Unable to get the RSSO admin token. RSSO response: ${RSSO_TOKEN_JSON}" 1
+    logErrorExit "112" "Unable to get the RSSO admin token. RSSO response: ${RSSO_TOKEN_JSON}"
   fi
 }
 
@@ -1183,7 +1190,7 @@ getTenantDetails() {
   TENANT_JSON=$(${CURL_BIN} -sk -X GET "${RSSO_URL}"/api/v1.1/tenant -H "Authorization: RSSO ${RSSO_TOKEN}" | ${JQ_BIN} .tenants)
   TENANT_ARRAY=($(echo "${TENANT_JSON}" | ${JQ_BIN} -r .[].name | grep -v SAAS_TENANT))
   if [ "${#TENANT_ARRAY[@]}" == "0" ]; then
-    logError "114" "No tenants, or only the SAAS_TENANT, found in SSO. Please review the Helix Platform deployment.log." 1
+    logErrorExit "114" "No tenants, or only the SAAS_TENANT, found in SSO. Please review the Helix Platform deployment.log."
   fi
   if [ "${#TENANT_ARRAY[@]}" != "1" ]; then
 #    echo "${TENANT_ARRAY}"
@@ -1286,10 +1293,10 @@ parseTctlCommand() {
   TCTL_CMD="${command_part}"
 
   if [[ ! -f "${file_path}" ]]; then
-    logError "276" "tctl JSON file not found: '${file_path}'." 1
+    logErrorExit "276" "tctl JSON file not found: '${file_path}'."
   fi
   if ! TCTL_FILE_JSON=$(${JQ_BIN} -c . "${file_path}" 2>/dev/null); then
-    logError "277" "tctl JSON file is not valid JSON: '${file_path}'." 1
+    logErrorExit "277" "tctl JSON file is not valid JSON: '${file_path}'."
   fi
   TCTL_FILE_USED=1
 }
@@ -1880,7 +1887,7 @@ checkJenkinsIsRunning() {
       getJenkinsCrumb
       ;;
     401|403)
-      logError "127" "Jenkins authentication is enabled but the credentials in ${HITT_CONFIG_FILE} are blank or wrong.  Please set correct credentials in the HITT config file '${HITT_CONFIG_FILE}'." 1
+      logErrorExit "127" "Jenkins authentication is enabled but the credentials in ${HITT_CONFIG_FILE} are blank or wrong.  Please set correct credentials in the HITT config file '${HITT_CONFIG_FILE}'."
       SKIP_JENKINS=1
       ;;
     *)
@@ -1914,7 +1921,7 @@ jenkinsPipelineBuildExists() {
     200) return 0 ;;
     404) return 1 ;;
     *)
-      logError "999" "Unable to verify Jenkins build #${build_num} for '${job_name}' (HTTP ${http_code})." 1
+      logErrorExit "999" "Unable to verify Jenkins build #${build_num} for '${job_name}' (HTTP ${http_code})."
       ;;
   esac
 }
@@ -2097,7 +2104,7 @@ createInputFileVarsArray() {
 downloadJenkinsCLIJar() {
   ${CURL_BIN} -sk "${JENKINS_URL}/jnlpJars/jenkins-cli.jar" -o jenkins-cli.jar
   if [ ! -f jenkins-cli.jar ]; then
-    logError "999" "Failed to download jenkins-cli.jar file from Jenkins." 1
+    logErrorExit "999" "Failed to download jenkins-cli.jar file from Jenkins."
   fi
 }
 
@@ -2191,7 +2198,7 @@ getPipelineValues() {
   ISP_CUSTOMER_SERVICE=$(parseJenkinsParam CUSTOMER_SERVICE)
   ISP_ENVIRONMENT=$(parseJenkinsParam ENVIRONMENT)
   if isBlank "${ISP_CUSTOMER_SERVICE}" || isBlank "${ISP_ENVIRONMENT}" ; then
-    logError "128" "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all required values in the HELIX_ONPREM_DEPLOYMENT pipeline." 1
+    logErrorExit "128" "CUSTOMER_SERVICE and/or ENVIRONMENT are blank - please enter all required values in the HELIX_ONPREM_DEPLOYMENT pipeline."
   fi
   if ! isRFC1123 "${ISP_CUSTOMER_SERVICE}" ; then
     logError "258" "The CUSTOMER_SERVICE value '${ISP_CUSTOMER_SERVICE}' is not valid - it should consist of lower case alphanumeric, '-' or '.' characters."
@@ -3232,13 +3239,13 @@ hittResolveGsiFromToken() {
   local token="${1}"
   local row matches_json match_count names
 
-  [[ -z "${token}" ]] && logError "999" "Usage: bash $0 -u \"get gsi GSI_ID|NAME|list\"" 1
+  [[ -z "${token}" ]] && logErrorExit "999" "Usage: bash $0 -u \"get gsi GSI_ID|NAME|list\""
 
   if [[ "${token}" =~ ^[0-9]+$ ]]; then
     row=$(echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -c --argjson id "${token}" \
       'first(.[] | select(.id == $id)) // empty')
     if [[ -z "${row}" || "${row}" == "null" ]]; then
-      logError "999" "Unknown GSI id '${token}' — not in the AR_SERVER_INFO catalog. Use \"get gsi list\"." 1
+      logErrorExit "999" "Unknown GSI id '${token}' — not in the AR_SERVER_INFO catalog. Use \"get gsi list\"."
     fi
     GSI_ID=$(echo "${row}" | ${JQ_BIN} -r '.id')
     GSI_NAME=$(echo "${row}" | ${JQ_BIN} -r '.name')
@@ -3263,11 +3270,11 @@ hittResolveGsiFromToken() {
 
   match_count=$(echo "${matches_json}" | ${JQ_BIN} 'length')
   if [[ "${match_count}" -eq 0 ]]; then
-    logError "999" "Unknown GSI '${token}' — no matching AR_SERVER_INFO name. Use \"get gsi list\"." 1
+    logErrorExit "999" "Unknown GSI '${token}' — no matching AR_SERVER_INFO name. Use \"get gsi list\"."
   fi
   if [[ "${match_count}" -gt 1 ]]; then
     names=$(echo "${matches_json}" | ${JQ_BIN} -r '[.[].name] | join(", ")')
-    logError "999" "GSI '${token}' is ambiguous (${match_count} matches: ${names}). Use a more specific name or a numeric id from \"get gsi list\"." 1
+    logErrorExit "999" "GSI '${token}' is ambiguous (${match_count} matches: ${names}). Use a more specific name or a numeric id from \"get gsi list\"."
   fi
   row=$(echo "${matches_json}" | ${JQ_BIN} -c '.[0]')
   GSI_ID=$(echo "${row}" | ${JQ_BIN} -r '.id')
@@ -3513,13 +3520,13 @@ ensureKubectlBin() {
     source "./${HITT_CONFIG_FILE}"
   fi
   if [[ "${KUBECTL_BIN}" != */* ]] && ! command -v "${KUBECTL_BIN}" >/dev/null 2>&1; then
-    logError "105" "kubectl command not found ('${KUBECTL_BIN}'). Set KUBECTL_BIN in '${HITT_CONFIG_FILE}' to the full path to the binary (shell aliases are not supported)." 1
+    logErrorExit "105" "kubectl command not found ('${KUBECTL_BIN}'). Set KUBECTL_BIN in '${HITT_CONFIG_FILE}' to the full path to the binary (shell aliases are not supported)."
   fi
   if [[ "${KUBECTL_BIN}" == */* ]] && [[ ! -x "${KUBECTL_BIN}" ]]; then
-    logError "105" "'${KUBECTL_BIN}' is not executable — check KUBECTL_BIN in '${HITT_CONFIG_FILE}'." 1
+    logErrorExit "105" "'${KUBECTL_BIN}' is not executable — check KUBECTL_BIN in '${HITT_CONFIG_FILE}'."
   fi
   if ! "${KUBECTL_BIN}" version --client >/dev/null 2>&1; then
-    logError "184" "'${KUBECTL_BIN} version --client' returned an error — unable to continue." 1
+    logErrorExit "184" "'${KUBECTL_BIN} version --client' returned an error — unable to continue."
   fi
 }
 
@@ -3530,7 +3537,7 @@ checkKubeconfig() {
     KUBECONFIG_ERROR=1
   fi
   if ! ${KUBECTL_BIN} version > /dev/null 2>&1; then
-    logError "184" "'kubectl version' command returned an error - unable to continue." 1
+    logErrorExit "184" "'kubectl version' command returned an error - unable to continue."
   fi
   if [ -n "${KUBECONFIG}" ] && [ "${KUBECONFIG}" != "${HOME}/.kube/config" ]; then
     if [ "${MODE}" == "info" ]; then return; fi
@@ -4061,11 +4068,11 @@ checkForNewHITT() {
     "Update HITT and rerun"|"Update HITT and stop")
       if ! hittVerifyPublishedSha256 "${remote_tmp}" "${HITT_SHA256_URL}"; then
         rm -f "${remote_tmp}"
-        logError "999" "Downloaded HITT failed sha256 verification — update aborted." 1
+        logErrorExit "999" "Downloaded HITT failed sha256 verification — update aborted."
       fi
       if ! hittInstallDownloadedScript "${remote_tmp}"; then
         rm -f "${remote_tmp}"
-        logError "999" "Failed to install updated HITT." 1
+        logErrorExit "999" "Failed to install updated HITT."
       fi
       rm -f "${remote_tmp}"
       target=$(hittScriptPath)
@@ -4183,7 +4190,7 @@ getJenkinsGlobalLibs() {
       GLOBAL_LIBS_JAVA="GlobalUntrustedLibraries"
       ;;
     *)
-      logError "999" "getJenkinsGlobalLibs: first argument must be 'trusted' or 'untrusted' (default: trusted)." 1
+      logErrorExit "999" "getJenkinsGlobalLibs: first argument must be 'trusted' or 'untrusted' (default: trusted)."
       ;;
   esac
 
@@ -4875,7 +4882,7 @@ downloadISCacertsFromSecret() {
   CACERTS_FILENAME="${CACERTS_FILENAME:-is-sealcacerts}"
   logMessage "Downloading cacerts from the '${IS_NAMESPACE}' cacerts secret..."
   if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts >/dev/null 2>&1; then
-    logError "999" "'cacerts' secret not found in Helix IS namespace '${IS_NAMESPACE}'." 1
+    logErrorExit "999" "'cacerts' secret not found in Helix IS namespace '${IS_NAMESPACE}'."
   fi
   IS_CACERTS_JSON=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret cacerts -o json 2>>"${HITT_ERR_FILE}")
   IS_CACERTS=$(echo "${IS_CACERTS_JSON}" | ${JQ_BIN} -r '.data.cacerts')
@@ -4889,7 +4896,7 @@ downloadISCacertsFromSecret() {
     IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
   fi
   if ! ${KEYTOOL_BIN} -list -keystore "${CACERTS_FILENAME}" -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" >/dev/null 2>&1; then
-    logError "999" "Downloaded cacerts file could not be opened — check CACERTS_SSL_TRUSTSTORE_PASSWORD for the IS namespace." 1
+    logErrorExit "999" "Downloaded cacerts file could not be opened — check CACERTS_SSL_TRUSTSTORE_PASSWORD for the IS namespace."
   fi
   logMessage "Downloaded cacerts from '${IS_NAMESPACE}' to '${CACERTS_FILENAME}'."
 }
@@ -4915,26 +4922,26 @@ validatePemCertificateFile() {
   cert_count=$(grep -c "BEGIN CERTIFICATE" "${pem_file}" 2>/dev/null || true)
   cert_count=${cert_count:-0}
   if ! [[ "${cert_count}" =~ ^[0-9]+$ ]] || [ "${cert_count}" -eq 0 ]; then
-    logError "999" "No certificates found in '${pem_file}' — expected a PEM file with one or more CERTIFICATE blocks." 1
+    logErrorExit "999" "No certificates found in '${pem_file}' — expected a PEM file with one or more CERTIFICATE blocks."
   fi
   logMessage "Found ${cert_count} certificate(s) in '${pem_file}'."
   cert_count=$(splitPemCertificatesToDir "${pem_file}" "${out_dir}")
   cert_count=${cert_count:-0}
   if ! [[ "${cert_count}" =~ ^[0-9]+$ ]] || [ "${cert_count}" -eq 0 ]; then
-    logError "999" "Unable to read certificates from '${pem_file}'." 1
+    logErrorExit "999" "Unable to read certificates from '${pem_file}'."
   fi
   idx=0
   for cert_file in "${out_dir}"/cert_*.pem; do
     [[ -f "${cert_file}" ]] || continue
     idx=$((idx + 1))
     if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout 2>>"${HITT_ERR_FILE}"; then
-      logError "999" "Certificate ${idx} in '${pem_file}' is not a valid X.509 certificate." 1
+      logErrorExit "999" "Certificate ${idx} in '${pem_file}' is not a valid X.509 certificate."
     fi
     subject=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -subject 2>/dev/null | sed 's/^subject=//')
     end_date=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')
     logMessage "Certificate ${idx}: ${subject}"
     if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout -checkend 0 >/dev/null 2>/dev/null; then
-      logError "999" "Certificate ${idx} has expired (${end_date})." 1
+      logErrorExit "999" "Certificate ${idx} has expired (${end_date})."
     fi
     if ! ${OPENSSL_BIN} x509 -in "${cert_file}" -noout -checkend "${expiry_warn}" >/dev/null 2>/dev/null; then
       logWarning "999" "Certificate ${idx} expires within 4 weeks (${end_date}) — continuing."
@@ -4997,7 +5004,7 @@ importPemCertificatesFromDir() {
       addcertRecordKeystoreFingerprint "${fp}"
       imported=$((imported + 1))
     else
-      logError "999" "Failed to import certificate into cacerts (alias '${alias}')." 1
+      logErrorExit "999" "Failed to import certificate into cacerts (alias '${alias}')."
     fi
   done
   addcertCleanupKeystoreFingerprintSet
@@ -5045,10 +5052,10 @@ hittUtilCheckCert() {
   local pem_file="${1}"
   pem_file="${pem_file/#\~/$HOME}"
   if [[ ! -f "${pem_file}" ]]; then
-    logError "999" "Certificate file '${pem_file}' not found." 1
+    logErrorExit "999" "Certificate file '${pem_file}' not found."
   fi
   if [[ ! -s "${pem_file}" ]]; then
-    logError "999" "Certificate file '${pem_file}' is empty." 1
+    logErrorExit "999" "Certificate file '${pem_file}' is empty."
   fi
   checkBinary curl
   addcertPreparePemCertDir "${pem_file}"
@@ -5107,13 +5114,13 @@ getItsmInstallerRepoUrl() {
   if isJenkinsInCluster; then
     setupGiteaUrlFromCluster
     if [ -z "${GITEA_HOST}" ] || [ "${GITEA_HOST}" == "null" ]; then
-      logError "999" "Unable to find Gitea connection details — cannot access the ITSM installer repository." 1
+      logErrorExit "999" "Unable to find Gitea connection details — cannot access the ITSM installer repository."
     fi
     echo "${GITEA_URL}/${GITEA_ADMIN_USER}/itsm-on-premise-installer"
   else
     GIT_REPO_DIR=$(parseJenkinsParam GIT_REPO_DIR)
     if [ -z "${GIT_REPO_DIR}" ] || [ "${GIT_REPO_DIR}" == "null" ]; then
-      logError "999" "GIT_REPO_DIR is not set in the HELIX_ONPREM_DEPLOYMENT pipeline — cannot access the ITSM installer repository." 1
+      logErrorExit "999" "GIT_REPO_DIR is not set in the HELIX_ONPREM_DEPLOYMENT pipeline — cannot access the ITSM installer repository."
     fi
     echo "${GIT_REPO_DIR}/ITSM_REPO/itsm-on-premise-installer.git"
   fi
@@ -5130,20 +5137,20 @@ cloneItsmInstallerCacertsSparse() {
   logMessage "Checking out ${cacerts_path} from the ITSM installer repository (branch ${default_branch})..."
   if ! gitGiteaCmd clone --depth 1 --filter=blob:none --no-checkout \
     "${repo_url}" itsmrepo >>"${HITT_ERR_FILE}" 2>&1; then
-    logError "999" "Failed to clone the ITSM installer repository." 1
+    logErrorExit "999" "Failed to clone the ITSM installer repository."
   fi
   # Target is a single file — non-cone sparse checkout (cone mode needs --skip-checks for files).
   if ! gitItsmRepoCmd sparse-checkout init --no-cone >>"${HITT_ERR_FILE}" 2>&1 \
     || ! gitItsmRepoCmd sparse-checkout set "${cacerts_path}" >>"${HITT_ERR_FILE}" 2>&1; then
     if ! gitItsmRepoCmd sparse-checkout set --skip-checks "${cacerts_path}" >>"${HITT_ERR_FILE}" 2>&1; then
-      logError "999" "Failed to configure sparse checkout for ${cacerts_path}." 1
+      logErrorExit "999" "Failed to configure sparse checkout for ${cacerts_path}."
     fi
   fi
   if ! gitItsmRepoCmd checkout "${default_branch}" >>"${HITT_ERR_FILE}" 2>&1; then
-    logError "999" "Failed to check out ${cacerts_path} from branch '${default_branch}'." 1
+    logErrorExit "999" "Failed to check out ${cacerts_path} from branch '${default_branch}'."
   fi
   if [ ! -f "itsmrepo/${cacerts_path}" ]; then
-    logError "999" "File ${cacerts_path} was not found in the ITSM installer repository." 1
+    logErrorExit "999" "File ${cacerts_path} was not found in the ITSM installer repository."
   fi
   logMessage "Checked out ${cacerts_path} to itsmrepo/${cacerts_path}."
 }
@@ -5160,7 +5167,7 @@ commitPushItsmInstallerCacerts() {
   fi
   if ! gitItsmRepoCmd -c user.name=HITT -c user.email=hitt@noreply.local \
     commit -m "HITT addcert: import certificate(s) from ${pem_name}" >>"${HITT_ERR_FILE}" 2>&1; then
-    logError "999" "Failed to commit pipeline/tasks/cacerts to the ITSM installer repository." 1
+    logErrorExit "999" "Failed to commit pipeline/tasks/cacerts to the ITSM installer repository."
   fi
   push_branch=$(gitItsmRepoCmd rev-parse --abbrev-ref HEAD 2>/dev/null)
   if [ -z "${push_branch}" ] || [ "${push_branch}" == "HEAD" ]; then
@@ -5168,7 +5175,7 @@ commitPushItsmInstallerCacerts() {
   fi
   [ -z "${push_branch}" ] && push_branch=master
   if ! gitItsmRepoCmd push origin "HEAD:${push_branch}" >>"${HITT_ERR_FILE}" 2>&1; then
-    logError "999" "Failed to push pipeline/tasks/cacerts to the ITSM installer repository." 1
+    logErrorExit "999" "Failed to push pipeline/tasks/cacerts to the ITSM installer repository."
   fi
   logMessage "Committed and pushed pipeline/tasks/cacerts to the ITSM installer repository (branch ${push_branch})."
 }
@@ -5183,7 +5190,7 @@ fixAddCertToSecret() {
   fi
   validateCacertsFile IS
   if [ "${VALID_CACERTS}" != "0" ]; then
-    logError "999" "Updated cacerts file did not pass validation — the cacerts secret was not changed." 1
+    logErrorExit "999" "Updated cacerts file did not pass validation — the cacerts secret was not changed."
   fi
   if askYesNo "Updated cacerts file is valid — replace the cacerts secret in '${IS_NAMESPACE}'?"; then
     replaceISCacertsSecret
@@ -5204,7 +5211,7 @@ fixAddCertToGit() {
     IS_CACERTS_SSL_TRUSTSTORE_PASSWORD=changeit
   fi
   if ! ${KEYTOOL_BIN} -list -keystore "${CACERTS_FILENAME}" -storepass "${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" >/dev/null 2>&1; then
-    logError "999" "Checked-out cacerts file could not be opened — check the keystore password for this environment." 1
+    logErrorExit "999" "Checked-out cacerts file could not be opened — check the keystore password for this environment."
   fi
   addcertImportPemIntoKeystore "${pem_file}"
   if [ "${ADD_CERT_IMPORTED_COUNT}" -eq 0 ]; then
@@ -5213,7 +5220,7 @@ fixAddCertToGit() {
   fi
   validateCacertsFile IS
   if [ "${VALID_CACERTS}" != "0" ]; then
-    logError "999" "Updated cacerts file did not pass validation — pipeline/tasks/cacerts was not changed in git." 1
+    logErrorExit "999" "Updated cacerts file did not pass validation — pipeline/tasks/cacerts was not changed in git."
   fi
   if askYesNo "Updated cacerts file is valid — commit and push pipeline/tasks/cacerts to the ITSM installer repository?"; then
     commitPushItsmInstallerCacerts "${pem_file}"
@@ -5229,20 +5236,20 @@ fixAddCert() {
       ;;
     3)
       if [ "${FIXARGS[2]}" != "git" ]; then
-        logError "999" "Optional third argument for addcert must be 'git' only." 1
+        logErrorExit "999" "Optional third argument for addcert must be 'git' only."
       fi
       ADD_CERT_GIT=1
       ;;
     *)
-      logError "999" "Usage: bash $0 -f \"addcert /path/to/certificates.pem [git]\"" 1
+      logErrorExit "999" "Usage: bash $0 -f \"addcert /path/to/certificates.pem [git]\""
       ;;
   esac
   PEM_FILE="${FIXARGS[1]/#\~/$HOME}"
   if [ ! -f "${PEM_FILE}" ]; then
-    logError "999" "Certificate file '${PEM_FILE}' not found." 1
+    logErrorExit "999" "Certificate file '${PEM_FILE}' not found."
   fi
   if [ ! -s "${PEM_FILE}" ]; then
-    logError "999" "Certificate file '${PEM_FILE}' is empty." 1
+    logErrorExit "999" "Certificate file '${PEM_FILE}' is empty."
   fi
   addcertPreparePemCertDir "${PEM_FILE}"
   addcertPreparePlatformContext
@@ -5283,7 +5290,7 @@ replaceISCacertsSecret() {
   ${KUBECTL_BIN} -n "${IS_NAMESPACE}" delete secret cacerts >/dev/null 2>&1
   ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic cacerts --from-file=cacerts="${CACERTS_FILENAME}" --dry-run=client -o yaml | ${KUBECTL_BIN} create -f - >"${HITT_ERR_FILE}" 2>&1
   if [ $? -ne 0 ]; then
-    logError "999" "Failed to create cacerts secret in '${IS_NAMESPACE}' namespace. Check ${HITT_ERR_FILE} for errors and use 'kubectl create -f ${BACKUP_FILE}' to restore from backup." 1
+    logErrorExit "999" "Failed to create cacerts secret in '${IS_NAMESPACE}' namespace. Check ${HITT_ERR_FILE} for errors and use 'kubectl create -f ${BACKUP_FILE}' to restore from backup."
   fi
 }
 
@@ -5361,11 +5368,11 @@ EOF
 
 fixCacerts() {
   if [ ${#FIXARGS[@]} -ne 2 ]; then
-    logError "999" "Usage: bash $0 -f \"cacerts /path/to/new/cacerts-file\"" 1
+    logErrorExit "999" "Usage: bash $0 -f \"cacerts /path/to/new/cacerts-file\""
   fi
   NEWCACERTS="${FIXARGS[1]/#\~/$HOME}" # convert ~ to path if used
   if [ ! -f "${NEWCACERTS}" ]; then
-    logError "999" "New cacerts file '${NEWCACERTS}' not found." 1
+    logErrorExit "999" "New cacerts file '${NEWCACERTS}' not found."
   fi
   checkToolVersion kubectl
   getVersions
@@ -5451,10 +5458,10 @@ updateJenkinsKubeconfig() {
 
 checkValidKubeconfig() {
   if [ ! -f "${1}" ]; then
-    logError "999" "kubeconfig file '${1}' not found." 1
+    logErrorExit "999" "kubeconfig file '${1}' not found."
   fi
   if ! ${KUBECTL_BIN} --kubeconfig="${1}" version > /dev/null 2>&1; then
-    logError "999" "'kubectl version' command returned an error - is '${1}' a valid kubeconfig file?" 1
+    logErrorExit "999" "'kubectl version' command returned an error - is '${1}' a valid kubeconfig file?"
   fi
 }
 
@@ -5467,7 +5474,7 @@ fixJenkinsKubeconfig() {
       KUBECONFIG_FILE="${FIXARGS[2]/#\~/$HOME}" # convert ~ to path if used
       ;;
     *)
-      logError "999" "Usage: bash $0 -f \"jenkins kubeconfig\" (uses ~/.kube/config) OR \"jenkins kubeconfig /path/to/kubeconfig\"" 1
+      logErrorExit "999" "Usage: bash $0 -f \"jenkins kubeconfig\" (uses ~/.kube/config) OR \"jenkins kubeconfig /path/to/kubeconfig\""
       ;;
   esac
   checkValidKubeconfig "${KUBECONFIG_FILE}"
@@ -5516,7 +5523,7 @@ fixJenkinsPipelineLibs() {
       PLPATHS_ARRAY=($(find ~ -type d -name "${PLGIT}" 2>/dev/null))
       PATH_TO_PL=""
       if [ ${#PLPATHS_ARRAY[@]} -eq 0 ]; then
-        logError "999" "Unable to find the pipeline libraries git directory - please use 'bash $0 -f \"jenkins pipelinelibs /path/to/LIBRARY_REPO\"'". 1
+        logErrorExit "999" "Unable to find the pipeline libraries git directory - please use 'bash $0 -f \"jenkins pipelinelibs /path/to/LIBRARY_REPO\"'."
       elif [ ${#PLPATHS_ARRAY[@]} -eq 1 ]; then
         PATH_TO_PL="${PLPATHS_ARRAY[0]}"
         logMessage "Auto-selected '${PLNAME}' git directory: ${PATH_TO_PL}" 1
@@ -5534,7 +5541,7 @@ fixJenkinsPipelineLibs() {
       if [ -d "${PATH_TO_PL}" ]; then
         logMessage "'${PLNAME}' pipeline library git directory found at '${PATH_TO_PL}'." 1
       else
-        logError "999" "'${PLNAME}' git directory not found at '${PATH_TO_PL}'." 1
+        logErrorExit "999" "'${PLNAME}' git directory not found at '${PATH_TO_PL}'."
       fi
     fi
 
@@ -5703,12 +5710,12 @@ updateJenkinsSecretFileCredentials() {
 
 fixJenkinsCredentials() {
   if ! which sshpass  > /dev/null 2>&1 ; then
-    logError "999" "The 'sshpass' command was not found but is required to enable Jenkins credentials password validation. Please install 'sshpass'." 1
+    logErrorExit "999" "The 'sshpass' command was not found but is required to enable Jenkins credentials password validation. Please install 'sshpass'."
   fi
   logStatus "Please enter your GIT user password:"
   read -r -s -p "GIT user password : " GIT_USER_PASSWORD
   if ! sshpass -p "${GIT_USER_PASSWORD}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new "${GIT_USER}@${LONG_HOSTNAME}" whoami >/dev/null 2>&1 ; then
-    logError "999" "The GIT user password is incorrect." 1
+    logErrorExit "999" "The GIT user password is incorrect."
   fi
   echo ""
   updateJenkinsUserCredentials
@@ -5839,7 +5846,7 @@ fixJenkins() {
       fixJenkinsKubeconfig
       ;;
     *)
-      logError "999" "'${FIXARGS[1]}' is not a valid jenkins fix option." 1
+      logErrorExit "999" "'${FIXARGS[1]}' is not a valid jenkins fix option."
       ;;
   esac
 }
@@ -5854,7 +5861,7 @@ fixJenkinsPlugins() {
 ')
 
   if [ $(echo "${JENKINS_RECOMMENDED_PLUGINS_XML}" | wc -l) == "0" ]; then
-    logError "999" "Failed to get list of Jenkins recommended plugins from '${JENKINS_RECOMMENDED_PLUGINS_URL}'" 1
+    logErrorExit "999" "Failed to get list of Jenkins recommended plugins from '${JENKINS_RECOMMENDED_PLUGINS_URL}'"
   fi
   logMessage "Installing Jenkins recommended plugins..."
   ${CURL_BIN} --max-time 3 -b .cookies -skv -H "Jenkins-Crumb:${JENKINS_CRUMB}" -d "${JENKINS_RECOMMENDED_PLUGINS_XML}" -H "Content-Type: text/xml" "${JENKINS_URL}/pluginManager/installNecessaryPlugins" 2>>${HITT_ERR_FILE}
@@ -5898,7 +5905,7 @@ generateISDbID() {
       DB_TYPE="POSTGRESQL"
       ;;
     *)
-      logError "999" "Invalid DB_TYPE '${IS_DB_TYPE}' - valid options are mssql|oracle|postgres." 1
+      logErrorExit "999" "Invalid DB_TYPE '${IS_DB_TYPE}' - valid options are mssql|oracle|postgres."
       ;;
   esac
   IS_DBID_SOURCE="${DB_TYPE^^}|${IS_DATABASE_HOST_NAME^^}|${IS_AR_DB_NAME^^}"
@@ -5936,7 +5943,7 @@ getISJWTToken() {
   fi
   logStatus "Getting IS REST API JWT for user '${IS_USERNAME}'..."
   if ! getISJWT; then
-    logError "999" "Failed to authenticate user '${IS_USERNAME}' - can't get JWT." 1
+    logErrorExit "999" "Failed to authenticate user '${IS_USERNAME}' - can't get JWT."
   fi
   printf 'ARJWT="%s"\n' "${ARJWT}"
 }
@@ -5969,7 +5976,7 @@ applyARLicense() {
   # is license already present?
   NUM_LICS=$(${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses?q=%27Key%27%3D%22${IS_LICENSE_KEY}%22&fields=values(Key)" -H "Authorization: AR-JWT ${ARJWT}" | ${JQ_BIN} -r '.entries |length')
   if [[ $NUM_LICS -ne 0 ]]; then
-    logError "999" "License with key '${IS_LICENSE_KEY}' is already present." 1
+    logErrorExit "999" "License with key '${IS_LICENSE_KEY}' is already present."
   fi
   HTTP_RESPONSE=$(mktemp)
   HTTP_CODE=$(${CURL_BIN} -o "${HTTP_RESPONSE}" -sk -w "%{http_code}" -X POST "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1/entry/AR%20System%20Licenses" -H "Authorization: AR-JWT ${ARJWT}" -H 'Content-Type: application/json' -d "${IS_LICENSE_JSON}" 2>/dev/null)
@@ -6107,7 +6114,7 @@ getPipelineConsoleOutput() {
   if ! ${CURL_BIN} -skf -b .cookies -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
     "${JENKINS_URL}/job/${1^^}/lastBuild/consoleText" > "${body_file}"; then
     rm -f "${body_file}"
-    logError "999" "Failed to read console log from the Deployment Engine." 1
+    logErrorExit "999" "Failed to read console log from the Deployment Engine."
   fi
   stripJenkinsConsoleText "${body_file}"
   rm -f "${body_file}"
@@ -6127,7 +6134,7 @@ jenkinsFollowProgressiveText() {
       -b .cookies -H "Jenkins-Crumb:${JENKINS_CRUMB}" \
       "${base_url}?start=${start}"; then
       rm -f "${headers_file}" "${body_file}"
-      logError "999" "Failed to read log from the Deployment Engine." 1
+      logErrorExit "999" "Failed to read log from the Deployment Engine."
     fi
     stripJenkinsConsoleText "${body_file}"
     more=$(awk 'BEGIN{IGNORECASE=1} /^X-More-Data:/ {gsub(/\r/,"",$2); print $2}' "${headers_file}")
@@ -6152,14 +6159,14 @@ parseConsoleLogOpts() {
   CONSOLE_TARGET=""
 
   if [ "${#CONSOLE_ARGS[@]}" -eq 0 ]; then
-    logError "999" "Usage: bash $0 -o <jenkins|agent|PIPELINE_NAME|help>" 1
+    logErrorExit "999" "Usage: bash $0 -o <jenkins|agent|PIPELINE_NAME|help>"
   fi
 
   if [ "${CONSOLE_ARGS[0]}" == "follow" ]; then
     CONSOLE_FOLLOW=1
     CONSOLE_ARGS=("${CONSOLE_ARGS[@]:1}")
     if [ "${#CONSOLE_ARGS[@]}" -eq 0 ]; then
-      logError "999" "Usage: bash $0 -o \"follow <PIPELINE_NAME> [POLL_SECONDS]\"" 1
+      logErrorExit "999" "Usage: bash $0 -o \"follow <PIPELINE_NAME> [POLL_SECONDS]\""
     fi
     local last_idx=$((${#CONSOLE_ARGS[@]} - 1))
     if [[ "${CONSOLE_ARGS[$last_idx]}" =~ ^[0-9]+$ ]]; then
@@ -6167,7 +6174,7 @@ parseConsoleLogOpts() {
       CONSOLE_ARGS=("${CONSOLE_ARGS[@]:0:$last_idx}")
     fi
     if [ "${#CONSOLE_ARGS[@]}" -eq 0 ]; then
-      logError "999" "Usage: bash $0 -o \"follow <PIPELINE_NAME> [POLL_SECONDS]\"" 1
+      logErrorExit "999" "Usage: bash $0 -o \"follow <PIPELINE_NAME> [POLL_SECONDS]\""
     fi
   fi
 
@@ -6234,13 +6241,13 @@ utilGetFields() {
   fi
   NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
   if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
-    logError "999" "AR SQL query response did not include a row count." 1
+    logErrorExit "999" "AR SQL query response did not include a row count."
   fi
   if [[ "${NUM_ROWS}" -eq 0 ]]; then
-    logError "999" "${ERR_MSG}" 1
+    logErrorExit "999" "${ERR_MSG}"
   fi
   if [[ "${NUM_ROWS}" -gt 100 ]]; then
-    logError "999" "${NUM_ROWS} fields found - please add a keyword." 1
+    logErrorExit "999" "${NUM_ROWS} fields found - please add a keyword."
   fi
   logStatus "Found ${NUM_ROWS} fields:"
   echo "${JSON}" | ${JQ_BIN} -r '
@@ -6254,10 +6261,10 @@ utilGetForms() {
   JSON=$(runARRESTSQL "select [name],[Schema ID],[schemaType],[nextId],[overlayProp] from [AR System Metadata: arschema] where [name] like '%${KEYWORD}%'")
   NUM_ROWS=$(echo "${JSON}" | ${JQ_BIN} '.rows | length')
   if [[ -z "${NUM_ROWS}" ]] || [[ "${NUM_ROWS}" == "null" ]]; then
-    logError "999" "AR SQL query response did not include a row count." 1
+    logErrorExit "999" "AR SQL query response did not include a row count."
   fi
   if [[ "${NUM_ROWS}" -eq 0 ]]; then
-    logError "999" "No forms with '${KEYWORD}' in their name found." 1
+    logErrorExit "999" "No forms with '${KEYWORD}' in their name found."
   fi
   STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}':"
   if [[ "${NUM_ROWS}" -gt 100 ]]; then
@@ -6268,7 +6275,7 @@ utilGetForms() {
     if [[ "${EXACT_ROWS}" -eq 1 ]]; then
       STATUS_MSG="Found ${NUM_ROWS} forms with names containing '${KEYWORD}' including one exact match. Please use a more specific keyword to see others."
     else
-      logError "999" "${NUM_ROWS} forms found with '${KEYWORD}' in their name - please use a more specific keyword." 1
+      logErrorExit "999" "${NUM_ROWS} forms found with '${KEYWORD}' in their name - please use a more specific keyword."
     fi
   fi
   logStatus "${STATUS_MSG}"
@@ -6779,7 +6786,7 @@ showHittHelp() {
 
 getJenkinsPipelineValues() {
   if [ ${#PIPELINEARGS[@]} -lt 2 ]; then
-    logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|kickstart|N> [filename]\"" 1
+    logErrorExit "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|kickstart|N> [filename]\""
   fi
 
   local PIPELINE_NAME=HELIX_ONPREM_DEPLOYMENT
@@ -6812,16 +6819,16 @@ getJenkinsPipelineValues() {
         else
           last_build_hint=" No builds found for this job."
         fi
-        logError "999" "Build #${PIPELINE_BUILD} not found for Jenkins job '${PIPELINE_NAME}'.${last_build_hint}" 1
+        logErrorExit "999" "Build #${PIPELINE_BUILD} not found for Jenkins job '${PIPELINE_NAME}'.${last_build_hint}"
       fi
       PIPELINE_VALUES_JSON=$(getPipelineValuesJSON getBuildByNumber ${PIPELINE_BUILD})
       ;;
     *)
-      logError "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|kickstart|N> [filename]\"" 1
+      logErrorExit "999" "Usage: bash $0 -k \"get <defaults|last|lastsuccessful|kickstart|N> [filename]\""
       ;;
   esac
   if ! echo "${PIPELINE_VALUES_JSON}" | ${JQ_BIN} -e . &>/dev/null; then
-    logError "999" "Pipeline values are not valid JSON." 1
+    logErrorExit "999" "Pipeline values are not valid JSON."
   fi
   local redact_passwords="true"
   if [ "${LOG_PASSWDS}" == "1" ]; then
@@ -6859,21 +6866,21 @@ triggerHelixOnpremPipelineBuild() {
   local jenkins_base rebuild_url rebuild_link pipeline_build_response_file=jenkins-pipeline-build-response.log
 
   if [ -z "${PIPELINE_INPUT_JSON}" ]; then
-    logError "999" "No pipeline parameter JSON supplied." 1
+    logErrorExit "999" "No pipeline parameter JSON supplied."
   fi
   if ! echo "${PIPELINE_INPUT_JSON}" | ${JQ_BIN} . &>/dev/null; then
-    logError "999" "Pipeline values JSON is not valid." 1
+    logErrorExit "999" "Pipeline values JSON is not valid."
   fi
 
   pipeline_file_params_json=$(getPipelineFileParams "${job_name}")
   if ! echo "${pipeline_file_params_json}" | ${JQ_BIN} -e 'type == "array"' &>/dev/null; then
-    logError "999" "Unable to discover file parameters from Jenkins job '${job_name}'." 1
+    logErrorExit "999" "Unable to discover file parameters from Jenkins job '${job_name}'."
   fi
   logMessage "Discovered $(echo "${pipeline_file_params_json}" | ${JQ_BIN} 'length') file parameter(s) to exclude from build request." 1
 
   pipeline_section_params_json=$(getPipelineSectionParams "${job_name}")
   if ! echo "${pipeline_section_params_json}" | ${JQ_BIN} -e 'type == "array"' &>/dev/null; then
-    logError "999" "Unable to discover PIPELINES section parameters from Jenkins job '${job_name}'." 1
+    logErrorExit "999" "Unable to discover PIPELINES section parameters from Jenkins job '${job_name}'."
   fi
   logMessage "Discovered $(echo "${pipeline_section_params_json}" | ${JQ_BIN} 'length') PIPELINES section parameter(s) from Jenkins." 1
 
@@ -6921,21 +6928,21 @@ triggerHelixOnpremPipelineBuild() {
       logMessage "Use ${BOLD}bash hitt.sh -k \"get last\"${NORMAL} to review values."
       ;;
     *)
-      logError "999" "Failed to queue ${job_name} pipeline build. See '${pipeline_build_response_file}' for details." 1
+      logErrorExit "999" "Failed to queue ${job_name} pipeline build. See '${pipeline_build_response_file}' for details."
       ;;
   esac
 }
 
 buildJenkinsPipelineFromFile() {
   if [ ${#PIPELINEARGS[@]} -ne 2 ]; then
-    logError "999" "Usage: bash $0 -k \"build json_values_file\"" 1
+    logErrorExit "999" "Usage: bash $0 -k \"build json_values_file\""
   fi
   PIPELINE_JSON_FILE="${PIPELINEARGS[1]}"
   if [ ! -f "${PIPELINE_JSON_FILE}" ]; then
-    logError "999" "HELIX_ONPREM_DEPLOYMENT pipeline values file '${PIPELINE_JSON_FILE}' not found." 1
+    logErrorExit "999" "HELIX_ONPREM_DEPLOYMENT pipeline values file '${PIPELINE_JSON_FILE}' not found."
   fi
   if ! ${JQ_BIN} . "${PIPELINE_JSON_FILE}" &>/dev/null ; then
-    logError "999" "Pipeline values file '${PIPELINE_JSON_FILE}' is not a valid JSON file." 1
+    logErrorExit "999" "Pipeline values file '${PIPELINE_JSON_FILE}' is not a valid JSON file."
   fi
   PIPELINE_INPUT_JSON=$(${JQ_BIN} -c . "${PIPELINE_JSON_FILE}")
   triggerHelixOnpremPipelineBuild "'${PIPELINE_JSON_FILE}'"
@@ -6956,7 +6963,7 @@ deleteJenkinsJobs() {
       JOBS_RANGE="${int1}..${int2}"
       MSG="builds"
   else
-      logError "999" "Invalid build range. Use a single build number or START-END (for example 42 or 1-50)." 1
+      logErrorExit "999" "Invalid build range. Use a single build number or START-END (for example 42 or 1-50)."
   fi
 
   SCRIPT="
@@ -7061,10 +7068,10 @@ exportK8sConfigMap() {
 
   CM_JSON=$(${KUBECTL_BIN} -n "${CM_NAMESPACE}" get configmap "${CM_NAME}" -o json 2>/dev/null)
   if [[ -z "${CM_JSON}" ]]; then
-    logError "999" "ConfigMap '${CM_NAME}' not found in '${CM_NAMESPACE}' namespace." 1
+    logErrorExit "999" "ConfigMap '${CM_NAME}' not found in '${CM_NAMESPACE}' namespace."
   fi
   if ! echo "${CM_JSON}" | ${JQ_BIN} -e '.metadata.name' &>/dev/null; then
-    logError "999" "ConfigMap '${CM_NAME}' not found in '${CM_NAMESPACE}' namespace." 1
+    logErrorExit "999" "ConfigMap '${CM_NAME}' not found in '${CM_NAMESPACE}' namespace."
   fi
   logMessage "Getting configMap '${CM_NAME}' from '${CM_NAMESPACE}' namespace..."
 
@@ -7100,7 +7107,7 @@ exportK8sConfigMap() {
   while IFS= read -r key; do
     [[ -z "${key}" ]] && continue
     if [[ "${key}" == */* ]] || [[ "${key}" == *..* ]]; then
-      logError "999" "ConfigMap data key '${key}' cannot be used as a file name (contains '/' or '..')." 1
+      logErrorExit "999" "ConfigMap data key '${key}' cannot be used as a file name (contains '/' or '..')."
     fi
     echo "${CM_JSON}" | ${JQ_BIN} -r --arg k "${key}" '.data[$k]' > "${export_dir}/${key}"
   done < <(echo "${CM_JSON}" | ${JQ_BIN} -r '.data // {} | keys[]' 2>/dev/null)
@@ -7108,7 +7115,7 @@ exportK8sConfigMap() {
   while IFS= read -r key; do
     [[ -z "${key}" ]] && continue
     if [[ "${key}" == */* ]] || [[ "${key}" == *..* ]]; then
-      logError "999" "ConfigMap binaryData key '${key}' cannot be used as a file name (contains '/' or '..')." 1
+      logErrorExit "999" "ConfigMap binaryData key '${key}' cannot be used as a file name (contains '/' or '..')."
     fi
     echo "${CM_JSON}" | ${JQ_BIN} -r --arg k "${key}" '.binaryData[$k]' | ${BASE64_BIN} -d > "${export_dir}/${key}"
   done < <(echo "${CM_JSON}" | ${JQ_BIN} -r '.binaryData // {} | keys[]' 2>/dev/null)
@@ -7130,11 +7137,11 @@ decodeK8sSecret() {
   K8S_SECRET=$(${KUBECTL_BIN} -n "${SECRETNAMESPACE}" get secret "${SECRETNAME}" -o json 2>/dev/null)
   # Check secret was found
   if [[ -z "${K8S_SECRET}" ]]; then
-    logError "999" "Secret '${SECRETNAME}' not found in '${SECRETNAMESPACE}' namespace." 1
+    logErrorExit "999" "Secret '${SECRETNAME}' not found in '${SECRETNAMESPACE}' namespace."
   fi
   # Test that it contains data we can decode
   if ! echo "${K8S_SECRET}" | ${JQ_BIN} -e '.data | type == "object" and length > 0' >/dev/null 2>&1; then
-    logError "999" "Secret '${SECRETNAME}' does not contain data that can be decoded by HITT." 1
+    logErrorExit "999" "Secret '${SECRETNAME}' does not contain data that can be decoded by HITT."
   fi
   logMessage "Getting secret '${SECRETNAME}' from '${SECRETNAMESPACE}' namespace..."
   # Check for binary data and decode
@@ -7190,7 +7197,7 @@ parseUtilGet() {
       ;;
     configmap)
       if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
-        logError "999" "Usage: bash $0 -u \"get configmap CM_NAME [NAMESPACE]\"" 1
+        logErrorExit "999" "Usage: bash $0 -u \"get configmap CM_NAME [NAMESPACE]\""
       fi
       if [ ${#UTILARGS[@]} -eq 4 ]; then
         exportK8sConfigMap "${UTILARGS[2]}" "${UTILARGS[3]}"
@@ -7198,14 +7205,14 @@ parseUtilGet() {
         populateUtilK8sObjectMatches configmap "${UTILARGS[2]}"
         case ${#UTIL_NS_MATCHES[@]} in
           0)
-            logError "999" "ConfigMap '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from ${HITT_CONFIG_FILE}. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get configmap ${UTILARGS[2]} NAMESPACE\"." 1
+            logErrorExit "999" "ConfigMap '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from ${HITT_CONFIG_FILE}. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get configmap ${UTILARGS[2]} NAMESPACE\"."
             ;;
           1)
             exportK8sConfigMap "${UTILARGS[2]}" "${UTIL_NS_MATCHES[0]}"
             ;;
           *)
             if [[ "${QUIET}" == "1" ]]; then
-              logError "999" "ConfigMap '${UTILARGS[2]}' exists in more than one configured namespace; omit -q to choose interactively, or pass NAMESPACE explicitly." 1
+              logErrorExit "999" "ConfigMap '${UTILARGS[2]}' exists in more than one configured namespace; omit -q to choose interactively, or pass NAMESPACE explicitly."
             fi
             logStatus "ConfigMap '${UTILARGS[2]}' exists in multiple namespaces — select namespace:" 1
             exportK8sConfigMap "${UTILARGS[2]}" "$(selectFromArray UTIL_NS_MATCHES)"
@@ -7221,11 +7228,11 @@ parseUtilGet() {
       ;;
     fields)
       if [ ${#UTILARGS[@]} -lt 3 ] ; then
-        logError "999" "Usage: bash $0 -u \"get fields SCHEMAID [KEYWORD]\"" 1
+        logErrorExit "999" "Usage: bash $0 -u \"get fields SCHEMAID [KEYWORD]\""
       fi
       SCHEMAID=${UTILARGS[2]}
       if [[ ! ${SCHEMAID} =~ ^[0-9]+$ ]]; then
-        logError "999" "Invalid schemaId '${SCHEMAID}' - must be a number. Use \"get forms\" to find schemaId." 1
+        logErrorExit "999" "Invalid schemaId '${SCHEMAID}' - must be a number. Use \"get forms\" to find schemaId."
       fi
       KEYWORD="${UTILARGS[3]}"
       if ((${#UTILARGS[@]} > 4)); then
@@ -7235,7 +7242,7 @@ parseUtilGet() {
       ;;
     forms)
       if [ ${#UTILARGS[@]} -le 2 ] ; then
-        logError "999" "Usage: bash $0 -u \"get forms KEYWORD\"" 1
+        logErrorExit "999" "Usage: bash $0 -u \"get forms KEYWORD\""
       fi
       KEYWORD="${UTILARGS[2]}"
       if ((${#UTILARGS[@]} > 3)); then
@@ -7251,14 +7258,14 @@ parseUtilGet() {
           GROUPNAME="${UTILARGS[*]:2}"
         fi
       fi
-      [[ -z "${GROUPNAME}" ]] && logError "999" "Usage: bash $0 -u \"get group GROUPNAME\" (use one quoted -u string when the group name contains spaces)" 1
+      [[ -z "${GROUPNAME}" ]] && logErrorExit "999" "Usage: bash $0 -u \"get group GROUPNAME\" (use one quoted -u string when the group name contains spaces)"
       QUIET=1
       initISAdminREST
       ${CURL_BIN} -sk "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/rx/application/group/$(URLEncode "${GROUPNAME}")" -H "Authorization: AR-JWT ${ARJWT}" | ${JQ_BIN}
       QUIET=0
       ;;
     gsi)
-      [[ -z "${UTILARGS[2]}" ]] && logError "999" "Usage: bash $0 -u \"get gsi GSI_ID|NAME|list\"" 1
+      [[ -z "${UTILARGS[2]}" ]] && logErrorExit "999" "Usage: bash $0 -u \"get gsi GSI_ID|NAME|list\""
       if [ "${UTILARGS[2]}" == "list" ]; then
         QUIET=1
         echo "${AR_SERVER_INFO_JSON}" | ${JQ_BIN} -r '.[] | "\(.name) : \(.id)"'
@@ -7282,12 +7289,12 @@ parseUtilGet() {
       REQUEST_ID=$(${CURL_BIN} -sk -H "Content-Type: application/x-www-form-urlencoded" -H "Authorization: AR-JWT ${ARJWT}" \
         "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/entry/AR%20System%20Upgrade%20Tracker?fields=values(Request%20ID)&q=%27componentName%27%3D%22Checker%20Utility%20tool%22%20AND%20%27commandLineArguments%27%3D%22--config-file%20%2Fopt%2Fbmc%2Fsoftwares%2FCheckerUtility%2Fconf%2Fpre_upgrade_checks_config.json%22&sort=43006.desc" \
         | ${JQ_BIN} -r '.entries[0].values."Request ID" // empty')
-      [[ -z "${REQUEST_ID}" ]] && logError "999" "No upgrade pre-checker results records found in the 'AR System Upgrade Tracker' form." 1
+      [[ -z "${REQUEST_ID}" ]] && logErrorExit "999" "No upgrade pre-checker results records found in the 'AR System Upgrade Tracker' form."
       logMessage "Found upgrade pre-checker results - 'AR System Upgrade Tracker' form request ID '${REQUEST_ID}'."
       ATTACHMENT_SIZE=$(${CURL_BIN} -sk -H "Content-Type: application/x-www-form-urlencoded" -H "Authorization: AR-JWT ${ARJWT}" \
         "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/entry/AR%20System%20Upgrade%20Tracker/${REQUEST_ID}" \
         | ${JQ_BIN} '.values.attachment.sizeBytes')
-      [[ -z "${ATTACHMENT_SIZE}" || "${ATTACHMENT_SIZE}" == "null" || "${ATTACHMENT_SIZE}" == "0" ]] && logError "999" "No upgrade pre-checker results attachment found for this record." 1
+      [[ -z "${ATTACHMENT_SIZE}" || "${ATTACHMENT_SIZE}" == "null" || "${ATTACHMENT_SIZE}" == "0" ]] && logErrorExit "999" "No upgrade pre-checker results attachment found for this record."
       logMessage "Saving upgrade pre-checker results attachment as 'prechecker.tar.gz'..."
       ${CURL_BIN} -sk -H "Content-Type: application/x-www-form-urlencoded" -H "Authorization: AR-JWT ${ARJWT}" \
         "https://${IS_ALIAS_PREFIX}-restapi.${CLUSTER_DOMAIN}/api/arsys/v1.0/entry/AR%20System%20Upgrade%20Tracker/${REQUEST_ID}/attach/attachment" \
@@ -7296,7 +7303,7 @@ parseUtilGet() {
       ;;
     secret)
       if [ ${#UTILARGS[@]} -lt 3 ] || [ ${#UTILARGS[@]} -gt 4 ]; then
-        logError "999" "Usage: bash $0 -u \"get secret SECRETNAME [NAMESPACE]\"" 1
+        logErrorExit "999" "Usage: bash $0 -u \"get secret SECRETNAME [NAMESPACE]\""
       fi
       if [ ${#UTILARGS[@]} -eq 4 ]; then
         decodeK8sSecret "${UTILARGS[2]}" "${UTILARGS[3]}"
@@ -7304,14 +7311,14 @@ parseUtilGet() {
         populateUtilK8sObjectMatches secret "${UTILARGS[2]}"
         case ${#UTIL_NS_MATCHES[@]} in
           0)
-            logError "999" "Secret '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from ${HITT_CONFIG_FILE}. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get secret ${UTILARGS[2]} NAMESPACE\"." 1
+            logErrorExit "999" "Secret '${UTILARGS[2]}' not found in IS_NAMESPACE, HP_NAMESPACE, or CDE_NAMESPACE from ${HITT_CONFIG_FILE}. Pass NAMESPACE explicitly, e.g. bash $0 -u \"get secret ${UTILARGS[2]} NAMESPACE\"."
             ;;
           1)
             decodeK8sSecret "${UTILARGS[2]}" "${UTIL_NS_MATCHES[0]}"
             ;;
           *)
             if [[ "${QUIET}" == "1" ]]; then
-              logError "999" "Secret '${UTILARGS[2]}' exists in more than one configured namespace; omit -q to choose interactively, or pass NAMESPACE explicitly." 1
+              logErrorExit "999" "Secret '${UTILARGS[2]}' exists in more than one configured namespace; omit -q to choose interactively, or pass NAMESPACE explicitly."
             fi
             logStatus "Secret '${UTILARGS[2]}' exists in multiple namespaces — select namespace:" 1
             decodeK8sSecret "${UTILARGS[2]}" "$(selectFromArray UTIL_NS_MATCHES)"
@@ -7320,7 +7327,7 @@ parseUtilGet() {
       fi
       ;;
     user)
-      [[ -z "${UTILARGS[2]:-}" ]] && logError "999" "Usage: bash $0 -u \"get user USERNAME\"" 1
+      [[ -z "${UTILARGS[2]:-}" ]] && logErrorExit "999" "Usage: bash $0 -u \"get user USERNAME\""
       QUIET=1
       USERNAME="${UTILARGS[2]}"
       if ((${#UTILARGS[@]} > 3)); then
@@ -7338,7 +7345,7 @@ parseUtilGet() {
 
 parseUtilCheck() {
   if [[ -z "${UTILARGS[1]:-}" ]]; then
-    logError "999" "Usage: bash $0 -u \"check <rbac|pat|arservers|liveness|readiness|cert> [options]\"" 1
+    logErrorExit "999" "Usage: bash $0 -u \"check <rbac|pat|arservers|liveness|readiness|cert> [options]\""
   fi
   case "${UTILARGS[1]}" in
     arserver|arservers)
@@ -7346,11 +7353,11 @@ parseUtilCheck() {
       printPlatformPodsTable
       ;;
     cert)
-      [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check cert /path/to/cert.pem\"" 1
+      [[ -n "${UTILARGS[2]:-}" ]] || logErrorExit "999" "Usage: bash $0 -u \"check cert /path/to/cert.pem\""
       hittUtilCheckCert "${UTILARGS[2]}"
       ;;
     liveness|readiness)
-      [[ -n "${UTILARGS[2]:-}" ]] || logError "999" "Usage: bash $0 -u \"check liveness|readiness PODNAME\"" 1
+      [[ -n "${UTILARGS[2]:-}" ]] || logErrorExit "999" "Usage: bash $0 -u \"check liveness|readiness PODNAME\""
       checkPodProbe "${UTILARGS[1]}" "${UTILARGS[2]:-}"
       ;;
     pat)
@@ -7363,7 +7370,7 @@ parseUtilCheck() {
           validateHittK8sPermissions "${profile}" || exit 1
           ;;
         *)
-          logError "999" "Usage: bash $0 -u \"check rbac [hitt|deploy|all]\" (default: hitt)." 1
+          logErrorExit "999" "Usage: bash $0 -u \"check rbac [hitt|deploy|all]\" (default: hitt)."
           ;;
       esac
       ;;
@@ -7380,7 +7387,7 @@ initISAdminREST() {
   buildISAliasesArray
   getISAdminCreds
   if ! getISJWT; then
-    logError "999" "Failed to authenticate — cannot run query." 1
+    logErrorExit "999" "Failed to authenticate — cannot run query."
   fi
 }
 
@@ -7438,16 +7445,16 @@ runARRESTSQL() {
   if [[ "${HTTP_CODE}" -lt 200 ]] || [[ "${HTTP_CODE}" -ge 300 ]]; then
     AR_DETAIL=$(head -c 300 "${RESP_FILE}" 2>/dev/null | tr '\n' ' ')
     rm -f "${RESP_FILE}"
-    logError "999" "AR SQL query failed (HTTP ${HTTP_CODE}).${AR_DETAIL:+ ${AR_DETAIL}}" 1
+    logErrorExit "999" "AR SQL query failed (HTTP ${HTTP_CODE}).${AR_DETAIL:+ ${AR_DETAIL}}"
   fi
   if [[ ! -s "${RESP_FILE}" ]]; then
     rm -f "${RESP_FILE}"
-    logError "999" "AR SQL query returned an empty response." 1
+    logErrorExit "999" "AR SQL query returned an empty response."
   fi
   if ! ${JQ_BIN} -e . "${RESP_FILE}" &>/dev/null; then
     AR_DETAIL=$(head -c 300 "${RESP_FILE}" 2>/dev/null | tr '\n' ' ')
     rm -f "${RESP_FILE}"
-    logError "999" "AR SQL query did not return valid JSON.${AR_DETAIL:+ ${AR_DETAIL}}" 1
+    logErrorExit "999" "AR SQL query did not return valid JSON.${AR_DETAIL:+ ${AR_DETAIL}}"
   fi
   if ! ${JQ_BIN} -e '(.rows | type) == "array"' "${RESP_FILE}" &>/dev/null; then
     AR_DETAIL=$(${JQ_BIN} -r '
@@ -7456,7 +7463,7 @@ runARRESTSQL() {
     ' "${RESP_FILE}" 2>/dev/null)
     [[ -z "${AR_DETAIL}" ]] && AR_DETAIL=$(head -c 300 "${RESP_FILE}" 2>/dev/null | tr '\n' ' ')
     rm -f "${RESP_FILE}"
-    logError "999" "AR SQL query returned an unexpected response (no rows array).${AR_DETAIL:+ ${AR_DETAIL}}" 1
+    logErrorExit "999" "AR SQL query returned an unexpected response (no rows array).${AR_DETAIL:+ ${AR_DETAIL}}"
   fi
   cat "${RESP_FILE}"
   rm -f "${RESP_FILE}"
@@ -7464,7 +7471,7 @@ runARRESTSQL() {
 
 parseUtilSQL() {
   if [ ${#UTILARGS[@]} -eq 1 ]; then
-    logError "999" "Usage: bash $0 -u \"sql AR_SQL_QUERY\"" 1
+    logErrorExit "999" "Usage: bash $0 -u \"sql AR_SQL_QUERY\""
   fi
   initISAdminREST
   runARRESTSQL "${UTILARGS[*]:1}"
@@ -7961,7 +7968,7 @@ getK8sNamespacePodDetails() {
   K8S_NODE_POD_DETAILS_TABLE=""
 
   if ! ${KUBECTL_BIN} get namespace "${ns_name}" >/dev/null 2>>"${HITT_ERR_FILE}"; then
-    logError "106" "Namespace '${ns_name}' not found." 1
+    logErrorExit "106" "Namespace '${ns_name}' not found."
   fi
 
   pods_json=$(${KUBECTL_BIN} -n "${ns_name}" get pods -o json 2>>"${HITT_ERR_FILE}") || pods_json='{"items":[]}'
@@ -8648,7 +8655,7 @@ validateDockerIOPat() {
     read -r -p "Enter your docker.io username : " DOCKER_IO_USERNAME
     echo ""
     if [ -z "${DOCKER_IO_USERNAME}" ]; then
-      logError "999" "Docker Hub username is required (pass on the command line or enter when prompted)." 1
+      logErrorExit "999" "Docker Hub username is required (pass on the command line or enter when prompted)."
     fi
   fi
 
@@ -8658,7 +8665,7 @@ validateDockerIOPat() {
   fi
 
   if [ -z "${DOCKER_IO_PAT}" ]; then
-    logError "999" "Docker Hub PAT is required (pass on the command line or enter when prompted)." 1
+    logErrorExit "999" "Docker Hub PAT is required (pass on the command line or enter when prompted)."
   fi
 
   logMessage "Checking docker.io token scope for user '${DOCKER_IO_USERNAME}'..."
@@ -8670,7 +8677,7 @@ validateDockerIOPat() {
   REGISTRY_JWT=$(echo "${RESPONSE}" | ${JQ_BIN} -r .token)
 
   if [ "${REGISTRY_JWT}" == "null" ] || [ -z "${REGISTRY_JWT}" ]; then
-    logError "999" "Could not obtain a registry token. Check your username and PAT." 1
+    logErrorExit "999" "Could not obtain a registry token. Check your username and PAT."
   fi
 
   PAYLOAD_BASE64=$(echo "${REGISTRY_JWT}" | cut -d'.' -f2)
@@ -8689,7 +8696,7 @@ validateDockerIOPat() {
   if echo "${ACTIONS}" | grep -q "pull"; then
     logMessage "Success: token grants pull scope for private repository '${DOCKER_IO_USERNAME}/bmchelix'."
   else
-    logError "999" "Failed: PAT does not grant pull for repository 'bmchelix'. Edit the PAT via EPD/Docker Hub and ensure it is of type 'Read-only' and not 'Public Repo Read-only'." 1
+    logErrorExit "999" "Failed: PAT does not grant pull for repository 'bmchelix'. Edit the PAT via EPD/Docker Hub and ensure it is of type 'Read-only' and not 'Public Repo Read-only'."
   fi
 }
 
@@ -8792,7 +8799,7 @@ kickstartResolveHandler() {
       echo "${FTS_ELASTIC_SERVICENAME}.${HP_NAMESPACE}"
       ;;
     *)
-      logError "999" "Unknown kickstart handler '${1}'." 1
+      logErrorExit "999" "Unknown kickstart handler '${1}'."
       ;;
   esac
 }
@@ -8817,7 +8824,7 @@ kickstartResolveSource() {
       printf '%s' "${value}"
       ;;
     *)
-      logError "999" "Unknown kickstart source type '${source_type}'." 1
+      logErrorExit "999" "Unknown kickstart source type '${source_type}'."
       ;;
   esac
 }
@@ -8835,7 +8842,7 @@ kickstartResolveManifest() {
   fi
   platform_helm_version=$(${JQ_BIN} -r '.PLATFORM_HELM_VERSION // empty' <<< "${pipeline_defaults_json}")
   if [ -z "${platform_helm_version}" ]; then
-    logError "999" "Unable to read PLATFORM_HELM_VERSION from HELIX_ONPREM_DEPLOYMENT pipeline defaults." 1
+    logErrorExit "999" "Unable to read PLATFORM_HELM_VERSION from HELIX_ONPREM_DEPLOYMENT pipeline defaults."
   fi
   if [ -n "${HITT_KICKSTART_MANIFEST_ID}" ]; then
     manifest_id="${HITT_KICKSTART_MANIFEST_ID}"
@@ -8851,7 +8858,7 @@ kickstartResolveManifest() {
     return 1
   fi
   if ! ${JQ_BIN} -e 'type == "array"' <<< "${manifest_json}" &>/dev/null; then
-    logError "999" "Kickstart manifest must be a JSON array." 1
+    logErrorExit "999" "Kickstart manifest must be a JSON array."
   fi
   if [ -n "${manifest_id}" ] && kickstartHasManifestDelta "${manifest_id}"; then
     manifest_scope="common + release ${manifest_id}"
@@ -8901,11 +8908,11 @@ hittPipelineJsonForKickstartExport() {
 
   pipeline_file_params_json=$(getPipelineFileParams "${job_name}")
   if ! echo "${pipeline_file_params_json}" | ${JQ_BIN} -e 'type == "array"' &>/dev/null; then
-    logError "999" "Unable to discover file parameters from Jenkins job '${job_name}'." 1
+    logErrorExit "999" "Unable to discover file parameters from Jenkins job '${job_name}'."
   fi
   pipeline_section_params_json=$(getPipelineSectionParams "${job_name}")
   if ! echo "${pipeline_section_params_json}" | ${JQ_BIN} -e 'type == "array"' &>/dev/null; then
-    logError "999" "Unable to discover PIPELINES section parameters from Jenkins job '${job_name}'." 1
+    logErrorExit "999" "Unable to discover PIPELINES section parameters from Jenkins job '${job_name}'."
   fi
 
   ${JQ_BIN} -n \
@@ -9092,7 +9099,7 @@ validateHittK8sPermissions() {
   case "${active_profile}" in
     hitt|deploy|all) ;;
     *)
-      logError "999" "Unknown RBAC profile '${active_profile}' — use hitt, deploy, or all." 1
+      logErrorExit "999" "Unknown RBAC profile '${active_profile}' — use hitt, deploy, or all."
       ;;
   esac
 
@@ -9103,7 +9110,7 @@ validateHittK8sPermissions() {
   mapfile -t helix_ns < <(_hittK8sHelixNamespaces)
 
   if [[ "${active_profile}" == "deploy" || "${active_profile}" == "all" ]] && ((${#helix_ns[@]} == 0)); then
-    logError "999" "Profile '${active_profile}' needs Helix namespaces in ${HITT_CONFIG_FILE} (HP_NAMESPACE, IS_NAMESPACE, and optionally CDE_NAMESPACE / HELIX_LOGGING_NAMESPACE) before deploy permissions can be checked." 1
+    logErrorExit "999" "Profile '${active_profile}' needs Helix namespaces in ${HITT_CONFIG_FILE} (HP_NAMESPACE, IS_NAMESPACE, and optionally CDE_NAMESPACE / HELIX_LOGGING_NAMESPACE) before deploy permissions can be checked."
   fi
 
   logStatus "Kubernetes RBAC audit (profile: ${active_profile})..."
@@ -9281,7 +9288,7 @@ listImageTags() {
   fi
   host="${SKOPEO_IMAGE%%/*}"
   if ! skopeo login --get-login "${host}" >/dev/null 2>&1; then
-    logError "999" "Please use 'skopeo login ${host}' to authenticate and then try again." 1
+    logErrorExit "999" "Please use 'skopeo login ${host}' to authenticate and then try again."
   fi
   SKOPEO_JSON=$(skopeo list-tags "docker://${SKOPEO_IMAGE}" 2>/dev/null)
   if [ "$?" != "0" ]; then
@@ -9486,7 +9493,7 @@ printNSDetails() {
 
   ns_line=$(${KUBECTL_BIN} get namespace "${nsname}" --no-headers 2>>"${HITT_ERR_FILE}") || ns_line=""
   if [[ -z "${ns_line}" ]]; then
-    logError "106" "Namespace '${nsname}' not found." 1
+    logErrorExit "106" "Namespace '${nsname}' not found."
   fi
   ns_status=$(awk '{print $2}' <<<"${ns_line}")
   ns_age=$(awk '{print $3}' <<<"${ns_line}")
@@ -9737,7 +9744,7 @@ imgr_check_tools() {
     missing+=("jq")
   fi
   if [[ ${#missing[@]} -gt 0 ]]; then
-    logError "999" "Image manager mode requires command-line tools: ${missing[*]}. Please install them and try again." 1
+    logErrorExit "999" "Image manager mode requires command-line tools: ${missing[*]}. Please install them and try again."
   fi
 }
 
@@ -9765,7 +9772,7 @@ detect_container_engine() {
   fi
   CONTAINER_STORAGE_DIR=$(get_container_storage_dir) || true
   if [[ -z "${CONTAINER_STORAGE_DIR}" ]]; then
-    logError "999" "Unable to determine container storage directory from docker/podman info." 1
+    logErrorExit "999" "Unable to determine container storage directory from docker/podman info."
   fi
 }
 
@@ -10111,8 +10118,8 @@ compare_images() {
 }
 
 migrateConfigs() {
-  [[ ! -f "${SOURCE_FILE}" ]] && logError "999" "Error: Source file '${SOURCE_FILE}' does not exist." 1
-  [[ ! -f "${TARGET_FILE}" ]] && logError "999" "Error: Target file '${TARGET_FILE}' does not exist." 1
+  [[ ! -f "${SOURCE_FILE}" ]] && logErrorExit "999" "Error: Source file '${SOURCE_FILE}' does not exist."
+  [[ ! -f "${TARGET_FILE}" ]] && logErrorExit "999" "Error: Target file '${TARGET_FILE}' does not exist."
 
   declare -A vars
   local -a updated_vars=()
@@ -10184,7 +10191,7 @@ migrateConfigs() {
 
   if ! mv "${tmp_file}" "${TARGET_FILE}.updated"; then
     rm -f "${tmp_file}"
-    logError "999" "Failed to write '${TARGET_FILE}.updated'." 1
+    logErrorExit "999" "Failed to write '${TARGET_FILE}.updated'."
   fi
   logStatus "'${TARGET_FILE}.updated' created with values from '${SOURCE_FILE}'."
 
@@ -10302,7 +10309,7 @@ if [ ! -f "${HITT_CONFIG_FILE}" ] && [[ "${MODE}" == "info" && "${INFOARGS[0]:-}
 elif [ ! -f "${HITT_CONFIG_FILE}" ]; then
   if ! ${KUBECTL_BIN} get ns > /dev/null 2>&1 ; then
     createHITTconf "${HITT_CONFIG_FILE}"
-    logError "199" "'kubectl get namespaces' command returned unexpected results - please update the HITT config file '${HITT_CONFIG_FILE}' manually." 1
+    logErrorExit "199" "'kubectl get namespaces' command returned unexpected results - please update the HITT config file '${HITT_CONFIG_FILE}' manually."
   fi
   NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':.metadata.name'))
   logStatus "HITT config file '${HITT_CONFIG_FILE}' not found - creating..."
@@ -10311,7 +10318,7 @@ elif [ ! -f "${HITT_CONFIG_FILE}" ]; then
   createHITTconf "${HITT_CONFIG_FILE}"
 else
   if [ -f .hitt.conf ] && [ ! -w .hitt.conf ]; then
-    logError "228" "The '.hitt.conf' file is not writable by the current user - please make sure all files in the hitt directory are owned by the user running the HITT script." 1
+    logErrorExit "228" "The '.hitt.conf' file is not writable by the current user - please make sure all files in the hitt directory are owned by the user running the HITT script."
   fi
   createHITTconf ".hitt.conf"
   checkHITTconf "${HITT_CONFIG_FILE}"
@@ -10372,7 +10379,7 @@ checkCLITools
 
 # Make Jenkins credentials URL safe
 if [ "${JENKINS_USERNAME}" == "" ] && [ "${JENKINS_PASSWORD}" != "" ]; then
-  logError "219" "JENKINS_PASSWORD is set but JENKINS_USERNAME is blank.  Please set both values in the ${HITT_CONFIG_FILE} file." 1
+  logErrorExit "219" "JENKINS_PASSWORD is set but JENKINS_USERNAME is blank.  Please set both values in the ${HITT_CONFIG_FILE} file."
 fi
 if [ -n "${JENKINS_USERNAME}" ]; then
   JENKINS_PASSWORD=$(printf %s "${JENKINS_PASSWORD}" | ${JQ_BIN} -sRr @uri)
@@ -10404,7 +10411,7 @@ if [[ -n "${TCTL_CMD}" ]]; then
   checkToolVersion kubectl
   getVersions
   if [ "${HP_SM_PLATFORM_CORE}"  == "yes" ]; then
-    logError "262" "Helix Platform CORE deployment - no tenant services deployed." 1
+    logErrorExit "262" "Helix Platform CORE deployment - no tenant services deployed."
   fi
   if [ "${TCTL_CMD}" == "config" ]; then
     genTctlConfig
@@ -10471,7 +10478,7 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     jenkins)
       if [ ${#FIXARGS[@]} -eq 1 ]; then
-        logError "999" "Usage: bash $0 -f \"jenkins fixtype [fixoptions]\"" 1
+        logErrorExit "999" "Usage: bash $0 -f \"jenkins fixtype [fixoptions]\""
       fi
       fixJenkins
       ;;
@@ -10480,7 +10487,7 @@ if [ "${MODE}" == "fix" ]; then
       ;;
     arlicense)
       if [ ${#FIXARGS[@]} -eq 1 ]; then
-        logError "999" "Usage: bash $0 -f \"arlicense key [expiry]\"" 1
+        logErrorExit "999" "Usage: bash $0 -f \"arlicense key [expiry]\""
       fi
       applyARLicense
       ;;
@@ -10494,7 +10501,7 @@ if [ "${MODE}" == "fix" ]; then
       showFixHelp
       ;;
     *)
-      logError "999" "'${FIXARGS[0]}' is not a valid fix mode option. Please check for an updated HITT." 1
+      logErrorExit "999" "'${FIXARGS[0]}' is not a valid fix mode option. Please check for an updated HITT."
       ;;
   esac
   exit
@@ -10514,14 +10521,14 @@ if [ "${MODE}" == "getlog" ]; then
   case "${CONSOLE_TARGET}" in
     jenkins)
       if [ "${CONSOLE_FOLLOW}" == "1" ]; then
-        logError "999" "follow is not supported for jenkins system log." 1
+        logErrorExit "999" "follow is not supported for jenkins system log."
       fi
       getJenkinsSystemLog
       exit
       ;;
     agent)
       if [ "${CONSOLE_FOLLOW}" == "1" ]; then
-        logError "999" "follow is not supported for agent log — use a pipeline job name (e.g. helix_onprem_deployment)." 1
+        logErrorExit "999" "follow is not supported for agent log — use a pipeline job name (e.g. helix_onprem_deployment)."
       fi
       getJenkinsAgentLog
       exit
@@ -10551,7 +10558,7 @@ if [ "${MODE}" == "pipeline" ]; then
       ;;
     delete)
       if [ ${#PIPELINEARGS[@]} -lt 2 ]; then
-        logError "999" "Usage: bash $0 -k \"delete BUILD_NUM|START-END [JOB_NAME]\"" 1
+        logErrorExit "999" "Usage: bash $0 -k \"delete BUILD_NUM|START-END [JOB_NAME]\""
       fi
       deleteJenkinsJobs "${PIPELINEARGS[1]}" "${PIPELINEARGS[2]:-}"
       ;;
@@ -10563,7 +10570,7 @@ if [ "${MODE}" == "pipeline" ]; then
       kickStartUberPipeline
       ;;
     *)
-    logError "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option (try: get, build, kickstart, delete, help). Please check for an updated HITT." 1
+    logErrorExit "999" "'${PIPELINEARGS[0]}' is not a valid pipeline mode option (try: get, build, kickstart, delete, help). Please check for an updated HITT."
     ;;
   esac
   exit
@@ -10596,7 +10603,7 @@ if [ "${MODE}" == "utility" ]; then
       ;;
     gendbid)
       if [ ${#UTILARGS[@]} -ne 4 ]; then
-        logError "999" "Usage: bash $0 -u \"gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME\"" 1
+        logErrorExit "999" "Usage: bash $0 -u \"gendbid DB_TYPE DATABASE_HOST_NAME AR_DB_NAME\""
       fi
       IS_DB_TYPE="${UTILARGS[1]}"
       IS_DATABASE_HOST_NAME="${UTILARGS[2]}"
@@ -10615,20 +10622,20 @@ if [ "${MODE}" == "utility" ]; then
       ;;
     kubens)
       if [ ${#UTILARGS[@]} -ne 2 ] || [[ -z "${UTILARGS[1]:-}" ]]; then
-        logError "999" "Usage: bash $0 -u \"kubens NAMESPACE\"" 1
+        logErrorExit "999" "Usage: bash $0 -u \"kubens NAMESPACE\""
       fi
       NS="${UTILARGS[1]}"
       if ! ${KUBECTL_BIN} get ns "${NS}" &>/dev/null; then
-        logError "999" "Namespace '${NS}' not found." 1
+        logErrorExit "999" "Namespace '${NS}' not found."
       fi
       if ! ${KUBECTL_BIN} config set-context --current --namespace="${NS}"; then
-        logError "999" "Failed to set default namespace to '${NS}'." 1
+        logErrorExit "999" "Failed to set default namespace to '${NS}'."
       fi
       logStatus "Default namespace changed to '${NS}'."
       ;;
     migrate)
       if [ ${#UTILARGS[@]} -ne 3 ]; then
-        logError "999" "Usage: bash $0 -u \"migrate PREVIOUS_FILE NEW_FILE\"" 1
+        logErrorExit "999" "Usage: bash $0 -u \"migrate PREVIOUS_FILE NEW_FILE\""
       fi
       SOURCE_FILE="${UTILARGS[1]}"
       TARGET_FILE="${UTILARGS[2]}"
@@ -10647,7 +10654,7 @@ if [ "${MODE}" == "utility" ]; then
         echo ""
       fi
       if [ -z "${REPO_USER}" ] || [ -z "${REPO_SECRET}" ]; then
-        logError "999" "Docker Hub credentials are required." 1
+        logErrorExit "999" "Docker Hub credentials are required."
       fi
       listImageRepos
       ;;
@@ -10658,7 +10665,7 @@ if [ "${MODE}" == "utility" ]; then
       showUtilHelp
       ;;
     *)
-      logError "999" "'${UTILARGS[0]}' is not a valid utility mode option. Please check for an updated HITT." 1
+      logErrorExit "999" "'${UTILARGS[0]}' is not a valid utility mode option. Please check for an updated HITT."
       ;;
   esac
   exit
@@ -10712,7 +10719,7 @@ if [ "${MODE}" == "info" ]; then
       if [[ -z "${INFO_NODE_NAME}" ]]; then
         NODE_ARRAY=($(${KUBECTL_BIN} get nodes --no-headers -o custom-columns=':metadata.name' 2>>"${HITT_ERR_FILE}"))
         if [[ ${#NODE_ARRAY[@]} -eq 0 ]]; then
-          logError "273" "No Kubernetes nodes found - check cluster access and permissions." 1
+          logErrorExit "273" "No Kubernetes nodes found - check cluster access and permissions."
         fi
         logStatus "Please select a node..." 1
         INFO_NODE_NAME=$(selectFromArray NODE_ARRAY)
@@ -10728,7 +10735,7 @@ if [ "${MODE}" == "info" ]; then
       if [[ -z "${INFO_NS_NAME}" ]]; then
         NS_ARRAY=($(${KUBECTL_BIN} get ns --no-headers -o custom-columns=':metadata.name' 2>>"${HITT_ERR_FILE}"))
         if [[ ${#NS_ARRAY[@]} -eq 0 ]]; then
-          logError "273" "No Kubernetes namespaces found - check cluster access and permissions." 1
+          logErrorExit "273" "No Kubernetes namespaces found - check cluster access and permissions."
         fi
         logStatus "Please select a namespace..." 1
         INFO_NS_NAME=$(selectFromArray NS_ARRAY)
@@ -10740,7 +10747,7 @@ if [ "${MODE}" == "info" ]; then
       showInfoHelp
       ;;
     *)
-      logError "999" "'${INFOARGS[0]}' is not a valid info mode option (try: cluster, node, ns, helix, ingress, dbversion, dbversions, full, help). Please check for an updated HITT." 1
+      logErrorExit "999" "'${INFOARGS[0]}' is not a valid info mode option (try: cluster, node, ns, helix, ingress, dbversion, dbversions, full, help). Please check for an updated HITT."
       ;;
   esac
   exit
@@ -10877,7 +10884,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261030-01"
+HITT_BUILD_VERSION="20261102-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -17063,7 +17070,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
       # ${!OPTIND} is a Bash feature that gets the value of the argument at that index
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "When using FIX mode commands with options you must enclose them in double quotes - eg: bash $0 -f \"cacerts /path/to/new/cacerts-file\"" 1
+        logErrorExit "999" "When using FIX mode commands with options you must enclose them in double quotes - eg: bash $0 -f \"cacerts /path/to/new/cacerts-file\""
       fi
       MODE=fix
       FIXOPTS="${OPTARG}"
@@ -17091,7 +17098,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
       if [[ -n "${OPTARG}" ]]; then
         NEXT_VAL="${!OPTIND}"
         if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-          logError "999" "When using INFO mode commands with options you must enclose them in double quotes - eg: bash $0 -i \"node my-node-name\"" 1
+          logErrorExit "999" "When using INFO mode commands with options you must enclose them in double quotes - eg: bash $0 -i \"node my-node-name\""
         fi
         read -r -a INFOARGS <<< "${OPTARG}"
       else
@@ -17115,7 +17122,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
       SKIP_UPDATE_CHECK=1
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "When using PIPELINE mode commands with options you must enclose them in double quotes - eg: bash $0 -k \"build filename\"" 1
+        logErrorExit "999" "When using PIPELINE mode commands with options you must enclose them in double quotes - eg: bash $0 -k \"build filename\""
       fi
       MODE=pipeline
       [[ -n "${REDIRECT}" ]] && QUIET=1
@@ -17127,7 +17134,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
     m)
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "When using mode (-m) commands with multiple words you must enclose them in double quotes - eg: bash $0 -m \"post-is\"" 1
+        logErrorExit "999" "When using mode (-m) commands with multiple words you must enclose them in double quotes - eg: bash $0 -m \"post-is\""
       fi
       read -r -a MODEARGS <<< "${OPTARG}"
       MODE="${MODEARGS[0]}"
@@ -17139,7 +17146,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
       SKIP_UPDATE_CHECK=1
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "When using -o follow you must enclose the value in double quotes - eg: bash $0 -o \"follow helix_onprem_deployment\"" 1
+        logErrorExit "999" "When using -o follow you must enclose the value in double quotes - eg: bash $0 -o \"follow helix_onprem_deployment\""
       fi
       PIPELINE_NAME="${OPTARG}"
       ;;
@@ -17160,7 +17167,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
       IMAGEMGR_OPTS="${OPTARG}"
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "When using imagemgr mode (-r) you must enclose the command in double quotes - eg: bash $0 -r \"sync -f images.txt -t my.registry/bmchelix\"" 1
+        logErrorExit "999" "When using imagemgr mode (-r) you must enclose the command in double quotes - eg: bash $0 -r \"sync -f images.txt -t my.registry/bmchelix\""
       fi
       if [[ "${IMAGEMGR_OPTS}" == "help" ]] || [[ -z "${IMAGEMGR_OPTS}" ]]; then
         showImageMgrHelp
@@ -17175,7 +17182,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
       [[ -n "${REDIRECT}" ]] && QUIET=1
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\"" 1
+        logErrorExit "206" "tctl commands must be enclosed in double quotes - eg hitt.sh -t \"get tenant\""
       fi
       ;;
     u)
@@ -17185,7 +17192,7 @@ while getopts "b:c:C:dD:e:E:f:ghH:i::jJ:k:lm:o:pP:q:r:t:u:U:vxz" options; do
       # ${!OPTIND} is a Bash feature that gets the value of the argument at that index
       NEXT_VAL="${!OPTIND}"
       if [[ -n "$NEXT_VAL" && "$NEXT_VAL" != -* ]]; then
-        logError "999" "When using UTILITY mode commands with options you must enclose them in double quotes - eg: bash $0 -u \"command option\"" 1
+        logErrorExit "999" "When using UTILITY mode commands with options you must enclose them in double quotes - eg: bash $0 -u \"command option\""
       fi
       MODE=utility
       UTILOPTS="${OPTARG}"
