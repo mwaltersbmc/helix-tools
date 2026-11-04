@@ -27,6 +27,7 @@ Click on the pin icon for the SAAS_TENANT and confirm that **Tenant: SAAS_TENANT
 ![RSSO tenant list](images/image-2024-3-5_12-38-16.png)
 
 Note the name of the non-SAAS_TENANT — for example **red.60831950** in the example above.
+> **Note:** For Helix Platform **CORE** deployments (SM_PLATFORM_CORE=yes) there will not be a tenant.
 
 Go to the **Realm** tab.
 
@@ -34,7 +35,7 @@ Confirm that a realm exists with the name format **CUSTOMER_SERVICE-ENVIRONMENT*
 
 > **Note:** If the ENVIRONMENT value is **prod**, the realm name must still include it, even though the aliases in the realm will not.  For example, CUSTOMER_SERVICE=mydept-itsm and ENVIRONMENT=prod then the **realm name** must be mydept-itsm-prod.
 
-Confirm that the **Tenant** for the realm is the same as the **Tenant Name** above.
+Confirm that the **Tenant** for the realm is the same as the **Tenant Name** above.  For Helix Platform **CORE** deployments use the string **core** as the **Tenant** value.
 
 ![RSSO realm tenant](images/image-2024-3-5_12-49-42.png)
 
@@ -68,6 +69,12 @@ curl -s -X POST https://LB_HOST/rsso/api/v1.1/admin/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"RSSO#Admin#"}'
 ```
+Both of the above are expected to return an admin token when successful:
+
+```bash
+{"admin_token":"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJBZG1pbiIsInJ......."} // gitleaks:allow
+```
+Add **-v** to the curl command to get more details if the admin token is not returned.
 
 ## Jenkins HELIX_ONPREM_DEPLOYMENT Pipeline Checks
 
@@ -76,6 +83,7 @@ Check the **RSSO PARAMETERS** section of the pipeline run that was used to deplo
 - Make sure that the RSSO_URL ends in **/rsso** and is not just the LB_HOST URL.
 - RSSO admin credentials are correct.
 - The TENANT_DOMAIN should be the tenant name as shown in RSSO above.
+- The TENANT_DOMAIN should be **core** when the Helix Platform is a CORE deployment.
 
 ![Jenkins RSSO parameters](images/image-2024-3-21_11-27-4.png)
 
@@ -116,6 +124,7 @@ Substitute your keystore password in place of changeit if you set CACERTS_SSL_TR
 
 ```bash
 /opt/java/bin/keytool --list -cacerts -storepass changeit -alias XXX
+or
 /opt/java/bin/keytool --list -cacerts -storepass changeit | grep customcert
 ```
 
