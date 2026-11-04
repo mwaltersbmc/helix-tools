@@ -1,6 +1,6 @@
 # Helix Authentication Troubleshooting Checklist
 
-- [Start with HITT]('#start-with-hitt')
+- [Start with HITT](#start-with-hitt)
 - [Pod Health](#pod-health)
 - [RSSO Checks](#rsso-checks)
 - [Jenkins HELIX_ONPREM_DEPLOYMENT Pipeline Checks](#jenkins-helixonpremdeployment-pipeline-checks)
