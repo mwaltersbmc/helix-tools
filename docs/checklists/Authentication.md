@@ -1,5 +1,6 @@
 # Helix Authentication Troubleshooting Checklist
 
+- [Start with HITT]('#start-with-hitt')
 - [Pod Health](#pod-health)
 - [RSSO Checks](#rsso-checks)
 - [Jenkins HELIX_ONPREM_DEPLOYMENT Pipeline Checks](#jenkins-helixonpremdeployment-pipeline-checks)
@@ -10,6 +11,14 @@
 - [Certificate Chain Tests](#certificate-chain-tests)
 - [Add certificate(s) to the cacerts keystore file](#add-certificates-to-the-cacerts-keystore-file)
 - [Recreate Helix IS cacerts Secret](#recreate-helix-is-cacerts-secret)
+
+## Start with HITT
+
+Download **[HITT](https://github.com/mwaltersbmc/helix-tools/tree/main/hitt)** and use **post-is** mode to validate the current state of the system as this will highlight issues such as certificate problems.
+```bash
+bash hitt.sh -m post-is
+```
+Review the HITT [fix-mode](https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md) and [use-cases](https://mwaltersbmc.github.io/helix-tools/hitt/index.html#topic-helix-is-mgmt) documentation for some quick fixes to certificate issues.
 
 ## Pod Health
 
