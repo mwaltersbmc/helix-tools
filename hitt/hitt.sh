@@ -1623,9 +1623,9 @@ validateRealmDomains() {
 
   # Portal alias checks
   # PCS core - portal alias not relevant
-  if [ "${HP_SM_PLATFORM_CORE}" == "yes" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
-    logWarning "053" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This alias is not used for PCS core deployments."
-  fi
+  #if [ "${HP_SM_PLATFORM_CORE}" == "yes" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
+  #  logWarning "053" "Alias '${PORTAL_HOSTNAME}' found in the realm Application Domains list. This alias is not used for PCS core deployments."
+  #fi
 
   # PC non-core/pre-is/fresh
   if [ "${HP_SM_PLATFORM_CORE}" == "no" ] && [ "${MODE}" == "pre-is" ] && [ "${IS_PIPELINE_MODE}" == "FRESH" ] && echo "${REALM_DOMAINS[@]}" | grep -q "${PORTAL_HOSTNAME}"; then
@@ -2365,6 +2365,12 @@ cloneCustomerConfigsRepo() {
     fi
     if [ -z "${GITEA_HOST}" ] ; then
       logMessage "Unable to find GITEA host connection details - skipping checks."
+      SKIP_REPO=1
+      return
+    fi
+    # test if gitea is accessible
+    if ! ${GIT_BIN} -c http.sslVerify=false ls-remote "${GITEA_URL}/${GITEA_ADMIN_USER}/onprem-remedyserver-config" > /dev/null 2>${HITT_ERR_FILE} ; then
+      logError "999" "Failed to connect to remote GITEA '${GITEA_URL}'."
       SKIP_REPO=1
       return
     fi
@@ -6718,7 +6724,7 @@ showGeneralHelp() {
   echo "Examples:"
   echo "bash $0 -m post-hp     - run post HP installation only checks"
   echo "bash $0 -m pre-is      - run pre-installation checks"
-  echo "bash $0 -m upgrade-is - run pre-upgrade pipeline validation checks"
+  echo "bash $0 -m upgrade-is  - run pre-upgrade pipeline validation checks"
   echo "bash $0 -m post-is     - run post-installation checks"
   echo "bash $0 -m jenkins     - run Jenkins configuration checks"
   echo ""
@@ -10884,7 +10890,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261102-01"
+HITT_BUILD_VERSION="20261106-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
