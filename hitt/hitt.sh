@@ -3314,6 +3314,11 @@ checkISLicense() {
 }
 
 getISAdminCreds() {
+  if [ -n "${IS_USER}" ]; then
+    logStatus "Please enter your ${IS_USER} user password:"
+    read -r -s -p "${IS_USER} user password : " IS_PASSWD
+    return
+  fi
   IS_USER=hannah_admin
   if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret > /dev/null 2>&1; then
     IS_PASSWD=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret ar-global-secret -o jsonpath='{.data.ATWS_UDDI_ADMIN_PASSWORD}' | ${BASE64_BIN} -d )
@@ -10890,7 +10895,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261106-01"
+HITT_BUILD_VERSION="20261111-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
