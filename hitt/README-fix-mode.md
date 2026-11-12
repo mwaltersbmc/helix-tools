@@ -6,6 +6,7 @@ When a fix command has more than one word, enclose the whole value in **double q
 
 ```bash
 bash hitt.sh -f sat
+bash hitt.sh -f "boost platform-admin-0"
 bash hitt.sh -f "cacerts /tmp/newcacerts"
 bash hitt.sh -f "addcert /path/to/custom-certs.pem"
 bash hitt.sh -f "addcert /path/to/custom-certs.pem git"
@@ -19,6 +20,7 @@ bash hitt.sh -f "addcert /path/to/custom-certs.pem git"
 | `realm` | Create or update the Helix Service Management SSO realm. |
 | `cacerts` | Update the **cacerts** secret in the Helix IS namespace with a new file. |
 | `addcert` | Add one or more PEM certificates to the IS **cacerts** secret, or with `git` to **pipeline/tasks/cacerts** in the ITSM installer repository. |
+| `boost` | Double CPU/memory **requests** on a running Helix IS pod via in-place resize (does not change Deployment/StatefulSet). |
 | `sat` | Create the role and role-binding required by the Support Assistant Tool in the Helix IS namespace. |
 | `arlicense` | Apply an Innovation Suite / AR server license via the REST API. |
 | `resetssopwd` | Reset the Helix SSO admin user password to the BMC default value. |
@@ -87,6 +89,22 @@ Repository location depends on your Deployment Engine setup:
 - **Standalone Deployment Engine** — ITSM installer repository path from the **GIT_REPO_DIR** value on **HELIX_ONPREM_DEPLOYMENT**
 
 You need permission to push to that repository. On a standalone Deployment Engine, HITT reads **GIT_REPO_DIR** from the pipeline job to locate the repo.
+
+## `"boost podname"`
+
+```bash
+bash hitt.sh -f "boost platform-admin-0"
+```
+
+Temporarily doubles **CPU and memory requests** on the primary container of a **running** pod in the Helix IS namespace, using Kubernetes **in-place Pod resize** (`kubectl patch … --subresource resize`). Deployment and StatefulSet specs are **not** updated, so a later roll returns to the owner’s resource values.
+
+**Behaviour**
+- Primary container name is the first hyphen-separated word of the pod name (for example `platform-admin-0` → `platform`, `midtier-0` → `midtier`).
+- Both CPU and memory **requests** must already be set; otherwise HITT errors.
+- **Limits:** if missing or lower than the new requests, set to the new requests; if already higher, leave unchanged. **Guaranteed** pods keep request=limit after the boost.
+- Requires **kubectl v1.32+** and a cluster that exposes the Pod **resize** subresource (typically Kubernetes ~1.33+).
+
+Use on a heavily loaded cluster when a specific pod needs more headroom so deployment scripts avoid timeouts.
 
 ## `sat`
 

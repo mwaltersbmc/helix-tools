@@ -6328,6 +6328,7 @@ showFixHelp() { # fix mode help
     \trealm \t\t| Create/update the Helix Service Management realm in SSO.
     \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
     \taddcert \t| Add PEM certificate(s) to the IS cacerts secret, or with 'git' to pipeline/tasks/cacerts. Args: /path/to/certificates.pem [git]
+    \tboost \t\t| Double CPU/memory requests on a running IS pod (in-place resize; no Deployment/STS change). Args: podname
     \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
     \tarlicense \t| Apply an Innovation Suite/AR server license to the system via the REST API.
     \tresetssopwd \t| Resets the Helix SSO admin user password to the BMC default value.
@@ -10301,6 +10302,177 @@ detectClusterType() {
   fi
 }
 
+getPodNamespaceByName() {
+  local POD_NAME=${1}
+  local ns
+  for ns in "${IS_NAMESPACE}" "${HP_NAMESPACE}" "${CDE_NAMESPACE}" ; do
+    if ${KUBECTL_BIN} get pod "${POD_NAME}" -n "$ns" --ignore-not-found --no-headers | grep -q .; then
+      echo "$ns"
+      break
+    fi
+  done
+}
+
+# Require kubectl client + cluster support for in-place Pod resize (resize subresource).
+hittRequirePodResizeSupport() {
+  local pod_name="$1"
+  local pod_ns="$2"
+  local raw_rc
+
+  if ! ${KUBECTL_BIN} patch --help 2>&1 | grep -qE -- '--subresource'; then
+    logErrorExit "999" "kubectl does not support '--subresource' (need kubectl v1.32 or later) — cannot boost pod resources in place."
+  fi
+
+  ${KUBECTL_BIN} get --raw "/api/v1/namespaces/${pod_ns}/pods/${pod_name}/resize" >/dev/null 2>>"${HITT_ERR_FILE}"
+  raw_rc=$?
+  if [[ ${raw_rc} -ne 0 ]]; then
+    logErrorExit "999" "Cluster does not support in-place Pod resize for '${pod_name}' (GET .../pods/${pod_name}/resize failed). Requires Kubernetes ~1.33+ with the resize feature available. See ${HITT_ERR_FILE}."
+  fi
+}
+
+# Double CPU/memory requests on the primary container of a running IS pod via the resize subresource.
+# Does not modify Deployments/StatefulSets. Primary container name = first hyphen-separated segment of the pod name.
+boostPod() {
+  local POD_NAME="${1}"
+  local POD_NS="${IS_NAMESPACE:-}"
+  local CONTAINER_NAME POD_JSON COMPUTED PATCH_JSON PATCH_OUT
+  local OLD_REQ_CPU OLD_REQ_MEM OLD_LIM_CPU OLD_LIM_MEM
+  local NEW_REQ_CPU NEW_REQ_MEM NEW_LIM_CPU NEW_LIM_MEM QOS ERR
+
+  if [[ -z "${POD_NAME}" ]]; then
+    logErrorExit "999" "Usage: bash $0 -f \"boost podname\""
+  fi
+  if [[ -z "${POD_NS}" ]]; then
+    logErrorExit "999" "IS_NAMESPACE is not set in ${HITT_CONFIG_FILE}."
+  fi
+
+  if ! ${KUBECTL_BIN} -n "${POD_NS}" get pod "${POD_NAME}" >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    logErrorExit "999" "Pod '${POD_NAME}' not found in Helix IS namespace '${POD_NS}'."
+  fi
+
+  # First word of the pod name: platform-admin-0 -> platform, midtier-0 -> midtier.
+  CONTAINER_NAME="${POD_NAME%%-*}"
+
+  POD_JSON=$(${KUBECTL_BIN} -n "${POD_NS}" get pod "${POD_NAME}" -o json 2>>"${HITT_ERR_FILE}") || \
+    logErrorExit "999" "Failed to read pod '${POD_NAME}' in namespace '${POD_NS}'."
+
+  if ! echo "${POD_JSON}" | ${JQ_BIN} -e --arg c "${CONTAINER_NAME}" \
+      '[.spec.containers[].name] | index($c) != null' >/dev/null 2>>"${HITT_ERR_FILE}"; then
+    local names
+    names=$(echo "${POD_JSON}" | ${JQ_BIN} -r '[.spec.containers[].name] | join(", ")')
+    logErrorExit "999" "Primary container '${CONTAINER_NAME}' not found in pod '${POD_NAME}'. Containers: ${names}."
+  fi
+
+  hittRequirePodResizeSupport "${POD_NAME}" "${POD_NS}"
+
+  COMPUTED=$(echo "${POD_JSON}" | ${JQ_BIN} -c --arg cname "${CONTAINER_NAME}" '
+    def cpu_milli:
+      if . == null or . == "" then null
+      elif (tostring | endswith("m")) then (tostring | sub("m$"; "") | tonumber)
+      else (tonumber * 1000)
+      end;
+    def mem_mi:
+      if . == null or . == "" then null
+      else
+        (tostring) as $q
+        | if $q | endswith("Ti") then ($q | sub("Ti$"; "") | tonumber * 1024 * 1024)
+          elif $q | endswith("Gi") then ($q | sub("Gi$"; "") | tonumber * 1024)
+          elif $q | endswith("G") then ($q | sub("G$"; "") | tonumber * 953.674)
+          elif $q | endswith("Mi") then ($q | sub("Mi$"; "") | tonumber)
+          elif $q | endswith("M") then ($q | sub("M$"; "") | tonumber * 0.953674)
+          elif $q | endswith("Ki") then ($q | sub("Ki$"; "") | tonumber / 1024)
+          else ($q | tonumber / 1024 / 1024)
+          end
+        | round
+      end;
+    def milli_to_cpu:
+      if . % 1000 == 0 then "\(. / 1000)" else "\(.)m" end;
+    def mi_to_mem:
+      if . >= 1024 and (. % 1024 == 0) then "\(. / 1024)Gi" else "\(.)Mi" end;
+
+    (.spec.containers[] | select(.name == $cname)) as $ctr
+    | ($ctr.resources.requests.cpu | cpu_milli) as $req_cpu
+    | ($ctr.resources.requests.memory | mem_mi) as $req_mem
+    | ($ctr.resources.limits.cpu | cpu_milli) as $lim_cpu
+    | ($ctr.resources.limits.memory | mem_mi) as $lim_mem
+    | .status.qosClass as $qos
+    | if $req_cpu == null then
+        {error: "Container \($cname) has no CPU request — cannot boost."}
+      elif $req_mem == null then
+        {error: "Container \($cname) has no memory request — cannot boost."}
+      else
+        ($req_cpu * 2) as $new_req_cpu
+        | ($req_mem * 2) as $new_req_mem
+        | (if ($qos == "Guaranteed")
+             or (($lim_cpu != null) and ($lim_cpu == $req_cpu) and ($lim_mem != null) and ($lim_mem == $req_mem))
+           then true else false end) as $guaranteed
+        | (if $guaranteed then $new_req_cpu
+           elif ($lim_cpu == null) or ($lim_cpu < $new_req_cpu) then $new_req_cpu
+           else $lim_cpu end) as $new_lim_cpu
+        | (if $guaranteed then $new_req_mem
+           elif ($lim_mem == null) or ($lim_mem < $new_req_mem) then $new_req_mem
+           else $lim_mem end) as $new_lim_mem
+        | {
+            error: null,
+            qos: ($qos // "Unknown"),
+            container: $cname,
+            old: {
+              requests: {cpu: ($req_cpu | milli_to_cpu), memory: ($req_mem | mi_to_mem)},
+              limits: {
+                cpu: (if $lim_cpu == null then null else ($lim_cpu | milli_to_cpu) end),
+                memory: (if $lim_mem == null then null else ($lim_mem | mi_to_mem) end)
+              }
+            },
+            new: {
+              requests: {cpu: ($new_req_cpu | milli_to_cpu), memory: ($new_req_mem | mi_to_mem)},
+              limits: {cpu: ($new_lim_cpu | milli_to_cpu), memory: ($new_lim_mem | mi_to_mem)}
+            },
+            patch: {
+              spec: {
+                containers: [
+                  {
+                    name: $cname,
+                    resources: {
+                      requests: {cpu: ($new_req_cpu | milli_to_cpu), memory: ($new_req_mem | mi_to_mem)},
+                      limits: {cpu: ($new_lim_cpu | milli_to_cpu), memory: ($new_lim_mem | mi_to_mem)}
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      end
+  ') || logErrorExit "999" "Failed to compute boosted resources for '${POD_NAME}/${CONTAINER_NAME}'."
+
+  ERR=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.error // empty')
+  if [[ -n "${ERR}" ]]; then
+    logErrorExit "999" "${ERR}"
+  fi
+
+  QOS=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.qos')
+  OLD_REQ_CPU=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.old.requests.cpu')
+  OLD_REQ_MEM=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.old.requests.memory')
+  OLD_LIM_CPU=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.old.limits.cpu // "none"')
+  OLD_LIM_MEM=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.old.limits.memory // "none"')
+  NEW_REQ_CPU=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.new.requests.cpu')
+  NEW_REQ_MEM=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.new.requests.memory')
+  NEW_LIM_CPU=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.new.limits.cpu')
+  NEW_LIM_MEM=$(echo "${COMPUTED}" | ${JQ_BIN} -r '.new.limits.memory')
+  PATCH_JSON=$(echo "${COMPUTED}" | ${JQ_BIN} -c '.patch')
+
+  logStatus "Boosting pod '${POD_NAME}' container '${CONTAINER_NAME}' in '${POD_NS}'..."
+  logMessage "Before: requests cpu=${OLD_REQ_CPU} mem=${OLD_REQ_MEM}  limits cpu=${OLD_LIM_CPU} mem=${OLD_LIM_MEM}" 0
+  logMessage "After:  requests cpu=${NEW_REQ_CPU} mem=${NEW_REQ_MEM}  limits cpu=${NEW_LIM_CPU} mem=${NEW_LIM_MEM}" 0
+
+  if ! PATCH_OUT=$(${KUBECTL_BIN} -n "${POD_NS}" patch pod "${POD_NAME}" \
+      --subresource resize --type strategic -p "${PATCH_JSON}" 2>>"${HITT_ERR_FILE}"); then
+    logErrorExit "999" "Failed to resize pod '${POD_NAME}'. Check cluster capacity, ResourceQuotas, and ${HITT_ERR_FILE}."
+  fi
+#  logMessage "${PATCH_OUT}" 1
+#  logStatus "Pod '${POD_NAME}' resize requested. Deployment/StatefulSet specs were not changed; a later roll will revert to owner resources."
+#  logMessage "Note: memory resize may restart the container depending on resizePolicy/runtime; CPU is usually applied in place." 0
+}
+
 #End functions
 
 #MAIN Start
@@ -10475,26 +10647,11 @@ if [ "${MODE}" == "fix" ]; then
   read -r -a FIXARGS <<< "${FIXOPTS}"
   logStatus "Running HITT in fix mode '${FIXARGS[0]}'..."
   case "${FIXARGS[0]}" in
-    cacerts)
-      fixCacerts
+    activatehp)
+      activateHP
       ;;
     addcert)
       fixAddCert
-      ;;
-    sat)
-      fixSATRole
-      ;;
-    realm)
-      fixSSORealm
-      ;;
-    jenkins)
-      if [ ${#FIXARGS[@]} -eq 1 ]; then
-        logErrorExit "999" "Usage: bash $0 -f \"jenkins fixtype [fixoptions]\""
-      fi
-      fixJenkins
-      ;;
-    ssh)
-      fixSSH "${GIT_USER}"
       ;;
     arlicense)
       if [ ${#FIXARGS[@]} -eq 1 ]; then
@@ -10502,11 +10659,32 @@ if [ "${MODE}" == "fix" ]; then
       fi
       applyARLicense
       ;;
-    activatehp)
-      activateHP
+    boost)
+      if [ ${#FIXARGS[@]} -ne 2 ]; then
+        logErrorExit "999" "Usage: bash $0 -f \"boost podname\""
+      fi
+      boostPod "${FIXARGS[1]}"
+      ;;
+    cacerts)
+      fixCacerts
+      ;;
+    jenkins)
+      if [ ${#FIXARGS[@]} -eq 1 ]; then
+        logErrorExit "999" "Usage: bash $0 -f \"jenkins fixtype [fixoptions]\""
+      fi
+      fixJenkins
+      ;;
+    realm)
+      fixSSORealm
       ;;
     resetssopwd)
       resetSSOPasswd
+      ;;
+    sat)
+      fixSATRole
+      ;;
+    ssh)
+      fixSSH "${GIT_USER}"
       ;;
     help)
       showFixHelp
@@ -10895,7 +11073,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261111-01"
+HITT_BUILD_VERSION="20261112-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -13190,6 +13368,21 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
         "This does not call the cluster; it only computes the ID from the three values."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "fix-boost",
+      "topicId": "helix-is-mgmt",
+      "order": 55,
+      "title": "I want to temporarily double CPU and memory requests on a running Helix IS pod",
+      "commands": [
+        "bash hitt.sh -f \"boost platform-admin-0\""
+      ],
+      "notes": [
+        "Uses in-place Pod resize on the primary container only; does not change the Deployment or StatefulSet.",
+        "Requires kubectl v1.32+ and a cluster that supports the Pod resize subresource (typically Kubernetes 1.33+).",
+        "A later pod roll reverts resources to the owner’s configured values."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md#boost-podname"
     },
     {
       "id": "fix-sat",

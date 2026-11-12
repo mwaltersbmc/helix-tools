@@ -895,6 +895,25 @@ window.HITT_USE_CASES = {
       }
     },
     {
+      "id": "fix-boost",
+      "topicId": "helix-is-mgmt",
+      "order": 55,
+      "title": "I want to temporarily double CPU and memory requests on a running Helix IS pod",
+      "commands": [
+        "bash hitt.sh -f \"boost platform-admin-0\""
+      ],
+      "notes": [
+        "Uses in-place Pod resize on the primary container only; does not change the Deployment or StatefulSet.",
+        "Requires kubectl v1.32+ and a cluster that supports the Pod resize subresource (typically Kubernetes 1.33+).",
+        "A later pod roll reverts resources to the owner’s configured values."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md#boost-podname",
+      "video": {
+        "enabled": false,
+        "script": "fix-boost"
+      }
+    },
+    {
       "id": "fix-sat",
       "topicId": "helix-is-mgmt",
       "order": 60,
