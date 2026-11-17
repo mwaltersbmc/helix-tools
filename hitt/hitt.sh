@@ -3038,6 +3038,8 @@ validateCacertsFile() {
     if ! ${JAVA_BIN} "-Djavax.net.ssl.trustStore=${CACERTS_FILENAME}" "-Djavax.net.ssl.trustStorePassword=${IS_CACERTS_SSL_TRUSTSTORE_PASSWORD}" ${JAVA_PROXY_STRING} SSLPoke "${LB_HOST}" 443 >>${HITT_ERR_FILE} 2>&1 ; then
       logError "163" "cacerts file does not appear to contain the certificates required to connect to the Helix Platform LB_HOST."
       VALID_CACERTS=1
+    else
+      logMessage "cacerts file is valid for '${LB_HOST}'." 1
     fi
   fi
 
@@ -3052,7 +3054,7 @@ validateCacertsFile() {
       MSG_SUFFIX=""
       VALID_CACERTS=1
     else
-      logMessage "  - valid certificate for '${TARGET}' found in ${CACERTS_SOURCE} cacerts file." 1
+      logMessage "${CACERTS_SOURCE} cacerts file is valid for '${TARGET}'." 1
     fi
   done
 
@@ -11073,7 +11075,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261112-01"
+HITT_BUILD_VERSION="20261117-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
