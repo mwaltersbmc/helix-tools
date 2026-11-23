@@ -410,7 +410,7 @@ cleanUp() {
     rm -rf "./${i}"
   done
   local d f
-  for d in addcert-certs.*; do
+  for d in addcert-certs.* addgptcert-certs.*; do
     [ -d "${d}" ] || continue
     rm -rf "${d}"
   done
@@ -5141,31 +5141,32 @@ getItsmInstallerRepoUrl() {
 
 cloneItsmInstallerCacertsSparse() {
   # $1 = repository URL
-  local repo_url=$1 cacerts_path="pipeline/tasks/cacerts" default_branch
+  # $2 = optional repo-relative file path (default: pipeline/tasks/cacerts)
+  local repo_url=$1 file_path="${2:-pipeline/tasks/cacerts}" default_branch
   export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
   rm -rf itsmrepo
   default_branch=$(gitGiteaCmd ls-remote --symref "${repo_url}" HEAD 2>>"${HITT_ERR_FILE}" \
     | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }')
   [ -z "${default_branch}" ] && default_branch=master
-  logMessage "Checking out ${cacerts_path} from the ITSM installer repository (branch ${default_branch})..."
+  logMessage "Checking out ${file_path} from the ITSM installer repository (branch ${default_branch})..."
   if ! gitGiteaCmd clone --depth 1 --filter=blob:none --no-checkout \
     "${repo_url}" itsmrepo >>"${HITT_ERR_FILE}" 2>&1; then
     logErrorExit "999" "Failed to clone the ITSM installer repository."
   fi
   # Target is a single file — non-cone sparse checkout (cone mode needs --skip-checks for files).
   if ! gitItsmRepoCmd sparse-checkout init --no-cone >>"${HITT_ERR_FILE}" 2>&1 \
-    || ! gitItsmRepoCmd sparse-checkout set "${cacerts_path}" >>"${HITT_ERR_FILE}" 2>&1; then
-    if ! gitItsmRepoCmd sparse-checkout set --skip-checks "${cacerts_path}" >>"${HITT_ERR_FILE}" 2>&1; then
-      logErrorExit "999" "Failed to configure sparse checkout for ${cacerts_path}."
+    || ! gitItsmRepoCmd sparse-checkout set "${file_path}" >>"${HITT_ERR_FILE}" 2>&1; then
+    if ! gitItsmRepoCmd sparse-checkout set --skip-checks "${file_path}" >>"${HITT_ERR_FILE}" 2>&1; then
+      logErrorExit "999" "Failed to configure sparse checkout for ${file_path}."
     fi
   fi
   if ! gitItsmRepoCmd checkout "${default_branch}" >>"${HITT_ERR_FILE}" 2>&1; then
-    logErrorExit "999" "Failed to check out ${cacerts_path} from branch '${default_branch}'."
+    logErrorExit "999" "Failed to check out ${file_path} from branch '${default_branch}'."
   fi
-  if [ ! -f "itsmrepo/${cacerts_path}" ]; then
-    logErrorExit "999" "File ${cacerts_path} was not found in the ITSM installer repository."
+  if [ ! -f "itsmrepo/${file_path}" ]; then
+    logErrorExit "999" "File ${file_path} was not found in the ITSM installer repository."
   fi
-  logMessage "Checked out ${cacerts_path} to itsmrepo/${cacerts_path}."
+  logMessage "Checked out ${file_path} to itsmrepo/${file_path}."
 }
 
 commitPushItsmInstallerCacerts() {
@@ -5270,6 +5271,209 @@ fixAddCert() {
     fixAddCertToGit "${PEM_FILE}"
   else
     fixAddCertToSecret "${PEM_FILE}"
+  fi
+}
+
+# --- addgptcert: merge PEMs into gpt-cacerts secret or pipeline/tasks/gpt-certs (PEM, not JKS) ---
+GPT_CACERTS_FILENAME="gpt-sealcacerts"
+GPT_CERTS_GIT_PATH="pipeline/tasks/gpt-certs"
+ADD_GPT_CERT_MERGED_COUNT=0
+
+downloadGptCacertsFromSecret() {
+  local secret_json pem_b64
+  GPT_CACERTS_FILENAME="${GPT_CACERTS_FILENAME:-gpt-sealcacerts}"
+  logMessage "Downloading PEM cacerts from the '${IS_NAMESPACE}' gpt-cacerts secret..."
+  if ! ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret gpt-cacerts >/dev/null 2>&1; then
+    logErrorExit "999" "'gpt-cacerts' secret not found in Helix IS namespace '${IS_NAMESPACE}'."
+  fi
+  secret_json=$(${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret gpt-cacerts -o json 2>>"${HITT_ERR_FILE}")
+  pem_b64=$(echo "${secret_json}" | ${JQ_BIN} -r '.data.cacerts')
+  if [ "${pem_b64}" == "null" ] || [ -z "${pem_b64}" ]; then
+    logError "999" "Required file 'cacerts' not found in the gpt-cacerts secret. Keys present:"
+    echo "${secret_json}" | ${JQ_BIN} -r '.data | keys[]?' 1>&2
+    logErrorExit "999" "Cannot continue without the cacerts PEM in gpt-cacerts."
+  fi
+  echo "${pem_b64}" | ${BASE64_BIN} -d > "${GPT_CACERTS_FILENAME}"
+  if ! grep -q "BEGIN CERTIFICATE" "${GPT_CACERTS_FILENAME}" 2>/dev/null; then
+    logErrorExit "999" "Downloaded gpt-cacerts/cacerts does not look like a PEM certificate bundle."
+  fi
+  logMessage "Downloaded gpt-cacerts PEM from '${IS_NAMESPACE}' to '${GPT_CACERTS_FILENAME}'."
+}
+
+replaceGptCacertsSecret() {
+  local NOW BACKUP_FILE
+  NOW=$(date +"%Y%m%d%H%M%S")
+  BACKUP_FILE="gpt-cacerts_backup_${NOW}.yaml"
+  if ${KUBECTL_BIN} -n "${IS_NAMESPACE}" get secret gpt-cacerts -o yaml > "${BACKUP_FILE}" 2>/dev/null; then
+    logMessage "Current gpt-cacerts secret saved as ${BACKUP_FILE}."
+  fi
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" delete secret gpt-cacerts >/dev/null 2>&1
+  ${KUBECTL_BIN} -n "${IS_NAMESPACE}" create secret generic gpt-cacerts \
+    --from-file=cacerts="${GPT_CACERTS_FILENAME}" --dry-run=client -o yaml \
+    | ${KUBECTL_BIN} create -f - >"${HITT_ERR_FILE}" 2>&1
+  if [ $? -ne 0 ]; then
+    logErrorExit "999" "Failed to create gpt-cacerts secret in '${IS_NAMESPACE}'. Check ${HITT_ERR_FILE} and use 'kubectl create -f ${BACKUP_FILE}' to restore from backup."
+  fi
+}
+
+# Merge certs from ADD_CERT_CERT_DIR into an existing PEM bundle; write result to outfile.
+# Preserves existing PEM text; appends only new certs (SHA-256 fingerprint). Sets ADD_GPT_CERT_MERGED_COUNT.
+mergePemCertificatesIntoBundle() {
+  local existing_bundle=$1 outfile=$2
+  local existing_dir cert_file fp subject merged=0 skipped=0 existing_count
+  if [ -z "${ADD_CERT_CERT_DIR}" ] || [ ! -d "${ADD_CERT_CERT_DIR}" ]; then
+    logErrorExit "999" "Internal error: incoming PEM cert directory is not prepared."
+  fi
+  if [ ! -f "${existing_bundle}" ] || [ ! -s "${existing_bundle}" ]; then
+    logErrorExit "999" "Existing PEM bundle '${existing_bundle}' is missing or empty."
+  fi
+  existing_dir=$(mktemp -d addgptcert-certs.XXXXXX)
+  existing_count=$(splitPemCertificatesToDir "${existing_bundle}" "${existing_dir}")
+  existing_count=${existing_count:-0}
+  if ! [[ "${existing_count}" =~ ^[0-9]+$ ]] || [ "${existing_count}" -eq 0 ]; then
+    rm -rf "${existing_dir}"
+    logErrorExit "999" "Existing PEM bundle '${existing_bundle}' has no certificates."
+  fi
+  ADD_CERT_KEYSTORE_FPS=$(mktemp addcert-fps.XXXXXX)
+  for cert_file in "${existing_dir}"/cert_*.pem; do
+    [[ -f "${cert_file}" ]] || continue
+    fp=$(addcertPemSha256Fingerprint "${cert_file}")
+    [[ -n "${fp}" ]] && echo "${fp}" >> "${ADD_CERT_KEYSTORE_FPS}"
+  done
+  cp -f "${existing_bundle}" "${outfile}"
+  if [[ -s "${outfile}" ]] && [[ "$(tail -c1 "${outfile}" | wc -l)" -eq 0 ]]; then
+    printf '\n' >> "${outfile}"
+  fi
+  for cert_file in "${ADD_CERT_CERT_DIR}"/cert_*.pem; do
+    [[ -f "${cert_file}" ]] || continue
+    fp=$(addcertPemSha256Fingerprint "${cert_file}")
+    if addcertKeystoreContainsFingerprint "${fp}"; then
+      subject=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -subject 2>/dev/null | sed 's/^subject=//')
+      logMessage "Certificate already present in PEM bundle (${subject}) — skipping."
+      skipped=$((skipped + 1))
+      continue
+    fi
+    cat "${cert_file}" >> "${outfile}"
+    if [[ "$(tail -c1 "${outfile}" | wc -l)" -eq 0 ]]; then
+      printf '\n' >> "${outfile}"
+    fi
+    addcertRecordKeystoreFingerprint "${fp}"
+    subject=$(${OPENSSL_BIN} x509 -in "${cert_file}" -noout -subject 2>/dev/null | sed 's/^subject=//')
+    logMessage "Merged certificate into PEM bundle (${subject})."
+    merged=$((merged + 1))
+  done
+  addcertCleanupKeystoreFingerprintSet
+  rm -rf "${existing_dir}"
+  ADD_GPT_CERT_MERGED_COUNT=${merged}
+  logMessage "Merged ${merged} certificate(s) into PEM bundle (${skipped} already present)."
+}
+
+commitPushItsmInstallerGptCerts() {
+  # $1 = source PEM path (for commit message)
+  local pem_file=$1 pem_name push_branch
+  pem_name=$(basename "${pem_file}")
+  cp -f "${GPT_CACERTS_FILENAME}" "itsmrepo/${GPT_CERTS_GIT_PATH}"
+  gitItsmRepoCmd add "${GPT_CERTS_GIT_PATH}"
+  if gitItsmRepoCmd diff --cached --quiet; then
+    logMessage "No changes to ${GPT_CERTS_GIT_PATH} — nothing to commit."
+    return 0
+  fi
+  if ! gitItsmRepoCmd -c user.name=HITT -c user.email=hitt@noreply.local \
+    commit -m "HITT addgptcert: merge certificate(s) from ${pem_name}" >>"${HITT_ERR_FILE}" 2>&1; then
+    logErrorExit "999" "Failed to commit ${GPT_CERTS_GIT_PATH} to the ITSM installer repository."
+  fi
+  push_branch=$(gitItsmRepoCmd rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [ -z "${push_branch}" ] || [ "${push_branch}" == "HEAD" ]; then
+    push_branch=$(gitItsmRepoCmd remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
+  fi
+  [ -z "${push_branch}" ] && push_branch=master
+  if ! gitItsmRepoCmd push origin "HEAD:${push_branch}" >>"${HITT_ERR_FILE}" 2>&1; then
+    logErrorExit "999" "Failed to push ${GPT_CERTS_GIT_PATH} to the ITSM installer repository."
+  fi
+  logMessage "Committed and pushed ${GPT_CERTS_GIT_PATH} to the ITSM installer repository (branch ${push_branch})."
+}
+
+fixAddGptCertToSecret() {
+  local pem_file=$1 merged_tmp validate_dir
+  downloadGptCacertsFromSecret
+  merged_tmp=$(mktemp addgptcert-certs.XXXXXX)
+  mergePemCertificatesIntoBundle "${GPT_CACERTS_FILENAME}" "${merged_tmp}"
+  if [ "${ADD_GPT_CERT_MERGED_COUNT}" -eq 0 ]; then
+    rm -f "${merged_tmp}"
+    logMessage "All certificate(s) from '${pem_file}' are already in gpt-cacerts — the secret was not changed."
+    return 0
+  fi
+  validate_dir=$(mktemp -d addgptcert-certs.XXXXXX)
+  validatePemCertificateFile "${merged_tmp}" "${validate_dir}"
+  rm -rf "${validate_dir}"
+  mv -f "${merged_tmp}" "${GPT_CACERTS_FILENAME}"
+  if askYesNo "Updated gpt-cacerts PEM is valid — replace the gpt-cacerts secret in '${IS_NAMESPACE}'?"; then
+    replaceGptCacertsSecret
+    logMessage "gpt-cacerts secret in '${IS_NAMESPACE}' updated with certificate(s) from '${pem_file}'. Pods may need a roll to pick up the new trust bundle."
+  else
+    logMessage "No changes made to the gpt-cacerts secret in '${IS_NAMESPACE}'."
+  fi
+}
+
+fixAddGptCertToGit() {
+  local pem_file=$1 repo_url merged_tmp validate_dir
+  checkBinary git
+  addcertLoadJenkinsPipelineParams
+  repo_url=$(getItsmInstallerRepoUrl)
+  cloneItsmInstallerCacertsSparse "${repo_url}" "${GPT_CERTS_GIT_PATH}"
+  cp -f "itsmrepo/${GPT_CERTS_GIT_PATH}" "${GPT_CACERTS_FILENAME}"
+  if ! grep -q "BEGIN CERTIFICATE" "${GPT_CACERTS_FILENAME}" 2>/dev/null; then
+    logErrorExit "999" "Checked-out ${GPT_CERTS_GIT_PATH} does not look like a PEM certificate bundle."
+  fi
+  merged_tmp=$(mktemp addgptcert-certs.XXXXXX)
+  mergePemCertificatesIntoBundle "${GPT_CACERTS_FILENAME}" "${merged_tmp}"
+  if [ "${ADD_GPT_CERT_MERGED_COUNT}" -eq 0 ]; then
+    rm -f "${merged_tmp}"
+    logMessage "All certificate(s) from '${pem_file}' are already in ${GPT_CERTS_GIT_PATH} — nothing was changed in git."
+    return 0
+  fi
+  validate_dir=$(mktemp -d addgptcert-certs.XXXXXX)
+  validatePemCertificateFile "${merged_tmp}" "${validate_dir}"
+  rm -rf "${validate_dir}"
+  mv -f "${merged_tmp}" "${GPT_CACERTS_FILENAME}"
+  if askYesNo "Updated PEM is valid — commit and push ${GPT_CERTS_GIT_PATH} to the ITSM installer repository?"; then
+    commitPushItsmInstallerGptCerts "${pem_file}"
+  else
+    logMessage "No changes pushed to the ITSM installer repository."
+  fi
+}
+
+fixAddGptCert() {
+  local PEM_FILE ADD_GPT_CERT_GIT=0
+  case ${#FIXARGS[@]} in
+    2)
+      ;;
+    3)
+      if [ "${FIXARGS[2]}" != "git" ]; then
+        logErrorExit "999" "Optional third argument for addgptcert must be 'git' only."
+      fi
+      ADD_GPT_CERT_GIT=1
+      ;;
+    *)
+      logErrorExit "999" "Usage: bash $0 -f \"addgptcert /path/to/certificates.pem [git]\""
+      ;;
+  esac
+  PEM_FILE="${FIXARGS[1]/#\~/$HOME}"
+  if [ ! -f "${PEM_FILE}" ]; then
+    logErrorExit "999" "Certificate file '${PEM_FILE}' not found."
+  fi
+  if [ ! -s "${PEM_FILE}" ]; then
+    logErrorExit "999" "Certificate file '${PEM_FILE}' is empty."
+  fi
+  checkToolVersion kubectl
+  checkBinary openssl
+  addcertPreparePemCertDir "${PEM_FILE}"
+  getVersions
+  setVarsFromPlatform
+  if [ "${ADD_GPT_CERT_GIT}" == "1" ]; then
+    fixAddGptCertToGit "${PEM_FILE}"
+  else
+    fixAddGptCertToSecret "${PEM_FILE}"
   fi
 }
 
@@ -6330,6 +6534,7 @@ showFixHelp() { # fix mode help
     \trealm \t\t| Create/update the Helix Service Management realm in SSO.
     \tcacerts \t| Update the cacerts secret in the Helix IS namespace with a new file.
     \taddcert \t| Add PEM certificate(s) to the IS cacerts secret, or with 'git' to pipeline/tasks/cacerts. Args: /path/to/certificates.pem [git]
+    \taddgptcert \t| Merge PEM certificate(s) into the IS gpt-cacerts secret (PEM), or with 'git' into pipeline/tasks/gpt-certs. Args: /path/to/certificates.pem [git]
     \tboost \t\t| Double CPU/memory requests on a running IS pod (in-place resize; no Deployment/STS change). Args: podname
     \tsat \t\t| Create the assisttool-rl role and assisttool-rlb role-binding required by the Support Assistant Tool.
     \tarlicense \t| Apply an Innovation Suite/AR server license to the system via the REST API.
@@ -10681,6 +10886,9 @@ if [ "${MODE}" == "fix" ]; then
     addcert)
       fixAddCert
       ;;
+    addgptcert)
+      fixAddGptCert
+      ;;
     arlicense)
       if [ ${#FIXARGS[@]} -eq 1 ]; then
         logErrorExit "999" "Usage: bash $0 -f \"arlicense key [expiry]\""
@@ -11101,7 +11309,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261123-01"
+HITT_BUILD_VERSION="20261123-02"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -11123,7 +11331,7 @@ HITT_MSG_FILE=hittmsgs.log
 VALUES_LOG_FILE=values.log
 VALUES_JSON_FILE=values.json
 CLEANUP_DIRS=(configsrepo itsmrepo)
-CLEANUP_FILES=(is-sealcacerts hp-sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cookies)
+CLEANUP_FILES=(is-sealcacerts hp-sealcacerts gpt-sealcacerts sealstore.p12 sealstore.pem kubeconfig.jenkins .cookies)
 CLEANUP_START_FILES=("${HITT_MSG_FILE}" "${HITT_DBG_FILE}" "${HITT_ERR_FILE}" "${VALUES_LOG_FILE}" "${VALUES_JSON_FILE}" "jenkins-pipeline-build-response.log" "${JENKINS_PLUGINS_LOG}")
 CLEANUP_STOP_FILES=()
 REQUIRED_TOOLS=(kubectl curl keytool openssl jq base64 git java tar host zip unzip)
@@ -13396,6 +13604,22 @@ read -r -d '' HITT_USE_CASES_JSON <<'HITT_USE_CASES_JSON_EOF' || true
         "This does not call the cluster; it only computes the ID from the three values."
       ],
       "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-utility-mode.md"
+    },
+    {
+      "id": "fix-addgptcert",
+      "topicId": "helix-is-mgmt",
+      "order": 35,
+      "title": "I want to add certificates to the Helix IS gpt-cacerts PEM trust bundle",
+      "commands": [
+        "bash hitt.sh -f \"addgptcert /path/to/custom-certs.pem\"",
+        "bash hitt.sh -f \"addgptcert /path/to/custom-certs.pem git\""
+      ],
+      "notes": [
+        "Merges into the multi-certificate PEM in the gpt-cacerts secret (key cacerts), or with git into pipeline/tasks/gpt-certs.",
+        "Skips certificates already present (SHA-256 fingerprint). Errors if the secret or git file is missing.",
+        "Unlike addcert, this does not use a Java keystore."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md#addgptcert-certificatespem"
     },
     {
       "id": "fix-boost",

@@ -895,6 +895,26 @@ window.HITT_USE_CASES = {
       }
     },
     {
+      "id": "fix-addgptcert",
+      "topicId": "helix-is-mgmt",
+      "order": 35,
+      "title": "I want to add certificates to the Helix IS gpt-cacerts PEM trust bundle",
+      "commands": [
+        "bash hitt.sh -f \"addgptcert /path/to/custom-certs.pem\"",
+        "bash hitt.sh -f \"addgptcert /path/to/custom-certs.pem git\""
+      ],
+      "notes": [
+        "Merges into the multi-certificate PEM in the gpt-cacerts secret (key cacerts), or with git into pipeline/tasks/gpt-certs.",
+        "Skips certificates already present (SHA-256 fingerprint). Errors if the secret or git file is missing.",
+        "Unlike addcert, this does not use a Java keystore."
+      ],
+      "seeAlso": "https://github.com/mwaltersbmc/helix-tools/blob/main/hitt/README-fix-mode.md#addgptcert-certificatespem",
+      "video": {
+        "enabled": false,
+        "script": "fix-addgptcert"
+      }
+    },
+    {
       "id": "fix-boost",
       "topicId": "helix-is-mgmt",
       "order": 55,

@@ -10,6 +10,8 @@ bash hitt.sh -f "boost platform-admin-0"
 bash hitt.sh -f "cacerts /tmp/newcacerts"
 bash hitt.sh -f "addcert /path/to/custom-certs.pem"
 bash hitt.sh -f "addcert /path/to/custom-certs.pem git"
+bash hitt.sh -f "addgptcert /path/to/custom-certs.pem"
+bash hitt.sh -f "addgptcert /path/to/custom-certs.pem git"
 ```
 
 ## Fix commands
@@ -19,7 +21,8 @@ bash hitt.sh -f "addcert /path/to/custom-certs.pem git"
 | `ssh` | Set up or update passwordless SSH for the `git` user. |
 | `realm` | Create or update the Helix Service Management SSO realm. |
 | `cacerts` | Update the **cacerts** secret in the Helix IS namespace with a new file. |
-| `addcert` | Add one or more PEM certificates to the IS **cacerts** secret, or with `git` to **pipeline/tasks/cacerts** in the ITSM installer repository. |
+| `addcert` | Add one or more PEM certificates to the IS **cacerts** secret (JKS), or with `git` to **pipeline/tasks/cacerts** in the ITSM installer repository. |
+| `addgptcert` | Merge PEM certificate(s) into the IS **gpt-cacerts** secret (PEM bundle), or with `git` into **pipeline/tasks/gpt-certs**. |
 | `boost` | Double CPU/memory **requests** on a running Helix IS pod via in-place resize (does not change Deployment/StatefulSet). |
 | `sat` | Create the role and role-binding required by the Support Assistant Tool in the Helix IS namespace. |
 | `arlicense` | Apply an Innovation Suite / AR server license via the REST API. |
@@ -89,6 +92,22 @@ Repository location depends on your Deployment Engine setup:
 - **Standalone Deployment Engine** — ITSM installer repository path from the **GIT_REPO_DIR** value on **HELIX_ONPREM_DEPLOYMENT**
 
 You need permission to push to that repository. On a standalone Deployment Engine, HITT reads **GIT_REPO_DIR** from the pipeline job to locate the repo.
+
+## `"addgptcert certificates.pem"`
+
+```bash
+bash hitt.sh -f "addgptcert /path/to/custom-certs.pem"
+```
+
+Merges one or more certificates from a **PEM** file into the multi-certificate PEM stored as **cacerts** in the **gpt-cacerts** secret in the Helix IS namespace. Duplicates (same SHA-256 fingerprint) are skipped. The secret and the `cacerts` key must already exist — HITT errors and stops if they are missing. You are prompted to confirm before the secret is replaced (same backup / delete / recreate pattern as **addcert**). No keystore password is used.
+
+## `"addgptcert certificates.pem git"`
+
+```bash
+bash hitt.sh -f "addgptcert /path/to/custom-certs.pem git"
+```
+
+Same PEM merge and duplicate skip as above, but updates **pipeline/tasks/gpt-certs** in the ITSM installer repository (a PEM bundle, not a JKS). The file must already exist in git — HITT errors and stops if it is missing. You are prompted before commit and push.
 
 ## `"boost podname"`
 
