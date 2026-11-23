@@ -10131,6 +10131,16 @@ compare_images() {
   fi
 }
 
+# Remove leading/trailing whitespace only. Unlike piping through xargs, this does
+# not interpret quotes, backslashes, or collapse internal whitespace, so config
+# values containing an apostrophe or quote are left intact.
+trimWhitespace() {
+  local str="$1"
+  str="${str#"${str%%[![:space:]]*}"}"
+  str="${str%"${str##*[![:space:]]}"}"
+  printf '%s' "${str}"
+}
+
 migrateConfigs() {
   [[ ! -f "${SOURCE_FILE}" ]] && logErrorExit "999" "Error: Source file '${SOURCE_FILE}' does not exist."
   [[ ! -f "${TARGET_FILE}" ]] && logErrorExit "999" "Error: Target file '${TARGET_FILE}' does not exist."
@@ -10140,11 +10150,12 @@ migrateConfigs() {
   local -a unchanged_vars=()
   local -a target_only_vars=()
   local line trimmed clean_line key value target_value leading_space tmp_file
+  local source_key_count target_key_count
 
   # 1. Read {SOURCE_FILE} and extract key-value pairs using native parameter expansion
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line//$'\r'/}"
-    trimmed="$(echo "$line" | xargs)"
+    trimmed="$(trimWhitespace "$line")"
 
     # Skip empty lines and comments
     [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
@@ -10153,17 +10164,23 @@ migrateConfigs() {
       key="${trimmed%%=*}"
       value="${trimmed#*=}"
       # Trim whitespace around key
-      key="$(echo "$key" | xargs)"
+      key="$(trimWhitespace "$key")"
       vars["$key"]="$value"
     fi
   done < "${SOURCE_FILE}"
 
+  source_key_count=${#vars[@]}
+  if ((source_key_count == 0)); then
+    logErrorExit "999" "No active KEY=value settings found in '${SOURCE_FILE}'. Check that the file is the expected KEY=value format and is readable."
+  fi
+
+  target_key_count=0
   tmp_file=$(mktemp)
 
   # 2. Read {TARGET_FILE} line by line and update matching variables
   while IFS= read -r line || [[ -n "$line" ]]; do
     clean_line="${line//$'\r'/}"
-    trimmed="$(echo "$clean_line" | xargs)"
+    trimmed="$(trimWhitespace "$clean_line")"
 
     # Keep comments and empty lines as-is
     if [[ -z "$trimmed" || "$trimmed" == \#* ]]; then
@@ -10174,10 +10191,11 @@ migrateConfigs() {
     if [[ "$trimmed" == *=* ]]; then
       key="${trimmed%%=*}"
       target_value="${trimmed#*=}"
-      key="$(echo "$key" | xargs)"
+      key="$(trimWhitespace "$key")"
+      target_key_count=$((target_key_count + 1))
 
       # Check if the key exists in {SOURCE_FILE}'s parsed variables
-      if [[ -v vars["$key"] ]]; then
+      if [[ -n "${vars["$key"]+_}" ]]; then
         # Leave unchanged if name contains 'VERSION' or values already match
         if [[ "${key^^}" == *VERSION* || "${vars["$key"]}" == "${target_value}" ]]; then
           unchanged_vars+=("${key}")
@@ -10203,17 +10221,25 @@ migrateConfigs() {
     echo "$line"
   done < "${TARGET_FILE}" > "${tmp_file}"
 
+  if ((target_key_count == 0)); then
+    rm -f "${tmp_file}"
+    logErrorExit "999" "No active KEY=value settings found in '${TARGET_FILE}'. Check that the file is the expected KEY=value format and is readable."
+  fi
+
   if ! mv "${tmp_file}" "${TARGET_FILE}.updated"; then
     rm -f "${tmp_file}"
     logErrorExit "999" "Failed to write '${TARGET_FILE}.updated'."
   fi
   logStatus "'${TARGET_FILE}.updated' created with values from '${SOURCE_FILE}'."
+  logStatus "Parsed ${source_key_count} setting(s) from '${SOURCE_FILE}' and ${target_key_count} setting(s) from '${TARGET_FILE}'."
 
   echo "Updated variables:"
   if ((${#updated_vars[@]})); then
     printf '  %s\n' "${updated_vars[@]}"
   else
     echo "  (none)"
+    echo "No values were changed. Only active KEY=value lines whose names match exactly are"
+    echo "migrated; commented-out or renamed keys in '${TARGET_FILE}' are left as-is."
   fi
   echo "Unchanged variables:"
   if ((${#unchanged_vars[@]})); then
@@ -11075,7 +11101,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261117-01"
+HITT_BUILD_VERSION="20261123-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
