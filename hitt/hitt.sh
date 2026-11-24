@@ -1363,6 +1363,12 @@ resolveTCTLImage() {
   TCTL_IMAGE=""
   TCTL_JOB_NAME=""
 
+  # Prefer current Helix Platform version + live registry (avoids stale install-time job images).
+  if TCTL_IMAGE=$(getDefaultTCTLImage); then
+    logMessage "Using tctl image from Helix Platform version mapping: '${TCTL_IMAGE}' (TCTL_REST_VER '${TCTL_REST_VER}', Helix Platform ${HP_VERSION})." 1
+    return 0
+  fi
+
   if getTCTLImageFromJob "tenantonboarding"; then
     logMessage "Using tctl image from job 'tenantonboarding': '${TCTL_IMAGE}'." 1
     return 0
@@ -1376,16 +1382,11 @@ resolveTCTLImage() {
 
   TCTL_IMAGE=$(${KUBECTL_BIN} -n "${HP_NAMESPACE}" get jobs -o json 2>/dev/null | ${JQ_BIN} -r '[.items[] | .spec.template.spec.containers[0].image // empty | select(test("tctlrest"))] | first // empty')
   if [ -n "${TCTL_IMAGE}" ]; then
-    logWarning "278" "No standard tctl job found; using tctlrest image '${TCTL_IMAGE}' from another job."
+    logWarning "278" "No TCTL_REST_VER mapping for Helix Platform '${HP_VERSION}'; using tctlrest image '${TCTL_IMAGE}' from an existing job (may be from an older install)."
     return 0
   fi
 
-  if TCTL_IMAGE=$(getDefaultTCTLImage); then
-    logWarning "278" "Unable to find an existing tctl job; using default image '${TCTL_IMAGE}' from TCTL_REST_VER '${TCTL_REST_VER}' (Helix Platform ${HP_VERSION})."
-    return 0
-  fi
-
-  logError "202" "Unable to find job with TCTL image details and no TCTL_REST_VER mapping for Helix Platform version '${HP_VERSION}'."
+  logError "202" "Unable to determine tctl image: no TCTL_REST_VER mapping for Helix Platform version '${HP_VERSION}' and no job with tctlrest image details."
   return 1
 }
 
@@ -11309,7 +11310,7 @@ tidyUp
 # START
 # Set vars and process command line
 # UTC calendar build id (YYYYMMDD-NN, NN 01-99); incremented on each git commit via .githooks/pre-commit.
-HITT_BUILD_VERSION="20261123-02"
+HITT_BUILD_VERSION="20261124-01"
 : "${HITT_CONFIG_FILE=hitt.conf}"
 HITT_URL=https://raw.githubusercontent.com/mwaltersbmc/helix-tools/main/hitt/hitt.sh
 HITT_SHA256_URL="${HITT_URL}.sha256"
@@ -12390,9 +12391,9 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
   },
   {
     "id": "202",
-    "cause": "HITT failed to find an existing job to provide the tctl client image name and no TCTL_REST_VER mapping exists for the Helix Platform version.",
+    "cause": "HITT could not build a tctl client image from the Helix Platform version mapping (TCTL_REST_VER / registry) and no Job with a tctlrest image was found.",
     "impact": "Some later checks will not be run.",
-    "remediation": "Ensure tenant onboarding or a tctl job exists in the Helix Platform namespace, or use a Helix Platform version supported by HITT."
+    "remediation": "Confirm Helix Platform is installed and the version is known to HITT, or ensure a tctlrest job image exists in the Helix Platform namespace."
   },
   {
     "id": "203",
@@ -12840,9 +12841,9 @@ read -r -d '' ALL_MSGS_JSON <<'ALL_MSGS_JSON_EOF' || true
   },
   {
     "id": "278",
-    "cause": "HITT could not find a standard tctl job and is using a derived tctlrest image instead.",
-    "impact": "The tctl command should still run but the image may not match the cluster if the version mapping is wrong.",
-    "remediation": "Ensure tenantonboarding or a tctl registration job exists in the Helix Platform namespace, or verify TCTL_REST_VER for your Helix Platform version."
+    "cause": "HITT has no TCTL_REST_VER mapping for the current Helix Platform version and is using a tctlrest image from an existing Job instead.",
+    "impact": "The tctl command may fail if that Job is from an older install or points at a registry/tag that is no longer available.",
+    "remediation": "Update HITT so TCTL_REST_VER is mapped for this Helix Platform version, or ensure a current tctlrest image is available in the Helix Platform namespace."
   },
   {
     "id": "279",
